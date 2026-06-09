@@ -1,0 +1,510 @@
+import { Product, Service, BlogPost, PortfolioItem, SystemConfig, Coupon } from './types';
+
+export const systemConfigDefault: SystemConfig = {
+  siteName: "WebzoneBD IT Solution",
+  siteTitle: "WebzoneBD IT Solution - Web Development & Digital Marketing Agency",
+  metaDesc: "Get premium web themes, Laravel scripts, web hosting, domain registration, and high-performance SEO and Digital Marketing services from WebzoneBD.",
+  googleAnalyticsId: "G-WEBZONEBD2026",
+  whatsappNumber: "+966570511931",
+  bangladeshContact: "+8801864000005",
+  supportEmail: "info@webzonebd.com",
+  autoApproveTickets: true
+};
+
+export const sampleCoupons: Coupon[] = [
+  { code: "WEBZONE20", discountPercent: 20, expiryDate: "2026-12-31" },
+  { code: "EID2026", discountPercent: 15, expiryDate: "2026-06-30" },
+  { code: "WELCOME", discountPercent: 10, expiryDate: "2026-12-31" }
+];
+
+export const sampleProducts: Product[] = [
+  {
+    id: "prod-1",
+    name: "ZoneCart - Multi-Vendor Laravel E-commerce Script",
+    nameBn: "জোনকার্ট - মাল্টি-ভেন্ডর লারাভেল ই-কমার্স স্ক্রিপ্ট",
+    nameAr: "ZoneCart - سكربت لارافيل للتجارة الإلكترونية متعدد التجار",
+    category: "laravel",
+    price: 49,
+    discountPrice: 29,
+    rating: 4.9,
+    reviewsCount: 42,
+    description: "ZoneCart is a highly optimized, fully responsive multi-vendor e-commerce platform built with Laravel latest version. Includes powerful admin panel, vendor management, multiple payment gateways, and order SMS notifications.",
+    descriptionBn: "জোনকার্ট হচ্ছে লারাভেল দিয়ে তৈরি একটি হাই-পারফরম্যান্স মাল্টি-ভেন্ডর ই-কমার্স স্ক্রিপ্ট। এতে রয়েছে অ্যাডমিন প্যানেল, ভেন্ডর ম্যানেজমেন্ট এবং পেমেন্ট গেটওয়ে ইন্টিগ্রেশন।",
+    descriptionAr: "ZoneCart هي منصة تجارة إلكترونية متعددة التجار متطورة ومحسنة للغاية تم إنشاؤها باستخدام أحدث إصدار من Laravel. تتضمن لوحة تحكم قوية للمسؤول، وإدارة البائعين، وبوابات دفع متعددة.",
+    features: [
+      "Laravel 11 & Tailwind CSS Structure",
+      "SSLCommerz, bKash, Stripe, PayPal integrated",
+      "Robust Admin, Vendor, and Customer Dashboards",
+      "SEO Friendly Slug & Structured Schema Markup",
+      "Fast API for Android/iOS mobile application support"
+    ],
+    featuresBn: [
+      "লারাভেল ১১ এবং টেইলউইন্ড সিএসএস আর্কিটেকচার",
+      "এসএসএলকমার্জ, বিকাশ, স্ট্রাইপ এবং পে-পাল যুক্ত করা",
+      "অ্যাডমিন, ভেন্ডর এবং কাস্টমার ড্যাশবোর্ড",
+      "এসইও ফ্রেন্ডলি ইউআরএল এবং স্কিমা মার্কআপ",
+      "মোবাইল অ্যাপের জন্য ফাস্ট এপিআই সাপোর্ট"
+    ],
+    featuresAr: [
+      "هيكل Laravel 11 و Tailwind CSS",
+      "بوابات مدمجة: bKash و SSLCommerz و Stripe و PayPal",
+      "لوحات تحكم متطورة للمسؤول والبائعين والعملاء",
+      "روابط صديقة لمحركات البحث (SEO) ومخطط هيكلي",
+      "واجهة برمجة تطبيقات سريعة لدعم تطبيقات الأجهزة المحمولة"
+    ],
+    image: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=800&q=80",
+    demoUrl: "https://demo.webzonebd.com/zonecart",
+    downloadUrl: "https://webzonebd.com/downloads/zonecart-v2.zip",
+    tags: ["Laravel", "E-commerce", "Multi-vendor", "Php Script"],
+    views: 1240
+  },
+  {
+    id: "prod-2",
+    name: "WebNews - Premium News & Magazine WordPress Theme",
+    nameBn: "ওয়েবনিউজ - প্রিমিয়াম নিউজ পোর্টাল ওয়ার্ডপ্রেস থিম",
+    nameAr: "WebNews - قالب ووردبريس مميز للأخبار والمجلات",
+    category: "wordpress",
+    price: 39,
+    discountPrice: 24,
+    rating: 4.8,
+    reviewsCount: 28,
+    description: "WebNews is a premium, elementor-powered news and responsive magazine WordPress theme. It loads in under 1 second, fully optimized for Google AdSense and social integrations. One-click demo install.",
+    descriptionBn: "ওয়েবনিউজ হলো একটি এলিমেন্টর দ্বারা চালিত প্রিমিয়াম নিউজ পোর্টাল ওয়ার্ডপ্রেস থিম। এটি গুগলের অ্যাডসেন্স ও সোশাল মিডিয়া ফ্রেন্ডলি।",
+    descriptionAr: "WebNews هو قالب ووردبريس متميز للأخبار والمجلات يعمل بواسطة Elementor. محمل في أقل من ثانية واحدة، ومتوافق بالكامل مع جوجل أدسنس والمشاركة الاجتماعية.",
+    features: [
+      "Ready-to-use custom news layouts",
+      "Optimized Google AdSense spaces and CTR",
+      "Super fast loading under 1 second",
+      "One-click demo install capabilities"
+    ],
+    featuresBn: [
+      "রেডি-টু-ইউজ নিউজ লেআউট ও কাস্টম উইজেট",
+      "গুগল অ্যাডসেন্সের জন্য মানসম্মত বিজ্ঞাপন প্লেসমেন্ট",
+      "১ সেকেন্ডের নিচে সুপার ফাস্ট লোডিং স্পিড",
+      "এক ক্লিকেই ডেমো ইমপোর্ট করার সুবিধা"
+    ],
+    featuresAr: [
+      "تنسيقات أخبار مخصصة وجاهزة تماماً للاستخدام",
+      "أماكن إعلانات محسّنة بالكامل لجوجل أدسنس",
+      "سرعة تحميل فائقة في أقل من ثانية واحدة",
+      "إمكانية تثبيت الديمو بضغطة زر واحدة تلقائياً"
+    ],
+    image: "https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=800&q=80",
+    demoUrl: "https://demo.webzonebd.com/webnews",
+    downloadUrl: "https://webzonebd.com/downloads/webnews-wp-theme.zip",
+    tags: ["WordPress", "News", "Magazine", "Elementor Theme"],
+    views: 940
+  },
+  {
+    id: "prod-3",
+    name: "BloggerSpot - Responsive Modern Personal Blogger Template",
+    nameBn: "ব্লগারস্পট - রেসপনসিভ আধুনিক পার্সোনাল ব্লগার টেমপ্লেট",
+    nameAr: "BloggerSpot - قالب بلوجر شخصي وعصري متجاوب",
+    category: "blogger",
+    price: 15,
+    discountPrice: 9,
+    rating: 4.7,
+    reviewsCount: 33,
+    description: "BloggerSpot is a premium UI-focused, clean portfolio and personal blog template for Google Blogspot. Extremely lightweight, lightweight JS loads instantly on mobile 3G/4G connections.",
+    descriptionBn: "ব্লগারস্পট হলো ব্লগার প্ল্যাটফর্মের জন্য একটি প্রিমিয়াম থিম। এটি খুবই ফ্রেন্ডলি এবং ৩জি/৪জি নেটওয়ার্কেও দ্রুত লোড হতে সক্ষম।",
+    descriptionAr: "قالب BloggerSpot هو قالب بلوجر احترافي مميز ومدونة شخصية نظيفة تركز على واجهة المستخدم لـ Blogspot من Google. خفيف الوزن للغاية ويتحمل على الفور.",
+    features: [
+      "Layout v3 with Custom Widgets support",
+      "Fully Responsive Grid & Clean Typography",
+      "SEO Meta Tags & Schema Configured",
+      "Fast dark-mode toggle action button",
+      "Structured FAQ and breadcrumbs widgets"
+    ],
+    featuresBn: [
+      "কাস্টম উইজেট সুবিধা সহ লেআউট ভার্সন ৩",
+      "ফুল রেসপনসিভ গ্রিড এবং প্রিমিয়াম টাইপোগ্রাফি",
+      "এসইও মেটা ট্যাগ এবং স্কিমা কনফিগার করা",
+      "সহজ ডার্ক মোড টগল অ্যাকশন বাটন",
+      "স্ট্রাকচার্ড এফএকিউ এবং ব্রেডক্রাম্বস সুবিধা"
+    ],
+    featuresAr: [
+      "مخطط الإصدار 3 مع دعم الأدوات المخصصة",
+      "شبكة متجاوبة بالكامل وتنسيق خطوط نظيف",
+      "مهيأ بالكامل لـ SEO والكلمات الدلالية والمخطط الهيكلي",
+      "زر تبديل سريع للوضع الداكن والسلس",
+      "مبني فيه نظام الأسئلة الشائعة وعناصر التنقل"
+    ],
+    image: "https://images.unsplash.com/photo-1499750310107-5fef28a66643?auto=format&fit=crop&w=800&q=80",
+    demoUrl: "https://demo.webzonebd.com/bloggerspot",
+    downloadUrl: "https://webzonebd.com/downloads/bloggerspot-blogger.xml",
+    tags: ["Blogger", "Blogspot", "Responsive Theme", "Blogging"],
+    views: 1560
+  },
+  {
+    id: "prod-4",
+    name: "SchoolZone - Ultimate School/College Management System PHP",
+    nameBn: "স্কুলজোন - স্কুল ও কলেজ ব্যবস্থাপনা সিস্টেম পিএইচপি স্ক্রিপ্ট",
+    nameAr: "SchoolZone - نظام إدارة المدارس والكليات المتكامل PHP",
+    category: "php",
+    price: 59,
+    discountPrice: 35,
+    rating: 4.95,
+    reviewsCount: 56,
+    description: "SchoolZone is a complete PHP solution for educational institutes. Covers student databases, marks management, dynamic fee collection, online classes, parent portals, and live SMS reporting tools.",
+    descriptionBn: "স্কুলজোন হলো শিক্ষা প্রতিষ্ঠানের জন্য পূর্ণাঙ্গ পিএইচপি স্ক্রিপ্ট। এতে স্টুডেন্ট ডাটাবেজ, রেজাল্ট শিট, ফি ড্যাশবোর্ড এবং অভিভাবক পোর্টাল রয়েছে।",
+    descriptionAr: "SchoolZone هو نظام PHP متكامل للمؤسسات التعليمية. يغطي قواعد بيانات الطلاب، إدارة الدرجات، تحصيل الرسوم إلكترونيًا، الفصول الدراسية عبر الإنترنت، وبوابات الآباء.",
+    features: [
+      "Student, Teacher, Admin, Parent multidimensional panels",
+      "Online exam structure with auto grading",
+      "Accounts & Dynamic Expense tracker built",
+      "Dynamic SMS notifications to mobile numbers",
+      "Built with high security against SQL injection & CSRF"
+    ],
+    featuresBn: [
+      "শিক্ষার্থী, শিক্ষক, অ্যাডমিন ও অভিভাবক আলাদা প্যানেল",
+      "অনলাইন পরীক্ষার সিস্টেম এবং অটো গ্রেডিং",
+      "একাউন্টস এবং দৈনিক খরচের হিসাব রাখার সফটওয়্যার",
+      "মোবাইলে ডাইনামিক অটো এসএমএস অ্যালার্ট সুবিধা",
+      "এসকিউএল ইনজেকশন এবং সিএসআরএফ থেকে সম্পূর্ণ নিরাপদ"
+    ],
+    featuresAr: [
+      "لوحات تحكم متعددة الأبعاد للطلاب والمعلمين والآباء والمسؤولين",
+      "نظام اختبارات متكامل ونظام تصحيح تلقائي",
+      "نظام حسابات وتتبع النفقات اليومية والديناميكية",
+      "إشعارات تلقائية عبر الرسائل القصيرة لجميع الهواتف",
+      "حماية قصوى ضد تزوير الطلبات وثغرات SQL Injection"
+    ],
+    image: "https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80",
+    demoUrl: "https://demo.webzonebd.com/schoolzone",
+    downloadUrl: "https://webzonebd.com/downloads/schoolzone-v1.zip",
+    tags: ["PHP Script", "School Management", "Education System", "Portal"],
+    views: 1120
+  }
+];
+
+export const sampleServices: Service[] = [
+  {
+    id: "srv-web",
+    title: "Website & Core Software Development",
+    titleBn: "ওয়েবসাইট ও কাস্টম সফটওয়্যার ডেভেলপমেন্ট",
+    titleAr: "تطوير مواقع الويب والبرمجيات المخصصة",
+    iconName: "Globe",
+    image: "https://images.unsplash.com/photo-1555066931-4365d14bab8c?auto=format&fit=crop&w=800&q=80",
+    shortDescription: "High-end corporate, agency, e-commerce, and enterprise web applications with solid PHP & Node structures.",
+    shortDescriptionBn: "লারাভেল, রিয়্যাক্ট এবং নোড জেএস এর মাধ্যমে প্রিমিয়াম ই-কমার্স ও কর্পোরেট ওয়েবসাইট ডেভেলপমেন্ট করিয়ে নিন।",
+    shortDescriptionAr: "مواقع ومنصات معقدة لشركات ومتاجر إلكترونية وتطبيقات مخصصة تعتمد على بنية PHP و Node قوية ومحسنة للعمل الشاق.",
+    fullDescription: "From dynamic custom script design to complex multi-vendor digital stores, we build web properties optimized for security, speeds, and long-term business scale. Our frameworks of choice: Laravel, React, and robust APIs.",
+    fullDescriptionBn: "ডাইনামিক কাস্টম প্রজেক্ট থেকে শুরু করে জটিল মাল্টি-ভেন্ডর ডিজিটাল স্টোর ও কর্পোরেট পোর্টাল – আমরা তৈরি করি দারুণ ডিজাইনে যা সিকিউরিটি, স্পিড এবং ভবিষ্যতের টেকনিক্যাল সাপোর্টে সেরা।",
+    fullDescriptionAr: "من تصميم البرامج البسيطة والسكربتات إلى الأسواق الضخمة متعددة التجار، نقوم ببناء مواقع ومنصات محسنة للغاية لتكون آمنة وسريعة ومتوافقة مع تطلعاتك. الأنظمة المفضلة لدينا: Laravel و React.",
+    startingPrice: 199,
+    features: ["Custom tailored design patterns", "100% security against vulnerability exploits", "Optimized mobile performance scoring", "Free 1 Year hosting + backup features"],
+    featuresBn: ["ক্লায়েন্ট পছন্দের কাস্টম ডিজাইন প্যাটার্ন", "১০০% সিকিউরড কোডিং এবং হ্যাকিং প্রোটেকশন", "মোবাইল ডিভাইসে ফাস্ট পেজ স্পিড লোড", "১ বছরের ফ্রি ডোমেইন এবং প্রিমিয়াম হোস্টিং"],
+    featuresAr: ["أنماط وتصاميم مخصصة تماماً لعملك", "حماية 100٪ ضد جميع الثغرات الأمنية المعروفة", "أداء محسّن بالكامل للأجهزة المحمابة", "استضافة مجانية لمدة عام مع ميزات النسخ الاحتياطي التلقائي"]
+  },
+  {
+    id: "srv-seo",
+    title: "Premium Search Engine Optimization (SEO)",
+    titleBn: "প্রিমিয়াম সার্চ ইঞ্জিন অপ্টিমাইজেশন (এসইও)",
+    titleAr: "خدمات تحسين محركات البحث المميزة (SEO)",
+    iconName: "Search",
+    image: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=800&q=80",
+    shortDescription: "Drive consistent unpaid Google traffic with deep technical audit, page-speed tweaks, and white-hat link building.",
+    shortDescriptionBn: "গুগলের প্রথম পেজে আপনার ব্র্যান্ডের র‍্যাংক নিয়ে আসুন টেকনিক্যাল ব্যাকলিংক এবং কিওয়ার্ড রিসার্চের মাধ্যমে।",
+    shortDescriptionAr: "اجذب زيارات حقيقية مستمرة من محرك البحث جوجل من خلال التدقيق التقني، وتحسين السرعة، وبناء روابط باك لينك آمنة.",
+    fullDescription: "We don't buy generic traffic. We target buyers by mapping intent search key terms, running rich responsive optimization audits, and doing custom outreach directory listing link campaigns.",
+    fullDescriptionBn: "আমরা সাধারণ ট্রাফিক এনে কাজ শেষ করি না। আমরা সরাসরি আপনার ক্রেতাদের টার্গেট করে কিওয়ার্ড নিয়ে কাজ করি, টেকনিক্যাল অডিট ঠিক করি এবং মানসম্মত ব্যাকলিংক তৈরি করে র‍্যাংক উন্নত করি।",
+    fullDescriptionAr: "نحن لا نشتري زيارات وهمية. نستهدف المشترين الحقيقيين من خلال استكشاف نية الكلمات الدلالية، وتنفيذ تعديلات تقنية، والحصول على باك لينك عالي الجودة لرفع الهوتة.",
+    startingPrice: 99,
+    features: ["Deep Keyword Intent Mapping Search", "Technical Speed and Meta Fix Campaigns", "Premium DA 50+ Manual Safe Link Building", "Weekly Competitors Track Metrics Reports"],
+    featuresBn: ["গভীর কিওয়ার্ড টার্গেটিং অ্যানালিসিস", "টেকনিক্যাল স্পিড এবং মেটা ক্যাশ ফিক্স", "হাই অথরিটি ডিএ ৫০+ ম্যানুয়াল ব্যাকলিংক", "সাপ্তাহিক কম্পিটিটর অ্যানালাইসিস এবং রিপোর্ট"],
+    featuresAr: ["تحليل وبحث معمق لنية الكلمات الدلالية", "تحسين الجوانب التقنية وسرعة الموقع والوسوم التلقائية", "بناء روابط يدوية آمنة في مواقع ذات ثقة عالية DA 50+", "تقارير أسبوعية لتتبع حركة المنافسين ومؤشرات الأداء"]
+  },
+  {
+    id: "srv-marketing",
+    title: "Digital & Social Media Marketing (SMM)",
+    titleBn: "ডিজিটাল ও সোশ্যাল মিডিয়া মার্কেটিং",
+    titleAr: "التسويق الرقمي وإدارة وسائل التواصل الاجتماعي",
+    iconName: "TrendingUp",
+    image: "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?auto=format&fit=crop&w=800&q=80",
+    shortDescription: "Facebook, Instagram and YouTube campaigns. Boost conversions, grow brand value, manage social media profiles.",
+    shortDescriptionBn: "ফেসবুক, ইনস্টাগ্রাম এবং গুগল অ্যাডস এর মাধ্যমে আপনার সেলস বাড়ান। প্রফেশনাল পেজ কন্টেন্ট ও বুস্টিং সার্ভিস।",
+    shortDescriptionAr: "إطلاق حملات تسويقية على فيسبوك وإنستقرام ويوتيوب لشريحة دقيقة. زيادة المبيعات وإشهار الهوية وإدارة الصفحات باحترافية.",
+    fullDescription: "Let experts handle your marketing budget. WebzoneBD design high-converting ad copies, setups pixel conversions correctly, scopes out lookalike target scopes to make every dollar profitable.",
+    fullDescriptionBn: "আমাদের দক্ষ মার্কেটারদের হাতে আপনার বিজ্ঞাপনের বাজেট ছেড়ে দিন। আমরা উচ্চ কনভার্সন অ্যাড কপি ডিজাইন করি, পিক্সেল সেটআপ করি এবং সঠিক অডিয়েন্স টার্গেট করে সেল বৃদ্ধি করি।",
+    fullDescriptionAr: "دع الخبراء يديرون ميزانيتك الإعلانية. نصمم نسخاً إعلانية تجذب الزبائن، ونقوم بتهيئة بكسل فيسبوك بدقة وشريحة الجمهور لضمان أفضل عائد استثمار لإعلانك.",
+    startingPrice: 79,
+    features: ["Premium Ad Creative Visual Design", "Pixel Setup & Custom Conversion Events", "Lookalike Custom Targeting Setup", "Expert Campaign Budget Optimization"],
+    featuresBn: ["প্রিমিয়াম অ্যাড ক্রিয়েটিভ ব্যানার ডিজাইন", "পিক্সেল সেটআপ এবং কাস্টম সেলস ট্র্যাকিং", "লুক-অ্যালাইক কাস্টম কাস্টমার টার্গেটিং", "বিজ্ঞাপনের বাজেট অপ্টিমাইজেশন সার্ভিস"],
+    featuresAr: ["تصميم صور وبانرات إعلانية جذابة ومحترفة", "إعداد البيكسل وتثبيت أكواد التحويلات بدقة", "إعداد واستهداف الجماهير المخصصة والشبيهة", "تحسين توزيغ وإدارة ميزانيتك الإعلانية للحصول على أرخص سعر نقرة"]
+  },
+  {
+    id: "srv-hosting",
+    title: "Ultra-Fast NVMe SSD Web Hosting Services",
+    titleBn: "আল্ট্রা-ফাস্ট এনভিএমই এসএসডি ওয়েব হোস্টিং",
+    titleAr: "خدمات الاستضافة السريعة للغاية NVMe SSD",
+    iconName: "Server",
+    image: "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=800&q=80",
+    shortDescription: "99.9% uptime guaranteed, cPanel control panel, free SSL, and daily off-site cloud backup hosting.",
+    shortDescriptionBn: "৯৯.৯% আপটাইম গ্যারান্টি, সিপ্যানেল সফটওয়্যার, ফ্রি এসএসএল এবং ডেইলি ব্যাকআপ সহ হোস্টিং সার্ভিস।",
+    shortDescriptionAr: "ضمان توفر الخدمة بنسبة 99.9٪، لوحة تحكم cPanel مألوفة، شهادة أمَان SSL مجانية، ونسخ احتياطي خارجي دوري.",
+    fullDescription: "WebzoneBD hosting platforms use Enterprise NVMe drives coupled with AMD EPYC modern servers to deliver 20x faster page rendering speeds than conventional SATA web host providers.",
+    fullDescriptionBn: "আমাদের সার্ভারগুলোতে ল্যাটেস্ট এএমডি এপিক প্রসেসর এবং আল্ট্রা ফাস্ট এনভিএমই এসএসডি স্টোরেজ ব্যবহার করা হয় যার ফলে আপনার ওয়েবসাইট লোড হবে রকেটের গতিতে।",
+    fullDescriptionAr: "تعتمد منصات استضافة WebzoneBD على محركات أقراص NVMe فائقة السرعة مدمجة بمعالجات AMD EPYC المتطورة لتقديم سرعات تصفح فائقة تفوق الاستضافات العادية.",
+    startingPrice: 19,
+    features: ["Litespeed Enterprise Caching Web Server", "Free Lifetime Let's Encrypt Wildcard SSL", "Imunify360 Live Firewall Malware Protection", "Instant 1-Click softaculous App Installer"],
+    featuresBn: ["লাইটস্পীড এন্টারপ্রাইজ ওয়েব সার্ভার স্পীড", "লাইফটাইম ফ্রি ওয়াইল্ডকার্ড এসএসএল সার্টিফিকেট", "রিয়েলটাইম ইমিউনিফাই৩৬০ ম্যালওয়্যার প্রোটেকশন", "এক ক্লিকে ওয়ার্ডপ্রেস ও অন্যান্য স্ক্রিপ্ট ইন্সটলার"],
+    featuresAr: ["خادم الويب السريع LiteSpeed Enterprise", "شهادات أمان SSL مجانية ومدى الحياة", "حماية فورية ضد البرمجيات الخبيثة مع Imunify360", "مثبت للتطبيقات بضغطة واحدة لأكثر من 400 سكربت"]
+  },
+  {
+    id: "srv-logo",
+    title: "Logo Design & Professional Branding",
+    titleBn: "লোগো ডিজাইন ও প্রিমিয়াম ব্র্যান্ডিং",
+    titleAr: "تصميم الهويات البصرية واللوغوهات الاحترافية",
+    iconName: "Award",
+    image: "https://images.unsplash.com/photo-1626785774573-4b799315345d?auto=format&fit=crop&w=800&q=80",
+    shortDescription: "Craft an memorable corporate identity with creative visual designs, vector formats, and custom guidelines.",
+    shortDescriptionBn: "আপনার ব্যবসার জন্য আকর্ষণীয় ও অর্থবহ লোগো এবং কমপ্লিট ব্র্যান্ড গাইডলাইন তৈরি করুন আমাদের দক্ষ ডিজাইনারদের দিয়ে।",
+    shortDescriptionAr: "اصنع هوية بصرية راسخة لشركتك وتصميم شعار مبتكر مع توفير جميع الصيغ الموجهة وكتيب إرشادات الألوان بالكامل.",
+    fullDescription: "Your corporate logo design builds instant trust on letterheads, social ads, signs and icons. WebzoneBD design pristine scalable vector structures paired with corporate typography styles that perfectly define your brand's message to the world.",
+    fullDescriptionBn: "একটি মানসম্মত লোগো আপনার ব্যবসার গ্রাহকদের কাছে প্রথম দর্শনেই বিশ্বাসযোগ্যতা বাড়িয়ে দেয়। আমাদের তৈরি করা প্রতিটি লোগো সম্পূর্ণ অনন্য, হাই-রেজোলিউশন ভেক্টর ফরম্যাট যুক্ত এবং কাস্টম কালার কম্বিনেশন সমৃদ্ধ হয়।",
+    fullDescriptionAr: "شعار الشركة هو أول خطوة لبناء الثقة لجمهورك. في ويب زون بي دي نصمم شعارات متوافقة مع الهوية ومصاغة بطريقة فريدة تجعل علامتك التجارية تبرز وتصل للريادة.",
+    startingPrice: 49,
+    features: ["Multiple Initial Unique Concepts", "High Resolution Vector AI/SVG Formats", "Complete Brand Typography Rules Booklet", "Lifetime copyright & trademark supports"],
+    featuresBn: ["একাধিক প্রাথমিক ইউনিক লোগো কনসেপ্ট", "হাই রেজোলিউশন ভেক্টর এআই/এসভিজি ফাইলসমূহ", "সম্পূর্ণ কাস্টম কালার এবং টাইপোগ্রাফি বুকলেট", "লাইফটাইম ব্যবহারের আইনি কপিরাইট ও সাপোর্ট"],
+    featuresAr: ["خيارات ومفاهيم أولية متعددة ومبتكرة", "توفير الملفات المصدرية الموجهة بجودة AI/SVG/EPS", "كتيب كامل لإرشادات الألوان ونوع الخطوط المستعملة", "حقوق ملكية فكرية وعلامة تجارية محفوظة مدى الحياة"]
+  }
+];
+
+export const samplePortfolio: PortfolioItem[] = [
+  {
+    id: "port-web-1",
+    title: "PrimeGroup corporate portal and headless workspace",
+    titleBn: "প্রাইমগ্রুপ কর্পোরেট পোর্টাল এবং হেডলেস ওয়ার্কস্পেস",
+    titleAr: "بوابة شركة برايم جروب الموحدة ومساحة العمل الرقمية السحابية",
+    category: "web",
+    categoryLabel: "Web Development",
+    categoryLabelBn: "ওয়েবসাইট উন্নয়ন",
+    categoryLabelAr: "تطوير الويب",
+    image: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=800&q=80",
+    client: "Prime Group BD Ltd.",
+    duration: "3 Weeks",
+    demoUrl: "https://primegroup.example",
+    description: "A state-of-the-art corporate website showcasing institutional services, custom contact desks, and multi-regional translation setups with dynamic loading.",
+    descriptionBn: "একটি আধুনিক কর্পোরেট ওয়েবসাইট যা প্রাতিষ্ঠানিক সেবা, যোগাযোগের জন্য বিশেষ ফর্ম এবং দ্রুত গতিতে ভাষা পরিবর্তন কাস্টমাইজেশন ফিচার সম্বলিত।",
+    descriptionAr: "موقع ويب احترافي ومتطور للشركات الكبرى لعرض الخدمات المؤسسية، مع بوابات اتصال مخصصة، وإعدادات ترجمة ديناميكية متعددة المناطق الجغرافية.",
+    techStack: ["React", "Vite", "Tailwind CSS", "Framer Motion"],
+    features: ["Fully Responsive Layout", "Light/Dark Mode Sync", "Quotation Cost Calculation Engine"],
+    featuresBn: ["১০০% রেস্পন্সিভ মোবাইল ফ্রেন্ডলি", "লাইট ও ডার্ক মুড অটো সিঙ্ক", "বাজেট এবং কোটেশন ক্যালকুলেশন ইঞ্জিন"],
+    featuresAr: ["تصميم متجاوب بالكامل وتفاعلي", "مزامنة تفاعلية للوضع المظلم والمضيء", "محرك حساب تكلفة الخدمة الفورية"],
+    results: [{ label: "Page Load Speed", value: "0.8s" }, { label: "Client Inquiries", value: "+150%" }],
+    resultsBn: [{ label: "পেজ লোড স্পীড", value: "০.৮ সেকেন্ড" }, { label: "ক্লায়েন্ট ইনকোয়ারি", value: "+১৫০%" }],
+    resultsAr: [{ label: "سرعة تحميل الصفحة", value: "0.8 ثانية" }, { label: "استفسارات العملاء", value: "+150%" }]
+  },
+  {
+    id: "port-news-1",
+    title: "ProthomBarta - High-speed Next.js News Portal with Google Ads",
+    titleBn: "প্রথমবার্তা - হাই-স্পিড নেক্সট-জেএস নিউজ পোর্টাল ও গুগল এডস",
+    titleAr: "ProthomBarta - بوابة إخبارية فائقة السرعة مع دمج إعلانات جوجل أدسنس",
+    category: "news",
+    categoryLabel: "News Portal",
+    categoryLabelBn: "নিউজ পোর্টাল",
+    categoryLabelAr: "بوابة الأخبار",
+    image: "https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=800&q=80",
+    client: "Prothom Barta Media Ltd.",
+    duration: "1.5 Months",
+    demoUrl: "https://news.prothombarta.example",
+    description: "An optimized media platform built with headless server-side rendering, featuring real-time local sports desks and intelligent ad placeholder zones.",
+    descriptionBn: "হেডলেস সার্ভার-সাইড রেন্ডারিং সহ তৈরি একটি অপ্টিমাইজড মিডিয়া প্ল্যাটফর্ম, যেখানে রিয়েল-টাইম খবর, স্পোর্টস ডেস্ক এবং বিজ্ঞাপন স্থাপনের জন্য বিশেষ জোন রয়েছে।",
+    descriptionAr: "منصة إعلامية متطورة ومحسنة للغاية تم إنشاؤها باستخدام نظام الرندر من جهة السيرفر، وتتميز بنشرات إخبارية حية ومناطق ذكية لعرض الإعلانات المستهدفة.",
+    techStack: ["Next.js", "Tailwind CSS", "Google Ad Manager", "GraphQL API"],
+    features: ["Breaking News Notification System", "Multi-Author Dashboard Engine", "Slick Ad Insertion Framework"],
+    featuresBn: ["ব্রেকিং নিউজ লাইভ নোটিফিকেশন", "মাল্টি-রাইটার ড্যাশবোর্ড প্যানেল", "অটোমেটেড বিজ্ঞাপন প্লেসমেন্ট ফ্রেমওয়ার্ক"],
+    featuresAr: ["نظام فوري لإشعارات الأخبار العاجلة", "منصة لوحة تحكم مخصصة للكتاب والمحررين", "إطار مدمج لتوزيع الإعلانات الذاتية"],
+    results: [{ label: "Monthly Sessions", value: "2.4M" }, { label: "Ad Visibility Match", value: "98.5%" }],
+    resultsBn: [{ label: "মাসিক ভিজিটর সেশন", value: "২৪ লাখ+" }, { label: "বিজ্ঞাপন দৃশ্যমানতা", value: "৯৮.৫%" }],
+    resultsAr: [{ label: "الجلسات الشهرية للموقع", value: "2.4 مليون" }, { label: "توافق رؤية الإعلان", value: "98.5%" }]
+  },
+  {
+    id: "port-blog-1",
+    title: "TechSphere - Elegant Headless WordPress & GraphQL Blogging Platform",
+    titleBn: "টেকস্ফিয়ার - চমৎকার হেডলেস ওয়ার্ডপ্রেস ও গ্রাফ-কিউএল ব্লগ",
+    titleAr: "TechSphere - منصة تدوين تقنية سريعة متصلة بالوردبريس الهيدليس وتكنولوجيا GraphQL",
+    category: "blog",
+    categoryLabel: "Blogging Site",
+    categoryLabelBn: "ব্লগিং সাইট",
+    categoryLabelAr: "موقع مدونة",
+    image: "https://images.unsplash.com/photo-1499750310107-5fef28a66643?auto=format&fit=crop&w=800&q=80",
+    client: "TechSphere Network",
+    duration: "1 Month",
+    demoUrl: "https://blog.techsphere.example",
+    description: "Super-fast technical publication portal pulling secure posts via GraphQL endpoints, equipped with instant automated newsletter newsletters.",
+    descriptionBn: "গ্রাফ-কিউএল এন্ডপয়েন্টের মাধ্যমে নিরাপদে পোস্ট লোড করার জন্য সুপার-ফাস্ট টেকনিক্যাল পাবলিকেশন পোর্টাল, সাথে রয়েছে অটোমেটেড ইমেইল নিউজলেটার সিস্টেম।",
+    descriptionAr: "بوابة نشر تقنية فائقة السرعة تجلب المقالات بأمان تام من واجهات ووردبريس عبر قنوات GraphQL، ومزودة بأنظمة نشرات بريدية لزيادة المتابعين تلقائياً.",
+    techStack: ["WordPress API", "React", "GraphQL", "Tailwind CSS"],
+    features: ["100/100 Google Lighthouse Score", "Instant Static Site Generation", "Automated Newsletter Dispatcher"],
+    featuresBn: ["১০০% গুগল লাইটহাউস স্পীড স্কোর", "তাত্ক্ষণিক স্ট্যাটিক পেজেস জেনারেশন", "অটোমেটেড ইমেইল নিউজলেটার সাবস্ক্রিপশন"],
+    featuresAr: ["مؤشر سرعة وتوافق جوجل لايتهاوس 100/100", "توليد فوري للمواقع الساكنة لخدمة أسرع", "موزع نشرات بريدية برمجية مؤتمت بالكامل"],
+    results: [{ label: "PageSpeed Index Score", value: "100/100" }, { label: "Newsletter Optins", value: "+28k" }],
+    resultsBn: [{ label: "পেজস্পিড ইনডেক্স স্কোর", value: "১০০/১০০" }, { label: "নিউজলেটার সাবস্ক্রাইবার", value: "২৮,০০০+" }],
+    resultsAr: [{ label: "مقياس سرعة محرك جوجل", value: "100/100" }, { label: "مشتركي النشرة البريدية", value: "+28,000" }]
+  },
+  {
+    id: "port-ecom-1",
+    title: "BazarBD - Dynamic Laravel Multi-Vendor E-commerce",
+    titleBn: "বাজারবিডি - ডাইনামিক লারাভেল মাল্টি-ভেন্ডর ই-কমার্স",
+    titleAr: "BazarBD - سوق إلكتروني ديناميكي متطور متعدد البائعين بمقومات حماية قصوى لارافيل",
+    category: "ecommerce",
+    categoryLabel: "E-Commerce Website",
+    categoryLabelBn: "ই-কমার্স",
+    categoryLabelAr: "التجارة الإلكترونية",
+    image: "https://images.unsplash.com/photo-1557821552-17105176677c?auto=format&fit=crop&w=800&q=80",
+    client: "BazarBD Bangladesh",
+    duration: "2.5 Months",
+    demoUrl: "https://bazarbd.com.example",
+    description: "A robust online digital store connecting vendors with tens of thousands of buyers daily, featuring automated checkout and active local currency SMS integration.",
+    descriptionBn: "একটি শক্তিশালী অনলাইন ডিজিটাল স্টোর যা বিক্রেতাদের হাজার হাজার ক্রেতাদের সাথে দৈনিক সংযোগ করে দেয়, সাথে অটোমেটেড পেমেন্ট এবং কাস্টমার এসএমএস সিঙ্ক সুবিধা রয়েছে।",
+    descriptionAr: "سوق إلكتروني متكامل وآمن يربط بين البائعين والعملاء، يوفر أنظمة دفع مؤتمتة وتكاملاً كاملاً مع بوابات الشحن ورسائل تتبع الهواتف الفورية.",
+    techStack: ["Laravel", "PHP", "MySQL", "SSLCommerz Checkout", "Tailwind CSS"],
+    features: ["Complex Multi-Vendor Dashboards", "Dynamic Shopping Cart", "Integrated Payment & Invoicing Gateways"],
+    featuresBn: ["কাস্টম বিক্রেতা ড্যাশবোর্ড", "ডাইনামিক শপিং কার্ট ও চেকআউট", "সমন্বিত পেমেন্ট গেটওয়ে এবং অটোমেটেড রসিদ"],
+    featuresAr: ["لوحات تحكم ذكية متعددة البائعين والمشرفين", "عربة تسوق ديناميكية وخيارات طلب مرنة", "بوابات دفع مدمجة وفواتير إلكترونية فورية"],
+    results: [{ label: "Daily Volume Tracking", value: "৳2.5M+" }, { label: "Registered Merchants", value: "450+" }],
+    resultsBn: [{ label: "দৈনিক লেনদেন", value: "৳২৫ লাখ+" }, { label: "নিবন্ধিত বিক্রেতা", value: "৪৫০+" }],
+    resultsAr: [{ label: "حجم المعاملات اليومي", value: "+2.5M ৳" }, { label: "التجار المسجلين بالمنصة", value: "450+" }]
+  },
+  {
+    id: "port-cust-1",
+    title: "Dr. Rahman - Interactive Physician Professional CV & Patient Booking Web",
+    titleBn: "ডাক্তার রহমান - ইন্টারেক্টিভ প্রফেশনাল পোর্টফোলিও ও বুকিং ওয়েবসাইট",
+    titleAr: "Dr. Rahman - معرض أعمال طبيب تفاعلي مع نظام حجز المواعيد فوري للعيادة এবং হাসপাতাল",
+    category: "portfolio",
+    categoryLabel: "Customer Portfolio",
+    categoryLabelBn: "কাস্টমার পোর্টফোলিও",
+    categoryLabelAr: "معرض أعمال العملاء",
+    image: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=800&q=80",
+    client: "Prof. Dr. Rahman Chowdhury",
+    duration: "3 Weeks",
+    demoUrl: "https://dr-rahman.example",
+    description: "A highly responsive business branding and portfolio portal for medical professionals, enabling patients to browse schedules, query credentials, and book appointments.",
+    descriptionBn: "চিকিৎসকদের জন্য একটি পেশাদারী পোর্টফোলিও এবং বুকিং ওয়েবসাইট, যার মাধ্যমে রোগীরা সহজে সিডিউল দেখে সরাসরি বুক করতে পারেন এবং ফি পেমেন্ট সম্পন্ন করতে পারেন।",
+    descriptionAr: "موقع هوية احترافي تفاعلي للأطباء والاستشاريين، يمنح المرضى إمكانية تصفح المؤهلات العلمية، وحجز مواعيد الكشف والعيادة الفورية مع سداد الفحص.",
+    techStack: ["React", "Google Calendar sync", "Lucide React Icons", "Node.js Schema"],
+    features: ["Real-time Slot Availability Checker", "Professional Branding Visuals Desk", "Automated SMS Schedule Confirmations"],
+    featuresBn: ["রিয়েল-টাইম কন্সাল্টেশন স্লট ফাঁকা আছে কিনা নিশ্চিতকারক", "আকর্ষণীয় ব্র্যান্ডিং প্রেজেন্টেশন", "অটোমেটেড এসএমএস অ্যাপয়েন্টমেন্ট কনফার্মেশন"],
+    featuresAr: ["نظام حجز مواعيد مرن في الوقت الفعلي", "تصميم بصري احترافي يعزز مكانة الطبيب", "إرسال رسائل نصية تلقائية لتأكيد مواعيد الكشف"],
+    results: [{ label: "Monthly Patient Bookings", value: "1,200+" }, { label: "Direct Phone Call Rate", value: "+80%" }],
+    resultsBn: [{ label: "মাসিক সরাসরি বুকিং", value: "১,২০০+" }, { label: "সরাসরি যোগাযোগ বৃদ্ধি", value: "+৮০%" }],
+    resultsAr: [{ label: "الحجوزات الطبية شهريا", value: "+1,200" }, { label: "زيادة الاتصال الهاتفي المباشر", value: "+80%" }]
+  },
+  {
+    id: "port-seo-1",
+    title: "GulfHost KSA - Industrial SEO Audit & high ROI ranking optimization campaign",
+    titleBn: "গালফহোস্ট - ইন্ডাস্ট্রিয়াল এসইও র‍্যাংকিং বুস্টার ও গুগল অ্যাডস ক্যাম্পেইন",
+    titleAr: "GulfHost KSA - حملة تنشيط وتحسين محركات البحث وسيو متقدم لشركة استضافة الخليج",
+    category: "seoAds",
+    categoryLabel: "SEO & Google Ads",
+    categoryLabelBn: "এসইও ও গুগল এডস",
+    categoryLabelAr: "سيو وإعلانات جوجل",
+    image: "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=800&q=80",
+    client: "GulfHost KSA Technology Group",
+    duration: "4 Months",
+    demoUrl: "https://gulfhost.com.example",
+    description: "Multi-layered digital search engine ranking operations driving tier-1 strategic local keywords directly to position 1, significantly cutting down per-click costs.",
+    descriptionBn: "গুগলের প্রথম পেজে নির্দিষ্ট কি-ওয়ার্ড র‍্যাঙ্ক করার জন্য হাই-লেভেল এসইও অপ্টিমাইজেশন প্রকল্প, যার মাধ্যমে পেইড ট্রাফিকের বিজ্ঞাপনী খরচ কমে এসেছে চমৎকারভাবে।",
+    descriptionAr: "عمليات تحسين متقدمة لظهور محركات البحث لمصطلحات حيوية عالية التنافسية بمشروع استضافة الويب، مما عاد بزيادة هائلة للزيارات المجانية وتخفيض تكلفة النقرة الإعلانية.",
+    techStack: ["Ahrefs Analysis Pro", "Google AdWords Engine", "Semantic Keyword Strategy", "Technical Schema Setup"],
+    features: ["Target Core Keywords Domination", "Cost-Per-Lead reduction of 42%", "High Traffic Velocity index metrics"],
+    featuresBn: ["প্রধান কি-ওয়ার্ড প্রথম পেজে রিকভারি", "প্রতি লিড সংগ্রহে ৪২% বিজ্ঞাপনী খরচ হ্রাস", "অর্গানিক ট্রাফিকের উচ্চ গতিশীল ভলিউম"],
+    featuresAr: ["تصدر نتائج البحث للكلمات الأكثر مبيعاً", "تخفيض تكلفة الحصول على العميل بنسبة 42%", "تتبع فوري ومؤشرات صحة الزيارات النشطة"],
+    results: [{ label: "Organic Search Volume", value: "+320%" }, { label: "Acquisition Cost Offset", value: "-42%" }],
+    resultsBn: [{ label: "অর্গানিক সার্চ ট্রাফিক", value: "+৩২০%" }, { label: "লিড সংগ্রহ খরচ হ্রাস", value: "-৪২%" }],
+    resultsAr: [{ label: "حجم الزيارات العضوية المجانية", value: "+320%" }, { label: "تكلفة الاستحواذ المخفضة", value: "-42%" }]
+  },
+  {
+    id: "port-sol-1",
+    title: "Webzone POS Pro - Intelligent Cloud Integrated Local Offline Business Core",
+    titleBn: "ওয়েবজোন পস প্রো - ইন্টেলিজেন্ট ক্লাউড সিঙ্ক এবং লো-কস্ট অফলাইন পস সফটওয়্যার",
+    titleAr: "Webzone POS Pro - نظام نقاط بيع والحركات المالية سحابي يعمل بدون الحاجة للانترنت المستمر",
+    category: "solutions",
+    categoryLabel: "ERP & POS Systems",
+    categoryLabelBn: "ইআরপি ও পস সফটওয়্যার",
+    categoryLabelAr: "أنظمة ERP و نقاط البيع",
+    image: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&fit=crop&w=800&q=80",
+    client: "Abaabil Super Shop Network",
+    duration: "2 Months",
+    demoUrl: "https://pos.webzonebd.example",
+    description: "Highly automated point-of-sale manager running in standard desktop web layouts. Saves offline tickets and synchronization queue when network triggers reconnect.",
+    descriptionBn: "ডেস্কটপ ব্রাউজারে চালিত দারুণ একটি পস সফটওয়্যার। ইন্টারনেট প্রবলেম থাকলেও অফলাইনে ডাটা সেভ রাখে এবং পরবর্তীতে স্বয়ংক্রিয়ভাবে ক্লাউড ডাটাবেজ সিঙ্ক সম্পন্ন করে।",
+    descriptionAr: "برنامج نقاط بيع وبنية مالية ذكية لأصحاب المحلات التجارية والمخازن، يسجل الحركات المالية المباشرة محلياً بدون إنترنت، ويزامنها مع السحابة فور عودة الاتصال فورا.",
+    techStack: ["React App", "IndexedDB Offline Cache", "PDF Thermal Receipt generator", "Tailwind styling CSS"],
+    features: ["Instant Offline Sales Hold State", "Dynamic Thermal Print Invoices", "Live Stock level warning notification"],
+    featuresBn: ["অফলাইন সেলস ও রিসিট হোল্ডিং", "থার্মাল প্রিন্ট চালান অটো জেনারেশন", "রিয়েল-টাইম স্টক লেভেল অ্যালার্ট ও নোটিফিকেশন"],
+    featuresAr: ["دعم معالجة المبيعات بلا إنترنت تماماً", "توليد وطباعة فورية للفواتير الحرارية والدفع", "تنبيهات فورية عند انخفاض مستوى المنتجات بالمخزن"],
+    results: [{ label: "Billing Processing Speed", value: "1.2s" }, { label: "Offline Outages Safe", value: "100%" }],
+    resultsBn: [{ label: "বিল প্রসেসিং স্পীড", value: "১.২ সেকেন্ড" }, { label: "অফলাইন নিরবচ্ছিন্ন সংযোগ নিশ্চিত", value: "১০০%" }],
+    resultsAr: [{ label: "سرعة تجهيز وإصدار الفاتورة", value: "1.2 ثانية" }, { label: "تأمين معالجة انقطاع الشبكة", value: "100%" }]
+  }
+];
+
+export const sampleBlogs: BlogPost[] = [
+  {
+    id: "blog-2",
+    title: "Step-by-Step Security Checklist To Harden Your PHP Core Applications",
+    titleBn: "পিএইচপি ওয়েবসাইট সুরক্ষিত রাখার ৫টি কার্যকরী সিকিউরিটি উপায়",
+    titleAr: "قائمة فحص شاملة لتأمين وحماية مواقع وتطبيقات PHP الخاصة بك",
+    image: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=800&q=80",
+    category: "Security",
+    categoryBn: "ওয়েবসাইট নিরাপত্তা",
+    categoryAr: "أمان الويب",
+    summary: "Prevent SQL injection attacks, close Cross-site Scripting (XSS) leaks, sanitize post requests, and implement secure token patterns.",
+    summaryBn: "সার্ভারে এসকিউএল ইনজেকশন প্রতিহত করা, এক্সএসএস ফাঁস প্রতিরোধ করা এবং সেশনের নিরাপত্তা নিশ্চিত করার কার্যকারী গাইডলাইন।",
+    summaryAr: "طريقة حظر هجمات حقن SQL Injection وسد ثغرات البرمجة عبر المواقع XSS وتعقيم المتغيرات الواردة وصياغة الرموز الآمنة.",
+    content: `Web applications face millions of bots trying to exploit SQL vulnerabilities daily. Always sanitize and use Prepared Statements for any Database querying. Use CSRF tokens on every POST request to avoid malicious script form submissions.
+
+Set HTTPOnly cookies to protect against session highjack attempts. Keep your PHP dependencies updated to patch software bugs.`,
+    contentBn: `বর্তমান যুগে প্রতিদিন হ্যাকারদের বিভিন্ন বট নেটওয়ার্কের মাধ্যমে হাজার হাজার সাইট আক্রান্ত হয়। তাই আপনার ডেটাবেজে সরাসরি ভ্যালু না পাঠিয়ে প্রি-প্রিপেয়ার্ড স্টেটমেন্ট কোয়েরি ব্যবহার করুন।
+
+সবসময় সিএসআরএফ টোকেন সক্রিয় রাখুন এবং কুকিজ সুরক্ষিত রাখতে 'HTTPOnly' অপশন অন করে রাখুন। নিয়মিত সার্ভারে সফটওয়্যার ভার্সন আপডেট করুন।`,
+    contentAr: `تواجه تطبيقات الويب يومياً محاولات مستمرة لاكتشاف الثغرات البرمجية. من الضروري جداً استخدام المعاملات المجهزة والأقواس الآمنة في قواعد البيانات.
+
+تأكد من تنشيط رموز CSRF في طلبات الإرسال لمنع الثغرات، واجعل ملفات الإرتباط HTTPOnly لمنع هجمات سرقة الجلسة.`,
+    date: "2026-05-12",
+    author: "Technical Specialist",
+    readTime: "4 min"
+  }
+];
+
+export const sampleFAQs = {
+  en: [
+    { q: "How do I download my purchased scripts or WordPress themes?", a: "Once your dynamic transaction completes, your script/theme is immediately available inside your User Dashboard under the 'Downloads' section. You'll also receive an secure email download link." },
+    { q: "What premium payment gateways do you support inside Bangladesh and globally?", a: "Inside Bangladesh, we accept bKash, Nagad, Rocket, and any local cards via SSLCommerz. Globally, we support secure automated credit card systems using Stripe and PayPal." },
+    { q: "Do you offer web development custom coding service?", a: "Yes, we build entirely custom tailored web platforms, API databases, and premium portal software according to client requirements. Drop a support ticket or ping our WhatsApp!" },
+    { q: "Can I get assistance for installing the purchased Laravel/PHP script?", a: "WebzoneBD offers free installation support for the first purchase. Our support ticket system is active 24/7 to assist with server setups." }
+  ],
+  bn: [
+    { q: "ক্রয়কৃত থিম বা স্কিপ্টগুলো কিভাবে ডাউনলোড করবো?", a: "পেমেন্ট সম্পন্ন হওয়ার পর আপনার কাস্টমার ড্যাশবোর্ডের 'Downloads' সেকশনে ফাইলগুলো পেয়ে যাবেন। একইসাথে আপনার ইমেইল অ্যাকাউন্টে একটি ডাউনলোড লিঙ্ক পাঠানো হবে।" },
+    { q: "বাংলাদেশে এবং বৈশ্বিক কী কী পেমেন্ট গেটওয়ে আপনারা সাপোর্ট করেন?", a: "বাংলাদেশে আমাদের বিকাশ, নগদ, রকেট এবং এসএসএলকমার্জ কার্ড পেমেন্ট রয়েছে। এছাড়া বৈশ্বিকভাবে স্ট্রাইপ ও পে-পাল এর মাধ্যমে পে করতে পারবেন।" },
+    { q: "আপনারা কি কাস্টম ওয়েবসাইট ডেভেলপমেন্ট সার্ভিস দিয়ে থাকেন?", a: "অবশ্যই! ক্লায়েন্টদের বিজনেস রিকোয়ারমেন্ট অনুযায়ী আমরা যেকোনো কাস্টম স্ক্রিপ্ট, লারাভেল বা রিয়্যাক্ট সফটওয়্যার তৈরি ও ডেভেলপমেন্ট করে থাকি। ওয়াটস অ্যাপে মেসেজ দিয়ে কথা বলুন।" },
+    { q: "ক্রয়কৃত স্ক্রিপ্ট সার্ভারে ইন্সটল করার জন্য সাহায্য পাওয়া যাবে কি?", a: "প্রতিটি থিম বা স্ক্রিপ্টের সাথে ফ্রি ডকুমেন্টেশন থাকে। এছাড়া আমাদের সাপোর্ট টিম ২৪/৭ ঘন্টার মধ্যে আপনাকে ফ্রিতে ফার্স্ট টাইম ইন্সটলেশনে সহায়তা প্রদান করবে।" }
+  ],
+  ar: [
+    { q: "كيف يمكنني تحميل السكربتات وقوالب ووردبريس المشتراة؟", a: "بمجرد إتمام الدفع بنجاح، ستكون ملفات السكربت أو القالب متاحة على الفور في لوحة تحكم حساب العميل تحت قسم 'التنزيلات'. وستتلقى أيضاً رابط تحميل آمن عبر بريدك الإلكتروني." },
+    { q: "ما هي بوابات الدفع المدعومة في بنجلاديش وعالمياً؟", a: "في بنجلاديش ندعم bKash و Nagad و Rocket و SSLCommerz لجميع البطاقات المحلية. عالمياً نقوم بمعالجة الدفع الآمن ببطاقات الائتمان عبر Stripe و PayPal." },
+    { q: "هل تقدمون خدمات مخصصة لتطوير المواقع والبرمجيات؟", a: "نعم، خدماتنا تشمل تطوير وبرمجة المواقع المخصصة وتطبيقات الهواتف والسكربتات بناءً على رغبة العميل. لا تتردد بالاتصال بنا عبر واتساب!" },
+    { q: "هل يتوفر لديكم دعم فني لتركيب وتثبيت السكربتات المشتراة؟", a: "نقدم خدمة تركيب مجانية في المرة الأولى لكل عملية شراء مع أدلة توثيق مفصلة. فريق تذاكر الدعم متواجد دائماً لخدمتكم." }
+  ]
+};
+
+export const clientTestimonials = [
+  {
+    name: "Ahmad Al-Harbi",
+    role: "CEO, GulfTrading KSA",
+    text: "WebzoneBD IT Solution digitized our entire company portal and optimized our local SEO rankings on Google. Highly professional, WhatsApp support is fast and friendly!",
+    textBn: "ওয়েবজোনবিডি আমাদের কোম্পানির সম্পূর্ণ পোর্টাল ডিজিটাল করেছে এবং গুগলে চমৎকার এসইও রেজাল্ট এনে দিয়েছে। এদের ব্যবহার ও ২৪/৭ সাপোর্ট অতুলনীয়!",
+    textAr: "قامت شركة WebzoneBD IT بتطوير نظام شركتنا بالكامل وتحسين تصنيفنا المحلي في محرك البحث جوجل. دعم فني سريع عبر واتساب ومحترفين جداً!",
+    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&h=150&q=80"
+  },
+  {
+    name: "Sajjad Rahman",
+    role: "Proprietor, BazarBD Ltd",
+    text: "The ZoneCart Laravel Multi-Vendor script is extremely clean, and easy to modify. Saved us thousands of dollars in customized web development. Highly recommended!",
+    textBn: "জোনকার্ট লারাভেল স্ক্রিপ্টটি চমৎকার এবং অত্যন্ত পরিচ্ছন্ন কোডিং। আমাদের কাস্টম সফটওয়্যার তৈরিতে হাজার হাজার ডলার সাশ্রয় করেছে। ধন্যবাদ সকলকে!",
+    textAr: "سكربت ZoneCart لارافيل للتجارة الإلكترونية رائع جداً وسهل التخصيص. وفر علينا آلاف الدولارات التي كدنا ننفقها في برمجة خاصة من الصفر.",
+    avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&h=150&q=80"
+  }
+];

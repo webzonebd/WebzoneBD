@@ -1,0 +1,1019 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  X, Mail, Lock, Eye, EyeOff, User, Phone, CheckCircle2, 
+  Smartphone, ShieldCheck, Sparkles, RefreshCw, Key, ArrowRight,
+  ShieldAlert, Activity, AlertCircle, Sparkles as SparklesIcon,
+  Check, Info, ChevronRight, CornerDownRight
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Language, Theme, UserSession, UserRole, Currency } from '../types';
+import { PRESEEDED_USERS } from './AuthSystem';
+
+interface AuthPopupProps {
+  isOpen: boolean;
+  onClose: () => void;
+  language: Language;
+  theme: Theme;
+  user: UserSession | null;
+  defaultView?: 'login' | 'register' | 'forgot';
+  defaultRole?: 'customer' | 'affiliate';
+  onLoginSuccess: (user: UserSession) => void;
+  triggerToast: (msg: string) => void;
+}
+
+export default function AuthPopup({
+  isOpen,
+  onClose,
+  language,
+  theme,
+  user,
+  defaultView = 'login',
+  defaultRole = 'customer',
+  onLoginSuccess,
+  triggerToast
+}: AuthPopupProps) {
+  const [view, setView] = useState<'login' | 'register' | 'forgot' | 'success'>('login');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // Form Fields - Login
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
+
+  // Form Fields - Registration
+  const [regFullName, setRegFullName] = useState('');
+  const [regUsername, setRegUsername] = useState('');
+  const [regEmail, setRegEmail] = useState('');
+  const [regPhoneCode, setRegPhoneCode] = useState('+880');
+  const [regPhone, setRegPhone] = useState('');
+  const [regPassword, setRegPassword] = useState('');
+  const [regConfirmPassword, setRegConfirmPassword] = useState('');
+  const [regTerms, setRegTerms] = useState(false);
+
+  // Forgot Password
+  const [forgotEmail, setForgotEmail] = useState('');
+
+  // Security & Simulations
+  const [mathNumA, setMathNumA] = useState(0);
+  const [mathNumB, setMathNumB] = useState(0);
+  const [mathAnswer, setMathAnswer] = useState(0);
+  const [mathInput, setMathInput] = useState('');
+  
+  // Security simulation messages
+  const [isHashing, setIsHashing] = useState(false);
+  const [hashedPassword, setHashedPassword] = useState('');
+  const [rateLimitCounter, setRateLimitCounter] = useState(0);
+  const [rateLimitBlocked, setRateLimitBlocked] = useState(false);
+  const [rateLimitTimer, setRateLimitTimer] = useState(0);
+  const [emailStatusMessage, setEmailStatusMessage] = useState('');
+
+  // Registered user reference for simulated email preview
+  const [lastRegisteredUser, setLastRegisteredUser] = useState<{
+    name: string;
+    email: string;
+    username: string;
+  } | null>(null);
+
+  // Auto math challenge creator
+  const generateMathQuestion = () => {
+    const list = [
+      { a: 3, b: 6, ans: 9 },
+      { a: 7, b: 2, ans: 9 },
+      { a: 5, b: 4, ans: 9 },
+      { a: 8, b: 5, ans: 13 },
+      { a: 6, b: 7, ans: 13 },
+      { a: 9, b: 3, ans: 12 },
+      { a: 4, b: 8, ans: 12 },
+      { a: 2, b: 9, ans: 11 }
+    ];
+    const picked = list[Math.floor(Math.random() * list.length)];
+    setMathNumA(picked.a);
+    setMathNumB(picked.b);
+    setMathAnswer(picked.ans);
+    setMathInput('');
+  };
+
+  // Reset variables on view swap or modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setView(defaultView === 'forgot' ? 'forgot' : defaultView || 'login');
+      generateMathQuestion();
+      setIsHashing(false);
+      setMathInput('');
+      setRateLimitCounter(0);
+      setRateLimitBlocked(false);
+    }
+  }, [isOpen, defaultView]);
+
+  // Rate Limiter countdown tracking
+  useEffect(() => {
+    let interval: any;
+    if (rateLimitBlocked && rateLimitTimer > 0) {
+      interval = setInterval(() => {
+        setRateLimitTimer(prev => {
+          if (prev <= 1) {
+            setRateLimitBlocked(false);
+            setRateLimitCounter(0);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [rateLimitBlocked, rateLimitTimer]);
+
+  // Handle password hashing visual simulation
+  const simulateHashing = (password: string, callback: () => void) => {
+    setIsHashing(true);
+    // Convert text to simple visual hex character sequence (mimicking pbkdf2_sha256 hashing)
+    let hash = 'pbkdf2_sha256$280000$';
+    for (let i = 0; i < password.length; i++) {
+      hash += password.charCodeAt(i).toString(16);
+    }
+    hash += 'f391e8bc02a945d8b7a0d';
+    setHashedPassword(hash.substring(0, 48) + '...');
+    
+    setTimeout(() => {
+      setIsHashing(false);
+      callback();
+    }, 1200);
+  };
+
+  // Login handler
+  const handleLoginSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (rateLimitBlocked) {
+      triggerToast(`🚨 Security Rate Limiter Active. Please wait ${rateLimitTimer}s.`);
+      return;
+    }
+
+    if (!loginEmail || !loginPassword) {
+      triggerToast(language === 'bn' ? 'দয়া করে সবগুলো ঘর পূরণ করুন।' : 'Please fill all required credentials.');
+      return;
+    }
+
+    // Brute Force Guard Checking
+    if (rateLimitCounter >= 5) {
+      setRateLimitBlocked(true);
+      setRateLimitTimer(30);
+      triggerToast('🚨 Brute Force Lockout: Too many login attempts. Blocked for 30 seconds.');
+      return;
+    }
+
+    // Math check
+    const answered = parseInt(mathInput);
+    if (isNaN(answered) || answered !== mathAnswer) {
+      setRateLimitCounter(prev => prev + 1);
+      triggerToast(language === 'bn' ? '🚨 ম্যাথ ভেরিফিকেশন উত্তর ভুল হয়েছে!' : '🚨 Math Verification challenge failed.');
+      generateMathQuestion();
+      return;
+    }
+
+    simulateHashing(loginPassword, () => {
+      // Find matching user from PRESEEDED_USERS
+      const matched = PRESEEDED_USERS.find(
+        u => u.email.toLowerCase() === loginEmail.toLowerCase().trim() && u.password === loginPassword
+      );
+
+      if (matched) {
+        if ((matched.status as string) === 'suspended') {
+          triggerToast('🚫 Suspended account. Please contact corporate workspace.');
+          return;
+        }
+
+        onLoginSuccess(matched);
+        triggerToast(language === 'bn' ? `স্বাগতম, ${matched.name}! লগইন সফল হয়েছে।` : `Welcome back, ${matched.name}! Security token stored.`);
+        onClose();
+      } else {
+        setRateLimitCounter(prev => prev + 1);
+        triggerToast(language === 'bn' ? '🚨 ভুল ইমেইল অথবা পাসওয়ার্ড!' : '🚨 Invalid email or password security combination.');
+        generateMathQuestion();
+      }
+    });
+  };
+
+  // Register handler
+  const handleRegisterSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!regFullName || !regUsername || !regEmail || !regPhone || !regPassword || !regConfirmPassword) {
+      triggerToast('All input fields are security mandatory.');
+      return;
+    }
+
+    if (regPassword !== regConfirmPassword) {
+      triggerToast(language === 'bn' ? 'পাসওয়ার্ড ম্যাচ করেনি!' : 'Passwords do not match.');
+      return;
+    }
+
+    if (regPassword.length < 6) {
+      triggerToast('Select a password of at least 6 characters.');
+      return;
+    }
+
+    if (!regTerms) {
+      triggerToast('You must accept WebzoneBD Terms & Privacy Agreements.');
+      return;
+    }
+
+    // Check if user email already exists
+    const exists = PRESEEDED_USERS.some(u => u.email.toLowerCase() === regEmail.toLowerCase().trim());
+    if (exists) {
+      triggerToast('An account already exists with this email address.');
+      return;
+    }
+
+    simulateHashing(regPassword, () => {
+      // Form combined phone number with the chosen country code
+      const cleanPhone = regPhone.replace(/\D/g, ''); // strip out non-numbers
+      const combinedWhatsApp = `${regPhoneCode}${cleanPhone}`;
+
+      // Automatic currency resolution
+      // bd (+880) -> BDT (Taka)
+      // sa (+966) -> SAR (Riyal)
+      // other -> USD (Dollar)
+      let resolvedPrefCurrency: Currency = 'USD';
+      if (regPhoneCode === '+880') {
+        resolvedPrefCurrency = 'BDT';
+      } else if (regPhoneCode === '+966') {
+        resolvedPrefCurrency = 'SAR';
+      }
+
+      // Create new customer user
+      const freshUser: UserSession = {
+        id: 'usr-' + Date.now(),
+        name: regFullName,
+        username: regUsername.toLowerCase().trim(),
+        email: regEmail.toLowerCase().trim(),
+        phone: combinedWhatsApp,
+        phoneCode: regPhoneCode,
+        role: 'customer' as UserRole,
+        isVerified: true,
+        createdAt: new Date().toISOString().split('T')[0],
+        status: 'active',
+        wishlistedProductIds: [],
+        preferredCurrency: resolvedPrefCurrency,
+        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'
+      };
+
+      // Push to preseeded list
+      PRESEEDED_USERS.push({
+        id: freshUser.id,
+        name: freshUser.name,
+        username: freshUser.username,
+        email: freshUser.email,
+        phone: freshUser.phone,
+        role: freshUser.role,
+        password: regPassword, // Keep for simulated login checks
+        avatar: freshUser.avatar || '',
+        isVerified: true,
+        isSocial: false,
+        createdAt: freshUser.createdAt,
+        status: freshUser.status as 'active',
+        preferredCurrency: freshUser.preferredCurrency,
+        wishlistedProductIds: []
+      } as any);
+
+      // Save for Email Simulated Preview
+      setLastRegisteredUser({
+        name: freshUser.name,
+        email: freshUser.email,
+        username: freshUser.username
+      });
+
+      // Log in immediately
+      onLoginSuccess(freshUser);
+      setView('success');
+      setEmailStatusMessage(`📧 Simulated Welcome Email sent successfully to ${freshUser.email}`);
+      triggerToast(language === 'bn' ? 'অ্যাকাউন্ট তৈরি সফল হয়েছে!' : 'WebzoneBD Account created and ready to use!');
+    });
+  };
+
+  // Google / Facebook dynamic authentication simulator
+  const handleSocialAuth = (provider: 'google' | 'facebook') => {
+    const isGoogle = provider === 'google';
+    
+    // Auto profiles data
+    const socialName = isGoogle ? "Google User" : "Facebook User";
+    const socialEmail = isGoogle ? "google@webzonebd.com" : "facebook@webzonebd.com";
+    const socialUsername = isGoogle ? "google_user" : "facebook_user";
+    const socialAvatar = isGoogle 
+      ? "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80"
+      : "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=150&q=80";
+
+    triggerToast(`🔗 Authenticating via ${isGoogle ? 'Google Cloud Secure API' : 'Facebook App Token'}...`);
+
+    setTimeout(() => {
+      // Find or create in memory
+      let matched = PRESEEDED_USERS.find(u => u.email === socialEmail);
+      if (!matched) {
+        matched = {
+          id: 'usr-social-' + Date.now(),
+          name: socialName,
+          username: socialUsername,
+          email: socialEmail,
+          phone: '+966570511931',
+          role: 'customer' as UserRole,
+          password: 'socialpassword',
+          avatar: socialAvatar,
+          isVerified: true,
+          isSocial: true,
+          createdAt: new Date().toISOString().split('T')[0],
+          status: 'active' as const,
+          wishlistedProductIds: []
+        };
+        PRESEEDED_USERS.push(matched);
+      }
+
+      onLoginSuccess({
+        id: matched.id,
+        name: matched.name,
+        username: matched.username,
+        email: matched.email,
+        phone: matched.phone,
+        role: matched.role,
+        isVerified: true,
+        createdAt: matched.createdAt,
+        status: matched.status,
+        wishlistedProductIds: [],
+        avatar: matched.avatar
+      });
+
+      triggerToast(`✅ Welcome back, ${matched.name}! Session established via social federation.`);
+      onClose();
+    }, 1000);
+  };
+
+  // Password reset submit handler
+  const handleForgotPasswordSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotEmail) {
+      triggerToast('Please write your email identifier key.');
+      return;
+    }
+    triggerToast(`📬 Success: Password reset token dispatched securely to ${forgotEmail}! Check junk folder.`);
+    setView('login');
+  };
+
+  if (!isOpen) return null;
+
+  // Visual Palette
+  const cardBgTheme = theme === 'dark' ? 'bg-[#0F172A]' : 'bg-white';
+  const overlayTheme = theme === 'dark' ? 'bg-[#020617]/80 backdrop-blur-md' : 'bg-slate-900/65 backdrop-blur-sm';
+
+  const gradientStyles = {
+    primary: 'linear-gradient(135deg, #2563EB 0%, #06B6D4 100%)',
+    account: 'linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%)',
+    premium: 'linear-gradient(135deg, #2563EB 0%, #8B5CF6 50%, #06B6D4 100%)'
+  };
+
+  return (
+    <div className={`fixed inset-0 z-[9999] flex items-center justify-center p-4 overflow-y-auto ${overlayTheme}`}>
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95, y: -20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: -20 }}
+        transition={{ duration: 0.3, ease: 'easeOut' }}
+        className={`relative w-full max-w-xl rounded-3xl overflow-hidden shadow-2xl border ${theme === 'dark' ? 'border-slate-800/80 bg-[#0F172A]/90' : 'border-slate-100 bg-white/95'} backdrop-blur-xl`}
+      >
+        {/* Glow Top Accent Bar using Premium Gradient */}
+        <div 
+          className="h-1.5 w-full" 
+          style={{ backgroundImage: view === 'success' ? gradientStyles.premium : gradientStyles.primary }} 
+        />
+
+        {/* Floating Close Button */}
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 p-2 rounded-full hover:bg-neutral-500/10 transition-all text-neutral-400 dark:text-neutral-500 hover:text-rose-500 dark:hover:text-rose-400 z-55 cursor-pointer active:scale-90"
+          aria-label="Close modal"
+        >
+          <X className="w-5 h-5 stroke-[2.5]" />
+        </button>
+
+        <div className="p-6 md:p-8 space-y-6 text-left">
+          
+          {/* =====================================
+              SECURITY CRYPYTO HASHING SIMULATIONAL OVERLAY
+              ===================================== */}
+          <AnimatePresence>
+            {isHashing && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 bg-[#020617]/85 backdrop-blur-sm z-[100] flex flex-col items-center justify-center text-center p-6"
+              >
+                <div className="p-4 bg-blue-600/10 rounded-full border border-blue-500/30 text-[#06B6D4] animate-spin mb-4">
+                  <RefreshCw className="w-8 h-8" />
+                </div>
+                <h4 className="text-sm font-black text-white uppercase tracking-widest font-mono">
+                  🔑 Encrypting Input Keys
+                </h4>
+                <p className="text-[10px] text-cyan-300 font-mono mt-1 w-full max-w-xs break-all truncate">
+                  SHA-256 Base state: {hashedPassword}
+                </p>
+                <div className="mt-4 flex items-center gap-1.5 px-3 py-1 bg-white/5 border border-white/10 rounded text-[9px] font-mono text-slate-300">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+                  <span>PBKDF2 SHA-256 Security active</span>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* =====================================
+              LOGIN VIEW
+              ===================================== */}
+          {view === 'login' && (
+            <div className="space-y-4 animate-in fade-in slide-in-from-top-4 duration-200">
+              <div className="text-left">
+                <h3 className="text-2xl font-black text-[#0F172A] dark:text-white tracking-tight flex items-center gap-2">
+                  <span className="p-[3px] rounded-xl text-white bg-gradient-to-r from-[#2563EB] to-[#06B6D4]">
+                    <span className="p-1 rounded-lg bg-slate-900/40 inline-block">
+                      <Key className="w-4 h-4 text-white" />
+                    </span>
+                  </span>
+                  <span>Welcome Back</span>
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                  Sign in to access WebzoneBD Services & unified customer portal dashboard.
+                </p>
+              </div>
+
+              <form onSubmit={handleLoginSubmit} className="space-y-4">
+                {/* Email address field */}
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 font-mono">
+                    Email Address
+                  </label>
+                  <div className="relative group">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400 group-focus-within:text-[#2563EB] transition-colors">
+                      <Mail className="w-4.5 h-4.5" />
+                    </span>
+                    <input
+                      type="email"
+                      required
+                      value={loginEmail}
+                      onChange={(e) => setLoginEmail(e.target.value)}
+                      placeholder="e.g. customer@webzonebd.com"
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-250 dark:border-slate-800 rounded-xl text-xs text-[#0F172A] dark:text-[#F8FAFC] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/25 focus:border-[#2563EB] transition duration-200"
+                    />
+                  </div>
+                </div>
+
+                {/* Password field */}
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 font-mono">
+                    Secure Code Password
+                  </label>
+                  <div className="relative group">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400 group-focus-within:text-[#2563EB] transition-colors">
+                      <Lock className="w-4.5 h-4.5" />
+                    </span>
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      value={loginPassword}
+                      onChange={(e) => setLoginPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full pl-10 pr-10 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-250 dark:border-slate-800 rounded-xl text-xs text-[#0F172A] dark:text-[#F8FAFC] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/25 focus:border-[#2563EB] transition duration-200 font-mono"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-slate-400 hover:text-slate-250 cursor-pointer"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* MATH SECURITY CHIP */}
+                <div className="p-3 bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800/80 rounded-xl space-y-2">
+                  <div className="flex justify-between items-center text-[10px] font-mono font-black">
+                    <span className="text-[#EC4899] uppercase tracking-wide flex items-center gap-1">
+                      <ShieldCheck className="w-3.5 h-3.5 text-[#8B5CF6]" />
+                      <span>Security Core Protection</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={generateMathQuestion}
+                      className="text-[#2563EB] dark:text-cyan-400 hover:underline flex items-center gap-0.5 cursor-pointer"
+                    >
+                      <RefreshCw className="w-2.5 h-2.5" />
+                      <span>Change Sum</span>
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 pt-1">
+                    <p className="text-xs text-slate-600 dark:text-slate-350 font-bold whitespace-nowrap">
+                      Calculate sum: 
+                      <span className="ml-1.5 px-2.5 py-1 rounded bg-[#2563EB]/10 dark:bg-cyan-500/10 text-[#2563EB] dark:text-cyan-400 font-mono text-xs font-black">
+                        {mathNumA} + {mathNumB} = ?
+                      </span>
+                    </p>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Sum answer"
+                      value={mathInput}
+                      onChange={(e) => setMathInput(e.target.value.replace(/[^0-9]/g, ''))}
+                      className="w-[35%] text-center font-mono font-extrabold text-xs px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
+                    />
+                  </div>
+                </div>
+
+                {/* Remember Me and Forgot Security Links */}
+                <div className="flex justify-between items-center text-xs select-none">
+                  <label className="flex items-center gap-2 cursor-pointer text-slate-500 dark:text-slate-400">
+                    <input
+                      type="checkbox"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                      className="w-4 h-4 rounded text-[#2563EB] border-slate-300 dark:border-slate-700 accent-[#2563EB] cursor-pointer"
+                    />
+                    <span>Remember Me</span>
+                  </label>
+
+                  <button
+                    type="button"
+                    onClick={() => setView('forgot')}
+                    className="text-[#2563EB] dark:text-cyan-400 hover:underline cursor-pointer font-bold"
+                  >
+                    Forgot Password?
+                  </button>
+                </div>
+
+                {/* Submition trigger Buttons */}
+                <button
+                  type="submit"
+                  className="w-full py-3 text-white font-extrabold text-xs uppercase tracking-widest rounded-xl hover:opacity-95 transition-all shadow-md active:scale-98 flex items-center justify-center gap-2 cursor-pointer hover:shadow-[0_0_15px_rgba(37,99,235,0.3)] duration-250 group pointer-events-auto"
+                  style={{ background: `linear-gradient(135deg, #2563EB 0%, #06B6D4 100%)` }}
+                >
+                  <ShieldCheck className="w-4 h-4 stroke-[2.5]" />
+                  <span>Secure SignIn Portal</span>
+                </button>
+              </form>
+
+              {/* Divider */}
+              <div className="relative flex py-2 items-center">
+                <div className="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
+                <span className="flex-shrink mx-4 text-[9px] font-black uppercase text-slate-400 font-mono tracking-wider">
+                  Or Federation Access
+                </span>
+                <div className="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
+              </div>
+
+              {/* Social Login Grid */}
+              <div className="grid grid-cols-2 gap-2.5">
+                <button
+                  onClick={() => handleSocialAuth('google')}
+                  className="py-2.5 px-4 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900 transition-all text-xs font-black flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 duration-200"
+                >
+                  {/* Custom built SVG for absolute dependency safety */}
+                  <svg className="w-4.5 h-4.5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l3.66-2.85z" fill="#FBBC05"/>
+                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.85c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                  </svg>
+                  <span>Google</span>
+                </button>
+
+                <button
+                  onClick={() => handleSocialAuth('facebook')}
+                  className="py-2.5 px-4 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900 transition-all text-xs font-black flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 duration-200"
+                >
+                  <svg className="w-4.5 h-4.5 fill-blue-600 dark:fill-blue-500" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                  </svg>
+                  <span>Facebook</span>
+                </button>
+              </div>
+
+              {/* Bottom login toggle */}
+              <div className="text-center pt-3 border-t border-slate-200 dark:border-slate-850">
+                <p className="text-xs text-slate-450 dark:text-slate-400">
+                  New to WebzoneBD?{' '}
+                  <button
+                    onClick={() => setView('register')}
+                    className="font-bold text-[#8B5CF6] dark:text-pink-400 hover:underline cursor-pointer"
+                  >
+                    Create New Account
+                  </button>
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* =====================================
+              REGISTRATION VIEW
+              ===================================== */}
+          {view === 'register' && (
+            <div className="space-y-4 animate-in fade-in slide-in-from-top-4 duration-200">
+              <div className="text-left">
+                <h3 className="text-2xl font-black text-[#0F172A] dark:text-white tracking-tight flex items-center gap-2">
+                  <span className="p-[3px] rounded-xl text-white bg-gradient-to-r from-[#8B5CF6] to-[#EC4899]">
+                    <span className="p-1 rounded-lg bg-slate-900/40 inline-block">
+                      <User className="w-4 h-4 text-white" />
+                    </span>
+                  </span>
+                  <span>Create Free Account</span>
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                  Join WebzoneBD IT Solution and manage your services from one secure dashboard.
+                </p>
+              </div>
+
+              <form onSubmit={handleRegisterSubmit} className="space-y-3.5 max-h-[380px] overflow-y-auto pr-1">
+                {/* Full Name */}
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 font-mono">
+                    Full Name
+                  </label>
+                  <div className="relative group">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">
+                      <User className="w-4 h-4" />
+                    </span>
+                    <input
+                      type="text"
+                      required
+                      value={regFullName}
+                      onChange={(e) => setRegFullName(e.target.value)}
+                      placeholder="e.g. Al-Amin Chowdhury"
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-250 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#8B5CF6]/20 focus:border-[#8B5CF6]"
+                    />
+                  </div>
+                </div>
+
+                {/* Grid row for UserName and WhatsApp mobile */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  {/* Unique Username */}
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 font-mono">
+                      Username
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={regUsername}
+                      onChange={(e) => setRegUsername(e.target.value.replace(/[^a-zA-Z0-9_-]/g, ''))}
+                      placeholder="e.g. alamin79"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-250 dark:border-slate-800 rounded-xl text-xs font-mono text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#8B5CF6]/20 focus:border-[#8B5CF6]"
+                    />
+                  </div>
+
+                  {/* WhatsApp Mobile Number */}
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 font-mono">
+                      WhatsApp Number & Country Code
+                    </label>
+                    <div className="flex gap-2 relative">
+                      {/* Country Code Selection Dropdown */}
+                      <div className="relative w-[30%] flex-shrink-0 group">
+                        <select
+                          value={regPhoneCode}
+                          onChange={(e) => {
+                            setRegPhoneCode(e.target.value);
+                            const label = e.target.value === '+880' ? 'BD (BDT Taka)' : e.target.value === '+966' ? 'SA (SAR Riyal)' : 'Global (USD Dollar)';
+                            triggerToast(`Phone Code: ${e.target.value} (${label})`);
+                          }}
+                          className="w-full pl-2 pr-7 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-250 dark:border-slate-800 rounded-xl text-neutral border-neutral-300 dark:border-neutral-850 text-xs font-bold font-mono text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 appearance-none cursor-pointer"
+                        >
+                          <option value="+880">🇧🇩 +880</option>
+                          <option value="+966">🇸🇦 +966</option>
+                          <option value="+1">🇺🇸 +1</option>
+                          <option value="+44">🇬🇧 +44</option>
+                          <option value="+971">🇦🇪 +971</option>
+                          <option value="+91">🇮🇳 +91</option>
+                        </select>
+                        <div className="pointer-events-none absolute inset-y-0 right-1.5 flex items-center text-slate-400">
+                          <svg className="w-3.5 h-3.5 fill-none stroke-current" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </div>
+                      </div>
+
+                      {/* Phone Local Number Input */}
+                      <div className="relative w-[70%] group">
+                        <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 text-slate-400">
+                          <Phone className="w-4 h-4 text-emerald-500" />
+                        </span>
+                        <input
+                          type="tel"
+                          required
+                          value={regPhone}
+                          onChange={(e) => setRegPhone(e.target.value.replace(/[^0-9]/g, ''))}
+                          placeholder="e.g. 1700112233"
+                          className="w-full pl-8 pr-3 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-250 dark:border-slate-800 rounded-xl text-xs font-mono text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/25 focus:border-emerald-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Email Address */}
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 font-mono">
+                    Email Address
+                  </label>
+                  <div className="relative group">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">
+                      <Mail className="w-4 h-4" />
+                    </span>
+                    <input
+                      type="email"
+                      required
+                      value={regEmail}
+                      onChange={(e) => setRegEmail(e.target.value)}
+                      placeholder="e.g. info@webzonebd.com"
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-250 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Passwords double security */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 font-mono">
+                      Password
+                    </label>
+                    <input
+                      type="password"
+                      required
+                      value={regPassword}
+                      onChange={(e) => setRegPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-250 dark:border-slate-800 rounded-xl text-xs font-mono text-slate-900 dark:text-white focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 font-mono">
+                      Confirm Password
+                    </label>
+                    <input
+                      type="password"
+                      required
+                      value={regConfirmPassword}
+                      onChange={(e) => setRegConfirmPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-250 dark:border-slate-800 rounded-xl text-xs font-mono text-slate-900 dark:text-white focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Agreement Checkbox Terms & Privacy Policy */}
+                <label className="flex items-start gap-2.5 select-none cursor-pointer pt-1">
+                  <input
+                    type="checkbox"
+                    required
+                    checked={regTerms}
+                    onChange={(e) => setRegTerms(e.target.checked)}
+                    className="w-4 h-4 rounded mt-0.5 text-[#8B5CF6] border-slate-300 dark:border-slate-700 accent-[#8B5CF6] cursor-pointer"
+                  />
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
+                    I agree to the <b className="text-slate-700 dark:text-white">Terms & Privacy Policy</b> guidelines.
+                  </span>
+                </label>
+
+                {/* Submit button registration */}
+                <button
+                  type="submit"
+                  className="w-full py-3 text-white font-extrabold text-xs uppercase tracking-widest rounded-xl hover:opacity-95 transition-all shadow-md active:scale-98 flex items-center justify-center gap-2 cursor-pointer duration-250 mt-1"
+                  style={{ background: `linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%)` }}
+                >
+                  <Smartphone className="w-4 h-4 stroke-[2.5]" />
+                  <span>Create Account</span>
+                </button>
+              </form>
+
+              {/* Divider */}
+              <div className="relative flex py-1.5 items-center">
+                <div className="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
+                <span className="flex-shrink mx-4 text-[9px] font-black uppercase text-slate-400 font-mono tracking-wider">
+                  Quick Signup Federation
+                </span>
+                <div className="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
+              </div>
+
+              {/* Social Login Grid */}
+              <div className="grid grid-cols-2 gap-2.5">
+                <button
+                  onClick={() => handleSocialAuth('google')}
+                  className="py-2.5 px-4 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900 transition-all text-xs font-black flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 duration-200"
+                >
+                  <svg className="w-4.5 h-4.5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l3.66-2.85z" fill="#FBBC05"/>
+                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.85c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                  </svg>
+                  <span>Google</span>
+                </button>
+
+                <button
+                  onClick={() => handleSocialAuth('facebook')}
+                  className="py-2.5 px-4 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900 transition-all text-xs font-black flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 duration-200"
+                >
+                  <svg className="w-4.5 h-4.5 fill-blue-600 dark:fill-blue-500" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                  </svg>
+                  <span>Facebook</span>
+                </button>
+              </div>
+
+              {/* Bottom toggle back to login */}
+              <div className="text-center pt-3 border-t border-slate-200 dark:border-slate-850">
+                <p className="text-xs text-slate-450 dark:text-slate-400">
+                  Already registered?{' '}
+                  <button
+                    onClick={() => setView('login')}
+                    className="font-bold text-[#2563EB] dark:text-cyan-400 hover:underline cursor-pointer"
+                  >
+                    Login Now
+                  </button>
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* =====================================
+              PASSWORD RESET / FORGOT POPUP
+              ===================================== */}
+          {view === 'forgot' && (
+            <div className="space-y-4 animate-in fade-in slide-in-from-top-4 duration-200">
+              <div className="text-left">
+                <h3 className="text-2xl font-black text-[#0F172A] dark:text-white tracking-tight flex items-center gap-2">
+                  <span className="p-1.5 rounded-xl text-white bg-indigo-600">
+                    <Lock className="w-4 h-4 text-white" />
+                  </span>
+                  <span>Reset Password</span>
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                  Enter your email address below to receive password reset security links automatically.
+                </p>
+              </div>
+
+              <form onSubmit={handleForgotPasswordSubmit} className="space-y-4">
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 font-mono">
+                    Email Address
+                  </label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">
+                      <Mail className="w-4.5 h-4.5" />
+                    </span>
+                    <input
+                      type="email"
+                      required
+                      value={forgotEmail}
+                      onChange={(e) => setForgotEmail(e.target.value)}
+                      placeholder="e.g. register@webzonebd.com"
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-250 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs uppercase tracking-widest rounded-xl transition shadow-md active:scale-98 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <ArrowRight className="w-4 h-4" />
+                  <span>Send Reset Link</span>
+                </button>
+              </form>
+
+              <div className="text-center pt-3 border-t border-slate-200 dark:border-slate-850">
+                <button
+                  onClick={() => setView('login')}
+                  className="font-bold text-slate-500 dark:text-slate-400 hover:underline cursor-pointer text-xs"
+                >
+                  ← Back to Secure Login
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* =====================================
+              SUCCESS POPUP VIEW - WITH VERIFIED WELCOME EMAIL PREVIEW
+              ===================================== */}
+          {view === 'success' && (
+            <div className="space-y-6 text-center py-2 animate-in fade-in zoom-in duration-350">
+              <div className="flex flex-col items-center space-y-3">
+                <div className="p-4 bg-emerald-500/10 rounded-full border border-emerald-500/20 text-emerald-500 animate-bounce">
+                  <CheckCircle2 className="w-12 h-12 stroke-[2]" />
+                </div>
+                
+                <div className="space-y-1">
+                  <h3 className="text-2xl font-black text-[#0F172A] dark:text-white tracking-tight">
+                    Account Created Successfully
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+                    Welcome to WebzoneBD IT Agency. Your account is ready to use.
+                  </p>
+                </div>
+              </div>
+
+              {/* WELCOME EMAIL SIMULATOR TEMPLATE PREVIEW BOX */}
+              {lastRegisteredUser && (
+                <div className="border border-indigo-500/25 dark:border-slate-800 bg-indigo-500/5 rounded-2xl p-4 text-left space-y-3 font-sans relative overflow-hidden">
+                  
+                  {/* Embedded envelope watermark decorative shape */}
+                  <div className="absolute -right-6 -bottom-6 text-indigo-500/5 select-none rotate-12 pointer-events-none">
+                    <Mail className="w-32 h-32" />
+                  </div>
+
+                  <div className="flex items-center justify-between border-b border-indigo-500/10 pb-2.5 text-[10px]">
+                    <div className="space-y-0.5">
+                      <p className="text-slate-400 font-mono">
+                        <span className="font-bold text-slate-500 dark:text-slate-350">FROM:</span> info@webzonebd.com
+                      </p>
+                      <p className="text-slate-400 font-mono">
+                        <span className="font-bold text-slate-500 dark:text-slate-350">TO:</span> {lastRegisteredUser.email}
+                      </p>
+                    </div>
+                    <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-500 font-mono font-black uppercase rounded text-[8px] tracking-wider border border-emerald-500/15">
+                      📧 Welcome Email Dispatched
+                    </span>
+                  </div>
+
+                  {/* Mail Subject line heading */}
+                  <div className="font-bold text-xs text-slate-800 dark:text-slate-100 flex items-center gap-1">
+                    <CornerDownRight className="w-3.5 h-3.5 text-[#2563EB]" />
+                    <span>Subject: Welcome to WebzoneBD IT Agency – Your Account is Ready</span>
+                  </div>
+
+                  {/* Scrollable Email client viewport */}
+                  <div className="bg-white dark:bg-slate-950 p-3.5 rounded-xl border border-slate-100 dark:border-slate-850 text-[10.5px] text-slate-600 dark:text-slate-300 leading-relaxed font-mono max-h-52 overflow-y-auto space-y-3.5">
+                    <p>Dear <strong className="text-slate-900 dark:text-white font-bold">{lastRegisteredUser.name}</strong>,</p>
+                    
+                    <p>Thank you for joining WebzoneBD IT Solution.</p>
+                    
+                    <p>We are pleased to inform you that your account has been successfully created.</p>
+                    
+                    <div className="border-l-3 border-[#2563EB] pl-3 py-1 bg-slate-550/5 dark:bg-slate-900/40 rounded space-y-1 my-2">
+                      <p className="font-bold uppercase tracking-wider text-[9px] text-[#2563EB] dark:text-cyan-400">Account Information</p>
+                      <p><span className="text-slate-450">Full Name:</span> {lastRegisteredUser.name}</p>
+                      <p><span className="text-slate-450">Email Address:</span> {lastRegisteredUser.email}</p>
+                      <p><span className="text-slate-450">Username:</span> {lastRegisteredUser.username}</p>
+                      <p><span className="text-slate-450">Login URL:</span> <a href="https://www.webzonebd.com/login" target="_blank" className="text-[#2563EB] hover:underline">https://www.webzonebd.com/login</a></p>
+                    </div>
+
+                    <p>You can now access your customer dashboard to manage:</p>
+                    <ul className="list-disc pl-4 space-y-0.5 text-slate-500 dark:text-slate-400 text-[10px]">
+                      <li>Hosting Services</li>
+                      <li>Domain Registrations</li>
+                      <li>Website Development Projects</li>
+                      <li>Digital Products & Downloads</li>
+                      <li>Invoices & Billing</li>
+                      <li>Support Tickets</li>
+                      <li>Affiliate Program</li>
+                    </ul>
+
+                    <p className="italic text-slate-450 text-[10px] border-t border-slate-100 dark:border-slate-800 pt-2 text-center">
+                      🔐 For security reasons, we recommend changing your password after your first login.
+                    </p>
+
+                    <div className="pt-2 text-[10px] space-y-0.5 text-slate-500 dark:text-slate-450">
+                      <p>Website: <a href="https://www.webzonebd.com" className="text-cyan-500">https://www.webzonebd.com</a></p>
+                      <p>Email: info@webzonebd.com</p>
+                      <p>WhatsApp: +966 570511931</p>
+                    </div>
+
+                    <div className="pt-3 border-t border-slate-100 dark:border-slate-850 font-sans text-[10px]">
+                      <p className="font-bold text-slate-700 dark:text-slate-350">Best Regards,</p>
+                      <p className="font-black text-[#2563EB] dark:text-cyan-450">WebzoneBD IT Solution</p>
+                      <p className="text-slate-455 text-[9px]">Technology & Digital Business Solutions</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Interaction grid */}
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                <button
+                  onClick={() => setView('login')}
+                  className="w-full py-3 bg-slate-100 dark:bg-slate-900 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-black uppercase rounded-xl transition border border-slate-205 dark:border-slate-800 cursor-pointer text-center pointer-events-auto active:scale-95 duration-200"
+                >
+                  Login Now
+                </button>
+                <button
+                  onClick={onClose}
+                  className="w-full py-3 text-white font-black text-xs uppercase tracking-wider rounded-xl hover:opacity-90 transition shadow-md cursor-pointer flex items-center justify-center gap-1.5 active:scale-95 duration-200 pointer-events-auto"
+                  style={{ background: `linear-gradient(135deg, #2563EB 0%, #8B5CF6 50%, #06B6D4 100%)` }}
+                >
+                  <span>Go To Dashboard</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
+
+        </div>
+      </motion.div>
+    </div>
+  );
+}
