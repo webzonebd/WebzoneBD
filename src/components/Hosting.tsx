@@ -4,11 +4,123 @@ import {
   Check, ArrowRight, Phone, MessageSquare, ExternalLink, HelpCircle, 
   Globe, Terminal, Award, BadgeAlert, Layers, Activity, Lock, Search, 
   Star, RefreshCw, Layers as LayersIcon, CheckCircle, Info, HelpCircle as HelpIcon,
-  ChevronDown, PhoneCall, CheckCircle2, DollarSign
+  ChevronDown, PhoneCall, CheckCircle2, DollarSign, Upload
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Language, Theme, Currency, Product } from '../types';
 import VpsPerformanceChart from './VpsPerformanceChart';
+import DomainSearch from './DomainSearch';
+
+const vpsSetupTrans = {
+  en: {
+    tag: "✓ Initial VPS Setup",
+    heading: "Step-by-Step VPS Setup",
+    sub: "A precise, technical checklist to securely access root privileges and lay down standard server configurations on WebzoneBD nodes.",
+    terminalTitle: "WebzoneBD Secure Server Terminal",
+    ipPlaceholder: "Your VPS IP Address",
+    connectedText: "Connected to root@",
+    activeStepPrefix: "Step",
+    steps: [
+      {
+        title: "Provisioning & Secure Welcome Email",
+        desc: "Once your WebzoneBD VPS order has finished provisioning, our systems auto-dispatch a highly secure, encrypted credentials package to your primary email address. This contains your dedicated IPv4 address, default SSH port, default administrative user 'root', and randomly generated temporary administrator passphrase.",
+        command: "# Initial status tracking:\ncurl -s https://api.webzonebd.com/vps/provision-status"
+      },
+      {
+        title: "Initial Connection via Secure Shell (SSH)",
+        desc: "Fire up your computer's native Terminal application (macOS/Linux) or launch PuTTY (Windows). Initiate a secure login handshake with the root administrator user using the assigned dedicated IP address. Upon first connection, you must accept the server's unique RSA/ECDSA key fingerprint to forge a secure encrypted pipe.",
+        command: "ssh root@your_server_ip -p 22\n# Accept RSA key fingerprint when prompted by typing 'yes'"
+      },
+      {
+        title: "Root Passphrase Rotation & Sudo Privilege Isolation",
+        desc: "To lock out threat vectors, you must immediately change the temporary system administrator password. To prevent accidental root commands, create a low-privilege system user account and assign it to the 'sudo' (superuser do) group for executing security administrative tasks on demand.",
+        command: "# Change main root account password:\npasswd\n\n# Create specialized low-privilege user and assign sudo powers:\nadduser webadmin\nusermod -aG sudo webadmin"
+      },
+      {
+        title: "Core Updates & Firewall Locking Policy",
+        desc: "Ensure the hypervisor's guest OS dependencies are pristine. Fetch the newest packages repositories and upgrade all core binaries to secure stable versions. Afterward, configure the Uncomplicated Firewall (UFW) to only permit incoming SSH, web ports (HTTP/HTTPS), and lock down unused ingress channels.",
+        command: "# Fetch and apply the latest Ubuntu/Debian updates:\nsudo apt update && sudo apt upgrade -y\n\n# Secure standard system ports with firewall rules:\nsudo ufw allow OpenSSH\nsudo ufw allow 80/tcp\nsudo ufw allow 443/tcp\nsudo ufw enable"
+      },
+      {
+        title: "Web Engine Stack & Panel Setup",
+        desc: "Access your pre-loaded Virtualizor control pane, or initialize standard modern web stacks such as LiteSpeed Enterprise Web Server, Nginx, or an easy GUI management layout (such as CyberPanel or Plesk). Update your DNS settings, deploy your application codes, and link your databases securely.",
+        command: "# Point nameservers to WebzoneBD & check virtual host records:\nnslookup yourbrand.com ns1.webzonebd.com\n# All systems green and ready for production deployment!"
+      }
+    ]
+  },
+  bn: {
+    tag: "✓ প্রাথমিক ভিপিএস সেটআপ",
+    heading: "ধাপে ধাপে ভিপিএস সেটআপ",
+    sub: "আপনার ব্র্যান্ড-নিউ WebzoneBD VPS সার্ভারে রুট অ্যাক্সেস পেতে এবং প্রাথমিক সিকিউরিটি ও কনফিগারেশন সেটআপ করতে নিচের সঠিক গাইডটি অনুসরণ করুন।",
+    terminalTitle: "WebzoneBD সুরক্ষিত সার্ভার টার্মিনাল",
+    ipPlaceholder: "আপনার ভিপিএস আইপি অ্যাড্রেস",
+    connectedText: "রুট কানেকশন সফল@",
+    activeStepPrefix: "ধাপ",
+    steps: [
+      {
+        title: "ভিপিএস প্রোভিশনিং ও সুরক্ষিত ইমেইল তথ্য",
+        desc: "WebzoneBD-তে আপনার ভিপিএস ক্রয় সম্পন্ন হওয়ার সাথে সাথেই আমাদের অটোমেটেড সিস্টেম আপনার রেজিস্টার্ড ইমেইলে একটি সুরক্ষিত ইমেল পাঠাবে। এই প্যাকের মধ্যে পাবেন আপনার ডেডিকেটেড IPv4 অ্যাড্রেস, ডিফল্ট SSH পোর্ট (২২), রুট ইউজারনেম ('root') এবং র্যান্ডমলি জেনারেটেড একটি স্ট্রং পাসওয়ার্ড।",
+        command: "# Initial status tracking:\ncurl -s https://api.webzonebd.com/vps/provision-status"
+      },
+      {
+        title: "SSH টার্মিনাল ব্যবহার করে প্রথম সংযোগ স্থাপন",
+        desc: "উইন্ডোজ অপারেটিং সিস্টেমে 'PuTTY' সফটওয়্যারটি ওপেন করুন অথবা ম্যাক/লিনাক্সে আপনার কম্পিউটারের ডিফল্ট 'Terminal' অ্যাপটি খুলুন। এরপর আপনার অনন্য সুরক্ষিত আইপি ব্যবহার করে সিকিউর কানেকশন রিকোয়েস্ট তৈরি করুন। প্রথমবারের মত কানেক্ট করতে RSA ফিঙ্গারপ্রিন্ট অ্যাক্সেপ্ট করতে হবে।",
+        command: "ssh root@your_server_ip -p 22\n# প্রম্পট আসলে 'yes' লিখে প্রথম সংযোগ অনুমোদন করুন"
+      },
+      {
+        title: "রুট পাসওয়ার্ড রোটেশন ও সুডো ইউজার ক্রিয়েশন",
+        desc: "সার্ভারের সর্বোচ্চ নিরাপত্তা বজায় রাখতে আপনার মেইলে পাওয়া সাময়িক পাসওয়ার্ডটি পরিবর্তন করা আবশ্যক। এছাড়াও সার্বক্ষণিক রুট অ্যাকাউন্ট এড়াতে একটি নরমাল সিস্টেম ইউজার তৈরি করুন এবং প্রয়োজনে রুট পাওয়ার দিয়ে চালানোর জন্য তাকে 'sudo' গ্রুপে যুক্ত করুন।",
+        command: "# এডমিনিস্ট্রেটরের মূল পাসওয়ার্ড পরিবর্তন করুন:\npasswd\n\n# নতুন শক্তিশালী ইউজার তৈরি এবং অ্যাডমিন গ্রুপে যুক্ত করুন:\nadduser webadmin\nusermod -aG sudo webadmin"
+      },
+      {
+        title: "সিস্টেম আপডেট এবং ফায়ারওয়াল পলিসি সেটিংস",
+        desc: "আপনার ভার্চুয়াল সার্ভারের নতুন লিনাক্স রিসিভারের অবিরত গতি ও নিরাপত্তা আপডেট নিশ্চিত করতে লিনাক্স ডিপেন্ডেন্সিগুলো আপডেট করে নিন। এরপর ফায়ারওয়াল (UFW) প্রটেকশন চালু করে অপ্রয়োজনীয় পোর্টের প্রবেশদ্বার সম্পূর্ণরূপে অফ করে দিন।",
+        command: "# নতুন আপডেট ও প্রয়োজনীয় ফাইল প্যাচ ডাউনলোড করুন:\nsudo apt update && sudo apt upgrade -y\n\n# লিনাক্স ফায়ারওয়ালে দরকারী পোর্ট অনুমোদন ও এটি সচল করুন:\nsudo ufw allow OpenSSH\nsudo ufw allow 80/tcp\nsudo ufw allow 443/tcp\nsudo ufw enable"
+      },
+      {
+        title: "ওয়েব ইঞ্জিন স্ট্যাক ও কন্ট্রোল প্যানেল কনফিগারেশন",
+        desc: "সবশেষে আপনার জন্য ইন্টিগ্রেটেড কাস্টম ভার্চুয়ালাইজেশন কন্ট্রোল ফ্লো (যেমন Virtualizor বা CyberPanel/cPanel) দিয়ে হোস্ট জোন সেটআপ করুন। আপনার ডোমেইনের ডিএনএস রেকর্ড আপডেট করুন, লাইটস্পিড ক্যাশ সচল করুন এবং প্রজেক্টের কোড ভিপিএস ডাটাবেসে লঞ্চ করুন।",
+        command: "# পয়েন্ট নেমসার্ভার এবং ডিএনএস কুয়েরি রেকর্ড দেখে নেওয়া:\nnslookup yourbrand.com ns1.webzonebd.com\n# সফল সেটআপ! আপনার ওয়েবসাইট এখন রকেট গতিতে লাইভ।"
+      }
+    ]
+  },
+  ar: {
+    tag: "✓ دليل إعداد خادم VPS الأولي",
+    heading: "إعداد خادم الـ VPS خطوة بخطوة",
+    sub: "خطوات تفصيلية آمنة للاتصال بخادم ويب زون المشترك والخاص وسيطرة كاملة على جدار الحماية ونظام التشغيل.",
+    terminalTitle: "محاكي الاتصال الآمن بسيرفرات ويب زون",
+    ipPlaceholder: "عنوان الآي بي المخصص للسيرفر",
+    connectedText: "تم الاتصال بنجاح بـ root@",
+    activeStepPrefix: "الخطوة",
+    steps: [
+      {
+        title: "تفعيل السيرفر واستلام بيانات الاعتماد",
+        desc: "بمجرد معالجة طلب شراء السيرفر من بنغلاديش، يقوم النظام آلياً بإرسال رسالة مشفرة إلى بريدك الإلكتروني تحتوي على الـ IP المخصص، واسم مستخدم الإدارة 'root' وكلمة المرور المؤقتة والآمنة.",
+        command: "# Initial status tracking:\ncurl -s https://api.webzonebd.com/vps/provision-status"
+      },
+      {
+        title: "الاتصال لأول مرة بالسيرفر عبر بروتوكول SSH",
+        desc: "افتح نافذة الأوامر Terminal على الماك أو برنامج PuTTY على الويندوز. قم بإنشاء بيئة اتصال مشفرة باستخدام عنوان IP الافتراضي والآمن والمنفذ الافتراضي 22. وافق على شفرة التوثيق للحماية والمتابعة.",
+        command: "ssh root@your_server_ip -p 22\n# اكتب 'yes' للموافقة وتحميل بصمة التشفير الآمنة"
+      },
+      {
+        title: "تغيير كلمة المرور الافتراضية للـ Root وعزل الصلاحيات",
+        desc: "توصي سياسات الأمان الخاصة بنا بتحديث فوري وعاجل لكلمة المرور الافتراضية. يوصى أيضاً بإنشاء مستخدم فرعي جديد وتعيينه كعضو في مجموعة الحماية 'sudo' لمنع عمليات الاختراق المباشرة للروت.",
+        command: "# تغيير كلمة مرور حساب المسؤول الرئيسي:\npasswd\n\n# إنشاء مستخدم عادي جديد ومنحه صلاحيات السوبر أدمن:\nadduser webadmin\nusermod -aG sudo webadmin"
+      },
+      {
+        title: "تحديث حزم نظام التشغيل وجدار الحماية الآمن (UFW)",
+        desc: "قم بتشغيل معالجات التحديث للحفاظ على ثبات وسرعة كفاءة نظام السيرفر. قم بتوجيه الجدار الناري لكي يمنح فقط تصريحات الوصول للمنافذ الأساسية للمشروع مثل منافذ المتصفحات والاتصال المشفر SSH.",
+        command: "# تحديث جميع ملفات نظام التشغيل والمحركات:\nsudo apt update && sudo apt upgrade -y\n\n# ضبط جدار الحماية للسيرفر الداخلي وفلترة المنافذ:\nsudo ufw allow OpenSSH\nsudo ufw allow 80/tcp\nsudo ufw allow 443/tcp\nsudo ufw enable"
+      },
+      {
+        title: "لوحات التحكم وحظر الهجمات وتدشين الموقع",
+        desc: "قم بتوجيه نطاق موقعك الإلكتروني لكي ينظر لخوادم الأسماء لويب زون (WebzoneBD). ثبّت خادم الويب LiteSpeed لرفع الفعاليات وسرعة تنفيذ قواعد البيانات وتشغيل موقع البروجكت بكفاءة قصوى.",
+        command: "# التحقق من تفعيل ونطاق خوادم الأسماء للخادم:\nnslookup yourbrand.com ns1.webzonebd.com\n# مبارك! السيرفر الآن نشط ومحمي وتطبيقك يعمل بسرعة خارقة."
+      }
+    ]
+  }
+};
 
 interface HostingProps {
   language: Language;
@@ -16,6 +128,10 @@ interface HostingProps {
   currency: Currency;
   currencySettings?: any;
   addToCart?: (product: Product) => void;
+  addServiceOrder?: (order: any) => Promise<void> | void;
+  user?: any;
+  triggerToast?: (title: string, type: 'success' | 'error' | 'warning' | 'info') => void;
+  setCurrentPage?: (page: string) => void;
 }
 
 export default function Hosting({ 
@@ -23,7 +139,11 @@ export default function Hosting({
   theme, 
   currency, 
   currencySettings, 
-  addToCart 
+  addToCart,
+  addServiceOrder,
+  user,
+  triggerToast,
+  setCurrentPage
 }: HostingProps) {
   
   // Active category tab for filtering Packages
@@ -50,11 +170,16 @@ export default function Hosting({
     };
   }, []);
   
-  // Billing cycle state: monthly | yearly
-  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
+  // Billing cycle state: 1 | 12 | 24 months
+  const [billingCycle, setBillingCycle] = useState<'1' | '12' | '24'>('24');
+  const [isBillingDropdownOpen, setIsBillingDropdownOpen] = useState(false);
 
   // FAQ Accordion active indices state
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
+
+  // Step-by-Step VPS Setup active step state
+  const [activeSetupStep, setActiveSetupStep] = useState<number | null>(0);
+  const [vpsIp, setVpsIp] = useState('141.136.42.112');
 
   // Domain search state inside the redesigned page
   const [domainQuery, setDomainQuery] = useState('');
@@ -73,16 +198,56 @@ export default function Hosting({
 
   const isRtl = language === 'ar';
 
+  // Migration Guide Interactive Wizard States
+  const [wizardStep, setWizardStep] = useState<number>(0);
+  const [wizardWebType, setWizardWebType] = useState<string>('wordpress');
+  const [wizardHasDomain, setWizardHasDomain] = useState<string>('yes');
+  const [wizardTransferMethod, setWizardTransferMethod] = useState<string>('expert');
+  const [wizardOldProvider, setWizardOldProvider] = useState<string>('Namecheap');
+  const [wizardSiteSize, setWizardSiteSize] = useState<string>('Under 5GB');
+  const [wizardAnalysisRun, setWizardAnalysisRun] = useState<boolean>(false);
+  
+  // Custom Manual Upload Simulated states
+  const [wizardFileSelected, setWizardFileSelected] = useState<string | null>(null);
+  const [wizardFileProgress, setWizardFileProgress] = useState<number>(0);
+  const [wizardFileUploading, setWizardFileUploading] = useState<boolean>(false);
+
+  // Live Simulated Transfer states
+  const [wizardSimState, setWizardSimState] = useState<'idle' | 'running' | 'completed'>('idle');
+  const [wizardSimProgress, setWizardSimProgress] = useState<number>(0);
+  const [wizardSimStatus, setWizardSimStatus] = useState<string>('');
+  const [wizardSimLogs, setWizardSimLogs] = useState<string[]>([]);
+
+  // Checklist states
+  const [wizardChecklist, setWizardChecklist] = useState<Record<string, boolean>>({
+    nameservers: false,
+    ssl: false,
+    dbconn: false,
+    cache: false
+  });
+
+  const planPricing: Record<string, { '1': number; '12': number; '24': number }> = {
+    'bdix-starter': { '1': 250, '12': 2500, '24': 4500 },
+    'bdix-business': { '1': 400, '12': 4000, '24': 7000 },
+    'bdix-professional': { '1': 600, '12': 6000, '24': 10500 },
+    'vps-starter': { '1': 1750, '12': 16800, '24': 29400 },
+    'vps-business': { '1': 3505, '12': 33648, '24': 58884 },
+    'vps-professional': { '1': 5925, '12': 56880, '24': 99540 },
+    'reseller-10g': { '1': 899, '12': 8500, '24': 15000 },
+    'reseller-20g': { '1': 1799, '12': 16500, '24': 29000 },
+    'reseller-50g': { '1': 2499, '12': 23500, '24': 42000 },
+  };
+
   const bdtPrices: Record<string, number> = {
-    'bdix-starter': 100,
-    'bdix-business': 200,
-    'bdix-professional': 350,
+    'bdix-starter': 250,
+    'bdix-business': 400,
+    'bdix-professional': 600,
     'vps-starter': 1750,
     'vps-business': 3505,
     'vps-professional': 5925,
-    'reseller-10g': 1400,
-    'reseller-20g': 2340,
-    'reseller-50g': 4680,
+    'reseller-10g': 899,
+    'reseller-20g': 1799,
+    'reseller-50g': 2499,
   };
 
   // Currency rates & precise formatting
@@ -108,11 +273,10 @@ export default function Hosting({
     }
   };
 
-  const getMonthlyPrice = (pkgId: string) => {
+  const getDisplayPrice = (pkgId: string, cycle: '1' | '12' | '24') => {
     let cur = currency;
-    let rates = { USD: 1.0, BDT: 118.5, SAR: 3.75 };
+    let rates = currencySettings?.rates || { USD: 1.0, BDT: 118.5, SAR: 3.75 };
     if (currencySettings) {
-      rates = currencySettings.rates || rates;
       if (currencySettings.enabled && !currencySettings.enabled[cur]) {
         cur = currencySettings.defaultCurrency || 'USD';
       }
@@ -122,13 +286,30 @@ export default function Hosting({
       }
     }
 
-    const bdtBase = bdtPrices[pkgId] || 100;
+    const priceInfo = planPricing[pkgId] || { '1': 100, '12': 1000, '24': 1800 };
+    const bdtTotal = priceInfo[cycle];
+    
+    const months = cycle === '1' ? 1 : cycle === '12' ? 12 : 24;
+    const bdtMonthlyAvg = bdtTotal / months;
+
     const bdtRate = rates.BDT ?? 118.5;
     const targetRate = rates[cur] ?? 1.0;
 
-    // Convert from BDT Base currency dynamically
-    const priceInUSD = bdtBase / bdtRate;
-    return priceInUSD * targetRate;
+    const monthlyPriceInUSD = bdtMonthlyAvg / bdtRate;
+    const monthlyPriceInTarget = monthlyPriceInUSD * targetRate;
+
+    const totalInUSD = bdtTotal / bdtRate;
+    const totalInTarget = totalInUSD * targetRate;
+
+    return {
+      monthlyAvg: monthlyPriceInTarget,
+      totalCost: totalInTarget,
+      bdtTotal,
+    };
+  };
+
+  const getMonthlyPrice = (pkgId: string) => {
+    return getDisplayPrice(pkgId, '1').monthlyAvg;
   };
 
   const formatPeriod = () => {
@@ -455,7 +636,7 @@ export default function Hosting({
         storage: "2GB NVMe SSD",
         badge: null,
         features: [
-          language === 'bn' ? "১টি ওয়েবসাইট হোস্ট করার সুবিধা" : language === 'ar' ? "موقع ويب واحد مخصص" : "Host 1 Website",
+          language === 'bn' ? "১টি ওয়েবসাইট এবং আনলিমিটেড সাবডোমেইন" : language === 'ar' ? "موقع ويب واحد ونطاقات فرعية غير محدودة" : "Host 1 Website & Unlimited Subdomains",
           language === 'bn' ? "২ জিবি ফাস্ট এসএসডি স্টোরেজ" : language === 'ar' ? "مساحة ٢ جيجابايت فائقة NVMe" : "2GB NVMe SSD Storage",
           language === 'bn' ? "unlimited ব্যান্ডউইথ" : language === 'ar' ? "معدل نقل بيانات وباندويث مفتوح" : "Unlimited Bandwidth",
           language === 'bn' ? "১০টি ইমেইল এড্রেস" : language === 'ar' ? "١٠ حسابات بريد مخصصة" : "10 Mailbox Accounts",
@@ -479,7 +660,7 @@ export default function Hosting({
         storage: "5GB NVMe SSD",
         badge: language === 'bn' ? "সবচেয়ে জনপ্রিয়" : language === 'ar' ? "الأكثر اختياراً" : "Most Popular",
         features: [
-          language === 'bn' ? "৩টি ওয়েবসাইট হোস্ট করার সুবিধা" : language === 'ar' ? "استضافة حتى ٣ مواقع مستقلة" : "Host up to 3 Websites",
+          language === 'bn' ? "১টি ওয়েবসাইট এবং আনলিমিটেড সাবডোমেইন" : language === 'ar' ? "موقع ويب واحد ونطاقات فرعية غير محدودة" : "Host 1 Website & Unlimited Subdomains",
           language === 'bn' ? "৫ জিবি আল্ট্রা ফাস্ট স্টোরেজ" : language === 'ar' ? "مساحة ٥ جيجابايت NVMe SSD" : "5GB NVMe SSD Storage",
           language === 'bn' ? "unlimited হাই-স্পিড ব্যান্ডউইথ" : language === 'ar' ? "ترافيك وباندويث غير محدود" : "Unlimited Bandwidth",
           language === 'bn' ? "৩০টি প্রফেশনাল মেইলবক্স" : language === 'ar' ? "٣٠ بريداً إلكترونياً رسمياً" : "30 Enterprise Email Boxes",
@@ -503,7 +684,7 @@ export default function Hosting({
         storage: "10GB NVMe SSD",
         badge: language === 'bn' ? "সেরা পছন্দ" : language === 'ar' ? "أفضل قيمة" : "Best Value",
         features: [
-          language === 'bn' ? "১০টি ওয়েবসাইট হোস্ট সুবিধা" : language === 'ar' ? "استضافة حتى ١٠ مواقع مستقلة" : "Host up to 10 Websites",
+          language === 'bn' ? "১টি ওয়েবসাইট এবং আনলিমিটেড সাবডোমেইন" : language === 'ar' ? "موقع ويب واحد ونطاقات فرعية غير محدودة" : "Host 1 Website & Unlimited Subdomains",
           language === 'bn' ? "১০ জিবি সুপারস্টোরেজ NVMe" : language === 'ar' ? "أقراص تخزين ١٠ جيجابايت NVMe SSD" : "10GB Premium NVMe Storage",
           language === 'bn' ? "unlimited রিয়েলটাইম ব্যান্ডউইথ" : language === 'ar' ? "معدل نقل ترافيك وباندويث فائق" : "Unlimited Bandwidth",
           language === 'bn' ? "unlimited মেইলবক্স অ্যাড্রেস" : language === 'ar' ? "حسابات بريد إلكتروني غير محدودة" : "Unlimited Email Accounts",
@@ -596,73 +777,67 @@ export default function Hosting({
     reseller: [
       {
         id: "reseller-10g",
-        name: "Reseller 10GB",
-        nameBn: "রিসেলার ১০ জিবি প্ল্যান",
-        nameAr: "موزع المبتدئين الروتيني 10GB",
-        price: 11.99,
+        name: "10 GB NVMe Reseller",
+        nameBn: "১০ জিবি এনভিএমই রিসেলার",
+        nameAr: "موزع 10 جيجابايت NVMe SSD",
+        price: 8.99,
         storage: "10GB NVMe SSD",
         badge: null,
         features: [
-          language === 'bn' ? "১০ জিবি সুপারস্টোরেজ NVMe ড্রাইভ" : language === 'ar' ? "مساحة ١٠ جيجابايت NVMe SSD للأداء" : "10GB Pure NVMe SSD Storage",
-          language === 'bn' ? "১০টি সম্পূর্ণ পৃথক সিপ্যানেল একাউন্ট তৈরি" : language === 'ar' ? "إنشاء وإدارة ١٠ حسابات cPanel مخصصة" : "Host up to 10 WHM/cPanel Accounts",
-          language === 'bn' ? "১০০% নিজস্ব ব্র্যান্ডিং (হোয়াইট-লেবেল)" : language === 'ar' ? "هوية مخصصة بيضاء بالكامل White-Label" : "100% White-Label (Custom Name Servers)",
-          language === 'bn' ? "ফাইল স্থানান্তরের জন্য আনলিমিটেড ব্যান্ডউইথ" : language === 'ar' ? "باندويث ترافيك مرن غير محدود" : "Unlimited Monthly Bandwidth",
-          language === 'bn' ? "ফ্রি আনলিমিটেড এসএসএল সব ডোমেনে" : language === 'ar' ? "شهادات أمان مجانية لجميع عملائك بموقعك" : "Free SSL Certificates for Users",
-          language === 'bn' ? "ডাইনামিক ডব্লিউএইচএম (WHM) এডমিন কন্ট্রোল" : language === 'ar' ? "لوحة تحكم إدارية مركزية WHM للموزع" : "Full Access to WHM Reseller Admin Panel",
-          language === 'bn' ? "১-ক্লিক সফটাকুলাস স্ক্রিপ্ট ইন্সটলার" : language === 'ar' ? "تثبيت وتركيب فوري ومبسط للأكواد" : "Softaculous installer for clients",
-          language === 'bn' ? "রিয়েলটাইম ইমিউনিফাই৩৬০ ফায়ারওয়াল" : language === 'ar' ? "حماية مضادة للمالوير والهاكينج Imunify360" : "Enterprise Malware Shield Isolation"
+          language === 'bn' ? "১০টি cPanel অ্যাকাউন্ট" : "10 cPanel Accounts Managed",
+          language === 'bn' ? "১০০% পিউর NVMe SSD স্টোরেজ" : "100% Pure NVMe SSD Storage",
+          language === 'bn' ? "ফ্রি WHM + SSL + ব্যাকআপ সুবিধা" : "Free WHM + SSL + Automated Backup",
+          language === 'bn' ? "১০০% হোয়াইট লেবেল (কাস্টম নেমসার্ভার)" : "100% White-Label Custom Nameservers",
+          language === 'bn' ? "লোকাল বিডিআইএক্স কানেক্টিভিটি" : "Super-fast BDIX Connectivity",
+          language === 'bn' ? "২৪/৭ ইনস্ট্যান্ট টেকনিক্যাল সাপোর্ট" : "24/7 Instant Technical Support"
         ],
         perfectFor: [
-          language === 'bn' ? "ক্ষুদ্র ওয়েব এজেন্সি বা আইটি প্রতিষ্ঠান" : language === 'ar' ? "وكالات الويب الصغيرة والاستوديوهات الرقمية" : "Aspiring Web Hosting Brands",
-          language === 'bn' ? "অল্প কিছু ক্লায়েন্ট সাইট নিরাপদ রাখার কাজে" : language === 'ar' ? "المصممين الراغبين بإدارة مواقع عملائهم مكعب" : "Custom Multi-site Hubs"
+          language === 'bn' ? "ক্ষুদ্র ওয়েব এজেন্সি বা আইটি প্রতিষ্ঠান" : "Aspiring Web Hosting Brands",
+          language === 'bn' ? "অল্প কিছু ক্লায়েন্ট সাইট নিরাপদ রাখার কাজে" : "Custom Multi-site Hubs"
         ],
         url: "https://host.webzonebd.com/index.php?rp=/store/reseller-hosting"
       },
       {
         id: "reseller-20g",
-        name: "Reseller 20GB",
-        nameBn: "রিসেলার ২০ জিবি প্ল্যান",
-        nameAr: "موزع الاستضافة المتقدم 20GB",
-        price: 19.99,
-        storage: "20GB NVMe SSD",
-        badge: language === 'bn' ? "সবচেয়ে জনপ্রিয়" : language === 'ar' ? "الأكثر اختياراً" : "Most Popular",
+        name: "30 GB NVMe Reseller",
+        nameBn: "৩০ জিবি এনভিএমই রিসেলার",
+        nameAr: "موزع 30 جيجابايت NVMe SSD",
+        price: 17.99,
+        storage: "30GB NVMe SSD",
+        badge: language === 'bn' ? "সবচেয়ে জনপ্রিয়" : "Most Popular",
         features: [
-          language === 'bn' ? "২০ জিবি সুপারস্টোরেজ NVMe ড্রাইভ" : language === 'ar' ? "مساحة ٢٠ جيجابايت NVMe SSD سريعة" : "20GB Pure NVMe SSD Storage",
-          language === 'bn' ? "২০টি সম্পূর্ণ পৃথক সিপ্যানেল একাউন্ট" : language === 'ar' ? "صلاحية إنشاء ٢٠ حساب cPanel منفصل" : "Host up to 20 WHM/cPanel Accounts",
-          language === 'bn' ? "হোয়াইট-লেবেল (WHM ও কাস্টম নেমসার্ভার)" : language === 'ar' ? "نيم سيرفرات وهامش تحكّم باسم شركتك" : "100% White-Label with Custom Name Servers",
-          language === 'bn' ? " can ব্যান্ডউইথ পুল" : language === 'ar' ? "سِعات ترافيك غير محدودة طوال الشهر" : "Unlimited Monthly Bandwidth Pool",
-          language === 'bn' ? "কাস্টমারদের জন্য ফ্রি লাইটস্পীড ক্যাশ" : language === 'ar' ? "مسرعات أداء لايت سبيد لعملاء خطتك" : "Free LiteSpeed Web Cache integration",
-          language === 'bn' ? "সম্পূর্ণ ই-মেইল এবং ডাটাবেস স্বাধীনতা" : language === 'ar' ? "حسابات بريد مهنية غير محدودة لأعمالك" : "Unlimited Databases & Email pools",
-          language === 'bn' ? "২টি পৃথক অফসাইট ব্যাকআপ নোড" : language === 'ar' ? "نسخ احتياطي مركزي دوري للعملاء والموزع" : "Automated off-site backup safeguards",
-          language === 'bn' ? "রিয়েলটাইম ইমিউনিফাই৩৬০ ফায়ারওয়াল" : language === 'ar' ? "حماية كبرى ضد ثغرات وحقن البيانات" : "Imunify360 Live Firewall isolation"
+          language === 'bn' ? "২৫-৩০টি cPanel অ্যাকাউন্ট" : "25-30 cPanel Accounts",
+          language === 'bn' ? "৩০ জিবি পিউর NVMe SSD স্টোরেজ" : "30GB Pure NVMe SSD Storage",
+          language === 'bn' ? "ডেডিকেটেড ফুল রিসোর্স পুল" : "Dedicated Server Resource Pool",
+          language === 'bn' ? "অত্যন্ত দ্রুত লাইটস্পিড ওয়েব সার্ভার" : "LiteSpeed Web Server Integration",
+          language === 'bn' ? "হোয়াইট-লেবেল ব্রান্ডিং রি-সেল সেলস" : "White-Label Brandings & Controls",
+          language === 'bn' ? "WHM প্যানেল এডমিন এক্সেস সুবিধা" : "Full WHM Central Reseller Panel"
         ],
         perfectFor: [
-          language === 'bn' ? "মাঝারি আইটি কনসালটেন্সি ও এজেন্সি" : language === 'ar' ? "شركات الخدمات البرمجية والتسويق المتوسطة" : "Growing IT & Web Solutions Teams",
-          language === 'bn' ? "পেশাদার ফ্রিল্যান্সার বা ওয়েব ডেভেলপার" : language === 'ar' ? "المطورين والفرلانسرز ذوي المحافظ الكبيرة" : "Modern Freelancers & Agencies"
+          language === 'bn' ? "মাঝারি আইটি কনসালটেন্সি ও এজেন্সি" : "Growing IT & Web Solutions Teams",
+          language === 'bn' ? "পেশাদার ফ্রিল্যান্সার বা ওয়েব ডেভেলপার" : "Modern Freelancers & Agencies"
         ],
         url: "https://host.webzonebd.com/index.php?rp=/store/reseller-hosting"
       },
       {
         id: "reseller-50g",
-        name: "Reseller 50GB",
-        nameBn: "রিসেলার ৫০ জিবি প্ল্যান",
-        nameAr: "باقة موزع النخبة الضخم 50GB",
-        price: 39.99,
+        name: "50 GB NVMe Reseller",
+        nameBn: "৫০ জিবি এনভিএমই রিসেলার",
+        nameAr: "موزع 50 جيجابايت NVMe SSD",
+        price: 24.99,
         storage: "50GB NVMe SSD",
-        badge: language === 'bn' ? "সেরা পছন্দ" : language === 'ar' ? "أفضل قيمة" : "Best Value",
+        badge: language === 'bn' ? "সেরা পছন্দ" : "Best Value",
         features: [
-          language === 'bn' ? "৫০ জিবি এন্টারপ্রাইজ NVMe স্টোরেজ" : language === 'ar' ? "سعة هائلة ٥٠ جيجابايت NVMe SSD مطورة" : "50GB Enterprise NVMe SSD Storage",
-          language === 'bn' ? "৫০টি স্বাধীন সিপ্যানেল একাউন্ট" : language === 'ar' ? "إمكانية إنشاء وإدارة ٥٠ حساب cPanel مستقل" : "Host up to 50 WHM/cPanel Accounts",
-          language === 'bn' ? "কাস্টম নেমসার্ভার ও হোয়াইট লেবেল" : language === 'ar' ? "نيم سيرفرات مخصصة تامة بدون شعارنا" : "100% White-Label with Dedicated Controls",
-          language === 'bn' ? "প্রিমিয়াম হাই-স্পিড ব্যান্ডউইথ পুল" : language === 'ar' ? "باقات ترافيك غير محدودة وفائقة الضخامة" : "Uncapped Monthly Bandwidth Capacity",
-          language === 'bn' ? "ক্লায়েন্টদের ফ্রি রিলেভেন্ট কুপন স্কিমস" : language === 'ar' ? "لوحة WHM مركزية مع مزايا الشركاء" : "WHM Core administration with reseller benefits",
-          language === 'bn' ? "আনলিমিটেড ডাটাবেস ও ইমেইল" : language === 'ar' ? "أنظمة بريد آمنة ومسرعات تصفح لعملائك" : "Unlimited Mailboxes, Databases & Subdomains",
-          language === 'bn' ? "উচ্চতর ক্ষমতার এন্টারপ্রাইজ ডাটা শিল্ড" : language === 'ar' ? "حماية كبرى ضد ثغرات SQL ومكافحة مخرجات DDoS" : "Active DDoS mitigation & Malware filtering pool",
-          language === 'bn' ? "২৪/৭ সরাসরি হোয়াটসঅ্যাপ ও সার্ভার রুট সাপোর্ট" : language === 'ar' ? "دعم أولوي مباشر لكادر مهندسي السيرفرات لدينا" : "VIP Server Route Management Support"
+          language === 'bn' ? "৪০-৫০টি cPanel অ্যাকাউন্ট" : "40-50 cPanel Accounts Allowed",
+          language === 'bn' ? "৫০ জিবি এন্টারপ্রাইজ NVMe স্টোরেজ" : "50GB Enterprise NVMe SSD Storage",
+          language === 'bn' ? "আল্ট্রা-ব্যান্ডউইথ আনক্যাপড প্ল্যান" : "Ultra-Bandwidth Uncapped Plan",
+          language === 'bn' ? "এক্সপার্ট এজেন্সি আনলিমিটেড চয়েস" : "Expert Agency Premium Choice",
+          language === 'bn' ? "কাস্টম নেমসার্ভার ও হোয়াইট লেবেল" : "Whitelabel Name Servers & Branding",
+          language === 'bn' ? "রিসেলার এক্সক্লুসিভ বেনিফিটস সিংক" : "Reseller Exclusive Central Benefits"
         ],
         perfectFor: [
-          language === 'bn' ? "প্রতিষ্ঠিত কাস্টম সফটওয়্যার কোম্পানি" : language === 'ar' ? "شركات البرمجة الرائدة لتوزيع الخطط لمشاريعها" : "Full-Scale Software & IT Companies",
-          language === 'bn' ? "বৃহৎ ফ্রিল্যান্সিং টিম বা ডেভেলপমেন্ট গুরু" : language === 'ar' ? "المشروعات الناشئة بتبسيط كلي للتكاليف تامة" : "Professional Hosting Resellers"
+          language === 'bn' ? "প্রতিষ্ঠিত কাস্টম সফটওয়্যার কোম্পানি" : "Full-Scale Software & IT Companies",
+          language === 'bn' ? "বৃহৎ ফ্রিল্যান্সিং টিম বা ডেভেলপমেন্ট গুরু" : "Professional Hosting Resellers"
         ],
         url: "https://host.webzonebd.com/index.php?rp=/store/reseller-hosting"
       }
@@ -687,6 +862,121 @@ export default function Hosting({
     const divider = url.includes('?') ? '&' : '?';
     const finalUrl = `${url}${divider}currency=${currency}`;
     window.open(finalUrl, '_blank', 'noopener,noreferrer');
+  };
+
+  // Migration Guide simulator and interaction handlers
+  const handleStartSimulation = () => {
+    if (wizardSimState === 'running') return;
+    setWizardSimState('running');
+    setWizardSimProgress(0);
+    setWizardSimLogs([]);
+
+    const steps = [
+      {
+        progress: 15,
+        status: language === 'bn' ? 'আগের হোস্টিং প্রোভাইডারের সার্ভারের সাথে নিরাপদ কানেকশন স্থাপন করা হচ্ছে...' 
+                : language === 'ar' ? 'جاري الاتصال بالسيرفر للمستضيف القديم وتأمين الاتصال السحابي...' 
+                : 'Establishing secure handshake connection with current hosting provider...',
+        log: language === 'bn' ? '✓ কানেকশন সাকসেসফুল। পিং রেট: ৪৫ মিলি সেকেন্ড।' 
+             : language === 'ar' ? '✓ تم إقامة الاتصال الهيكلي بنجاح. وقت الاستجابة: 45ms' 
+             : '✓ Handshake established successfully. Ping Latency: 45ms'
+      },
+      {
+        progress: 40,
+        status: language === 'bn' ? 'পুরো সিপ্যানেল ফাইল এবং ডাটাবেস ব্যাকআপ তৈরি করা হচ্ছে...' 
+                : language === 'ar' ? 'جاري تجميع وضغط ملفات الموقع وقواعد البيانات بصيغة cPanel تار...' 
+                : 'Packaging files & compressing MySQL databases into a secure cPanel backup standard archive...',
+        log: language === 'bn' ? '✓ ব্যাকআপ আর্কাইভ তৈরি শেষ। সাইজ: ১২৪ মেগাবাইট।' 
+             : language === 'ar' ? '✓ تم إنشاء حزمة الأرشيف بالكامل. المساحة المستخرجة: 124MB' 
+             : '✓ Archive packaged. Detected size: 124MB cPanel tarball.'
+      },
+      {
+        progress: 65,
+        status: language === 'bn' ? 'ওয়েবজোনবিডি আল্ট্রা-স্পিড ঢাকা বিডিআইএক্স উডলিংকের মাধ্যমে ফাইল ট্রান্সফার করা হচ্ছে...' 
+                : language === 'ar' ? 'جاري نقل الملفات عبر منفذ الربط السحابي لـ WebzoneBD بمعدل فائق...' 
+                : 'Transporting data block via secure WebzoneBD high-speed BDIX pipeline link...',
+        log: language === 'bn' ? '✓ ট্রান্সফার কমপ্লিট। গড় স্পিড: ৬.৫ এমবি/সেকেন্ড।' 
+             : language === 'ar' ? '✓ اكتملت عملية النقل الآمن للمقر الجديد. معدل السرعة: 6.5 MB/s' 
+             : '✓ Data transmitted. Dynamic speed: 6.5 MB/s uplink burst.'
+      },
+      {
+        progress: 85,
+        status: language === 'bn' ? 'লাইটস্পিড সার্ভারে ফাইল কুয়েরি এক্সট্রাক্ট করা হচ্ছে ও পিএইচপি মেমোরি এডজাস্ট করা হচ্ছে...' 
+                : language === 'ar' ? 'جاري فك الضغط على خادم LiteSpeed ومطابقة روابط قواعد البيانات للووردبريس...' 
+                : 'Extracting file tree onto LiteSpeed system nodes & matching database credentials...',
+        log: language === 'bn' ? '✓ ডেটাবেস কানেকশন রিকনফিগার করা শেষ।' 
+             : language === 'ar' ? '✓ تم فك الضغط ومطابقة wp-config لتفادي مشاكل الأخطاء بالكامل' 
+             : '✓ Database credentials successfully re-mapped and wp-config matches confirmed.'
+      },
+      {
+        progress: 100,
+        status: language === 'bn' ? 'স্বয়ংক্রিয় ক্লাউড সিকিউরিটি স্ক্যান এবং লেটস এনক্রিপ্ট এসএসএল ইস্যু করা হচ্ছে...' 
+                : language === 'ar' ? 'جاري إجراء الفحص بالحصن الأمني Imunify360 وإصدار شهادةLet\'s Encrypt SSL مجاناً...' 
+                : 'Running custom Imunify360 scan & issuing Let\'s Encrypt TLS protection...',
+        log: language === 'bn' ? '✓ অভিনন্দন! কোনো ম্যালওয়্যার পাওয়া যায়নি। এসএসএল সিকিউর শীল্ড একটিভ হয়েছে!' 
+             : language === 'ar' ? '✓ رائع جداً! لم يتم العثور على برمجيات ضارة وتم تفعيل تشفير SSL وبادلوك الحماية!' 
+             : '✓ Completed! Imunify350 scan: 0 threats. Free Let\'s Encrypt SSL active.'
+      }
+    ];
+
+    let currentStepIdx = 0;
+    
+    const interval = setInterval(() => {
+      if (currentStepIdx < steps.length) {
+        const item = steps[currentStepIdx];
+        setWizardSimProgress(item.progress);
+        setWizardSimStatus(item.status);
+        setWizardSimLogs(prev => [...prev, item.log]);
+        currentStepIdx++;
+      } else {
+        clearInterval(interval);
+        setWizardSimState('completed');
+      }
+    }, 1200);
+  };
+
+  const handleMockFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const file = e.target.files[0];
+    setWizardFileSelected(file.name);
+    setWizardFileUploading(true);
+    setWizardFileProgress(0);
+
+    const interval = setInterval(() => {
+      setWizardFileProgress(prev => {
+        if (prev >= 100) {
+          clearInterval(interval);
+          setWizardFileUploading(false);
+          return 100;
+        }
+        return prev + 20;
+      });
+    }, 150);
+  };
+
+  const handleDummyDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setWizardFileSelected("backup_site_archive.tar.gz");
+    setWizardFileUploading(true);
+    setWizardFileProgress(0);
+
+    const interval = setInterval(() => {
+      setWizardFileProgress(prev => {
+        if (prev >= 100) {
+          clearInterval(interval);
+          setWizardFileUploading(false);
+          return 100;
+        }
+        return prev + 25;
+      });
+    }, 120);
+  };
+
+  const handleToggleChecklist = (key: string) => {
+    setWizardChecklist(prev => ({
+      ...prev,
+      [key]: !prev[key]
+    }));
   };
 
   // Perform a simulated domain lookup inside Hosting page
@@ -795,6 +1085,140 @@ export default function Hosting({
     }
   };
 
+  // --- WHATSAPP ORDER FORM STATES & HANDLERS ---
+  const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
+  const [orderForm, setOrderForm] = useState({
+    customerName: '',
+    customerEmail: '',
+    customerPhone: '',
+    companyName: '',
+    domain: '',
+    hostingType: 'bdix',
+    planId: 'bdix-starter',
+    billingCycle: '24' as '1' | '12' | '24',
+    notes: ''
+  });
+  const [formSubmitted, setFormSubmitted] = useState(false);
+  const [formLoading, setFormLoading] = useState(false);
+  const [formError, setFormError] = useState('');
+
+  const formPackagesList = [
+    { id: 'bdix-starter', title: 'Starter Plan (BDIX Shared)', titleBn: 'স্টার্টার প্ল্যান (BDIX Shared)', category: 'Shared Hosting', price: 0.99, hostingType: 'bdix' },
+    { id: 'bdix-business', title: 'Business Plan (BDIX Shared)', titleBn: 'বিজনেস প্ল্যান (BDIX Shared)', category: 'Shared Hosting', price: 1.99, hostingType: 'bdix' },
+    { id: 'bdix-professional', title: 'Professional Plan (BDIX Shared)', titleBn: 'প্রফেশনাল প্ল্যান (BDIX Shared)', category: 'Shared Hosting', price: 2.99, hostingType: 'bdix' },
+    { id: 'vps-starter', title: 'VPS Starter Plan', titleBn: 'ভিপিএস স্টার্টার প্ল্যান', category: 'VPS Plans', price: 14.99, hostingType: 'vps' },
+    { id: 'vps-business', title: 'VPS Business Plan', titleBn: 'ভিপিএস বিজনেস প্ল্যান', category: 'VPS Plans', price: 29.99, hostingType: 'vps' },
+    { id: 'vps-professional', title: 'VPS Pro Plan', titleBn: 'ভিপিএস প্রো প্ল্যান', category: 'VPS Plans', price: 49.99, hostingType: 'vps' },
+    { id: 'reseller-10g', title: '10 GB NVMe Reseller', titleBn: '১০ জিবি এনভিএমই রিসেলার', category: 'Reseller Hosting', price: 8.99, hostingType: 'reseller' },
+    { id: 'reseller-20g', title: '30 GB NVMe Reseller', titleBn: '৩০ জিবি এনভিএমই রিসেলার', category: 'Reseller Hosting', price: 17.99, hostingType: 'reseller' },
+    { id: 'reseller-50g', title: '50 GB NVMe Reseller', titleBn: '৫০ জিবি এনভিএমই রিসেলার', category: 'Reseller Hosting', price: 24.99, hostingType: 'reseller' },
+  ];
+
+  const handleHostingTypeChange = (type: string) => {
+    const firstPkgOfNewType = formPackagesList.find(p => p.hostingType === type);
+    setOrderForm(prev => ({
+      ...prev,
+      hostingType: type,
+      planId: firstPkgOfNewType ? firstPkgOfNewType.id : ''
+    }));
+  };
+
+  const handleOpenOrderModal = (planId?: string) => {
+    const selectedPlanId = planId || 'bdix-starter';
+    let detectedType = 'bdix';
+    if (selectedPlanId.startsWith('vps-')) {
+      detectedType = 'vps';
+    } else if (selectedPlanId.startsWith('reseller-')) {
+      detectedType = 'reseller';
+    }
+
+    setOrderForm({
+      customerName: user?.name || '',
+      customerEmail: user?.email || '',
+      customerPhone: user?.phone || '',
+      companyName: '',
+      domain: '',
+      hostingType: detectedType,
+      planId: selectedPlanId,
+      billingCycle: billingCycle || '24',
+      notes: ''
+    });
+    setFormSubmitted(false);
+    setFormError('');
+    setIsOrderModalOpen(true);
+  };
+
+  const handleFormSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError('');
+
+    if (!orderForm.customerName.trim()) {
+      setFormError(language === 'bn' ? 'দয়া করে আপনার নাম লিখুন।' : 'Please enter your name.');
+      return;
+    }
+    if (!orderForm.customerPhone.trim()) {
+      setFormError(language === 'bn' ? 'দয়া করে আপনার মোবাইল নম্বর লিখুন।' : 'Please enter your mobile number.');
+      return;
+    }
+
+    setFormLoading(true);
+
+    try {
+      const selectedPkgDetails = formPackagesList.find(p => p.id === orderForm.planId);
+      const displayPrice = getDisplayPrice(orderForm.planId, orderForm.billingCycle);
+      
+      const orderId = `ord-fixed-hosting-${Date.now()}`;
+      const orderObj = {
+        id: orderId,
+        itemTitle: selectedPkgDetails ? `[Hosting] ${selectedPkgDetails.title}` : `[Hosting] ${orderForm.planId}`,
+        price: Number(displayPrice.totalCost.toFixed(2)),
+        date: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+        paymentMethod: 'WhatsApp Order Direct',
+        paymentStatus: 'pending' as const,
+        status: 'pending' as const,
+        customerName: orderForm.customerName,
+        customerEmail: orderForm.customerEmail || 'N/A',
+        customerPhone: orderForm.customerPhone,
+        orderNotes: `Company: ${orderForm.companyName || 'N/A'}\nDomain: ${orderForm.domain || 'N/A'}\nBilling Cycle: ${orderForm.billingCycle} Months\nPlan: ${orderForm.planId}\nNotes: ${orderForm.notes || 'None'}`
+      };
+
+      if (addServiceOrder) {
+        await addServiceOrder(orderObj);
+      } else {
+        const saved = localStorage.getItem('webzone_orders');
+        const list = saved ? JSON.parse(saved) : [];
+        list.push(orderObj);
+        localStorage.setItem('webzone_orders', JSON.stringify(list));
+      }
+
+      // Format WhatsApp Message
+      const msg = `🟢 *NEW HOSTING ORDER* 🟢
+----------------------------------
+👤 *Customer:* ${orderForm.customerName}
+📞 *Phone:* ${orderForm.customerPhone}
+📧 *Email:* ${orderForm.customerEmail || 'N/A'}
+🏢 *Company Name:* ${orderForm.companyName || 'N/A'}
+🌐 *Domain:* ${orderForm.domain || 'N/A'}
+📦 *Plan:* ${selectedPkgDetails?.title || orderForm.planId}
+🗓️ *Billing Cycle:* ${orderForm.billingCycle} Months
+💰 *Price:* ${formatPriceVal(displayPrice.totalCost)}
+📝 *Notes:* ${orderForm.notes || 'None'}
+----------------------------------
+Sent from WebzoneBD Premium Order System`;
+
+      window.open(`https://wa.me/966570511931?text=${encodeURIComponent(msg)}`, '_blank', 'noopener,noreferrer');
+      setFormSubmitted(true);
+      if (triggerToast) {
+        triggerToast(language === 'bn' ? 'অর্ডার সফলভাবে জমা হয়েছে!' : 'Order submitted successfully!', 'success');
+      }
+    } catch (err: any) {
+      console.error(err);
+      setFormError(language === 'bn' ? 'অর্ডার জমা দিতে সমস্যা হয়েছে। আবার চেষ্টা করুন।' : 'Failed to submit order. Please try again.');
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
   return (
     <div 
       className="bg-[#F8FAFC] dark:bg-[#020617] text-slate-800 dark:text-slate-100 min-h-screen transition-colors duration-300 font-sans overflow-hidden" 
@@ -814,27 +1238,25 @@ export default function Hosting({
         
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
           
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border border-blue-500/20 dark:border-cyan-500/30 mb-6 shadow-sm"
-          >
-            <Sparkles className="w-4 h-4 text-[#2563EB] dark:text-[#0EA5E9] animate-spin" style={{ animationDuration: '6s' }} />
-            <span className="text-xs font-black uppercase tracking-wider text-blue-700 dark:text-cyan-400 font-mono">
-              WebzoneBD IT Solutions Node-Uptime SLA Guarantee
-            </span>
-          </motion.div>
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-cyan-400 border border-blue-200/40 dark:border-blue-900/40 text-xs font-black uppercase tracking-wider animate-pulse mb-6">
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>SSD Cloud Web VPS Hosting</span>
+          </div>
 
           <motion.h1
-            initial={{ opacity: 0, y: 15 }}
+            initial={{ opacity: 0, y: 25 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.1 }}
+            transition={{ type: "spring", stiffness: 100, damping: 15, delay: 0.15 }}
             className="text-4xl md:text-6xl font-black tracking-tight text-slate-900 dark:text-white leading-tight mb-6"
           >
-            <span className="bg-gradient-to-r from-[#2563EB] to-[#8B5CF6] bg-clip-text text-transparent">
+            <motion.span 
+              animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
+              transition={{ repeat: Infinity, duration: 8, ease: "easeInOut" }}
+              style={{ backgroundSize: "200% auto" }}
+              className="bg-gradient-to-r from-[#2563EB] via-[#8B5CF6] to-[#0EA5E9] bg-clip-text text-transparent inline-block pb-1"
+            >
               {currentTrans.heroTitle}
-            </span>
+            </motion.span>
           </motion.h1>
 
           <motion.p
@@ -881,184 +1303,14 @@ export default function Hosting({
       </section>
 
       {/* ================================= DOMAIN SEARCH SECTION ================================= */}
-      <section className="relative -mt-16 md:-mt-24 mb-20 max-w-5xl mx-auto px-4 z-20">
-        <div className="bg-white/80 dark:bg-[#0F172A]/85 backdrop-blur-3xl p-6 md:p-8 rounded-[32px] border border-slate-200/60 dark:border-slate-800/80 shadow-2xl shadow-slate-900/10">
-          <div className="text-center mb-6">
-            <h3 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white mb-2 flex items-center justify-center gap-2 font-display">
-              <Globe className="w-5 h-5 text-emerald-500 animate-spin" style={{ animationDuration: '10s' }} />
-              <span className="bg-gradient-to-r from-[#10B981] to-[#06B6D4] bg-clip-text text-transparent">
-                {currentTrans.domainTitle}
-              </span>
-            </h3>
-            
-            {/* Quick Actions row */}
-            <div className="flex flex-wrap justify-center items-center gap-3 text-xs text-slate-500 dark:text-slate-400 font-medium mt-1">
-              <button 
-                onClick={() => setDomainQuery('mybusiness')}
-                className="hover:text-blue-600 dark:hover:text-cyan-400 underline decoration-dotted"
-              >
-                ✓ {currentTrans.registerDomain}
-              </button>
-              <span className="text-slate-300 dark:text-slate-700 select-none">|</span>
-              <button 
-                onClick={() => handleSupportInquiry('sales')}
-                className="hover:text-blue-600 dark:hover:text-cyan-400 underline decoration-dotted"
-              >
-                ✓ {currentTrans.transferDomain}
-              </button>
-              <span className="text-slate-300 dark:text-slate-700 select-none">|</span>
-              <button 
-                onClick={() => handleScrollToId('redesigned-comparison-table')}
-                className="hover:text-blue-600 dark:hover:text-cyan-400 underline decoration-dotted font-bold"
-              >
-                ★ {currentTrans.viewPricing}
-              </button>
-            </div>
-          </div>
-
-          <form onSubmit={handleCheckAvailability} className="flex flex-col sm:flex-row items-stretch gap-2">
-            <div className="relative flex-1 flex items-center bg-slate-100 dark:bg-slate-950/60 rounded-2xl border border-slate-200 dark:border-slate-800 px-4 focus-within:border-cyan-500/50 transition">
-              <Search className="text-slate-400 w-5 h-5" />
-              <input
-                type="text"
-                placeholder={currentTrans.domainPlaceholder}
-                value={domainQuery}
-                onChange={(e) => setDomainQuery(e.target.value)}
-                className="w-full bg-transparent pl-3 pr-2 py-4 text-slate-900 dark:text-white placeholder-slate-500 text-sm focus:outline-none"
-              />
-              
-              {/* Quick extensions dropdown directly in search bar */}
-              <select
-                value={selectedExt}
-                onChange={(e) => setSelectedExt(e.target.value)}
-                className="bg-transparent text-xs font-bold text-blue-600 dark:text-cyan-400 cursor-pointer pr-2 pl-2 focus:outline-none uppercase border-l border-slate-200 dark:border-slate-850"
-              >
-                {Object.keys(domainExtensionsPrices).map((ext) => (
-                  <option key={ext} value={ext} className="bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-white font-sans text-xs">
-                    {ext}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <button
-              type="submit"
-              disabled={isSearching || !domainQuery.trim()}
-              className="px-8 py-4 bg-gradient-to-r from-[#10B981] to-[#06B6D4] hover:from-[#059669] hover:to-[#0891B2] disabled:opacity-50 text-white font-black text-xs sm:text-sm rounded-2xl transition duration-300 shrink-0 shadow-lg shadow-emerald-500/10 cursor-pointer flex items-center justify-center gap-1.5 hover:scale-[1.01]"
-            >
-              {isSearching ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4 text-white fill-white" />}
-              <span>{isSearching ? "..." : (language === 'bn' ? 'অনুসন্ধান' : language === 'ar' ? 'البحث الفوري' : 'Check Availability')}</span>
-            </button>
-          </form>
-
-          {/* Quick Extensions cards/caps */}
-          <div className="flex flex-wrap gap-2.5 justify-center items-center mt-5">
-            {Object.keys(domainExtensionsPrices).map((ext) => (
-              <button
-                key={ext}
-                type="button"
-                onClick={() => {
-                  setSelectedExt(ext);
-                  if (domainQuery.trim()) {
-                    setDomainQuery(prev => {
-                      const splitDot = prev.indexOf('.');
-                      const name = splitDot !== -1 ? prev.substring(0, splitDot) : prev;
-                      return `${name}${ext}`;
-                    });
-                  }
-                }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold font-mono transition border cursor-pointer ${
-                  selectedExt === ext 
-                    ? 'bg-emerald-500/10 border-emerald-400/50 text-emerald-600 dark:text-emerald-400' 
-                    : 'bg-slate-50 dark:bg-slate-950/20 border-slate-200 dark:border-slate-800/80 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                }`}
-              >
-                <span>{ext}</span>
-                <span className="text-[10px] text-slate-400 font-mono ml-1">
-                  ({ext === '.com.bd' ? (language === 'bn' ? '৳১২০০' : '$10.25') : (ext === '.bd' ? (language === 'bn' ? '৳১৫০০' : '$12.80') : `$${domainExtensionsPrices[ext]}`)})
-                </span>
-              </button>
-            ))}
-          </div>
-
-          {/* Result visual state */}
-          <AnimatePresence>
-            {hasSearched && domainResult && (
-              <motion.div
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -15 }}
-                className="mt-6 p-4 rounded-2xl bg-slate-50 dark:bg-[#020617]/50 border border-slate-200/60 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4"
-              >
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-base font-black font-mono tracking-tight text-slate-900 dark:text-white">{domainResult.domain}</span>
-                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                      domainResult.isAvailable 
-                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400' 
-                        : 'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-400'
-                    }`}>
-                      {domainResult.isAvailable ? currentTrans.available : currentTrans.taken}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                    {domainResult.isAvailable 
-                      ? "This domain name is safe and unreserved. Secure it instantly to build your direct business!" 
-                      : "Oops! This domain configuration is already owned. Search for alternative domain prefixes/suffixes above."
-                    }
-                  </p>
-                </div>
-
-                <div className="flex items-center justify-between md:justify-end gap-4 shrink-0 pt-3 md:pt-0 border-t md:border-t-0 border-slate-200/50 dark:border-slate-800">
-                  {domainResult.isAvailable && (
-                    <div className="text-right">
-                      <span className="text-lg font-extrabold text-emerald-500 block leading-tight">
-                        {(() => {
-                          let baseBDT = domainResult.priceUSD * 118.5; 
-                          if (domainResult.domain.endsWith('.com.bd')) {
-                            baseBDT = 1200;
-                          } else if (domainResult.domain.endsWith('.bd')) {
-                            baseBDT = 1500;
-                          } else if (domainResult.domain.endsWith('.com')) {
-                            baseBDT = 1400;
-                          }
-                          const r = currencySettings?.rates || { USD: 1.0, BDT: 118.5, SAR: 3.75 };
-                          const targetRate = r[currency] ?? 1.0;
-                          const bdtRate = r.BDT ?? 118.5;
-                          const dynamicVal = (baseBDT / bdtRate) * targetRate;
-                          return formatPriceVal(dynamicVal);
-                        })()}
-                      </span>
-                      <span className="text-[10px] text-slate-400 block tracking-wider font-mono">/ {language === 'bn' ? 'বছর' : language === 'ar' ? 'سنة' : 'year'}</span>
-                    </div>
-                  )}
-
-                  {domainResult.isAvailable ? (
-                    <button
-                      onClick={() => handleRegisterDomainItem(domainResult.domain, domainResult.priceUSD)}
-                      className={`px-5 py-2.5 text-xs font-bold rounded-xl transition cursor-pointer ${
-                        addedItems[domainResult.domain] 
-                          ? 'bg-emerald-500 text-white' 
-                          : 'bg-[#2563EB] hover:bg-blue-600 text-white'
-                      }`}
-                    >
-                      {addedItems[domainResult.domain] ? "✓ Added!" : "Add to Cart"}
-                    </button>
-                  ) : (
-                    <button 
-                      onClick={() => handleSupportInquiry('sales')}
-                      className="px-5 py-2.5 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-xl transition cursor-pointer"
-                    >
-                      WHOIS Inquiry
-                    </button>
-                  )}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-        </div>
-      </section>
+      <DomainSearch
+        language={language}
+        theme={theme}
+        currency={currency}
+        addToCart={addToCart || (() => {})}
+        setCurrentPage={setCurrentPage || (() => {})}
+        currencySettings={currencySettings}
+      />
 
       {/* ================================= HOSTING CATEGORIES ================================= */}
       <section className="py-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8" id="redesigned-categories">
@@ -1104,6 +1356,24 @@ export default function Hosting({
             const Icon = cat.icon;
             const isSelected = activeTab === cat.id;
 
+            const highlights = cat.id === 'bdix'
+              ? (language === 'bn' 
+                  ? ["⚡ সুপারফাস্ট ৫ মিলি-সেকেন্ড লেটেন্সি", "🔒 ফ্রি ক্রোম-ভেরিফাইড SSL লাইসেন্স", "📂 ১০০% এনভিএমই এসএসডি ড্রাইভ"]
+                  : language === 'ar'
+                  ? ["⚡ استجابة فائقة السرعة للأجهزة", "🔒 شهادة أمان SSL تلقائية ومجانية", "📂 أقراص تخزين سحابية NVMe فائقة"]
+                  : ["⚡ Ultra-low 5ms local latency", "🔒 Free chrome-verified SSL", "📂 20x faster NVMe SSD disks"])
+              : cat.id === 'vps'
+              ? (language === 'bn' 
+                  ? ["🚀 ডেডিকেটেড রুট অ্যাডমিন অ্যাক্সেস", "🌐 নিজস্ব ডেডিকেটেড আইপি অ্যাড্রেস", "⚙️ ম্যানেজড সুপার-কন্ট্রোল প্যানেল"]
+                  : language === 'ar'
+                  ? ["🚀 صلاحية وصول كاملة للـ Root", "🌐 عناوين IP مخصصة لكل سيرفر", "⚙️ لوحة قيادة مدارة بالكامل"]
+                  : ["🚀 Server-grade Dedicated IP", "🌐 Full root administrator access", "⚙️ Managed server optimizations"])
+              : (language === 'bn'
+                  ? ["👥 হোয়াইট-লেবেল ব্রান্ডিং অপশন", "🛠️ মাস্টার WHM অ্যাডমিন প্যানেল", "💰 আনলিমিটেড সিপ্যানেল অ্যাকাউন্ট তৈরি"]
+                  : language === 'ar'
+                  ? ["👥 إعادة توجيه لوحة التحكم بالهوية", "🛠️ واجهة إدارة المشتركين WHM", "💰 إنشاء عدد غير محدود من الحسابات"]
+                  : ["👥 White-label custom branding", "🛠️ Master WHM administrative access", "💰 Create unlimited standard cPanels"]);
+
             return (
               <div
                 key={cat.id}
@@ -1111,7 +1381,7 @@ export default function Hosting({
                   selectTab(cat.id as any);
                   handleScrollToId('redesigned-packages');
                 }}
-                className={`p-8 bg-white dark:bg-[#0F172A] rounded-3xl border transition-all duration-300 hover:-translate-y-2 cursor-pointer relative overflow-hidden group ${
+                className={`p-6 sm:p-8 bg-white dark:bg-[#0F172A] rounded-3xl border transition-all duration-300 hover:-translate-y-1 cursor-pointer relative overflow-hidden group flex flex-col justify-between ${
                   isSelected 
                     ? `border-blue-500 dark:border-cyan-400 shadow-2xl ${cat.accent}` 
                     : 'border-slate-200/50 dark:border-slate-800/40 shadow-md hover:border-slate-300 dark:hover:border-slate-700/80 shadow-slate-950/5'
@@ -1120,39 +1390,58 @@ export default function Hosting({
                 {/* Visual glow accent */}
                 <div className={`absolute top-0 right-0 w-24 h-24 bg-gradient-to-br ${cat.color} opacity-10 blur-xl pointer-events-none group-hover:opacity-30 transition`} />
                 
-                <div className={`p-4 rounded-2xl bg-gradient-to-tr ${cat.color} text-white flex items-center justify-center w-14 h-14 shadow-lg mb-6`}>
-                  <Icon className="w-7 h-7 stroke-[2]" />
+                <div>
+                  {/* Icon beside title */}
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className={`p-3 rounded-2xl bg-gradient-to-tr ${cat.color} text-white flex items-center justify-center w-12 h-12 shadow-md shrink-0`}>
+                      <Icon className="w-6 h-6 stroke-[2]" />
+                    </div>
+                    <div>
+                      <h3 className="text-base sm:text-lg font-extrabold text-slate-900 dark:text-white font-display leading-tight">
+                        {cat.title}
+                      </h3>
+                    </div>
+                  </div>
+
+                  <p className="text-xs sm:text-xs text-slate-500 dark:text-slate-400 leading-relaxed mb-5">
+                    {cat.desc}
+                  </p>
+
+                  {/* Highlights section */}
+                  <div className="flex flex-col gap-2 mb-6 border-t border-slate-100/70 dark:border-slate-800/40 pt-4">
+                    {highlights.map((hlt, hIdx) => (
+                      <div key={hIdx} className="flex items-center gap-2 text-xxs sm:text-xs text-slate-600 dark:text-slate-350">
+                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
+                        <span className="font-medium tracking-tight">{hlt}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
-                <h3 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white mb-2 font-display">
-                  {cat.title}
-                </h3>
-                
-                <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 leading-relaxed mb-6">
-                  {cat.desc}
-                </p>
-
-                <div className="flex items-end justify-between mt-auto">
+                <div className="flex items-end justify-between mt-auto pt-4 border-t border-slate-100/70 dark:border-slate-800/40">
                   <div>
-                    <span className="text-xxs sm:text-xs text-slate-400 uppercase font-mono block leading-none mb-1">
+                    <span className="text-xxs sm:text-xs text-slate-400 uppercase font-bold font-mono block leading-none mb-1">
                       {currentTrans.from}
                     </span>
-                    <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">
+                    <span className="text-lg sm:text-xl font-black text-slate-900 dark:text-white">
                       {(() => {
                         const baseVal = cat.id === 'bdix' 
-                          ? getMonthlyPrice('bdix-starter') 
+                          ? getDisplayPrice('bdix-starter', '24').monthlyAvg 
                           : cat.id === 'vps' 
-                          ? getMonthlyPrice('vps-starter') 
-                          : getMonthlyPrice('reseller-10g');
+                          ? getDisplayPrice('vps-starter', '24').monthlyAvg 
+                          : getDisplayPrice('reseller-10g', '24').monthlyAvg;
                         return formatPriceVal(baseVal);
                       })()}
                     </span>
-                    <span className="text-xxs text-slate-510 dark:text-slate-400 font-bold ml-1">
+                    <span className="text-xxs text-slate-500 dark:text-slate-400 font-bold ml-1">
                       {formatPeriod()}
+                    </span>
+                    <span className="block text-[9px] text-green-600 dark:text-green-400 font-mono font-extrabold mt-0.5">
+                      {language === 'bn' ? '২৪ মাসের কিস্তিতে' : language === 'ar' ? 'فوترة ٢٤ شهراً' : '(Billed 24 months)'}
                     </span>
                   </div>
 
-                  <button className="px-4 py-2 rounded-xl text-xxs font-black text-white bg-gradient-to-r from-blue-600 to-cyan-500 hover:scale-[1.02] shadow transition duration-300 inline-flex items-center gap-1">
+                  <button className="px-3.5 py-2 rounded-xl text-xxs font-black text-white bg-gradient-to-r from-blue-600 to-cyan-500 hover:scale-[1.02] shadow transition duration-300 inline-flex items-center gap-1 cursor-pointer">
                     <span>{currentTrans.explorePlans}</span>
                     <ArrowRight className="w-3 h-3" />
                   </button>
@@ -1203,57 +1492,139 @@ export default function Hosting({
               ))}
             </div>
 
-            {/* Billing toggler with 20% discount reminder */}
-            <div className="flex items-center gap-3">
+            {/* Elegant Custom Billing Cycle Dropdown Selector */}
+            <div className="relative w-full max-w-sm px-4">
+              <label className="block text-[10px] uppercase font-bold tracking-widest text-slate-400 dark:text-slate-500 mb-2 text-center font-mono">
+                {language === 'bn' ? 'বিলিং সাইকেল নির্বাচন করুন' : language === 'ar' ? 'اختر دورة الفوترة' : 'Select Billing Cycle Duration'}
+              </label>
+              
               <button
-                onClick={() => setBillingCycle('monthly')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
-                  billingCycle === 'monthly' 
-                    ? 'bg-slate-200 text-slate-900 dark:bg-slate-800 dark:text-white font-extrabold' 
-                    : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-350'
-                }`}
+                type="button"
+                id="billing-cycle-dropdown-trigger"
+                onClick={() => setIsBillingDropdownOpen(!isBillingDropdownOpen)}
+                className="w-full flex items-center justify-between gap-3 px-5 py-3.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-850 rounded-2xl shadow-sm hover:border-blue-500 hover:shadow-md transition-all duration-250 text-xs font-black text-slate-800 dark:text-slate-100 cursor-pointer"
               >
-                <span className={`w-3 h-3 rounded-full border-2 flex items-center justify-center transition-all ${
-                  billingCycle === 'monthly' ? 'border-blue-650 bg-blue-650' : 'border-slate-400'
-                }`}>
-                  {billingCycle === 'monthly' && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
-                </span>
-                <span>{currentTrans.monthly}</span>
+                <div className="flex items-center gap-2.5">
+                  <span className={`w-3 h-3 rounded-full ${
+                    billingCycle === '24' ? 'bg-purple-500 animate-pulse' : billingCycle === '12' ? 'bg-blue-500' : 'bg-slate-400'
+                  }`} />
+                  <span className="tracking-tight">
+                    {billingCycle === '24'
+                      ? (language === 'bn' ? '২৪ মাস (৩০% ছাড়)' : language === 'ar' ? '٢٤ شهراً (خصم ٣٠٪)' : '24 Months (Best Value - 30% Off) 🔥')
+                      : billingCycle === '12'
+                      ? (language === 'bn' ? '১২ মাস (২০% ছাড়)' : language === 'ar' ? '١٢ شهراً (خصم ٢٠٪)' : '12 Months (Popular - 20% Off) ⭐')
+                      : (language === 'bn' ? '১ মাস (সাধারণ মূল্য)' : language === 'ar' ? 'شهر واحد (سعر عادي)' : '1 Month (Standard Pricing)')
+                    }
+                  </span>
+                </div>
+                <ChevronDown className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform duration-300 ${isBillingDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
 
-              <button
-                onClick={() => setBillingCycle('yearly')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer relative ${
-                  billingCycle === 'yearly' 
-                    ? 'bg-gradient-to-r from-blue-600 to-cyan-400 text-white font-extrabold shadow' 
-                    : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-350'
-                }`}
-              >
-                <span className={`w-3 h-3 rounded-full border-2 flex items-center justify-center transition-all ${
-                  billingCycle === 'yearly' ? 'border-white bg-white' : 'border-slate-400'
-                }`}>
-                  {billingCycle === 'yearly' && <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />}
-                </span>
-                <span>{currentTrans.save20}</span>
-                
-                {/* Bubble badge */}
-                <span className="absolute -top-3 -right-3 bg-red-500 text-white font-mono font-black text-[8px] px-1.5 py-0.5 rounded-full animate-bounce">
-                  -20%
-                </span>
-              </button>
+              <AnimatePresence>
+                {isBillingDropdownOpen && (
+                  <>
+                    {/* Backdrop wrapper to close select on click outside */}
+                    <div 
+                      className="fixed inset-0 z-40 cursor-default" 
+                      onClick={() => setIsBillingDropdownOpen(false)}
+                    />
+                    
+                    <motion.div
+                      id="billing-cycle-dropdown-list"
+                      initial={{ opacity: 0, y: -8, scale: 0.98 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -8, scale: 0.98 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute left-4 right-4 mt-2 p-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl z-50 overflow-hidden flex flex-col gap-1"
+                    >
+                      {[
+                        { 
+                          id: '1' as '1' | '12' | '24', 
+                          label: language === 'bn' ? '১ মাস (সাধারণ মূল্য)' : language === 'ar' ? 'شهر واحد' : '1 Month',
+                          desc: language === 'bn' ? 'কোনো ডিসকাউন্ট নেই' : 'Standard monthly rolling billing cycle',
+                          badge: null,
+                          color: 'bg-slate-400'
+                        },
+                        { 
+                          id: '12' as '1' | '12' | '24', 
+                          label: language === 'bn' ? '১২ মাস (২০% ছাড়)' : language === 'ar' ? '١٢ شهراً (خصم ٢٠٪)' : '12 Months',
+                          desc: language === 'bn' ? 'বার্ষিক মেয়াদে ২০% সাশ্রয় করুন' : 'Save 20% compared to monthly rolling',
+                          badge: 'Save 20% ⭐',
+                          badgeColor: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
+                          color: 'bg-blue-500'
+                        },
+                        { 
+                          id: '24' as '1' | '12' | '24', 
+                          label: language === 'bn' ? '২৪ মাস (৩০% ছাড়)' : language === 'ar' ? '٢٤ شهراً (خصم ٣٠٪)' : '24 Months',
+                          desc: language === 'bn' ? 'দ্বিবার্ষিক মেয়াদে ৩০% সর্বোচ্চ ডিসকাউন্ট' : 'Save 30% - Absolute Best Value deal',
+                          badge: 'Save 30% 🔥',
+                          badgeColor: 'bg-purple-500/10 text-purple-600 dark:text-purple-400',
+                          color: 'bg-purple-500'
+                        }
+                      ].map((opt) => (
+                        <button
+                          key={opt.id}
+                          onClick={() => {
+                            setBillingCycle(opt.id);
+                            setIsBillingDropdownOpen(false);
+                          }}
+                          className={`w-full text-left px-4 py-3 rounded-xl transition flex items-center justify-between text-xs cursor-pointer ${
+                            billingCycle === opt.id 
+                              ? 'bg-blue-50/70 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 font-bold' 
+                              : 'text-slate-600 dark:text-slate-350 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className={`w-2 h-2 rounded-full ${opt.color}`} />
+                            <div className="flex flex-col gap-0.5">
+                              <span className="font-extrabold">{opt.label}</span>
+                              <span className="text-[10px] text-slate-400 dark:text-slate-500 font-normal leading-tight">{opt.desc}</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {opt.badge && (
+                              <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase font-mono ${opt.badgeColor}`}>
+                                {opt.badge}
+                              </span>
+                            )}
+                            {billingCycle === opt.id && (
+                              <Check className="w-4 h-4 text-blue-600 dark:text-blue-400 stroke-[3px]" />
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
             </div>
           </div>
 
           {/* Cards dynamic listings */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 justify-center items-stretch max-w-6xl mx-auto">
             {packagesList[activeTab].map((pkg) => {
-              const basePrice = getMonthlyPrice(pkg.id);
-              const originalYearly = basePrice * 12;
-              const discountedYearly = originalYearly * 0.8;
-              const savingsAmount = originalYearly * 0.2;
-              const discountedMonthly = basePrice * 0.8;
+              const priceData = getDisplayPrice(pkg.id, billingCycle);
+              const displayPrice = priceData.monthlyAvg;
 
-              const displayPrice = billingCycle === 'yearly' ? discountedMonthly : basePrice;
+              const rates = currencySettings?.rates || { BDT: 118.5, SAR: 3.75, USD: 1.0 };
+              const bdtRate = rates.BDT ?? 118.5;
+              const targetRate = rates[currency] ?? 1.0;
+
+              const months = billingCycle === '1' ? 1 : billingCycle === '12' ? 12 : 24;
+              const baselineMonthlyTarget = (planPricing[pkg.id]?.['1'] ?? 100) / bdtRate * targetRate;
+              const baselineTotalTarget = baselineMonthlyTarget * months;
+              
+              const totalCostTarget = priceData.totalCost;
+              const totalSavingsTarget = baselineTotalTarget - totalCostTarget;
+
+              let activeBadge = pkg.badge;
+              if (billingCycle === '24') {
+                if (pkg.id.endsWith('professional') || pkg.id.endsWith('50g')) {
+                  activeBadge = language === 'bn' ? "সেরা ভ্যালু (৩০% ছাড়) 💎" : language === 'ar' ? "أفضل قيمة" : "Best Value (30% Off) 💎";
+                } else if (pkg.id.endsWith('business') || pkg.id.endsWith('20g')) {
+                  activeBadge = language === 'bn' ? "সবচেয়ে জনপ্রিয় 🔥" : language === 'ar' ? "الأكثر اختياراً" : "Most Popular 🔥";
+                }
+              }
 
               return (
                 <motion.div
@@ -1263,15 +1634,21 @@ export default function Hosting({
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ duration: 0.4 }}
                   className={`relative overflow-hidden flex flex-col justify-between p-6 sm:p-8 rounded-3xl bg-white dark:bg-[#0F172A] border transition-all duration-300 transform hover:-translate-y-2 ${
-                    pkg.badge 
-                      ? 'border-blue-500 dark:border-cyan-400 shadow-2xl ring-2 ring-blue-500/20' 
+                    activeBadge 
+                      ? activeBadge.includes('Best Value') || activeBadge.includes('সেরা ভ্যালু')
+                        ? 'border-emerald-500 dark:border-emerald-400 shadow-2xl ring-2 ring-emerald-500/20'
+                        : 'border-blue-500 dark:border-cyan-400 shadow-2xl ring-2 ring-blue-500/20'
                       : 'border-slate-200/50 dark:border-slate-800 shadow-md shadow-slate-900/5'
                   }`}
                 >
                   {/* Floating Badge */}
-                  {pkg.badge && (
-                    <span className="absolute top-4 right-4 bg-gradient-to-r from-blue-600 to-indigo-650 text-white font-mono font-black text-[9px] uppercase tracking-wider px-3 py-1 rounded-full shadow animate-pulse">
-                      {pkg.badge}
+                  {activeBadge && (
+                    <span className={`absolute top-4 right-4 text-white font-mono font-black text-[9px] uppercase tracking-wider px-3 py-1 rounded-full shadow animate-pulse bg-gradient-to-r ${
+                      activeBadge.includes('Best Value') || activeBadge.includes('সেরা ভ্যালু')
+                        ? 'from-emerald-500 to-teal-600'
+                        : 'from-blue-600 to-indigo-650'
+                    }`}>
+                      {activeBadge}
                     </span>
                   )}
 
@@ -1292,7 +1669,7 @@ export default function Hosting({
 
                     {/* Pricing view */}
                     <div className="py-4 border-y border-slate-100 dark:border-slate-800">
-                      <div className="flex items-baseline gap-1.5">
+                      <div className="flex items-baseline gap-1.5 font-sans">
                         <span className="text-3xl sm:text-4xl font-extrabold text-[#2563EB] dark:text-cyan-400">
                           {formatPriceVal(displayPrice)}
                         </span>
@@ -1306,41 +1683,45 @@ export default function Hosting({
                         <span className="font-sans font-medium text-slate-400 text-[10px] uppercase tracking-wider">or:</span>
                         {currency !== 'BDT' && (
                           <span className="font-extrabold text-neutral-800 dark:text-neutral-200">
-                            🇧🇩 ৳{Math.round(((bdtPrices[pkg.id] || 100) * (billingCycle === 'yearly' ? 0.8 : 1.0)))}
+                            🇧🇩 ৳{Math.round(priceData.bdtTotal / months)}{formatPeriod()}
                           </span>
                         )}
                         {currency !== 'BDT' && currency !== 'SAR' && <span className="text-slate-350 dark:text-slate-700">|</span>}
                         {currency !== 'SAR' && (
                           <span className="font-extrabold text-neutral-800 dark:text-neutral-200">
-                            🇸🇦 ﷼{(((bdtPrices[pkg.id] || 100) * (billingCycle === 'yearly' ? 0.8 : 1.0)) / (currencySettings?.rates?.BDT ?? 118.5) * (currencySettings?.rates?.SAR ?? 3.75)).toFixed(2)}
+                            🇸🇦 ﷼{(priceData.monthlyAvg * (rates.SAR ?? 3.75) / targetRate).toFixed(2)}{formatPeriod()}
                           </span>
                         )}
                         {currency !== 'USD' && (currency === 'BDT' || currency === 'SAR') && <span className="text-slate-350 dark:text-slate-700">|</span>}
                         {currency !== 'USD' && (
                           <span className="font-extrabold text-neutral-800 dark:text-neutral-200">
-                            🇺🇸 ${(((bdtPrices[pkg.id] || 100) * (billingCycle === 'yearly' ? 0.8 : 1.0)) / (currencySettings?.rates?.BDT ?? 118.5) * 1.0).toFixed(2)}
+                            🇺🇸 ${(priceData.monthlyAvg / targetRate).toFixed(2)}{formatPeriod()}
                           </span>
                         )}
                       </div>
 
-                      {billingCycle === 'yearly' ? (
+                      {billingCycle !== '1' ? (
                         <div className="mt-3.5 space-y-1 bg-emerald-500/5 p-2 rounded-xl border border-emerald-500/10 font-mono text-[10.5px] leading-relaxed text-slate-500 dark:text-slate-400 text-left">
                           <div className="flex justify-between items-center">
-                            <span>{currentTrans.originalYearly}</span>
-                            <span className="line-through">{formatPriceVal(originalYearly)}</span>
+                            <span>{language === 'bn' ? 'রেগুলার প্রাইস:' : language === 'ar' ? 'السعر العادي:' : 'Regular Price:'}</span>
+                            <span className="line-through">{formatPriceVal(baselineTotalTarget)}</span>
                           </div>
                           <div className="flex justify-between items-center font-bold text-[#10B981]">
-                            <span>{currentTrans.discountedYearly}</span>
-                            <span>{formatPriceVal(discountedYearly)}</span>
+                            <span>{language === 'bn' ? 'বিশেষ ছাড়কৃত মূল্য:' : language === 'ar' ? 'ಸعر العرض:' : 'Special Price:'}</span>
+                            <span>{formatPriceVal(totalCostTarget)}</span>
                           </div>
                           <div className="flex justify-between items-center text-[10px] bg-emerald-500/10 dark:bg-emerald-500/20 px-1.5 py-0.5 rounded text-emerald-600 dark:text-emerald-400 font-extrabold mt-1">
-                            <span>{currentTrans.totalSavings}</span>
-                            <span>{formatPriceVal(savingsAmount)}</span>
+                            <span>{language === 'bn' ? 'মোট সাশ্রয়:' : language === 'ar' ? 'إجمالي التوفير:' : 'Total Savings:'}</span>
+                            <span>{formatPriceVal(totalSavingsTarget)}</span>
                           </div>
                         </div>
                       ) : (
                         <p className="text-[10px] text-slate-400 font-bold mt-2 font-mono">
-                          ⚡ Save up to 20% on yearly plans. Billed {formatPriceVal(originalYearly)} annually.
+                          ⚡ {language === 'bn' 
+                            ? '১২ এবং ২৪ মাসের পেমেন্টে ক্যাশব্যাক সহ ২০% থেকে ৩০% ছাড় পান।' 
+                            : language === 'ar' 
+                            ? 'وفر ما يصل إلى ٣٠٪ عند اختيار باقات الدفع السنوية.'
+                            : 'Save 20% to 30% when purchasing in 12 or 24 month cycles.'}
                         </p>
                       )}
                     </div>
@@ -1389,11 +1770,11 @@ export default function Hosting({
                       <ExternalLink className="w-3.5 h-3.5" />
                     </button>
                     <button
-                      onClick={() => handleSupportInquiry('sales')}
-                      className="w-full py-2 bg-slate-50 hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-850 text-slate-600 dark:text-slate-400 text-[11px] font-extrabold rounded-xl border border-slate-200 dark:border-slate-800 transition cursor-pointer flex items-center justify-center gap-1"
+                      onClick={() => handleOpenOrderModal(pkg.id)}
+                      className="w-full py-2 bg-slate-50 hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-850 text-emerald-600 dark:text-emerald-400 text-[11px] font-extrabold rounded-xl border border-slate-200 dark:border-slate-800 transition cursor-pointer flex items-center justify-center gap-1.5 hover:border-emerald-500/30"
                     >
-                      <PhoneCall className="w-3 h-3 text-blue-500" />
-                      <span>{currentTrans.contactSales}</span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                      <span>{language === 'bn' ? '🟢 হোয়াটসঅ্যাপ অর্ডার ফর্ম' : language === 'ar' ? '🟢 طلب عبر الواتساب' : '🟢 WhatsApp Order Form'}</span>
                     </button>
                   </div>
 
@@ -1749,6 +2130,788 @@ export default function Hosting({
         </div>
       </section>
 
+      {/* ================================= WEBSITE MIGRATION WIZARD ================================= */}
+      <section className="py-24 bg-gradient-to-b from-slate-100/30 via-white to-slate-50 dark:from-slate-950/20 dark:via-[#0F172A]/10 dark:to-slate-950/20 border-y border-slate-200/50 dark:border-slate-900" id="migration-wizard-section">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          
+          {/* Localized Wizard Translations */}
+          {(() => {
+            const wizardTrans = {
+              en: {
+                sectionBadge: "🚚 INTERACTIVE COMPANION",
+                sectionTitle: "Website Migration Guide & Wizard",
+                sectionSub: "Moving from an old hosting provider (like Bluehost, Hostinger, cPanel) to WebzoneBD is 100% free and automatic. Step through our live interactive simulator to see how simple it is!",
+                prevStep: "Previous Step",
+                nextStep: "Next Step",
+                
+                step1Name: "1. Framework & Domain",
+                step1Desc: "Map your setup",
+                step2Name: "2. Choose Method",
+                step2Desc: "Automated or Expert",
+                step3Name: "3. Live Simulator",
+                step3Desc: "Run the transfer",
+                step4Name: "4. Verification",
+                step4Desc: "Checkpoint checklists",
+
+                frameworkHeading: "Select Your Site Framework Profile",
+                wpTitle: "WordPress / WooCommerce",
+                phpTitle: "Pure / OOP PHP",
+                larTitle: "Laravel Engine",
+                statTitle: "Static HTML Store",
+
+                recTitle: "💡 Custom Package Recommendation",
+                haveDomainHeading: "Do you already own your active domain?",
+                yesDomain: "Yes, I will point WebzoneBD nameservers after buying",
+                noDomain: "No, I will register a brand-new domain",
+
+                optSharedTitle: "Recommended: Shared BDIX Business Plan",
+                optSharedDesc: "Featuring LiteSpeed caching, premium NVMe arrays, and automated cPanel restore. WordPress loads 20x faster with under 5ms ping times in Bangladesh.",
+                optPhpTitle: "Recommended: Shared BDIX Starter or Business",
+                optPhpDesc: "Fully customizable environment with MultiPHP selector supporting version 5.6 to 8.3, fully loaded with Zend OPCache & customized execution specs.",
+                optLarTitle: "Recommended: Managed VPS Starter Server",
+                optLarDesc: "Fully managed VPS node with root SSH controls, git clone interfaces, Composer, custom SQLite or MariaDB database servers.",
+                optStatTitle: "Recommended: Shared BDIX Starter Plan",
+                optStatTitleSub: "Highly secure, cost-optimized, and static asset pre-built speeds. Comes with free SSL certificate and monthly automated off-site cloud replication.",
+
+                methodHeading: "How would you like to handle your data transfer?",
+                expTitle: "Option A: Free Expert Managed Migration (Recommended)",
+                expDesc: "Our senior server engineers migrate everything — databases, emails, configuration files — safely without a single second of downtime.",
+                manTitle: "Option B: Manual cPanel Auto-Upload (Self-Service)",
+                manDesc: "Export a complete backup (.tar.gz cPanel file) from your current host and upload it here into our automatic analysis and loading queue.",
+
+                providerLabel: "Select Your Current Host Provider:",
+                sizeLabel: "Estimated Website File Size:",
+                btnAnalyze: "Analyze Transition Path",
+                analysisFinished: "✓ Transition Path Analysis Compiled Successfully:",
+                analyzingWait: "Analyzing transition compatibility...",
+                estimateTime: "Estimated Duration",
+                compLevel: "Compatibility Level",
+                recDowntime: "Downtime Estimation",
+                statusReady: "Status Ready",
+
+                dragDropLabel: "Drag & drop your old host's cPanel full backup archive (.tar.gz) here, or browse files",
+                uploadingLabel: "Uploading cPanel Backup...",
+                uploadedSuccess: "Backup successfully parsed & mapped:",
+
+                simHeading: "Live Server Website Migration Simulator",
+                simDesc: "Run our interactive pipeline engine and preview how WebzoneBD replicates files, maps databases, and secures configs behind the scenes.",
+                btnSimStart: "Initialize Live Simulation Pipeline",
+                btnSimRunning: "Simulation Active. Transferring...",
+                btnSimDone: "Simulation Finished Successfully!",
+                terminalTitle: "WebzoneBD Node Console — Dhaka Server Central",
+                logPrompt: "[sys_admin@webzonebd-dhaka ~]$ ",
+
+                checklistHeading: "Step 4: Post-Migration Checkpoint Checks",
+                checklistDesc: "Your data is fully moved! Check off these final items to safely switch your DNS nameservers and begin loading under 5ms.",
+                chk1: "Nameservers pointed to ns1.webzonebd.com & ns2.webzonebd.com",
+                chk2: "Let's Encrypt Free Wildcard SSL active inside cPanel",
+                chk3: "Database configurations matched correctly inside code files",
+                chk4: "Cleared browser cached files & Cloudflare assets",
+
+                congratsTitle: "🎉 Congratulations! Website is Fully Live!",
+                congratsDesc: "All checkpoints passed. Your website is officially running on WebzoneBD's premium local servers, loading instantly inside Bangladesh with 99.9% uptime!",
+                pricingScrollCTA: "Explore Hosting Packages & Get Started",
+              },
+              bn: {
+                sectionBadge: "🚚 ইন্টারেক্টিভ গাইড",
+                sectionTitle: "এক ক্লিকে ওয়েবসাইট মাইগ্রেশন গাইড",
+                sectionSub: "নেমচিপ, হোস্টিংগার বা অন্য কোনো প্রোভাইডার থেকে ওয়েবজোনবিডিতে সাইট নিয়ে আসার প্রক্রিয়া অত্যন্ত সহজ। নিজেকে প্রস্তুত করতে নিচের লাইভ ইন্টারেক্টিভ সিমুলেটরটি ব্যবহার করে দেখুন!",
+                prevStep: "পূর্ববর্তী ধাপ",
+                nextStep: "পরবর্তী ধাপ",
+
+                step1Name: "১. ফ্রেমওয়ার্ক ও ডোমেন",
+                step1Desc: "আপনার ফাইল নির্বাচন",
+                step2Name: "২. পদ্ধতি নির্বাচন",
+                step2Desc: "ফ্রি বা ম্যানুয়াল",
+                step3Name: "৩. লাইভ সিমুলেটর",
+                step3Desc: "ট্রান্সফার প্রক্রিয়া",
+                step4Name: "৪. ভেরিফিকেশন",
+                step4Desc: "চেকলিস্ট ও লাইভ",
+
+                frameworkHeading: "আপনার ওয়েবসাইটের ফ্রেমওয়ার্ক নির্বাচন করুন",
+                wpTitle: "ওয়ার্ডপ্রেস / WooCommerce",
+                phpTitle: "পিওর পিএইচপি কোড",
+                larTitle: "লারাভেল ফ্রেমওয়ার্ক",
+                statTitle: "স্ট্যাটিক HTML সাইট",
+
+                recTitle: "💡 বিশেষ হোস্টিং প্যাকেজ পরামর্শ",
+                haveDomainHeading: "আপনার কি নিজস্ব সচল ডোমেন আছে?",
+                yesDomain: "হ্যাঁ, আমি ওয়েবজোনবিডি নেমসার্ভার আপডেট করব",
+                noDomain: "না, কাস্টম ডোমেন বুকিং করব",
+
+                optSharedTitle: "সুপারিশকৃত: বিডিআইএক্স বিজেনস হোস্টিং প্ল্যান",
+                optSharedDesc: "ওয়ার্ডপ্রেস সাইটের জন্য লাইটস্পিড ক্যাশিং এবং দ্রুত এনভিএমই ড্রাইভ। স্পিড ২০ গুণ পর্যন্ত বাড়বে এবং বাংলাদেশে ৫ মিলি-সেকেন্ডের নিচে দ্রুত পেজ লোড হবে।",
+                optPhpTitle: "সুপারিশকৃত: বিডিআইএক্স স্টার্টার বা বিজনেস প্ল্যান",
+                optPhpDesc: "MultiPHP ম্যানেজারের মাধ্যমে পিএইচপি ৫.৬ থেকে ৮.৩ পর্যন্ত যেকোনো সংস্করণ এক ক্লিকে সংস্করণ নির্বাচন করুন। মেমরি লিমিট বাড়ানোর জন্য চমৎকার সুযোগ।",
+                optLarTitle: "সুপারিশকৃত: আমাদের ক্লাউড ভিপিএস স্টার্টার সার্ভার",
+                optLarDesc: "লারাভেলের জন্য রুট এসএসএইচ এক্সেস, গিট ডেপ্লয়মেন্ট, ক্রন জবস এবং সম্পূর্ণ ডেডিকেটেড রিসোর্স সমৃদ্ধ শক্তিশালী সার্ভার এনভায়রনমেন্ট।",
+                optStatTitle: "সুপারিশকৃত: বিডিআইএক্স স্টার্টার হোস্টিং প্ল্যান",
+                optStatTitleSub: "অল্প ট্রাফিকের জন্য চমৎকার বাজেট প্ল্যান। সম্পূর্ণ সুরক্ষিত লেটস এনক্রিপ্ট এসএসএল এবং প্রতি সপ্তাহে অটোমেটেড অফসাইট ক্লাউড ব্যাকআপ সহ।",
+
+                methodHeading: "ফাইলগুলো আমাদের সার্ভারে কীভাবে স্থানান্তর করতে চান?",
+                expTitle: "পদ্ধতি ক: সম্পূর্ণ ফ্রী প্রফেশনাল টিম দ্বারা মাইগ্রেশন (সুপারিশকৃত)",
+                expDesc: "আমাদের সার্ভার এডমিনরাই ডাউনলোড, ডাটাবেস এক্সপোর্ট এবং জিরো ডাউনটাইম গ্যারান্টি দিয়ে সমস্ত ডাটা ফ্রিতে নতুন সার্ভারে স্থানান্তর করে দিবেন।",
+                manTitle: "পদ্ধতি খ: সিপ্যানেল ফুল ব্যাকআপ ম্যানুয়াল আপলোড (সেলফ-সার্ভিস)",
+                manDesc: "আপনার পূর্বের হোস্টিং সিপ্যানেল থেকে একটি ফুল ব্যাকআপ ফাইল (.tar.gz) ডাউনলোড করুন এবং ডাটা রেডি করতে এখানে আপলোড করুন।",
+
+                providerLabel: "আপনার বর্তমান হোস্টিং প্রোভাইডার কে?",
+                sizeLabel: "ওয়েবসাইট ফাইলের আনুমানিক সাইজ কত?",
+                btnAnalyze: "মাইগ্রেশন এনালাইসিস উইজার্ড",
+                analysisFinished: "✓ সাকসেসফুল মাইগ্রেশন এনালাইসিস কমপ্লিট:",
+                analyzingWait: "মাইগ্রেশন সামঞ্জস্যতা যাচাই করা হচ্ছে...",
+                estimateTime: "প্রয়োজনীয় সময়",
+                compLevel: "সামঞ্জস্যতার মান",
+                recDowntime: "সম্ভাব্য ডাউনটাইম",
+                statusReady: "রেডি স্ট্যাটাস",
+
+                dragDropLabel: "আপনার আগের হোস্টিংয়ের সিপ্যানেল ব্যাকআপ ফাইলটি (.tar.gz) এখানে ড্র্যাগ অ্যান্ড ড্রপ বা সিলেক্ট করুন",
+                uploadingLabel: "ব্যাকআপ ফাইল আপলোড হচ্ছে...",
+                uploadedSuccess: "ব্যাকআপ ফাইলটি সফলভাবে বিশ্লেষণ করা হয়েছে:",
+
+                simHeading: "লাইভ সার্ভার ট্রান্সফার সিমুলেটর",
+                simDesc: "সিমুলেশন ইঞ্জিনটি চালু করে রিয়েলটাইমে দেখে নিন কীভাবে ওয়েবজোনবিডি সার্ভারের নেপথ্যে ফাইল, ডাটাবেস স্থানান্তর এবং এসএসএল কাস্টম কনফিগার করে।",
+                btnSimStart: "লাইভ সিমুলেশন শুরু করুন",
+                btnSimRunning: "সিমুলেশন চলছে. ফাইল ট্রান্সফার...",
+                btnSimDone: "সিমুলেশন সফলভাবে সম্পন্ন হয়েছে!",
+                terminalTitle: "ওয়েবজোনবিডি কনসোল — ঢাকা সার্ভার সেন্ট্রাল",
+                logPrompt: "[sys_admin@webzonebd-dhaka ~]$ ",
+
+                checklistHeading: "ধাপ ৪: ফাইনাল চেকলিস্ট ও ওয়েবসাইট লাইভ",
+                checklistDesc: "অভিনন্দন! আপনার ফাইলগুলো স্থানান্তরিত হয়েছে। ডোমেন এবং হোস্টিং সম্পূর্ণ লাইভ করতে নিচের কাজগুলো সম্পন্ন করুন।",
+                chk1: "nameservers ns1.webzonebd.com এবং ns2.webzonebd.com এ আপডেট করা হয়েছে",
+                chk2: "সিপ্যানেল থেকে ফ্রি লেটস এনক্রিপ্ট এসএসএল একটিভ করা হয়েছে",
+                chk3: "কোড ফাইলের মধ্যে নতুন ডাটাবেস পাসওয়ার্ড ও ইউজারনেম ঠিক করা হয়েছে",
+                chk4: "ব্রাউজার ক্যাশ ফাইল এবং ক্লাউডফ্লেয়ার সম্পূর্ণ ক্লিয়ার করা হয়েছে",
+
+                congratsTitle: "🎉 অভিনন্দন! আপনার ওয়েবসাইট সম্পূর্ণ লাইভ হয়েছে!",
+                congratsDesc: "সমস্ত চেকলিস্ট সম্পন্ন। আপনার সাইট এখন ওয়েবজোনবিডির হাই-স্পিড লোকাল সার্ভার চালিত এবং বাংলাদেশে বাফারিং ছাড়া ৫ms-এ লোড হচ্ছে!",
+                pricingScrollCTA: "আমাদের হোস্টিং প্ল্যানগুলো দেখে নিন",
+              },
+              ar: {
+                sectionBadge: "🚚 معالج النقل الذكي",
+                sectionTitle: "دليل ومعالج نقل المواقع التفاعلي",
+                sectionSub: "إن نقل موقعك النشط حالياً من مستضيف قديم (مثل نيم شيب، هوستينجر، سي بانل) هو عملية سهلة ومجانية بنسبة 100%. أطلق المحاكاة لتعرف كيف تنجز ذلك خطوة بخطوة!",
+                prevStep: "الخطوة السابقة",
+                nextStep: "الخطوة التالية",
+
+                step1Name: "١. البيئة العتادية والنطاق",
+                step1Desc: "تحديد مواصفات الموقع",
+                step2Name: "٢. طريقة الإعداد",
+                step2Desc: "تلقائي أو بمساعدتنا",
+                step3Name: "٣. تشغيل المحاكي اللحظي",
+                step3Desc: "متابعة عملية النقل والربط",
+                step4Name: "٤. التشغيل والاستقرار",
+                step4Desc: "فحص متكامل وتأمين النطاق",
+
+                frameworkHeading: "اختر لغة البرمجة أو سكربت موقعك الحالي",
+                wpTitle: "ووردبريس / ووكومرس",
+                phpTitle: "بي اتش بي PHP مستقل",
+                larTitle: "إطار عمل لاراويل Laravel",
+                statTitle: "موقع ثابت HTML / CSS",
+
+                recTitle: "💡 نصيحة الاستضافة الأنسب لتوزيعك الفني",
+                haveDomainHeading: "هل تمتلك نطاقاً (دومين) نشطاً بالفعل؟",
+                yesDomain: "نعم، سأقوم بتوجيه عناوين خوادمي Nameservers بعد الحجز",
+                noDomain: "لا، أرغب في تسجيل نطاق جديد فوراً",
+
+                optSharedTitle: "الخيار الأفضل للووردبريس: باقة الأعمال المشتركة BDIX",
+                optSharedDesc: "مزود بمسرعات الكاش LiteSpeed الذكية وقواعد بيانات NVMe SSD لضمان أسرع استجابة وتجربة تصفح سريعة للغاية بأقل من 5 ملي ثانية لبنجلاديش وجوارها.",
+                optPhpTitle: "الخيار الأنسب للبي اتش بي: باقة BDIX الأساسية أو الأعمال",
+                optPhpDesc: "مزود ببيئات مرنة تمنحك تحديد إصدار PHP من 5.6 وحتى 8.3 بضغطة واحدة، مع زيادة حدود الذاكرة وتعديل خيارات معالجة الاستفسارات.",
+                optLarTitle: "الخيار المناسب للاراﭭيل: خادم VPS سحابي مدار",
+                optLarDesc: "خادم افتراضي خاص يمنحك سرعة فائقة مع معالجات AMD EPYC، صلاحيات جذر، مكدسات تفعيل Git، وتهجير قواعد البيانات بشكل معزول.",
+                optStatTitle: "الخيار الأنسب للمواقع الثابتة: الباقة الاقتصادية المشتركة BDIX",
+                optStatTitleSub: "أداء فائق بأسعار ممتازة لتشغيل المحتوى والتعريف السريع. تشمل شهادة أمان وعزل تشفير متكامل ونسخ احتياطي أسبوعي خارجي.",
+
+                methodHeading: "كيف تود البدء بنقل ورفع ملفاتك إلينا؟",
+                expTitle: "الخيار الأول: النقل الاحترافي بواسطة فريقنا المدار (مجاني بالكامل - موصى به)",
+                expDesc: "سيقوم خبراء الخوادم لدينا بسحب وتفعيل جميع المقاطع البرمجية، قواعد البيانات، وإيميلات العمل باحترافية كاملة وبدون ثانية واحدة من التوقف لموقعك.",
+                manTitle: "الخيار الثاني: رفع ملف الأرشيف السحابي يدوياً (خدمة ذاتية ذكية)",
+                manDesc: "قم باستخراج ملف نسخ كلي (.tar.gz) من مستضيفك القديم وارفع الملف هنا لتشغيل خطوط الاستئناف التلقائي لفك الضغط وتوزيع المقاطع.",
+
+                providerLabel: "اختر مستضيفك الحالي:",
+                sizeLabel: "الحجم المقدر لملفات موقعك حالياً:",
+                btnAnalyze: "تحليل وتفصيل مسار النقل المتاح",
+                analysisFinished: "✓ تم إنتاج وإعداد تحليل مسار الانتقال بنجاح:",
+                analyzingWait: "جاري تحليل ملاءمة الخادم وخطوات النقل...",
+                estimateTime: "الوقت الإجمالي المتوقع",
+                compLevel: "معدل الملاءمة الفنية",
+                recDowntime: "وقت التوقف المتوقع",
+                statusReady: "جاهز للتنفيذ فوراً",
+
+                dragDropLabel: "اسحب وألقِ ملف النسخ الاحتياطي لـ cPanel بصيغة (.tar.gz) هنا، أو تصفح الملفات المحلية",
+                uploadingLabel: "جاري رفع ملف الموقع المقدر...",
+                uploadedSuccess: "تم تحليل وحصر محتويات الأرشيف السحابي بنجاح:",
+
+                simHeading: "محاكي خط معالجة النقل الفوري للسيرفر",
+                simDesc: "اضغط لتشغيل معالج نقل المواقع الذكي الافتراضي وشاهد كيف تقوم خوادم ويب زون بربط وتسكين البيانات في الخلفية بمرونة فائقة.",
+                btnSimStart: "أطلق محاكاة النقل البرمجية الفورية",
+                btnSimRunning: "المحاكي نشط الآن. جاري المعالجة الحية لملفك...",
+                btnSimDone: "اكتملت محاكاة نقل المواقع وتوطين البيانات بنجاح تام!",
+                terminalTitle: "منصة ويب زون الفورية — الطرفية المركزية لخادم دكا داتا سنتر",
+                logPrompt: "[sys_admin@webzonebd-dhaka ~]$ ",
+
+                checklistHeading: "الخطوة ٤: مراجعة نقاط الحماية والاستقرار",
+                checklistDesc: "لقد تم نقل ملفات موقعك بالكامل! تفضل بالتحقق وتطبيق النقاط النهائية لتأمين استقرار موقعك وتفعيله الفوري.",
+                chk1: "تم توجيه عناوين نطاقي بالكامل للخوادم ns1.webzonebd.com و ns2.webzonebd.com",
+                chk2: "تفعيل شهادة Let's Encrypt SSL بنجاح من داخل cPanel الفورية",
+                chk3: "تأكيد توافق إعدادات قواعد البيانات مع التغييرات الجديدة للمقر",
+                chk4: "تفريغ ذاكرة الكاش بالمتصفح وخصائص CDN (Cloudflare)",
+
+                congratsTitle: "🎉 تهانينا القلبية الحارة! موقعك الإلكتروني مستقر ونشط الآن!",
+                congratsDesc: "لقد اجتزت كافة نقاط التحقق. موقعك الآن يعمل بكامل كفاءته من داخل خوادم ويب زون الحية، وسرعة باهرة بأقل من ٥ ملي ثانية لمستخدِميك ومتابِعيك!",
+                pricingScrollCTA: "تصفح باقات الاستضافة السحابية والبدء الفوري",
+              }
+            };
+
+            const tW = wizardTrans[language] || wizardTrans.en;
+
+            return (
+              <div className="space-y-12">
+                
+                {/* Stepper Header Nodes */}
+                <div className="max-w-4xl mx-auto">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 p-2 bg-slate-100 dark:bg-slate-900 rounded-3xl border border-slate-200/60 dark:border-slate-800">
+                    {[
+                      { step: 0, title: tW.step1Name, desc: tW.step1Desc },
+                      { step: 1, title: tW.step2Name, desc: tW.step2Desc },
+                      { step: 2, title: tW.step3Name, desc: tW.step3Desc },
+                      { step: 3, title: tW.step4Name, desc: tW.step4Desc },
+                    ].map((item) => {
+                      const isActive = wizardStep === item.step;
+                      const isCompleted = wizardStep > item.step;
+                      
+                      return (
+                        <button
+                          key={item.step}
+                          onClick={() => {
+                            if (wizardSimState === 'running') return;
+                            setWizardStep(item.step);
+                          }}
+                          className={`text-start p-4 rounded-2xl border transition-all duration-300 relative cursor-pointer flex items-start gap-2.5 ${
+                            isActive 
+                              ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white border-transparent shadow shadow-blue-500/20' 
+                              : isCompleted 
+                              ? 'bg-emerald-500/5 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                              : 'bg-white dark:bg-[#1E293B] text-slate-500 hover:text-slate-800 dark:hover:text-white border-transparent'
+                          }`}
+                        >
+                          <div className={`p-1.5 rounded-lg shrink-0 ${
+                            isActive 
+                              ? 'bg-white/20 text-white' 
+                              : isCompleted 
+                              ? 'bg-emerald-500/20 text-emerald-500' 
+                              : 'bg-slate-105 dark:bg-slate-800 text-slate-400'
+                          }`}>
+                            {isCompleted ? <Check className="w-3.5 h-3.5 text-emerald-500 stroke-[3]" /> : <Award className="w-3.5 h-3.5" />}
+                          </div>
+                          <div className="text-start leading-none mt-1">
+                            <div className="text-xs font-black tracking-tight">{item.title}</div>
+                            <div className={`text-[9.5px] mt-1.5 ${isActive ? 'text-white/80' : 'text-slate-400'}`}>
+                              {item.desc}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Stepper Content Panels */}
+                <div className="max-w-4xl mx-auto bg-white dark:bg-[#0F172A] rounded-3xl border border-slate-200/70 dark:border-slate-800 shadow-xl overflow-hidden p-6 sm:p-10 relative">
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      key={wizardStep}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      transition={{ duration: 0.25 }}
+                    >
+                      
+                      {/* Step 1: Framework and Domain Mapping */}
+                      {wizardStep === 0 && (
+                        <div className="space-y-8">
+                          <div>
+                            <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-white mb-2 flex items-center gap-2 justify-start">
+                              <Terminal className="text-blue-500 w-4 h-4" />
+                              <span>{tW.frameworkHeading}</span>
+                            </h3>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
+                              {[
+                                { id: 'wordpress', label: tW.wpTitle, icon: Globe, color: 'hover:border-blue-500 text-blue-500 dark:text-blue-400' },
+                                { id: 'custom-php', label: tW.phpTitle, icon: Database, color: 'hover:border-purple-500 text-purple-500 dark:text-purple-400' },
+                                { id: 'laravel', label: tW.larTitle, icon: Cpu, color: 'hover:border-rose-500 text-rose-500 dark:text-rose-400' },
+                                { id: 'static-html', label: tW.statTitle, icon: HardDrive, color: 'hover:border-emerald-500 text-emerald-500 dark:text-emerald-400' },
+                              ].map((fw) => {
+                                const FwIcon = fw.icon;
+                                const isSel = wizardWebType === fw.id;
+                                return (
+                                  <button
+                                    key={fw.id}
+                                    onClick={() => setWizardWebType(fw.id)}
+                                    className={`p-5 rounded-2xl border text-center transition cursor-pointer flex flex-col items-center justify-center gap-3 ${
+                                      isSel
+                                        ? 'border-blue-500 dark:border-cyan-400 bg-blue-50/20 dark:bg-cyan-950/20 shadow-md ring-2 ring-blue-500/25'
+                                        : 'border-slate-200/50 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-850 bg-transparent'
+                                    } ${fw.color}`}
+                                  >
+                                    <FwIcon className="w-7 h-7 stroke-[1.8]" />
+                                    <span className="text-xs font-black tracking-tight leading-snug">{fw.label}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Recommendation Box */}
+                          <div className="p-5.5 bg-gradient-to-r from-blue-500/5 to-indigo-500/5 dark:from-cyan-500/5 dark:to-blue-500/5 rounded-2xl border border-blue-500/10 dark:border-cyan-400/10 text-left">
+                            <h4 className="text-[10px] font-black uppercase text-blue-600 dark:text-cyan-400 tracking-wider flex items-center gap-1.5 mb-2.5">
+                              <Sparkles className="w-3.5 h-3.5 animate-pulse" />
+                              <span>{tW.recTitle}</span>
+                            </h4>
+                            {wizardWebType === 'wordpress' && (
+                              <div>
+                                <h5 className="text-xs sm:text-sm font-extrabold text-slate-800 dark:text-slate-100">{tW.optSharedTitle}</h5>
+                                <p className="text-xxs sm:text-xs text-slate-500 dark:text-slate-400 mt-1.5 leading-relaxed">{tW.optSharedDesc}</p>
+                              </div>
+                            )}
+                            {wizardWebType === 'custom-php' && (
+                              <div>
+                                <h5 className="text-xs sm:text-sm font-extrabold text-slate-800 dark:text-slate-100">{tW.optPhpTitle}</h5>
+                                <p className="text-xxs sm:text-xs text-slate-500 dark:text-slate-400 mt-1.5 leading-relaxed">{tW.optPhpDesc}</p>
+                              </div>
+                            )}
+                            {wizardWebType === 'laravel' && (
+                              <div>
+                                <h5 className="text-xs sm:text-sm font-extrabold text-slate-800 dark:text-slate-100">{tW.optLarTitle}</h5>
+                                <p className="text-xxs sm:text-xs text-slate-500 dark:text-slate-400 mt-1.5 leading-relaxed">{tW.optLarDesc}</p>
+                              </div>
+                            )}
+                            {wizardWebType === 'static-html' && (
+                              <div>
+                                <h5 className="text-xs sm:text-sm font-extrabold text-slate-800 dark:text-slate-100">{tW.optStatTitle}</h5>
+                                <p className="text-xxs sm:text-xs text-slate-500 dark:text-slate-400 mt-1.5 leading-relaxed">{tW.optStatTitleSub}</p>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Domain Preferences */}
+                          <div className="border-t border-slate-100 dark:border-slate-800/60 pt-6">
+                            <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white mb-3 text-left">
+                              {tW.haveDomainHeading}
+                            </h3>
+                            <div className="flex flex-col sm:flex-row gap-3">
+                              <button
+                                onClick={() => setWizardHasDomain('yes')}
+                                className={`flex-1 p-4 rounded-xl border text-left flex items-center gap-3 transition cursor-pointer ${
+                                  wizardHasDomain === 'yes'
+                                    ? 'border-[#2563EB] dark:border-cyan-400 bg-slate-50/50 dark:bg-slate-900/40 font-bold'
+                                    : 'border-slate-200/50 dark:border-slate-800/80 bg-transparent'
+                                }`}
+                              >
+                                <div className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center ${wizardHasDomain === 'yes' ? 'border-[#2563EB] dark:border-cyan-400 bg-[#2563EB] dark:bg-cyan-400' : 'border-slate-400'}`}>
+                                  {wizardHasDomain === 'yes' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                                </div>
+                                <span className="text-xs text-slate-700 dark:text-slate-300">{tW.yesDomain}</span>
+                              </button>
+                              <button
+                                onClick={() => setWizardHasDomain('no')}
+                                className={`flex-1 p-4 rounded-xl border text-left flex items-center gap-3 transition cursor-pointer ${
+                                  wizardHasDomain === 'no'
+                                    ? 'border-[#2563EB] dark:border-cyan-400 bg-slate-50/50 dark:bg-slate-900/40 font-bold'
+                                    : 'border-slate-200/50 dark:border-slate-800/80 bg-transparent'
+                                }`}
+                              >
+                                <div className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center ${wizardHasDomain === 'no' ? 'border-[#2563EB] dark:border-cyan-400 bg-[#2563EB] dark:bg-cyan-400' : 'border-slate-400'}`}>
+                                  {wizardHasDomain === 'no' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                                </div>
+                                <span className="text-xs text-slate-700 dark:text-slate-300">{tW.noDomain}</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Step 2: Select Transfer Method */}
+                      {wizardStep === 1 && (
+                        <div className="space-y-6">
+                          <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-white mb-4 text-left">
+                            {tW.methodHeading}
+                          </h3>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <button
+                              onClick={() => setWizardTransferMethod('expert')}
+                              className={`p-6 rounded-2xl border text-left transition cursor-pointer flex flex-col justify-between gap-3 ${
+                                wizardTransferMethod === 'expert'
+                                  ? 'border-blue-500 dark:border-cyan-400 bg-blue-50/10 dark:bg-cyan-950/15'
+                                  : 'border-slate-200/50 dark:border-slate-800'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2 justify-start">
+                                <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
+                                <h4 className="text-xs sm:text-sm font-black text-slate-800 dark:text-white leading-tight">{tW.expTitle}</h4>
+                              </div>
+                              <p className="text-xxs sm:text-xs text-slate-500 dark:text-slate-400 leading-relaxed mt-1">{tW.expDesc}</p>
+                            </button>
+
+                            <button
+                              onClick={() => setWizardTransferMethod('manual')}
+                              className={`p-6 rounded-2xl border text-left transition cursor-pointer flex flex-col justify-between gap-3 ${
+                                wizardTransferMethod === 'manual'
+                                  ? 'border-blue-500 dark:border-cyan-400 bg-blue-50/10 dark:bg-cyan-950/15'
+                                  : 'border-slate-200/50 dark:border-slate-800'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2 justify-start">
+                                <Upload className="w-4 h-4 text-blue-500 shrink-0" />
+                                <h4 className="text-xs sm:text-sm font-black text-slate-800 dark:text-white leading-tight">{tW.manTitle}</h4>
+                              </div>
+                              <p className="text-xxs sm:text-xs text-slate-500 dark:text-slate-400 leading-relaxed mt-1">{tW.manDesc}</p>
+                            </button>
+                          </div>
+
+                          {/* Option A View: Free Expert Tool */}
+                          {wizardTransferMethod === 'expert' ? (
+                            <div className="p-5 sm:p-7 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-200/40 dark:border-slate-800/85">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left">
+                                <div>
+                                  <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1.5">{tW.providerLabel}</label>
+                                  <select 
+                                    value={wizardOldProvider}
+                                    onChange={(e) => {
+                                      setWizardOldProvider(e.target.value);
+                                      setWizardAnalysisRun(false);
+                                    }}
+                                    className="w-full text-xs p-3 px-3.5 rounded-xl border border-slate-200 dark:border-slate-850 bg-white dark:bg-[#1E293B] text-slate-800 dark:text-white outline-none cursor-pointer font-bold"
+                                  >
+                                    <option value="Namecheap">Namecheap</option>
+                                    <option value="Hostinger">Hostinger</option>
+                                    <option value="GoDaddy">GoDaddy</option>
+                                    <option value="Hostgator">Hostgator</option>
+                                    <option value="Bluehost">Bluehost</option>
+                                    <option value="Other cPanel Provider">Other Provider</option>
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1.5">{tW.sizeLabel}</label>
+                                  <select 
+                                    value={wizardSiteSize}
+                                    onChange={(e) => {
+                                      setWizardSiteSize(e.target.value);
+                                      setWizardAnalysisRun(false);
+                                    }}
+                                    className="w-full text-xs p-3 px-3.5 rounded-xl border border-slate-200 dark:border-slate-850 bg-white dark:bg-[#1E293B] text-slate-800 dark:text-white outline-none cursor-pointer font-bold"
+                                  >
+                                    <option value="Under 5GB">Under 5GB</option>
+                                    <option value="5GB - 20GB">5GB - 20GB</option>
+                                    <option value="20GB - 100GB">20GB - 100GB</option>
+                                    <option value="Over 100GB">Over 100GB</option>
+                                  </select>
+                                </div>
+                              </div>
+
+                              <div className="mt-5 text-left">
+                                <button
+                                  onClick={() => setWizardAnalysisRun(true)}
+                                  className="px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:scale-[1.01] text-white text-[11px] font-black rounded-xl cursor-pointer flex items-center gap-1 shadow transition"
+                                >
+                                  <Activity className="w-3.5 h-3.5 animate-pulse text-indigo-200" />
+                                  <span>{tW.btnAnalyze}</span>
+                                </button>
+                              </div>
+
+                              {wizardAnalysisRun && (
+                                <motion.div 
+                                  initial={{ opacity: 0, y: 10 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  className="mt-6 bg-slate-950 font-mono text-[10.5px] text-emerald-400 p-4.5 rounded-xl text-left border border-slate-800 leading-relaxed shadow-inner"
+                                >
+                                  <div className="font-extrabold text-white text-xs mb-3 flex items-center gap-2 justify-start">
+                                    <Star className="w-3.5 h-3.5 text-amber-500 fill-current animate-spin" />
+                                    <span>{tW.analysisFinished}</span>
+                                  </div>
+                                  <div className="space-y-1.5 text-slate-300">
+                                    <div>• <span className="text-slate-400">{tW.estimateTime}:</span> <span className="text-amber-400 font-extrabold">{wizardSiteSize === 'Under 5GB' ? '20-30 mins' : wizardSiteSize === '5GB - 20GB' ? '30-45 mins' : '1-2 hours'}</span></div>
+                                    <div>• <span className="text-slate-400">{tW.compLevel}:</span> <span className="text-emerald-400 font-extrabold">100% Fully Compatible automatic transfer route</span></div>
+                                    <div>• <span className="text-slate-400">{tW.recDowntime}:</span> <span className="text-emerald-400 font-black">Absolutely ZERO (0.00s downtime guaranteed)</span></div>
+                                    <div className="pt-2 text-[9.5px] text-[#10B911] font-bold uppercase tracking-wider">➔ [ {tW.statusReady} / Proceed to Step 3 for Simulator ]</div>
+                                  </div>
+                                </motion.div>
+                              )}
+                            </div>
+                          ) : (
+                            /* Option B View: cPanel Archive Manual Upload Simulation */
+                            <div className="space-y-4 text-left">
+                              <div 
+                                onDragOver={(e) => e.preventDefault()}
+                                onDrop={handleDummyDrop}
+                                className="border-2 border-dashed border-slate-250 dark:border-slate-800 rounded-2xl p-8 text-center bg-slate-50/50 dark:bg-slate-900/30 hover:border-blue-500 hover:bg-slate-100/40 dark:hover:bg-slate-850/30 transition duration-300 relative cursor-pointer"
+                              >
+                                <input 
+                                  type="file" 
+                                  id="wizard-mock-file"
+                                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
+                                  onChange={handleMockFileUpload}
+                                />
+                                <Upload className="w-10 h-10 text-slate-400 mx-auto mb-3" />
+                                <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                                  {tW.dragDropLabel}
+                                </h4>
+                                <span className="block text-[10px] text-slate-400 tracking-wider mt-1.5 font-mono">Accepts: .tar, .tar.gz, .zip (Max. 50GB file size)</span>
+                              </div>
+
+                              {wizardFileSelected && (
+                                <div className="p-4 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200/50 dark:border-slate-800 flex flex-col gap-2">
+                                  <div className="flex items-center justify-between text-xs font-bold text-slate-755 dark:text-slate-300">
+                                    <span className="truncate max-w-[250px] font-mono">📁 {wizardFileSelected}</span>
+                                    <span>{wizardFileProgress}%</span>
+                                  </div>
+                                  <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                                    <div 
+                                      className="h-full bg-gradient-to-r from-blue-600 to-cyan-400 transition-all duration-300" 
+                                      style={{ width: `${wizardFileProgress}%` }}
+                                    />
+                                  </div>
+                                  
+                                  {wizardFileUploading ? (
+                                    <span className="text-[10px] text-slate-400 font-bold animate-pulse">{tW.uploadingLabel}</span>
+                                  ) : (
+                                    <div className="text-[11px] font-mono text-emerald-600 dark:text-emerald-450 mt-1 flex items-center gap-1.5 leading-normal font-semibold justify-start">
+                                      <Check className="w-4 h-4 text-emerald-500 shrink-0" />
+                                      <span>{tW.uploadedSuccess} cPanel dynamic core archive matches. PHP structures mapped successfully. Ready for step 3.</span>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Step 3: Simulated Live Transfer */}
+                      {wizardStep === 2 && (
+                        <div className="space-y-6">
+                          <div className="text-left">
+                            <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-white mb-2 flex items-center gap-2 justify-start">
+                              <Terminal className="text-cyan-400 w-4 h-4 animate-pulse" />
+                              <span>{tW.simHeading}</span>
+                            </h3>
+                            <p className="text-xxs sm:text-xs text-slate-500 dark:text-slate-400 leading-relaxed border-b border-slate-100 dark:border-slate-800/60 pb-3">
+                              {tW.simDesc}
+                            </p>
+                          </div>
+
+                          <div className="flex flex-col md:flex-row items-stretch justify-between gap-6">
+                            <div className="text-left flex flex-col justify-center space-y-3.5 md:flex-1">
+                              {wizardSimState === 'idle' && (
+                                <button
+                                  onClick={handleStartSimulation}
+                                  className="px-5 py-3.5 bg-[#2563EB] hover:bg-blue-650 text-white text-xs font-black rounded-xl shadow-md flex items-center gap-2 cursor-pointer transition transform hover:scale-[1.01] self-start"
+                                >
+                                  <Terminal className="w-4 h-4 text-cyan-300 animate-pulse" />
+                                  <span>{tW.btnSimStart}</span>
+                                </button>
+                              )}
+
+                              {wizardSimState === 'running' && (
+                                <div className="flex items-center gap-4">
+                                  <div className="px-5 py-3 bg-slate-105 dark:bg-slate-850 text-slate-500 dark:text-slate-350 text-xs font-black rounded-xl border border-slate-200 dark:border-slate-800 flex items-center gap-2">
+                                    <RefreshCw className="w-3.5 h-3.5 text-blue-500 animate-spin" />
+                                    <span>{tW.btnSimRunning}</span>
+                                  </div>
+                                  <span className="text-base font-bold text-[#2563EB] dark:text-cyan-400 font-mono animate-pulse">{wizardSimProgress}%</span>
+                                </div>
+                              )}
+
+                              {wizardSimState === 'completed' && (
+                                <div className="flex flex-wrap gap-3">
+                                  <div className="px-4 py-2.5 bg-emerald-500 text-white text-xs font-black rounded-xl shadow flex items-center gap-1.5">
+                                    <CheckCircle className="w-4 h-4 text-white" />
+                                    <span>{tW.btnSimDone}</span>
+                                  </div>
+                                  <button
+                                    onClick={handleStartSimulation}
+                                    className="px-3 py-1.5 text-[10.5px] font-bold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-850 rounded-xl transition cursor-pointer flex items-center gap-1 border border-slate-200 dark:border-slate-800"
+                                  >
+                                    <RefreshCw className="w-3 h-3" />
+                                    <span>Reset Simulator</span>
+                                  </button>
+                                </div>
+                              )}
+
+                              {wizardSimStatus && (
+                                <p className="text-xs text-slate-600 dark:text-slate-350 font-bold max-w-sm leading-snug">
+                                  ⚙️ {wizardSimStatus}
+                                </p>
+                              )}
+                            </div>
+
+                            <div className="w-full md:w-[460px] text-left shrink-0">
+                              <div className="bg-slate-950 rounded-2xl border border-slate-800 shadow-2xl overflow-hidden font-mono text-[10px]">
+                                <div className="bg-slate-900 px-4 py-2 border-b border-slate-800 flex items-center justify-between">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="w-2h h-2 bg-red-500 rounded-full inline-block" style={{ width: 8, height: 8 }} />
+                                    <span className="w-2h h-2 bg-yellow-500 rounded-full inline-block" style={{ width: 8, height: 8 }} />
+                                    <span className="w-2h h-2 bg-green-500 rounded-full inline-block" style={{ width: 8, height: 8 }} />
+                                  </div>
+                                  <span className="text-[9px] uppercase font-bold tracking-wider text-slate-500 font-mono">{tW.terminalTitle}</span>
+                                </div>
+                                
+                                <div className="p-4 h-48 overflow-y-auto space-y-2 text-emerald-400 scrollbar-thin leading-normal">
+                                  <div className="text-slate-500 flex items-center justify-start gap-1">
+                                    <span>{tW.logPrompt}</span>
+                                    <span>init_migration --source=cpanel_archive.tar.gz</span>
+                                  </div>
+                                  {wizardSimLogs.map((log, index) => (
+                                    <div key={index} className="text-emerald-400 animate-fade-in font-medium">
+                                      {log}
+                                    </div>
+                                  ))}
+                                  {wizardSimState === 'running' && (
+                                    <div className="flex items-center gap-1.5 text-slate-500 tracking-wider justify-start">
+                                      <span className="inline-block w-2 w-2 bg-cyan-400 rounded-sm shrink-0 animate-pulse" style={{ width: 6, height: 6 }} />
+                                      <span>Transmitting encrypted packets...</span>
+                                    </div>
+                                  )}
+                                  {wizardSimState === 'completed' && (
+                                    <div className="pt-2.5 border-t border-slate-900 text-white font-extrabold text-center text-xxs text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400 animate-pulse uppercase tracking-wider">
+                                      [ *** DEPLOYMENT OK — BDIX DHAKA ROUTE HIGH SPEED BURST ACTIVE *** ]
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Step 4: Checklist & Live Badge */}
+                      {wizardStep === 3 && (
+                        <div className="space-y-6">
+                          <div className="text-left">
+                            <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-white mb-2 flex items-center gap-2 justify-start">
+                              <CheckCircle2 className="text-emerald-500 w-4 h-4" />
+                              <span>{tW.checklistHeading}</span>
+                            </h3>
+                            <p className="text-xxs sm:text-xs text-slate-500 dark:text-slate-400 leading-relaxed border-b border-slate-104 dark:border-slate-800/60 pb-3">
+                              {tW.checklistDesc}
+                            </p>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+                            <div className="space-y-3 text-left">
+                              {[
+                                { key: 'nameservers', text: tW.chk1 },
+                                { key: 'ssl', text: tW.chk2 },
+                                { key: 'dbconn', text: tW.chk3 },
+                                { key: 'cache', text: tW.chk4 },
+                              ].map((chk) => {
+                                const isTicked = wizardChecklist[chk.key];
+                                return (
+                                  <button
+                                    key={chk.key}
+                                    onClick={() => handleToggleChecklist(chk.key)}
+                                    className={`w-full p-4 rounded-xl border text-left flex items-start gap-3 transition cursor-pointer hover:bg-slate-50/50 dark:hover:bg-slate-900/30 ${
+                                      isTicked 
+                                        ? 'border-emerald-500/30 bg-emerald-500/5 dark:bg-emerald-500/10' 
+                                        : 'border-slate-200/50 dark:border-slate-800'
+                                    }`}
+                                  >
+                                    <div className={`w-4 h-4 rounded-md border-2 flex items-center justify-center shrink-0 mt-0.5 transition-all ${
+                                      isTicked 
+                                        ? 'border-emerald-500 bg-emerald-500 text-white' 
+                                        : 'border-slate-350 dark:border-slate-700'
+                                    }`}>
+                                      {isTicked && <Check className="w-3 h-3 text-white stroke-[3.5]" />}
+                                    </div>
+                                    <span className={`text-[11.5px] select-none font-bold ${isTicked ? 'text-slate-900 dark:text-white line-through opacity-70' : 'text-slate-650 dark:text-slate-300'}`}>
+                                      {chk.text}
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+
+                            {/* Success Trophy Badges */}
+                            <div className="flex flex-col items-center justify-center p-6 text-center bg-slate-50/30 dark:bg-slate-900/10 rounded-3xl border border-slate-205/30 dark:border-slate-805/20 relative min-h-[220px]">
+                              <AnimatePresence mode="wait">
+                                {Object.values(wizardChecklist).every(v => v) ? (
+                                  <motion.div
+                                    key="celebrate-badge"
+                                    initial={{ scale: 0.88, opacity: 0 }}
+                                    animate={{ scale: 1, opacity: 1 }}
+                                    exit={{ scale: 0.88, opacity: 0 }}
+                                    className="space-y-4"
+                                  >
+                                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-emerald-500/15 rounded-full blur-2xl pointer-events-none animate-pulse" />
+                                    
+                                    <div className="p-3.5 rounded-full bg-gradient-to-r from-emerald-500 to-teal-550 text-white w-16 h-16 flex items-center justify-center shadow-lg shadow-emerald-500/30 mx-auto animate-bounce">
+                                      <Award className="w-8 h-8 text-white stroke-[2.2] animate-pulse" />
+                                    </div>
+                                    <h4 className="text-sm sm:text-base font-black text-slate-900 dark:text-white font-display">
+                                      {tW.congratsTitle}
+                                    </h4>
+                                    <p className="text-xxs sm:text-xs text-slate-500 dark:text-slate-450 max-w-xs mx-auto leading-relaxed">
+                                      {tW.congratsDesc}
+                                    </p>
+                                    
+                                    <button
+                                      onClick={() => handleScrollToId('redesigned-packages')}
+                                      className="px-4 py-2 bg-gradient-to-r from-blue-600 to-cyan-500 hover:scale-[1.02] text-white text-[10px] font-black rounded-lg cursor-pointer shadow transition"
+                                    >
+                                      {tW.pricingScrollCTA}
+                                    </button>
+                                  </motion.div>
+                                ) : (
+                                  <motion.div
+                                    key="waiting-badge"
+                                    className="text-slate-400 dark:text-slate-600 flex flex-col items-center gap-3.5"
+                                  >
+                                    <Lock className="w-10 h-10 stroke-[1.5] text-slate-300 dark:text-slate-750 animate-pulse" />
+                                    <span className="text-[10px] uppercase tracking-widest font-black text-slate-400 dark:text-slate-550 max-w-[200px] leading-snug">
+                                      Point NS, configure SSL, match DB, and clear browser cache to test full Go-Live safety
+                                    </span>
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                    </motion.div>
+                  </AnimatePresence>
+
+                  {/* Nav Footer controls */}
+                  <div className="flex items-center justify-between mt-10 pt-6 border-t border-slate-100 dark:border-slate-800/80">
+                    <button
+                      onClick={() => setWizardStep(prev => Math.max(0, prev - 1))}
+                      disabled={wizardStep === 0 || wizardSimState === 'running'}
+                      className="px-4.5 py-2 bg-slate-100 dark:bg-slate-850 hover:bg-slate-200 dark:hover:bg-slate-755 text-slate-700 dark:text-slate-350 disabled:opacity-40 disabled:pointer-events-none rounded-xl text-[11px] font-black transition cursor-pointer"
+                    >
+                      ← {tW.prevStep}
+                    </button>
+
+                    <button
+                      onClick={() => setWizardStep(prev => Math.min(3, prev + 1))}
+                      disabled={wizardStep === 3 || wizardSimState === 'running'}
+                      className="px-4.5 py-2 bg-gradient-to-r from-blue-600 to-cyan-500 hover:scale-[1.01] text-white disabled:opacity-40 disabled:pointer-events-none rounded-xl text-[11px] font-black transition cursor-pointer flex items-center gap-1.5"
+                    >
+                      <span>{tW.nextStep}</span>
+                      <span>→</span>
+                    </button>
+                  </div>
+
+                </div>
+
+              </div>
+            );
+          })()}
+
+        </div>
+      </section>
+
       {/* ================================= CUSTOMER TESTIMONIALS ================================= */}
       <section className="py-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-3xl mx-auto mb-16">
@@ -1812,6 +2975,191 @@ export default function Hosting({
               </div>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* ================================= STEP-BY-STEP VPS SETUP ACCORDION ================================= */}
+      <section className="py-24 bg-gradient-to-b from-white to-slate-50/70 dark:from-slate-900/10 dark:to-slate-950/45 border-t border-slate-200/50 dark:border-slate-800/80">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          
+          <div className="text-center max-w-3xl mx-auto mb-16 animate-fade-in">
+            <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[10px] font-mono font-black bg-blue-500/10 text-blue-700 dark:bg-blue-400/10 dark:text-blue-400 uppercase tracking-widest mb-4">
+              <Terminal className="w-3.5 h-3.5 animate-pulse text-blue-500" />
+              {(vpsSetupTrans[language] || vpsSetupTrans.en).tag}
+            </span>
+            <h2 className="text-3xl md:text-5xl font-black tracking-tight text-slate-900 dark:text-white leading-tight mb-4 font-display">
+              {(vpsSetupTrans[language] || vpsSetupTrans.en).heading}
+            </h2>
+            <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400 max-w-2xl mx-auto">
+              {(vpsSetupTrans[language] || vpsSetupTrans.en).sub}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            
+            {/* Left side: Interactive Accordion steps */}
+            <div className="lg:col-span-7 space-y-4">
+              {(vpsSetupTrans[language] || vpsSetupTrans.en).steps.map((step, idx) => {
+                const isOpen = activeSetupStep === idx;
+                return (
+                  <div 
+                    key={idx}
+                    className={`rounded-2xl border transition duration-300 overflow-hidden text-left ${
+                      isOpen 
+                        ? 'bg-white dark:bg-[#0F172A] border-blue-500/30 shadow-lg dark:shadow-blue-900/10 scale-[1.01]' 
+                        : 'bg-white/80 dark:bg-slate-900/50 border-slate-200/65 dark:border-slate-800/80 hover:border-slate-350 dark:hover:border-slate-700 shadow-sm'
+                    }`}
+                  >
+                    <button
+                      onClick={() => setActiveSetupStep(isOpen ? null : idx)}
+                      className="w-full py-5 px-6 flex items-center justify-between text-left cursor-pointer focus:outline-none"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className={`w-8.5 h-8.5 rounded-xl flex items-center justify-center font-mono text-xs font-black transition ${
+                          isOpen 
+                            ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' 
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                        }`}>
+                          {idx + 1}
+                        </div>
+                        <div>
+                          <span className="block text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                            {(vpsSetupTrans[language] || vpsSetupTrans.en).activeStepPrefix} {idx + 1}
+                          </span>
+                          <span className="text-sm md:text-base font-extrabold text-slate-900 dark:text-white leading-snug">
+                            {step.title}
+                          </span>
+                        </div>
+                      </div>
+                      <div className={`p-1.5 rounded-lg transition-colors ${
+                        isOpen ? 'bg-blue-500/10 text-blue-500' : 'bg-slate-150/10 text-slate-400 dark:text-slate-500'
+                      }`}>
+                        <ChevronDown className={`w-4 h-4 transition transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
+                      </div>
+                    </button>
+
+                    <AnimatePresence initial={false}>
+                      {isOpen && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.28, ease: "easeInOut" }}
+                        >
+                          <div className="px-6 pb-6 pt-1 border-t border-slate-100 dark:border-slate-850/75">
+                            <p className="text-xs sm:text-sm text-slate-650 dark:text-slate-300 leading-relaxed font-sans mb-5">
+                              {step.desc}
+                            </p>
+                            
+                            {/* Command helper inline inside accordion item */}
+                            <div className="bg-slate-900 rounded-xl p-4.5 border border-slate-800 text-left font-mono text-[10.5px] sm:text-xs">
+                              <div className="flex items-center justify-between text-slate-450 border-b border-slate-850/30 pb-2 mb-3">
+                                <span className="text-[10px] uppercase font-bold tracking-wider text-slate-500">
+                                  {language === 'bn' ? 'কমান্ড এক্সিকিউটর' : language === 'ar' ? 'سطر الأوامر' : 'CLI Command'}
+                                </span>
+                                <span className="text-[9px] text-slate-600">bash / linux</span>
+                              </div>
+                              <pre className="text-emerald-400 overflow-x-auto whitespace-pre font-mono leading-relaxed">
+                                {step.command.replace(/your_server_ip/g, vpsIp)}
+                              </pre>
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Right side: Interactive Server Simulator Terminal Display */}
+            <div className="lg:col-span-5 bg-[#080E1C] rounded-3xl border border-slate-800 shadow-2xl p-6.5 overflow-hidden relative">
+              {/* Terminal glowing backdrop light */}
+              <div className="absolute top-0 right-0 w-48 h-48 bg-cyan-500/5 dark:bg-cyan-500/5 rounded-full blur-3xl pointer-events-none" />
+              
+              {/* Terminal Header dots */}
+              <div className="flex items-center justify-between border-b border-slate-800/90 pb-4 mb-5 animate-fade-in">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-full bg-rose-500" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                </div>
+                <div className="text-[9px] font-mono text-slate-500 uppercase tracking-widest font-black">
+                  {(vpsSetupTrans[language] || vpsSetupTrans.en).terminalTitle}
+                </div>
+                <div className="w-8" />
+              </div>
+
+              {/* Interactive IP Configurator */}
+              <div className="mb-6 bg-slate-900/90 rounded-2xl border border-slate-850 p-4">
+                <label className="block text-[10px] font-mono uppercase tracking-wider text-slate-400 dark:text-slate-450 mb-2.5 text-left font-bold">
+                  ⚡ {language === 'bn' ? 'সার্ভার আইপি মডিফায়ার (লাইভ টেস্ট)' : language === 'ar' ? 'عنوان الآي بي التجريبي' : 'Interactive IP Address'}
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={vpsIp}
+                    onChange={(e) => setVpsIp(e.target.value)}
+                    placeholder={(vpsSetupTrans[language] || vpsSetupTrans.en).ipPlaceholder}
+                    className="flex-1 bg-[#030712] border border-slate-850 rounded-xl px-3.5 py-2 text-xs text-slate-200 font-mono focus:outline-none focus:border-blue-500/70"
+                  />
+                  <button 
+                    onClick={() => setVpsIp('141.136.42.112')}
+                    className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-[10px] font-mono font-bold text-slate-300 rounded-xl transition-all"
+                  >
+                    Reset
+                  </button>
+                </div>
+              </div>
+
+              {/* Terminal Display Screen */}
+              <div className="bg-[#030712] rounded-2xl border border-slate-900 p-5 font-mono text-xxs sm:text-xs text-left leading-relaxed min-h-[310px] flex flex-col justify-between">
+                <div className="space-y-3.5 text-slate-300">
+                  <div className="text-slate-500 leading-tight">
+                    # WebzoneBD Secure SSH Terminal v1.42 (KVM Node-12)<br />
+                    # Port: 22 | Host: {vpsIp} | Agent: secure-shell
+                  </div>
+                  
+                  {activeSetupStep !== null && (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-1.5 text-slate-500">
+                        <span>$</span>
+                        <span className="text-blue-400 font-bold">
+                          {(vpsSetupTrans[language] || vpsSetupTrans.en).activeStepPrefix} {activeSetupStep + 1} System Core:
+                        </span>
+                      </div>
+                      
+                      <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-850/60 font-mono text-[10px] sm:text-[11px] text-emerald-400">
+                        {(vpsSetupTrans[language] || vpsSetupTrans.en).steps[activeSetupStep].title}
+                      </div>
+
+                      <div className="pl-3.5 border-l-2 border-slate-800 text-slate-400 font-sans text-xxs sm:text-xs">
+                        {(vpsSetupTrans[language] || vpsSetupTrans.en).steps[activeSetupStep].desc.substring(0, 100)}...
+                      </div>
+
+                      <div className="text-slate-550 text-[11px]">
+                        $ current run command:<br />
+                        <span className="text-slate-100 font-mono text-[10px]">
+                          {(vpsSetupTrans[language] || vpsSetupTrans.en).steps[activeSetupStep].command.split('\n')[0].replace(/your_server_ip/g, vpsIp)}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="pt-4 border-t border-slate-850/40 flex items-center justify-between text-[10px]">
+                  <span className="text-blue-500 font-bold animate-pulse inline-flex items-center gap-1.5 font-mono">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block" />
+                    {(vpsSetupTrans[language] || vpsSetupTrans.en).connectedText}{vpsIp}
+                  </span>
+                  <span className="text-slate-600 font-mono">UTC +6h</span>
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+
         </div>
       </section>
 
@@ -1904,11 +3252,11 @@ export default function Hosting({
             </button>
 
             <button 
-              onClick={() => handleSupportInquiry('sales')}
+              onClick={() => handleOpenOrderModal()}
               className="w-full sm:w-auto px-7 py-3.5 bg-white/10 hover:bg-white/15 text-white border border-white/20 rounded-xl text-xs font-black cursor-pointer flex items-center justify-center gap-2 transition duration-300"
             >
-              <Terminal className="w-4 h-4 text-cyan-400" />
-              <span>{currentTrans.contactSales}</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+              <span>{language === 'bn' ? '🟢 হোয়াটসঅ্যাপ অর্ডার ফর্ম' : language === 'ar' ? '🟢 طلب عبر الواتساب' : '🟢 WhatsApp Order Form'}</span>
             </button>
 
             <button 
@@ -1922,6 +3270,276 @@ export default function Hosting({
 
         </div>
       </section>
+
+      {/* WhatsApp Order Form Modal */}
+      <AnimatePresence>
+        {isOrderModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ type: 'spring', duration: 0.5 }}
+              className="relative w-full max-w-2xl bg-white dark:bg-[#0F172A] rounded-[20px] border border-slate-200/50 dark:border-white/[0.08] shadow-[0_20px_50px_rgba(0,0,0,0.12)] p-6 sm:p-8 md:p-10 text-slate-950 dark:text-white overflow-hidden max-h-[90vh] flex flex-col"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100 dark:border-slate-800/60 shrink-0">
+                <div>
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-mono font-black bg-emerald-500/10 text-emerald-600 dark:bg-emerald-400/10 dark:text-emerald-400 uppercase tracking-widest mb-1.5">
+                    🟢 {language === 'bn' ? 'অর্ডার ফর্ম' : 'Order Form'}
+                  </span>
+                  <h3 className="text-xl sm:text-2xl font-black font-display tracking-tight bg-gradient-to-r from-violet-600 via-purple-600 to-pink-500 bg-clip-text text-transparent">
+                    {language === 'bn' ? 'হোস্টিং অর্ডার ও সাবস্ক্রিপশন' : '🟢 WhatsApp Order Form'}
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setIsOrderModalOpen(false)}
+                  className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-850 text-slate-400 hover:text-slate-600 dark:hover:text-white transition cursor-pointer"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Scrollable Container */}
+              <div className="flex-1 overflow-y-auto pr-1 -mr-3 space-y-6 scrollbar-thin">
+                {formSubmitted ? (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="py-10 text-center"
+                  >
+                    <div className="w-16 h-16 bg-[#DCFCE7] border border-[#22C55E] text-[#22C55E] rounded-full flex items-center justify-center mx-auto mb-5 animate-bounce">
+                      <Check className="w-8 h-8 stroke-[3]" />
+                    </div>
+                    <h4 className="text-xl font-bold text-slate-900 dark:text-white mb-2">
+                      {language === 'bn' ? 'অর্ডার সফলভাবে পাঠানো হয়েছে!' : 'Order Placed Successfully!'}
+                    </h4>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto mb-6">
+                      {language === 'bn' 
+                        ? 'আপনার হোস্টিং অর্ডারের তথ্য সিস্টেমে নথিভুক্ত করা হয়েছে এবং হোয়াটসঅ্যাপ চ্যাট ওপেন করা হচ্ছে।' 
+                        : 'Your hosting order specifications have been stored in the database. WhatsApp is opening for instant completion.'}
+                    </p>
+                    <button
+                      onClick={() => setIsOrderModalOpen(false)}
+                      className="px-6 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-xl text-xs font-bold transition"
+                    >
+                      {language === 'bn' ? 'উইন্ডো বন্ধ করুন' : 'Close Window'}
+                    </button>
+                  </motion.div>
+                ) : (
+                  <form onSubmit={handleFormSubmit} className="space-y-5">
+                    {/* Select Hosting Plan Category Dropdown */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-slate-600 dark:text-slate-300 block">
+                        {language === 'bn' ? 'হোস্টিং প্ল্যান নির্বাচন করুন *' : 'Select Hosting Plan *'}
+                      </label>
+                      <div className="relative">
+                        <select
+                          value={orderForm.hostingType}
+                          onChange={(e) => handleHostingTypeChange(e.target.value)}
+                          className="w-full h-14 pl-4 pr-10 rounded-[14px] font-medium bg-[#F8FAFC] dark:bg-[#111827] border border-[#E2E8F0] dark:border-[#374151] text-slate-950 dark:text-white text-sm focus:outline-none focus:ring-4 focus:ring-violet-500/18 focus:border-transparent transition-all duration-300 appearance-none hover:border-slate-300 dark:hover:border-slate-600 cursor-pointer"
+                        >
+                          <option value="bdix" className="dark:bg-[#111827]">Shared BDiX</option>
+                          <option value="reseller" className="dark:bg-[#111827]">Reseller Hosting</option>
+                          <option value="vps" className="dark:bg-[#111827]">VPS Hosting</option>
+                        </select>
+                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+                      </div>
+                    </div>
+
+                    {/* Dynamic Hosting Package Select Dropdown */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-slate-600 dark:text-slate-300 block">
+                        {language === 'bn' ? 'প্যাকেজ নির্বাচন করুন *' : 'Select Package *'}
+                      </label>
+                      <div className="relative">
+                        <select
+                          value={orderForm.planId}
+                          onChange={(e) => setOrderForm({ ...orderForm, planId: e.target.value })}
+                          className="w-full h-14 pl-4 pr-10 rounded-[14px] font-medium bg-[#F8FAFC] dark:bg-[#111827] border border-[#E2E8F0] dark:border-[#374151] text-slate-950 dark:text-white text-sm focus:outline-none focus:ring-4 focus:ring-violet-500/18 focus:border-transparent transition-all duration-300 appearance-none hover:border-slate-300 dark:hover:border-slate-600 cursor-pointer"
+                        >
+                          {formPackagesList
+                            .filter((pkg) => pkg.hostingType === orderForm.hostingType)
+                            .map((pkg) => {
+                              const priceData = getDisplayPrice(pkg.id, orderForm.billingCycle);
+                              return (
+                                <option key={pkg.id} value={pkg.id} className="dark:bg-[#111827]">
+                                  {language === 'bn' ? pkg.titleBn : pkg.title} ({formatPriceVal(priceData.monthlyAvg)}/{language === 'bn' ? 'মাস' : 'mo'})
+                                </option>
+                              );
+                            })}
+                        </select>
+                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+                      </div>
+                    </div>
+
+                    {/* Billing Cycle Radio Grid */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-slate-600 dark:text-slate-300 block">
+                        {language === 'bn' ? 'বিলিং সাইকেল নির্বাচন করুন' : 'Select Billing Cycle'}
+                      </label>
+                      <div className="grid grid-cols-3 gap-3">
+                        {[
+                          { value: '1', label: language === 'bn' ? '১ মাস (মাসিক)' : '1 Month' },
+                          { value: '12', label: language === 'bn' ? '১২ মাস (১ বছর)' : '12 Months' },
+                          { value: '24', label: language === 'bn' ? '২৪ মাস (২ বছর)' : '24 Months' },
+                        ].map((cycle) => {
+                          const isSelected = orderForm.billingCycle === cycle.value;
+                          return (
+                            <button
+                              key={cycle.value}
+                              type="button"
+                              onClick={() => setOrderForm({ ...orderForm, billingCycle: cycle.value as '1' | '12' | '24' })}
+                              className={`p-3 rounded-xl border text-center transition-all duration-300 flex flex-col justify-center items-center gap-1 cursor-pointer ${
+                                isSelected
+                                  ? 'bg-gradient-to-r from-violet-500/10 to-pink-500/10 border-violet-500 text-violet-600 dark:text-violet-400 font-bold shadow-sm shadow-violet-500/5'
+                                  : 'bg-[#F8FAFC] dark:bg-[#111827] border-[#E2E8F0] dark:border-[#374151] text-slate-500 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600'
+                              }`}
+                            >
+                              <span className="text-xs">{cycle.label}</span>
+                              <span className="text-[10px] font-mono opacity-80">
+                                {formatPriceVal(getDisplayPrice(orderForm.planId, cycle.value as '1' | '12' | '24').monthlyAvg)}/mo
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Name */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-slate-600 dark:text-slate-300 block">
+                        {language === 'bn' ? 'আপনার নাম *' : 'Your Name *'}
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={orderForm.customerName}
+                        onChange={(e) => setOrderForm({ ...orderForm, customerName: e.target.value })}
+                        placeholder={language === 'bn' ? 'যেমন: সাজ্জাদ হোসেন' : 'e.g. Sazzad Hossain'}
+                        className="w-full h-14 px-4 rounded-[14px] font-medium bg-[#F8FAFC] dark:bg-[#111827] border border-[#E2E8F0] dark:border-[#374151] text-slate-950 dark:text-white text-sm focus:outline-none focus:ring-4 focus:ring-violet-500/18 focus:border-transparent transition-all duration-300"
+                      />
+                    </div>
+
+                    {/* Email & Phone Row */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-slate-600 dark:text-slate-300 block">
+                          {language === 'bn' ? 'মোবাইল নম্বর *' : 'Mobile Number *'}
+                        </label>
+                        <input
+                          type="tel"
+                          required
+                          value={orderForm.customerPhone}
+                          onChange={(e) => setOrderForm({ ...orderForm, customerPhone: e.target.value })}
+                          placeholder={language === 'bn' ? 'যেমন: ০১৭XXXXXXXX' : 'e.g. 017XXXXXXXX'}
+                          className="w-full h-14 px-4 rounded-[14px] font-medium bg-[#F8FAFC] dark:bg-[#111827] border border-[#E2E8F0] dark:border-[#374151] text-slate-950 dark:text-white text-sm focus:outline-none focus:ring-4 focus:ring-violet-500/18 focus:border-transparent transition-all duration-300"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-slate-600 dark:text-slate-300 block">
+                          {language === 'bn' ? 'ইমেইল অ্যাড্রেস' : 'Email Address'}
+                        </label>
+                        <input
+                          type="email"
+                          value={orderForm.customerEmail}
+                          onChange={(e) => setOrderForm({ ...orderForm, customerEmail: e.target.value })}
+                          placeholder="e.g. name@example.com"
+                          className="w-full h-14 px-4 rounded-[14px] font-medium bg-[#F8FAFC] dark:bg-[#111827] border border-[#E2E8F0] dark:border-[#374151] text-slate-950 dark:text-white text-sm focus:outline-none focus:ring-4 focus:ring-violet-500/18 focus:border-transparent transition-all duration-300"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Company name */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-slate-600 dark:text-slate-300 block">
+                        {language === 'bn' ? 'কোম্পানির নাম (যদি থাকে)' : 'Add Your Company Name (If any)'}
+                      </label>
+                      <input
+                        type="text"
+                        value={orderForm.companyName}
+                        onChange={(e) => setOrderForm({ ...orderForm, companyName: e.target.value })}
+                        placeholder={language === 'bn' ? 'যেমন: আমাদের ব্যবসা লিমিটেড' : 'e.g. My Business Ltd.'}
+                        className="w-full h-14 px-4 rounded-[14px] font-medium bg-[#F8FAFC] dark:bg-[#111827] border border-[#E2E8F0] dark:border-[#374151] text-slate-950 dark:text-white text-sm focus:outline-none focus:ring-4 focus:ring-violet-500/18 focus:border-transparent transition-all duration-300"
+                      />
+                    </div>
+
+                    {/* Domain name */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-slate-600 dark:text-slate-300 block">
+                        {language === 'bn' ? 'ডোমেন নাম (যদি থাকে)' : 'Your Domain Name (If any)'}
+                      </label>
+                      <input
+                        type="text"
+                        value={orderForm.domain}
+                        onChange={(e) => setOrderForm({ ...orderForm, domain: e.target.value })}
+                        placeholder="e.g. mybusiness.com"
+                        className="w-full h-14 px-4 rounded-[14px] font-medium bg-[#F8FAFC] dark:bg-[#111827] border border-[#E2E8F0] dark:border-[#374151] text-slate-950 dark:text-white text-sm focus:outline-none focus:ring-4 focus:ring-violet-500/18 focus:border-transparent transition-all duration-300"
+                      />
+                    </div>
+
+                    {/* Additional requirements Notes */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-slate-600 dark:text-slate-300 block">
+                        {language === 'bn' ? 'विशेष কোনো নির্দেশনা বা নোট' : 'Special Requirements / Notes'}
+                      </label>
+                      <textarea
+                        value={orderForm.notes}
+                        onChange={(e) => setOrderForm({ ...orderForm, notes: e.target.value })}
+                        placeholder={language === 'bn' ? 'আপনার প্রয়োজনীয় কোনো সেটিংস বা নির্দেশাবলী এখানে লিখুন...' : 'Enter any setup specifications or custom requirements here...'}
+                        className="w-full min-h-[140px] p-4 rounded-[14px] font-medium bg-[#F8FAFC] dark:bg-[#111827] border border-[#E2E8F0] dark:border-[#374151] text-slate-950 dark:text-white text-sm focus:outline-none focus:ring-4 focus:ring-violet-500/18 focus:border-transparent transition-all duration-300 resize-y"
+                      />
+                    </div>
+
+                    {/* Error Box */}
+                    {formError && (
+                      <div className="p-4 bg-[#FEE2E2] border border-[#EF4444] rounded-xl text-red-650 text-xs font-semibold flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
+                        <span>{formError}</span>
+                      </div>
+                    )}
+
+                    {/* Bottom Order summary & Button */}
+                    <div className="pt-4 border-t border-slate-100 dark:border-slate-800/65 flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0">
+                      <div className="text-center sm:text-left">
+                        <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-mono tracking-widest block leading-none">
+                          {language === 'bn' ? 'মোট প্রদেয় মূল্য' : 'Total Price'}
+                        </span>
+                        <span className="text-2xl font-black bg-gradient-to-r from-violet-600 to-pink-500 bg-clip-text text-transparent font-mono">
+                          {formatPriceVal(getDisplayPrice(orderForm.planId, orderForm.billingCycle).totalCost)}
+                        </span>
+                        <span className="text-[10px] text-slate-400 ml-1">
+                          ({orderForm.billingCycle} {language === 'bn' ? 'মাস' : 'Months'})
+                        </span>
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={formLoading}
+                        className="w-full sm:w-auto h-[54px] px-8 rounded-[14px] bg-gradient-to-r from-violet-600 via-purple-600 to-pink-500 hover:scale-[1.02] hover:shadow-[0_12px_30px_rgba(124,58,237,0.35)] text-white text-xs font-black tracking-wider uppercase transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
+                      >
+                        {formLoading ? (
+                          <>
+                            <RefreshCw className="w-4 h-4 animate-spin" />
+                            <span>{language === 'bn' ? 'সাবমিট হচ্ছে...' : 'Submitting...'}</span>
+                          </>
+                        ) : (
+                          <>
+                            <span>{language === 'bn' ? 'অর্ডার সম্পন্ন করুন 🟢' : 'Complete Order on WhatsApp 🟢'}</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
     </div>
   );

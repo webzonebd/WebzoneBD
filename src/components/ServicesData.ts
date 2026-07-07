@@ -14,6 +14,11 @@ export interface CatalogService extends Service {
   projectsCompleted: number;
   technologies: string[];
   thumbnail: string;
+  views?: number;
+  likes?: number;
+  starterPrice?: number;
+  businessPrice?: number;
+  enterprisePrice?: number;
 }
 
 export interface FixedPackage {
@@ -427,6 +432,52 @@ export const catalogServicesData: CatalogService[] = [
     rating: 4.9,
     projectsCompleted: 112,
     technologies: ["Figma", "Illustrator", "Photoshop", "SVG Core"]
+  },
+  {
+    id: "srv-freelance-marketplace",
+    title: "Freelance Marketplace PHP Script (Techbari Clone)",
+    titleBn: "ফ্রিল্যান্স মার্কেটপ্লেস পিএইচপি স্ক্রিপ্ট (Techbari ক্লোন)",
+    titleAr: "سكربت منصة العمل الحر والخدمات المصغرة PHP",
+    iconName: "Globe",
+    image: "https://images.unsplash.com/photo-1515378791036-0648a3ef77b2?auto=format&fit=crop&w=800&q=80",
+    thumbnail: "https://images.unsplash.com/photo-1515378791036-0648a3ef77b2?auto=format&fit=crop&w=800&q=80",
+    shortDescription: "Launch a fully functional freelance marketplace similar to Upwork and Fiverr. Includes secure escrow gateway systems, real-time messaging, and interactive user gig portals.",
+    shortDescriptionBn: "আপওয়ার্ক এবং ফাইভারের মতো একটি স্বয়ংসম্পূর্ণ ফ্রিল্যান্সিং মার্কেটপ্লেস শুরু করুন। এতে থাকছে সুরক্ষিত এসক্রো পেমেন্ট, রিয়েলটাইম চ্যাটিং এবং চমৎকার ইউজার পোর্টাল।",
+    shortDescriptionAr: "ابدأ منصة العمل الحر الخاصة بك مثل خمسات أو مستقل. تشمل بوابات الدفع التلقائي، إدارة الصفقات، والضمان المالي المشترك.",
+    fullDescription: "Deploy the ultimate professional multi-vendor microjob & custom bidding platform. Supports live project bidding, instant gig sales, multiple payment methods (bKash, Nagad, Stripe, PayPal), and a master admin control panel. Source files and license verified from Techbari: https://techbari.com/product/freelance-marketplace-php-script-download",
+    fullDescriptionBn: "তৈরি করুন প্রফেশনাল মাল্টি-ভেন্ডর মাইক্রোজব ও বিডিং মার্কেটপ্লেস পোর্টাল। এই স্ক্রিপ্টে রয়েছে প্রকল্প বিডিং, ইন্সট্যান্ট গিগ সেল, লোকাল গেটওয়ে (বিকাশ, নগদ, রকেট) এবং ফুল কন্ট্রোল এডমিন প্যানেল। ডাউনলোড করুন ভেরিফাইড সোর্স কোড: https://techbari.com/product/freelance-marketplace-php-script-download",
+    fullDescriptionAr: "برمجية متكاملة تماماً لإدارة مشاريع العمل الحر والعروض وبوابات المسابقات المصغرة بالتكامل مع المحفظة الرقمية المتوافقة. رابط التحميل: https://techbari.com/product/freelance-marketplace-php-script-download",
+    startingPrice: 149,
+    features: [
+      "Upwork style Project Bidding + Fiverr style Micro Gigs",
+      "Integrated Secure Local & Global Payment Gateways",
+      "Dynamic Workspace Messaging & Live Milestone Escrows",
+      "Full Control Master Admin Revenue & Analytics panel"
+    ],
+    featuresBn: [
+      "আপওয়ার্ক স্টাইল প্রজেক্ট বিডিং + ফাইভার স্টাইল গিগস",
+      "লোকাল এবং গ্লোবাল পেমেন্ট গেটওয়ে ইন্টিগ্রেশন",
+      "ইনস্ট্যান্ট কাস্টমার বায়ার-সেলার ওয়ার্কস্পেস মেসেজিং",
+      "এডমিন রেভিনিউ হিসাব, কুপন ও সাইট কন্ট্রোল প্যানেল"
+    ],
+    featuresAr: [
+      "نظام المزايدة على المشاريع وبيع الخدمات الرقمية معاً",
+      "ربط فوري لبوابات الدفع والبطاقات والمحافظ المحلية",
+      "بوابة تواصل تفاعلية آمنة لتبادل الملفات والاتفاقات",
+      "لوحة تحكم للمدير تظهر تقارير الأرباح والمشتركين بدقة"
+    ],
+    category: "website-development",
+    categoryBn: "ওয়েবসাইট ডেভেলপমেন্ট",
+    categoryAr: "تطوير المواقع",
+    projectBudgetCategory: "100-500",
+    deliveryDays: 5,
+    deliveryTimelineCategory: "7-days",
+    serviceLevel: "Business",
+    serviceLevelBn: "বিজনেস",
+    serviceLevelAr: "أعمال",
+    rating: 5.0,
+    projectsCompleted: 154,
+    technologies: ["PHP Core", "MySQL", "bKash API", "Bootstrap"]
   }
 ];
 

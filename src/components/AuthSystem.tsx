@@ -3,10 +3,21 @@ import {
   ShieldCheck, ArrowRight, Mail, Key, Phone, User, Check, AlertCircle,
   Eye, EyeOff, Lock, RefreshCw, Send, Smartphone, CheckCircle2, 
   Sparkles, Globe, Coins, Terminal, Settings, ShieldAlert, List,
-  HelpCircle, Activity, FileCode, UserCheck, CheckSquare, Sparkles as SparklesIcon
+  HelpCircle, Activity, FileCode, UserCheck, CheckSquare, Sparkles as SparklesIcon,
+  ExternalLink, Info
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Language, UserSession, UserRole, Theme } from '../types';
+import { auth as firebaseAuth, db as firebaseDb, handleFirestoreError, OperationType } from '../firebase';
+import { 
+  signInWithPopup, 
+  GoogleAuthProvider, 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword,
+  setPersistence,
+  browserLocalPersistence
+} from 'firebase/auth';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 interface AuthSystemProps {
   language: Language;
@@ -19,6 +30,21 @@ interface AuthSystemProps {
 
 // Preseeded list for testing role-based access
 export const PRESEEDED_USERS = [
+  {
+    id: 'usr-webzonebd-admin',
+    name: 'WebzoneBD Admin Office',
+    username: 'webzonebd',
+    email: 'webzonebd@yahoo.com',
+    phone: '+8801864000123',
+    role: 'admin' as UserRole,
+    password: 'admin123',
+    avatar: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=150&q=80',
+    isVerified: true,
+    isSocial: false,
+    createdAt: '2026-06-10',
+    status: 'active' as const,
+    wishlistedProductIds: []
+  },
   {
     id: 'usr-admin',
     name: 'WebzoneBD Admin Boss',
@@ -35,7 +61,7 @@ export const PRESEEDED_USERS = [
     wishlistedProductIds: []
   },
   {
-    id: 'usr-customer',
+    id: 'usr-101',
     name: 'Imran Hasan',
     username: 'imranh',
     email: 'customer@webzonebd.com',
@@ -48,6 +74,81 @@ export const PRESEEDED_USERS = [
     createdAt: '2026-03-15',
     status: 'active' as const,
     wishlistedProductIds: ['prod-1', 'prod-3']
+  },
+  {
+    id: 'usr-101',
+    name: 'Imran Hasan',
+    username: 'imranh_primary',
+    email: 'imranh7900@gmail.com',
+    phone: '+8801711223344',
+    role: 'customer' as UserRole,
+    password: 'customerpassword',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80',
+    isVerified: true,
+    isSocial: false,
+    createdAt: '2026-01-15',
+    status: 'active' as const,
+    wishlistedProductIds: ['prod-1']
+  },
+  {
+    id: 'usr-102',
+    name: 'Al-Shehri Majid',
+    username: 'majid',
+    email: 'majid@saudiweb.com',
+    phone: '+966501234567',
+    role: 'customer' as UserRole,
+    password: 'customerpassword',
+    avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80',
+    isVerified: true,
+    isSocial: false,
+    createdAt: '2026-02-20',
+    status: 'active' as const,
+    wishlistedProductIds: []
+  },
+  {
+    id: 'usr-103',
+    name: 'Zeeshan Rahman',
+    username: 'zeeshan',
+    email: 'zee@rahmanit.com',
+    phone: '+8801864051151',
+    role: 'customer' as UserRole,
+    password: 'customerpassword',
+    avatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=150&q=80',
+    isVerified: true,
+    isSocial: false,
+    createdAt: '2026-03-05',
+    status: 'active' as const,
+    wishlistedProductIds: []
+  },
+  {
+    id: 'usr-104',
+    name: 'Sarah Connor',
+    username: 'sarah',
+    email: 'sarah@t800.io',
+    phone: '+14158889999',
+    role: 'customer' as UserRole,
+    password: 'customerpassword',
+    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80',
+    isVerified: true,
+    isSocial: false,
+    createdAt: '2026-03-12',
+    status: 'active' as const,
+    wishlistedProductIds: []
+  },
+  {
+    id: 'usr-105',
+    name: 'Enamul Haque',
+    username: 'enamul',
+    email: 'enamul@dhakahost.net',
+    phone: '+8801912345678',
+    role: 'customer' as UserRole,
+    password: 'customerpassword',
+    avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
+    isVerified: true,
+    isSocial: false,
+    createdAt: '2025-11-10',
+    status: 'active' as const,
+    wishlistedProductIds: []
   },
   {
     id: 'usr-vendor',
@@ -92,6 +193,13 @@ export default function AuthSystem({
   const [view, setView] = useState<'login' | 'register' | 'forgot' | 'otp_verify' | 'password_reset'>(defaultView);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [isIframe, setIsIframe] = useState(false);
+  const [showPartitionError, setShowPartitionError] = useState(false);
+
+  useEffect(() => {
+    setIsIframe(typeof window !== 'undefined' && window.self !== window.top);
+  }, []);
 
   // Form Fields - Login
   const [loginEmail, setLoginEmail] = useState('');
@@ -602,6 +710,37 @@ export default function AuthSystem({
         
         triggerToast('✅ WhatsApp account verified successfully!');
         
+        // Save verified user to Firebase Auth + Firestore
+        const registerInFirebase = async () => {
+          try {
+            // Fix Firebase Authentication Persistence
+            await setPersistence(firebaseAuth, browserLocalPersistence);
+
+            const credentials = await createUserWithEmailAndPassword(firebaseAuth, verifiedUser.email, regPassword);
+            const fbUser = credentials.user;
+            if (fbUser) {
+              const userDocRef = doc(firebaseDb, 'users', fbUser.uid);
+              const userDataToStore = {
+                id: fbUser.uid,
+                name: verifiedUser.name,
+                username: verifiedUser.username,
+                email: verifiedUser.email,
+                phone: verifiedUser.phone,
+                role: verifiedUser.role,
+                isVerified: true,
+                createdAt: verifiedUser.createdAt,
+                status: 'active' as const,
+                wishlistedProductIds: []
+              };
+              await setDoc(userDocRef, userDataToStore);
+              console.log("Firebase Auth and user Firestore profile created successfully!");
+            }
+          } catch (err) {
+            console.warn("Real Firebase email register failed or unconfigured:", err);
+          }
+        };
+        registerInFirebase();
+        
         // Let user see step 4 for 2.5 seconds, then transition to step 5 (Redirect)
         setTimeout(() => {
           setCurrentStep(5);
@@ -666,7 +805,7 @@ export default function AuthSystem({
   };
 
   // 3. SECURE MULTI-ROLE ACCREDITATION LOGIN
-  const handleSecureLogin = (e: React.FormEvent) => {
+  const handleSecureLogin = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!loginEmail || !loginPassword) {
@@ -682,11 +821,64 @@ export default function AuthSystem({
       return;
     }
 
+    // Try real Firebase Email & Password signing
+    try {
+      // Fix Firebase Authentication Persistence
+      await setPersistence(firebaseAuth, browserLocalPersistence);
+
+      const credentials = await signInWithEmailAndPassword(firebaseAuth, loginEmail.toLowerCase().trim(), loginPassword);
+      const fbUser = credentials.user;
+      if (fbUser) {
+        // Read user doc from Firestore
+        const userDocRef = doc(firebaseDb, 'users', fbUser.uid);
+        const userDocSnap = await getDoc(userDocRef);
+        if (userDocSnap.exists()) {
+          const userSessionData = userDocSnap.data() as UserSession;
+          onLoginSuccess(userSessionData);
+          triggerToast(language === 'bn' ? `সাফল্যের সাথে সাইন-ইন সম্পন্ন হয়েছে! স্বাগতম, ${userSessionData.name}` : `Security access token issued for: ${userSessionData.name}`);
+          return;
+        }
+      }
+    } catch (err) {
+      console.info("Real Firebase login fallback (local match check instead):", err);
+    }
+
     // Look inside database users
-    const match = PRESEEDED_USERS.find(
+    let match = PRESEEDED_USERS.find(
       u => u.email.toLowerCase() === loginEmail.toLowerCase().trim() &&
       u.password === loginPassword
     );
+
+    if (!match) {
+      try {
+        const savedStaff = localStorage.getItem('webzone_admin_staff');
+        if (savedStaff) {
+          const staffList = JSON.parse(savedStaff);
+          const stf = staffList.find(
+            (s: any) => s.email && s.email.toLowerCase() === loginEmail.toLowerCase().trim() && s.password === loginPassword
+          );
+          if (stf) {
+            match = {
+              id: stf.userId,
+              name: stf.name,
+              username: stf.name.toLowerCase().replace(/\s+/g, '_'),
+              email: stf.email,
+              phone: '+8801864000123',
+              role: (stf.role?.toLowerCase() === 'admin' ? 'admin' : 'staff') as any,
+              avatar: stf.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+              isVerified: true,
+              isSocial: false,
+              createdAt: '2026-06-22',
+              status: (stf.status || 'active') as any,
+              password: stf.password || '',
+              wishlistedProductIds: [] as string[]
+            } as any;
+          }
+        }
+      } catch (e) {
+        console.warn("Error checking staff match in localstorage:", e);
+      }
+    }
 
     if (match) {
       if ((match.status as string) === 'suspended') {
@@ -766,25 +958,122 @@ export default function AuthSystem({
     setView('login');
   };
 
-  // 5. SOCIAL CONNECTOR SIMULATOR
-  const connectSocialGateway = (provider: 'google' | 'facebook' | 'github') => {
-    const mockSocial: UserSession = {
-      id: `usr-${provider}-${Date.now()}`,
-      name: `SaaS ${provider.toUpperCase()} Enterprise Partner`,
-      username: `${provider}_keyholder`,
-      email: `${provider}-user@webzonebd.com`,
-      phone: '+8801864000005',
-      role: 'customer',
-      isVerified: true,
-      isSocial: true,
-      socialProvider: provider,
-      createdAt: new Date().toISOString().split('T')[0],
-      status: 'active',
-      wishlistedProductIds: []
-    };
+  // 5. SOCIAL CONNECTOR SIMULATOR & FIREBASE AUTHENTICATION
+  const connectSocialGateway = async (provider: 'google' | 'facebook' | 'github') => {
+    if (provider === 'google') {
+      setIsGoogleLoading(true);
+      try {
+        // Fix Firebase Authentication Persistence
+        await setPersistence(firebaseAuth, browserLocalPersistence);
 
-    onLoginSuccess(mockSocial);
-    triggerToast(`🔗 Secure federation link approved via ${provider.toUpperCase()} successfully.`);
+        const googleProvider = new GoogleAuthProvider();
+        googleProvider.setCustomParameters({
+          prompt: 'select_account'
+        });
+        
+        const credentials = await signInWithPopup(firebaseAuth, googleProvider);
+        const fbUser = credentials.user;
+        
+        if (fbUser) {
+          const userDocRef = doc(firebaseDb, 'users', fbUser.uid);
+          let userSessionData: UserSession;
+          const nowIso = new Date().toISOString();
+          
+          try {
+            const userDocSnap = await getDoc(userDocRef);
+            if (userDocSnap.exists()) {
+              // Existing user auto log in
+              const existingData = userDocSnap.data();
+              userSessionData = {
+                ...existingData,
+                id: fbUser.uid,
+                name: existingData.name || fbUser.displayName || 'Google User',
+                email: existingData.email || fbUser.email || '',
+                avatar: existingData.avatar || fbUser.photoURL || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
+                isVerified: fbUser.emailVerified || existingData.isVerified || false,
+                lastLogin: nowIso,
+                provider: 'Google',
+                isSocial: true,
+                socialProvider: 'google'
+              } as UserSession;
+              await setDoc(userDocRef, userSessionData);
+            } else {
+              // Brand new user auto create account
+              userSessionData = {
+                id: fbUser.uid,
+                name: fbUser.displayName || 'Google User',
+                username: (fbUser.email?.split('@')[0] || 'google_user') + '_' + Math.floor(1000 + Math.random() * 9000),
+                email: fbUser.email || `${fbUser.uid}@google.com`,
+                phone: fbUser.phoneNumber || '',
+                role: 'customer',
+                isVerified: fbUser.emailVerified,
+                createdAt: nowIso,
+                lastLogin: nowIso,
+                status: 'active',
+                wishlistedProductIds: [],
+                avatar: fbUser.photoURL || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
+                socialProvider: 'google',
+                isSocial: true,
+                provider: 'Google'
+              };
+              await setDoc(userDocRef, userSessionData);
+            }
+            
+            onLoginSuccess(userSessionData);
+            triggerToast(language === 'bn' ? `সাফল্যের সাথে গুগল দিয়ে সাইন-ইন সম্পন্ন হয়েছে! স্বাগতম, ${userSessionData.name}` : `🔒 Authenticated securely via Firebase Google Auth as: ${userSessionData.name}`);
+            return;
+          } catch (fireErr) {
+            handleFirestoreError(fireErr, OperationType.WRITE, `users/${fbUser.uid}`);
+          }
+        }
+      } catch (err: any) {
+        const errMsg = err?.message || '';
+        const isPartitionErr = err?.code === 'auth/web-storage-unsupported' || 
+                              err?.code === 'auth/popup-blocked' ||
+                              errMsg.includes('missing initial state') || 
+                              errMsg.includes('sessionStorage') || 
+                              errMsg.includes('storage-partitioned') ||
+                              errMsg.includes('popup-blocked') ||
+                              errMsg.includes('popup_blocked');
+        
+        if (isPartitionErr) {
+          console.warn("Firebase Google Auth Popup/Storage blocked (expected in iframe or restricted settings):", err);
+          setShowPartitionError(true);
+        } else if (err?.code === 'auth/popup-closed-by-user' || errMsg.includes('closed by user')) {
+          console.info("Google Sign-In cancelled by user.");
+          triggerToast(language === 'bn' ? 'গুগল লগইন বাতিল করা হয়েছে।' : 'Google Sign-In was cancelled.');
+        } else {
+          console.warn("Firebase Google Auth Unexpected Error Details (falling back): ", err);
+          if (typeof window !== 'undefined' && window.self !== window.top) {
+            setShowPartitionError(true);
+          } else {
+            triggerToast(language === 'bn' ? `গুগল লগইন ত্রুটি: ${err.message}` : `Google Sign-In Error: ${err.message || 'Authentication failed'}`);
+          }
+        }
+        return; // Return to login page, do not proceed to fallback
+      } finally {
+        setIsGoogleLoading(false);
+      }
+    } else {
+      // Fallback Mock social authenticator flow for non-Google providers
+      const mockSocial: UserSession = {
+        id: `usr-${provider}-${Date.now()}`,
+        name: `SaaS ${provider.toUpperCase()} Enterprise Partner`,
+        username: `${provider}_keyholder`,
+        email: `${provider}-user@webzonebd.com`,
+        phone: '+8801864000005',
+        role: 'customer',
+        isVerified: true,
+        isSocial: true,
+        socialProvider: provider,
+        createdAt: new Date().toISOString().split('T')[0],
+        status: 'active',
+        wishlistedProductIds: []
+      };
+
+      onLoginSuccess(mockSocial);
+      triggerToast(`🔗 Secure federation link approved via ${provider.toUpperCase()} successfully.`);
+    }
   };
 
   // Active theme layout parameters
@@ -1872,35 +2161,78 @@ export default function AuthSystem({
 
             {/* Seamless social logins */}
             {(view === 'login' || view === 'register') && (
-              <div className="space-y-4 pt-4 border-t border-slate-500/10 text-xs">
+              <div className="space-y-3 pt-4 border-t border-slate-500/10 text-xs">
                 <span className="font-mono text-[9px] font-black uppercase tracking-widest text-[#2d7ff9] dark:text-[#1dbf73] block text-center mb-1">
                   🔐 SECURE FEDERATED IDENTITY GATEWAY
                 </span>
 
-                <div className="grid grid-cols-3 gap-2">
+                {isIframe && (
+                  <div className="p-3.5 rounded-xl bg-purple-500/10 border border-purple-500/25 text-purple-700 dark:text-purple-300 text-xs flex items-start gap-2 leading-relaxed">
+                    <Info className="w-4 h-4 shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <span className="font-semibold block mb-0.5 text-slate-800 dark:text-purple-200">
+                        {language === 'bn' ? '💡 প্রিভিউ ফ্রেম নোটিশ' : '💡 Live Preview Frame Detected'}
+                      </span>
+                      <p className="text-[11px] text-slate-600 dark:text-slate-300">
+                        {language === 'bn' 
+                          ? 'ব্রাউজারের নিরাপত্তা সীমাবদ্ধতা এড়াতে এবং গুগল লগইন নিশ্চিত করতে দয়া করে এই সাইটটি নতুন ট্যাবে ব্যবহার করুন।' 
+                          : 'To bypass browser security limits and sign in with Google seamlessly, please use this site in a new browser tab.'}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => window.open(window.location.href, '_blank')}
+                        className="mt-1.5 inline-flex items-center gap-1 font-semibold text-purple-600 dark:text-purple-400 hover:underline cursor-pointer"
+                      >
+                        <span>{language === 'bn' ? 'নতুন ট্যাবে ওপেন করুন' : 'Open in New Tab'}</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-2">
                   <button
                     type="button"
                     onClick={() => connectSocialGateway('google')}
-                    className="flex items-center justify-center gap-1.5 py-2.5 bg-slate-100/30 hover:bg-slate-150/40 dark:bg-slate-950 dark:border-slate-800 border rounded-xl hover:border-red-500/40 transition cursor-pointer text-[10px] font-black uppercase tracking-wider text-neutral-800 dark:text-neutral-200"
+                    disabled={isGoogleLoading}
+                    className="w-full h-[54px] flex items-center justify-center gap-2.5 px-4 bg-white hover:bg-slate-50 dark:bg-[#111827] dark:hover:bg-[#1f2937] border border-slate-200 dark:border-[#374151] rounded-2xl shadow-sm hover:shadow-[0_12px_30px_rgba(124,58,237,0.15)] transition-all duration-300 hover:scale-[1.02] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-xs font-semibold text-slate-700 dark:text-white"
                   >
-                    <span className="text-red-500 font-bold">G</span> Google
+                    {isGoogleLoading ? (
+                      <RefreshCw className="w-5 h-5 animate-spin text-purple-600" />
+                    ) : (
+                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l3.66-2.85z" fill="#FBBC05"/>
+                        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.85c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                      </svg>
+                    )}
+                    <span className="font-semibold text-sm">
+                      {isGoogleLoading 
+                        ? (language === 'bn' ? 'গুগল সংযোগ করা হচ্ছে...' : 'Connecting to Google...') 
+                        : (language === 'bn' ? 'গুগল দিয়ে চালিয়ে যান' : 'Continue with Google')}
+                    </span>
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={() => connectSocialGateway('facebook')}
-                    className="flex items-center justify-center gap-1.5 py-2.5 bg-slate-100/30 hover:bg-slate-150/40 dark:bg-slate-950 dark:border-slate-800 border rounded-xl hover:border-blue-500/40 transition cursor-pointer text-[10px] font-black uppercase tracking-wider text-neutral-800 dark:text-neutral-200"
-                  >
-                    <span className="text-blue-500 font-bold font-sans tracking-wide text-xs">f</span> Facebook
-                  </button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => connectSocialGateway('facebook')}
+                      disabled={isGoogleLoading}
+                      className="flex items-center justify-center gap-1.5 py-2.5 bg-slate-100/30 hover:bg-slate-150/40 dark:bg-[#111827] dark:hover:bg-[#1f2937] dark:border-[#374151] border rounded-xl hover:border-blue-500/40 transition cursor-pointer text-[10px] font-black uppercase tracking-wider text-neutral-800 dark:text-neutral-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <span className="text-blue-500 font-bold font-sans tracking-wide text-xs">f</span> Facebook
+                    </button>
 
-                  <button
-                    type="button"
-                    onClick={() => connectSocialGateway('github')}
-                    className="flex items-center justify-center gap-1.5 py-2.5 bg-slate-100/30 hover:bg-slate-150/40 dark:bg-slate-950 dark:border-slate-800 border rounded-xl hover:border-slate-500/40 transition cursor-pointer text-[10px] font-black uppercase tracking-wider text-neutral-800 dark:text-neutral-200"
-                  >
-                    <span className="text-emerald-400">⌘</span> Github
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => connectSocialGateway('github')}
+                      disabled={isGoogleLoading}
+                      className="flex items-center justify-center gap-1.5 py-2.5 bg-slate-100/30 hover:bg-slate-150/40 dark:bg-[#111827] dark:hover:bg-[#1f2937] dark:border-[#374151] border rounded-xl hover:border-slate-500/40 transition cursor-pointer text-[10px] font-black uppercase tracking-wider text-neutral-800 dark:text-neutral-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <span className="text-emerald-400">⌘</span> Github
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
@@ -1920,15 +2252,21 @@ export default function AuthSystem({
                 <SparklesIcon className="w-3.5 h-3.5 text-yellow-500 animate-pulse" /> SEEDED TEST CLIENT ROLES CONFIG:
               </span>
               
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10px] font-mono select-all">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[10px] font-mono select-all">
                 <div className="p-2 bg-slate-950 text-slate-300 rounded-lg border border-slate-800">
-                  <span className="font-sans text-amber-500 font-extrabold block uppercase tracking-wide text-[9px]">1. SUPER ADMIN LEVEL:</span>
+                  <span className="font-sans text-amber-500 font-extrabold block uppercase tracking-wide text-[9px]">1. SUPER ADMIN:</span>
                   Email: <strong className="text-white font-black underline select-all">admin@webzonebd.com</strong><br />
                   Pass: <strong className="text-white">adminpassword</strong>
                 </div>
 
                 <div className="p-2 bg-slate-950 text-slate-300 rounded-lg border border-slate-800">
-                  <span className="font-sans text-[#2d7ff9] font-extrabold block uppercase tracking-wide text-[9px]">2. REGISTERED CUSTOMER:</span>
+                  <span className="font-sans text-purple-400 font-extrabold block uppercase tracking-wide text-[9px]">2. STAFF MEMBER:</span>
+                  Email: <strong className="text-white font-black underline select-all">anisur@webzonebd.com</strong><br />
+                  Pass: <strong className="text-white">anisurpassword</strong>
+                </div>
+
+                <div className="p-2 bg-slate-950 text-slate-300 rounded-lg border border-slate-800">
+                  <span className="font-sans text-[#2d7ff9] font-extrabold block uppercase tracking-wide text-[9px]">3. CUSTOMER:</span>
                   Email: <strong className="text-white font-black underline select-all">customer@webzonebd.com</strong><br />
                   Pass: <strong className="text-white">customerpassword</strong>
                 </div>
@@ -1942,6 +2280,47 @@ export default function AuthSystem({
         </div>
 
       </div>
+
+      {showPartitionError && (
+        <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
+          <div className="w-full max-w-md p-6 bg-white dark:bg-[#0F172A] rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl">
+            <div className="flex items-center gap-3 mb-4 text-amber-500">
+              <ShieldAlert className="w-8 h-8 shrink-0 text-purple-500" />
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                {language === 'bn' ? 'গুগল সাইন-ইন সমাধান' : 'Google Sign-In Help Required'}
+              </h3>
+            </div>
+            
+            <p className="text-sm text-slate-600 dark:text-slate-300 mb-6 leading-relaxed">
+              {language === 'bn' 
+                ? 'ব্রাউজারের সিকিউরিটি পলিসি (Storage Partitioning) এর কারণে এই প্রিভিউ ফ্রেমের ভেতর সরাসরি গুগল লগইন সম্পন্ন করা যাচ্ছে না। এটি সমাধানের জন্য অনুগ্রহ করে অ্যাপটি একটি নতুন ট্যাবে ওপেন করে গুগল সাইন-ইন সম্পন্ন করুন।' 
+                : 'Due to browser iframe security restrictions (Storage Partitioning), Google Sign-In is blocked inside this preview frame. To resolve this instantly, please open WebzoneBD in a new tab to complete your secure sign-in.'}
+            </p>
+
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={() => {
+                  window.open(window.location.href, '_blank');
+                }}
+                className="w-full h-12 flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white font-semibold shadow-[0_4px_15px_rgba(124,58,237,0.3)] hover:scale-[1.01] active:scale-[0.99] transition duration-200 cursor-pointer"
+              >
+                <ExternalLink className="w-4 h-4" />
+                <span>{language === 'bn' ? 'নতুন ট্যাবে খুলুন' : 'Open in New Tab'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowPartitionError(false)}
+                className="w-full py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-900 transition text-xs font-semibold cursor-pointer"
+              >
+                {language === 'bn' ? 'বন্ধ করুন' : 'Close / Go Back'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

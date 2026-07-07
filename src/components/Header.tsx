@@ -7,11 +7,14 @@ import {
   Facebook, Linkedin, Youtube, Search, Code, Server, Sparkles, Layers, Cpu,
   ExternalLink, HelpCircle, Briefcase, Settings2, Laptop, Database, Globe2,
   BookOpen, Heart, Bell, UserPlus, LogIn, Coins,
-  Star, Bot, MessageSquare, Flame, CheckCircle, Users, Wifi
+  Star, Bot, MessageSquare, Flame, CheckCircle, Users, Wifi, Copy, Check, Upload,
+  Eye, EyeOff
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Language, Theme, CartItem, Coupon, UserSession, Currency, Product } from '../types';
 import { sampleCoupons, sampleProducts } from '../data';
+import { catalogServicesData, fixedPackagesData } from './ServicesData';
+import { initialLocalBlogs } from './BlogData';
 
 interface HeaderProps {
   language: Language;
@@ -21,8 +24,9 @@ interface HeaderProps {
   cart: CartItem[];
   removeFromCart: (index: number) => void;
   applyCouponToCart: (couponCode: string) => string | null;
+  removeCouponFromCart?: () => void;
   resetCart: () => void;
-  addSimulatedOrder: (method: string) => void;
+  addSimulatedOrder: (method: string, guestInfo?: any) => void;
   currentPage: string;
   setCurrentPage: (page: string) => void;
   isAdmin: boolean;
@@ -43,6 +47,12 @@ interface HeaderProps {
   triggerToast: (msg: string) => void;
   cartOpen?: boolean;
   setCartOpen?: (open: boolean) => void;
+  currencyRates?: any;
+  verificationSettings?: any;
+  bdMethods?: any;
+  saMethods?: any;
+  intlMethods?: any;
+  customMethods?: any[];
 }
 
 export default function Header({
@@ -53,6 +63,7 @@ export default function Header({
   cart,
   removeFromCart,
   applyCouponToCart,
+  removeCouponFromCart,
   resetCart,
   addSimulatedOrder,
   currentPage,
@@ -74,14 +85,238 @@ export default function Header({
   setCurrencySettings,
   triggerToast,
   cartOpen: propCartOpen,
-  setCartOpen: propSetCartOpen
+  setCartOpen: propSetCartOpen,
+  currencyRates,
+  verificationSettings,
+  bdMethods,
+  saMethods,
+  intlMethods,
+  customMethods
 }: HeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [localCartOpen, setLocalCartOpen] = useState(false);
   const cartOpen = propCartOpen !== undefined ? propCartOpen : localCartOpen;
   const setCartOpen = propSetCartOpen !== undefined ? propSetCartOpen : setLocalCartOpen;
+
+  // Fallbacks for payment configurations
+  const finalBdMethods = bdMethods || {
+    bkash: { enabled: true, type: 'merchant', number: '01711223344', apiKey: 'bkash_mid_9901_key', instructions: 'Send money to our merchant number and paste the transaction ID here.', qrCode: 'https://images.unsplash.com/photo-1595079676339-1534801ad6cf?auto=format&fit=crop&q=80&w=300' },
+    nagad: { enabled: true, type: 'personal', number: '01811223344', apiKey: 'nagad_api_secure_token', instructions: 'Send money with send money option and input your mobile number as reference.', qrCode: '' },
+    rocket: { enabled: false, type: 'personal', number: '019112233449', apiKey: '', instructions: ' rocket transfer to 12-digit number.', qrCode: '' },
+    cellfin: { enabled: false, number: '01511223344', instructions: 'Transfer to CellFin wallet.', qrCode: '' },
+    islamiBank: { enabled: true, bankName: 'Islami Bank Bangladesh PLC', accountName: 'WebzoneBD IT Solutions', accountNumber: '20501450201235600', iban: 'BD03IBBL20501450201235600', swift: 'IBBLBDDHXXX', qrCode: '' }
+  };
+
+  const finalSaMethods = saMethods || {
+    stcPay: { enabled: true, walletNumber: '+966501234567', instructions: 'Transfer via STC Pay mobile app directly to our wallet.', qrCode: '' },
+    alRajhi: { enabled: true, bankName: 'Al Rajhi Bank', accountName: 'WebzoneBD SA Ltd', accountNumber: '880012345678901', iban: 'SA8000000000880012345678901', swift: 'RAJISARIXXX', qrCode: '' }
+  };
+
+  const finalIntlMethods = intlMethods || {
+    paypal: { enabled: true, email: 'billing@webzonebd.com', clientId: 'AX_M_MOCK_PAYPAL_CLIENT_ID_9921', secretKey: 'E_M_MOCK_SECRET_KEY_8820' },
+    bankTransfer: { enabled: true, bankName: 'HSBC International', accountHolder: 'WebzoneBD Global Ltd', accountNumber: '4005001234566', iban: 'GB88MIDL4005001234566', swift: 'MIDLGB22' }
+  };
+
+  // Active MFS resolver helper
+  const getActiveMfsDetails = (gatewayName: string) => {
+    switch (gatewayName) {
+      case 'bKash Wallet':
+        return {
+          name: 'bKash (বিকাশ)',
+          number: finalBdMethods.bkash?.number || '0186400 0005',
+          instructions: finalBdMethods.bkash?.instructions || (language === 'bn' ? 'আমাদের বিকাশ নাম্বারে সেন্ড মানি অথবা পার্সোনাল টু পার্সোনাল ট্রান্সফার সম্পন্ন করুন।' : 'Send Money or Personal transfer directly to our bKash personal wallet.'),
+          qrColor: 'd1245e',
+          qrCodeUrl: finalBdMethods.bkash?.qrCode || '',
+          type: finalBdMethods.bkash?.type || 'personal'
+        };
+      case 'Nagad Digital':
+        return {
+          name: 'Nagad (নগদ)',
+          number: finalBdMethods.nagad?.number || '0186400 0005',
+          instructions: finalBdMethods.nagad?.instructions || (language === 'bn' ? 'আমাদের নগদ নাম্বারে সরাসরি টাকা পাঠিয়ে আপনার ট্রানজেকশন ক্লিয়ার করুন।' : 'Send Money directly to our secure Nagad Personal Wallet.'),
+          qrColor: 'f15a22',
+          qrCodeUrl: finalBdMethods.nagad?.qrCode || '',
+          type: finalBdMethods.nagad?.type || 'personal'
+        };
+      case 'Rocket Wallet':
+        return {
+          name: 'Rocket (রকেট)',
+          number: finalBdMethods.rocket?.number || '0186400 0005',
+          instructions: finalBdMethods.rocket?.instructions || (language === 'bn' ? 'ডাচ বাংলা ব্যাংক রকেট ওয়ালেট সার্ভিস ব্যবহার করে পেমেন্ট সম্পূর্ণ করুন।' : 'Direct Mobile Cash-in or Send Money via Rocket wallet.'),
+          qrColor: '8c2aeb',
+          qrCodeUrl: finalBdMethods.rocket?.qrCode || '',
+          type: finalBdMethods.rocket?.type || 'personal'
+        };
+      case 'Cellfin Payment':
+        return {
+          name: 'Cellfin Card',
+          number: finalBdMethods.cellfin?.number || '0186400 0005',
+          instructions: finalBdMethods.cellfin?.instructions || (language === 'bn' ? 'ইসলামী ব্যাংক সেলফিন অ্যাকাউন্টে সহজে ফান্ড ট্রান্সফার বা টাকা পাঠান।' : 'Initiate prompt cellfin transfer directly to our wallet.'),
+          qrColor: '0081d6',
+          qrCodeUrl: finalBdMethods.cellfin?.qrCode || '',
+          type: 'personal'
+        };
+      default:
+        return {
+          name: 'bKash (বিকাশ)',
+          number: '0186400 0005',
+          instructions: '',
+          qrColor: 'd1245e',
+          qrCodeUrl: '',
+          type: 'personal'
+        };
+    }
+  };
+
   const [wishlistOpen, setWishlistOpen] = useState(false);
   const [authDrawerOpen, setAuthDrawerOpen] = useState(false);
+
+  // Unified Type for Wishlisted Item
+  interface WishlistItem {
+    id: string;
+    type: 'product' | 'service' | 'package' | 'blog';
+    title: string;
+    titleBn: string;
+    titleAr: string;
+    image: string;
+    category: string;
+    categoryBn: string;
+    categoryAr: string;
+    shortDetails: string;
+    shortDetailsBn: string;
+    shortDetailsAr: string;
+    price?: number;
+    discountPrice?: number;
+    originalItem: any;
+  }
+
+  // Construct a unified list of wishlisted items from products, services, packages, and blogs
+  const getWishlistDetails = (): WishlistItem[] => {
+    const items: WishlistItem[] = [];
+    const addedIds = new Set<string>();
+
+    // Dynamic products source from webzone_store_products
+    let activeProducts = sampleProducts;
+    const storedProds = localStorage.getItem('webzone_store_products');
+    if (storedProds) {
+      try {
+        const parsed = JSON.parse(storedProds);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          activeProducts = parsed;
+        }
+      } catch (e) {}
+    }
+
+    // Dynamic services source from webzone_services_catalog
+    let activeServices = catalogServicesData;
+    const storedSrvs = localStorage.getItem('webzone_services_catalog');
+    if (storedSrvs) {
+      try {
+        const parsed = JSON.parse(storedSrvs);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          activeServices = parsed;
+        }
+      } catch (e) {}
+    }
+
+    wishlist.forEach(id => {
+      if (addedIds.has(id)) return;
+
+      // 1. Check Store Products
+      const product = activeProducts.find(p => p.id === id);
+      if (product) {
+        addedIds.add(id);
+        items.push({
+          id: product.id,
+          type: 'product',
+          title: product.name,
+          titleBn: product.nameBn || product.name,
+          titleAr: product.nameAr || product.name,
+          image: product.image,
+          category: product.category,
+          categoryBn: product.category,
+          categoryAr: product.category,
+          shortDetails: product.description || '',
+          shortDetailsBn: product.description || '',
+          shortDetailsAr: product.description || '',
+          price: product.price,
+          discountPrice: product.discountPrice,
+          originalItem: product
+        });
+        return;
+      }
+
+      // 2. Check Custom Services
+      const customService = activeServices.find(s => s.id === id);
+      if (customService) {
+        addedIds.add(id);
+        items.push({
+          id: customService.id,
+          type: 'service',
+          title: customService.title,
+          titleBn: customService.titleBn || customService.title,
+          titleAr: customService.titleAr || customService.title,
+          image: customService.image,
+          category: customService.category,
+          categoryBn: customService.categoryBn || customService.category,
+          categoryAr: customService.categoryAr || customService.category,
+          shortDetails: customService.shortDescription,
+          shortDetailsBn: customService.shortDescriptionBn || customService.shortDescription,
+          shortDetailsAr: customService.shortDescriptionAr || customService.shortDescription,
+          price: customService.startingPrice,
+          originalItem: customService
+        });
+        return;
+      }
+
+      // 3. Check Fixed Packages
+      const packageService = fixedPackagesData.find(pkg => pkg.id === id);
+      if (packageService) {
+        addedIds.add(id);
+        items.push({
+          id: packageService.id,
+          type: 'package',
+          title: packageService.name,
+          titleBn: packageService.nameBn || packageService.name,
+          titleAr: packageService.nameAr || packageService.name,
+          image: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=400&q=80',
+          category: packageService.category,
+          categoryBn: packageService.categoryBn || packageService.category,
+          categoryAr: packageService.categoryAr || packageService.category,
+          shortDetails: `Revisions: ${packageService.revisions}. Delivery: ${packageService.deliveryDays} Days.`,
+          shortDetailsBn: `রিভিশন: ${packageService.revisions}, ডেলিভারি: ${packageService.deliveryDays} দিন।`,
+          shortDetailsAr: `تعديلات: ${packageService.revisions}، تسليم: ${packageService.deliveryDays} يوم`,
+          price: packageService.price,
+          originalItem: packageService
+        });
+        return;
+      }
+
+      // 4. Check Blog Posts
+      const blogPost = initialLocalBlogs.find(b => b.id === id);
+      if (blogPost) {
+        addedIds.add(id);
+        items.push({
+          id: blogPost.id,
+          type: 'blog',
+          title: blogPost.title,
+          titleBn: blogPost.titleBn || blogPost.title,
+          titleAr: blogPost.titleAr || blogPost.title,
+          image: blogPost.image,
+          category: blogPost.category,
+          categoryBn: blogPost.categoryBn || blogPost.category,
+          categoryAr: blogPost.categoryAr || blogPost.category,
+          shortDetails: blogPost.summary,
+          shortDetailsBn: blogPost.summaryBn || blogPost.summary,
+          shortDetailsAr: blogPost.summaryAr || blogPost.summary,
+          originalItem: blogPost
+        });
+        return;
+      }
+    });
+
+    return items;
+  };
 
   // Premium Mega Menu States
   const [navDomainQuery, setNavDomainQuery] = useState('');
@@ -172,20 +407,88 @@ export default function Header({
   const [authDrawerError, setAuthDrawerError] = useState('');
   const [authDrawerSuccess, setAuthDrawerSuccess] = useState('');
   const [tempRegUser, setTempRegUser] = useState<UserSession | null>(null);
+
+  // Enhanced Register State & Validation Fields
+  const [showPass, setShowPass] = useState(false);
+  const [showPassConfirm, setShowPassConfirm] = useState(false);
+  const [custFullNameTouched, setCustFullNameTouched] = useState(false);
+  const [custEmailTouched, setCustEmailTouched] = useState(false);
+  const [custPhoneTouched, setCustPhoneTouched] = useState(false);
+  const [custPassTouched, setCustPassTouched] = useState(false);
+  const [custPassConfirmTouched, setCustPassConfirmTouched] = useState(false);
+
+  const getPasswordStrength = (pass: string): 'Weak' | 'Medium' | 'Strong' => {
+    if (!pass) return 'Weak';
+    if (pass.length < 8) return 'Weak';
+    let requirementsMet = 0;
+    if (/[A-Z]/.test(pass)) requirementsMet++;
+    if (/[a-z]/.test(pass)) requirementsMet++;
+    if (/[0-9]/.test(pass)) requirementsMet++;
+    if (/[^A-Za-z0-9]/.test(pass)) requirementsMet++;
+    
+    if (requirementsMet <= 2) return 'Weak';
+    if (requirementsMet === 3) return 'Medium';
+    return 'Strong';
+  };
   const [couponCode, setCouponCode] = useState('');
   const [couponError, setCouponError] = useState<string | null>(null);
   const [couponSuccess, setCouponSuccess] = useState<string | null>(null);
+  const lastAppliedCodeRef = useRef<string | null>(null);
   const [checkoutSuccess, setCheckoutSuccess] = useState(false);
   const [checkoutSelectedMethod, setCheckoutSelectedMethod] = useState<string | null>(null);
+  const [stcPayExpanded, setStcPayExpanded] = useState(false);
+  const [stcPayCopied, setStcPayCopied] = useState(false);
+  const [bdtPaymentCopied, setBdtPaymentCopied] = useState(false);
+  const [copiedBankAccNo, setCopiedBankAccNo] = useState(false);
+  const [copiedBankAccName, setCopiedBankAccName] = useState(false);
+  const [copiedBankRouting, setCopiedBankRouting] = useState(false);
+  const [copiedAlrajiAccNo, setCopiedAlrajiAccNo] = useState(false);
+  const [copiedAlrajiAccName, setCopiedAlrajiAccName] = useState(false);
+  const [copiedAlrajiIban, setCopiedAlrajiIban] = useState(false);
+  const [copiedAlrajiSwift, setCopiedAlrajiSwift] = useState(false);
+  const [selectedRegisteredGateway, setSelectedRegisteredGateway] = useState<string>('');
+  const [deletingCartIndex, setDeletingCartIndex] = useState<number | null>(null);
+  
+  // Guest checkout details for frictionless direct checkouts
+  const [checkoutMode, setCheckoutMode] = useState<'guest' | 'login'>('guest');
+  const [guestName, setGuestName] = useState('');
+  const [guestPhone, setGuestPhone] = useState('');
+  const [guestEmail, setGuestEmail] = useState('');
+  const [guestTransactionId, setGuestTransactionId] = useState('');
+  const [guestReceipt, setGuestReceipt] = useState('');
+  const [guestReceiptName, setGuestReceiptName] = useState('');
+  const [selectedGuestGateway, setSelectedGuestGateway] = useState<string>('');
+  const [guestValidationError, setGuestValidationError] = useState('');
+  const [orderNotes, setOrderNotes] = useState('');
+
+  // Sender details for registered BDT payment verification
+  const [senderName, setSenderName] = useState('');
+  const [senderNumber, setSenderNumber] = useState('');
+  const [senderTrxId, setSenderTrxId] = useState('');
+
+  useEffect(() => {
+    if (user) {
+      setSenderName(user.name || '');
+      if (user.phone) {
+        setSenderNumber(user.phone || '');
+      }
+    } else {
+      setSenderName('');
+      setSenderNumber('');
+    }
+  }, [user]);
 
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [profileDropdownOpenMobile, setProfileDropdownOpenMobile] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [guestDropdownOpenDesktop, setGuestDropdownOpenDesktop] = useState(false);
   
   const profileDropdownRef = useRef<HTMLDivElement>(null);
   const profileDropdownRefMobile = useRef<HTMLDivElement>(null);
   const guestDropdownRefDesktop = useRef<HTMLDivElement>(null);
+  const wishlistDropdownRef = useRef<HTMLDivElement>(null);
+  const cartDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -197,6 +500,12 @@ export default function Header({
       }
       if (guestDropdownRefDesktop.current && !guestDropdownRefDesktop.current.contains(event.target as Node)) {
         setGuestDropdownOpenDesktop(false);
+      }
+      if (wishlistDropdownRef.current && !wishlistDropdownRef.current.contains(event.target as Node)) {
+        setWishlistOpen(false);
+      }
+      if (cartDropdownRef.current && !cartDropdownRef.current.contains(event.target as Node)) {
+        setCartOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -212,12 +521,56 @@ export default function Header({
 
   const [discountAmount, setDiscountAmount] = useState(0);
 
-  // Reset coupon discount when cart is empty
+  // Reset/calculate coupon discount based on cart items
   useEffect(() => {
     if (cart.length === 0) {
       setDiscountAmount(0);
+      localStorage.removeItem('webzone_active_coupon_code');
+    } else {
+      const totalDiscount = cart.reduce((acc, item) => {
+        if (item.appliedCoupon) {
+          const price = item.product.discountPrice || item.product.price;
+          return acc + (price * item.appliedCoupon.discountPercent / 100);
+        }
+        return acc;
+      }, 0);
+      setDiscountAmount(totalDiscount);
     }
   }, [cart]);
+
+  // Sync coupon code and success state when cart has applied coupon
+  useEffect(() => {
+    const activeCode = localStorage.getItem('webzone_active_coupon_code');
+    if (activeCode && cart.some(item => item.appliedCoupon)) {
+      setCouponCode(activeCode);
+      if (lastAppliedCodeRef.current !== activeCode) {
+        lastAppliedCodeRef.current = activeCode;
+        setCouponSuccess(language === 'bn' ? `কুপন "${activeCode}" প্রযোজ্য হয়েছে!` : `Coupon "${activeCode}" applied!`);
+      }
+    } else if (!cart.some(item => item.appliedCoupon)) {
+      setCouponCode('');
+      lastAppliedCodeRef.current = null;
+    }
+  }, [cart, language]);
+
+  // Auto-dismiss coupon feedback after 4 seconds
+  useEffect(() => {
+    if (couponSuccess) {
+      const timer = setTimeout(() => {
+        setCouponSuccess(null);
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [couponSuccess]);
+
+  useEffect(() => {
+    if (couponError) {
+      const timer = setTimeout(() => {
+        setCouponError(null);
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [couponError]);
 
   const subtotal = cart.reduce((acc, item) => {
     const price = item.product.discountPrice || item.product.price;
@@ -257,17 +610,176 @@ export default function Header({
     }
   };
 
+  const handleRemoveCoupon = () => {
+    if (removeCouponFromCart) {
+      removeCouponFromCart();
+    }
+    setCouponCode('');
+    setCouponSuccess(null);
+    setCouponError(null);
+  };
+
   const handleSimulatePayment = (method: string) => {
+    if (!user && checkoutMode === 'guest') {
+      if (!guestName.trim() || !guestPhone.trim() || !guestEmail.trim()) {
+        setGuestValidationError(language === 'bn' ? 'দয়া করে সবগুলো তথ্য পূরণ করুন!' : language === 'ar' ? 'يرجى ملء جميع الحقول!' : 'Please fill out all fields before processing payment.');
+        return;
+      }
+      setGuestValidationError('');
+    }
+
+    if (user && (currency === 'BDT' || currency === 'SAR')) {
+      if (!senderName.trim() || !senderNumber.trim() || !senderTrxId.trim()) {
+        triggerToast(language === 'bn' ? 'দয়া করে প্রেরকের নাম, নম্বর এবং ট্রানজেকশন আইডি পূরণ করুন!' : 'Please fill out all payment details: Sender Name, Phone/Account Number and Transaction ID.');
+        return;
+      }
+    }
+
     setCheckoutSuccess(true);
     setCheckoutSelectedMethod(method);
     setTimeout(() => {
-      addSimulatedOrder(method);
+      if (user && (currency === 'BDT' || currency === 'SAR')) {
+        addSimulatedOrder(method, {
+          name: senderName,
+          phone: senderNumber,
+          email: user.email || '',
+          transactionId: senderTrxId,
+          isGuest: false,
+          orderNotes: orderNotes
+        });
+      } else {
+        addSimulatedOrder(method, {
+          name: user?.name || 'Mizanur Rahman',
+          phone: user?.phone || '01711223344',
+          email: user?.email || 'mizanur@gmail.com',
+          isGuest: false,
+          orderNotes: orderNotes
+        });
+      }
+
       setCheckoutSuccess(false);
       setCartOpen(false);
       resetCart();
       setDiscountAmount(0);
       setCouponCode('');
       setCouponSuccess(null);
+      setOrderNotes('');
+      // Reset guest inputs
+      setGuestName('');
+      setGuestPhone('');
+      setGuestEmail('');
+      setGuestValidationError('');
+      // Reset registered payment verification inputs
+      setSenderName(user?.name || '');
+      setSenderNumber(user?.phone || '');
+      setSenderTrxId('');
+    }, 1500);
+  };
+
+  const handleSubmitGuestTransaction = () => {
+    if (!guestName.trim() || !guestPhone.trim() || !guestEmail.trim()) {
+      setGuestValidationError(language === 'bn' ? 'দয়া করে আপনার নাম, মোবাইল এবং ইমেইল পূরণ করুন!' : language === 'ar' ? 'يرجى ملء الاسم ورقم الهاتف والبريد الإلكتروني!' : 'Please fill out your Name, Phone, and Email address.');
+      return;
+    }
+
+    // Determine gateway method
+    let method = selectedGuestGateway;
+    if (!method) {
+      if (currency === 'SAR') method = 'STC Pay (+966 57 051 1931)';
+      else if (currency === 'BDT') method = 'bKash Wallet';
+      else method = 'USD Bank Transfer';
+    }
+
+    setCheckoutSelectedMethod(method);
+    setCheckoutSuccess(true);
+
+    const guestInfo = {
+      name: guestName,
+      phone: guestPhone,
+      email: guestEmail,
+      transactionId: guestTransactionId,
+      transactionReceipt: guestReceipt,
+      isGuest: true,
+      orderNotes: orderNotes
+    };
+
+    // Calculate currency symbol
+    const symbol = currency === 'BDT' ? '৳' : currency === 'SAR' ? 'SR ' : '$';
+    
+    // Format orders for text template
+    const orderItemsText = cart.map(item => {
+      let text = `• ${item.product.name} (${symbol}${item.product.discountPrice || item.product.price})`;
+      if (item.product.advancePercent !== undefined && item.product.advancePercent < 100) {
+        text += `\n  [Advance ${item.product.advancePercent}%: ${symbol}${item.product.advanceAmount}, Due: ${symbol}${item.product.dueAmount}]`;
+      }
+      return text;
+    }).join('\n');
+
+    const hasAdvanceItemGlobal = cart.some(item => item.product.advancePercent !== undefined && item.product.advancePercent < 100);
+    const payableNowValGlobal = cart.reduce((acc, item) => {
+      if (item.product.advanceAmount !== undefined) return acc + item.product.advanceAmount;
+      return acc + (item.product.discountPrice || item.product.price);
+    }, 0) - discountAmount;
+    const dueRemainingValGlobal = cart.reduce((acc, item) => acc + (item.product.dueAmount || 0), 0);
+
+    const totalAmountText = hasAdvanceItemGlobal
+      ? `${symbol}${total} (Paid Advance: ${symbol}${Math.max(0, payableNowValGlobal)}, Remaining Due: ${symbol}${dueRemainingValGlobal})`
+      : `${symbol}${total}`;
+    const notesLabelText = orderNotes ? `\n📝 Order Notes: ${orderNotes}` : '';
+
+    const whatsappText = `Assalamu Alaikum Imran Hasan,
+I am submitting a Guest Checkout transaction on WebzoneBD:
+
+👤 Guest Name: ${guestName}
+📞 WhatsApp / Phone: ${guestPhone}
+✉️ Email Address: ${guestEmail}
+💳 Payment Method Selected: ${method}
+🔑 Transaction ID (TrxID): ${guestTransactionId || 'Not Provided'}${notesLabelText}
+
+🛒 Products Ordered:
+${orderItemsText}
+
+💰 Total Amount Paid: ${totalAmountText}
+📅 Transaction Date: ${new Date().toLocaleDateString('bn-BD', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+
+Please verify this payment and process the order. Thank you!`;
+
+    const encodedMsg = encodeURIComponent(whatsappText);
+    const whatsappUrl = `https://api.whatsapp.com/send?phone=966570511931&text=${encodedMsg}`;
+
+    setTimeout(() => {
+      // Create guest order
+      addSimulatedOrder(method, guestInfo);
+
+      setCheckoutSuccess(false);
+      setCartOpen(false);
+      resetCart();
+      setDiscountAmount(0);
+      setCouponCode('');
+      setCouponSuccess(null);
+
+      // Clean checkout states
+      setGuestName('');
+      setGuestPhone('');
+      setGuestEmail('');
+      setGuestTransactionId('');
+      setGuestReceipt('');
+      setGuestReceiptName('');
+      setSelectedGuestGateway('');
+      setGuestValidationError('');
+      setOrderNotes('');
+
+      // Open WhatsApp Link
+      try {
+        window.open(whatsappUrl, '_blank');
+      } catch (err) {
+        console.warn("Blocked window.open for WhatsApp, opening with helper anchor:", err);
+        const a = document.createElement('a');
+        a.href = whatsappUrl;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        a.click();
+      }
     }, 1500);
   };
 
@@ -724,7 +1236,7 @@ export default function Header({
           : 'bg-white dark:bg-neutral-950 border-b border-neutral-100 dark:border-neutral-900/60'
       }`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
+          <div className="flex items-center justify-between h-14 md:h-16">
             
             {/* LEFT: Logo area */}
             <div 
@@ -1148,7 +1660,7 @@ export default function Header({
                               onClick={() => setCurrentPage('marketplace')}
                               className="p-2 rounded-xl hover:bg-neutral-50 dark:hover:bg-slate-800/40 cursor-pointer transition duration-150"
                             >
-                              <div className="text-xs font-black text-neutral-850 dark:text-white">{item.title}</div>
+                              <div className="text-xs font-black text-[#0F172A] dark:text-white">{item.title}</div>
                               <p className="text-[9.5px] text-neutral-400 dark:text-neutral-450 mt-0.5 leading-normal">{item.desc}</p>
                             </div>
                           ))}
@@ -1172,7 +1684,7 @@ export default function Header({
                               onClick={() => setCurrentPage('marketplace')}
                               className="p-2 rounded-xl hover:bg-neutral-50 dark:hover:bg-slate-800/40 cursor-pointer transition duration-150"
                             >
-                              <div className="text-xs font-black text-neutral-850 dark:text-white">{item.title}</div>
+                              <div className="text-xs font-black text-[#0F172A] dark:text-white">{item.title}</div>
                               <p className="text-[9.5px] text-neutral-400 dark:text-neutral-450 mt-0.5 leading-normal">{item.desc}</p>
                             </div>
                           ))}
@@ -1246,19 +1758,256 @@ export default function Header({
                 {theme === 'light' ? <Moon className="h-4.5 w-4.5 text-blue-600" /> : <Sun className="h-4.5 w-4.5 text-amber-500" />}
               </button>
 
-              {/* Wishlist Heart Icon & dynamic badge count */}
-              <button 
-                onClick={() => setWishlistOpen(!wishlistOpen)}
-                className="relative p-2 rounded-xl border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-all duration-150 cursor-pointer"
-                title={`${wishlist.length} item(s) in your Wishlist`}
-              >
-                <Heart className={`h-4.5 w-4.5 ${wishlist.length > 0 ? 'text-rose-500 fill-rose-500 animate-pulse' : 'text-neutral-500'}`} />
-                {wishlist.length > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 inline-flex items-center justify-center min-w-[16px] h-4 px-1 text-[8px] font-black leading-none text-white bg-rose-500 rounded-full shadow-sm">
-                    {wishlist.length}
-                  </span>
-                )}
-              </button>
+              {/* Wishlist Heart Icon & premium dropdown */}
+              <div className="relative" ref={wishlistDropdownRef} id="wishlist-dropdown-wrapper">
+                <button 
+                  onClick={() => setWishlistOpen(!wishlistOpen)}
+                  className="relative p-2 rounded-xl border border-neutral-200 dark:border-slate-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-slate-900 transition-all duration-150 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#7C3AED]/40"
+                  title={`${wishlist.length} item(s) in your Wishlist`}
+                >
+                  <Heart className={`h-4.5 w-4.5 transition-all duration-300 ${wishlist.length > 0 ? 'text-rose-500 fill-rose-500 animate-pulse' : 'text-neutral-500 hover:text-[#7C3AED] dark:hover:text-[#A855F7]'}`} />
+                  {wishlist.length > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 inline-flex items-center justify-center min-w-[16px] h-4 px-1 text-[8px] font-black leading-none text-white bg-gradient-to-r from-[#7C3AED] via-[#A855F7] to-[#EC4899] rounded-full shadow-lg">
+                      {wishlist.length}
+                    </span>
+                  )}
+                </button>
+
+                {/* Dropdown Menu - Premium Modern UI Gradient look */}
+                <AnimatePresence>
+                  {wishlistOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 15, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 15, scale: 0.95 }}
+                      transition={{ duration: 0.25, ease: "easeOut" }}
+                      className="absolute right-[-100px] xs:right-[-60px] sm:right-0 mt-3 w-[330px] sm:w-[420px] z-[999] rounded-[24px] border border-neutral-200/60 dark:border-white/8 bg-white/95 dark:bg-[#0F172A]/95 backdrop-blur-[20px] p-6 shadow-[0_20px_50px_rgba(0,0,0,0.12)] dark:shadow-[0_20px_50px_rgba(124,58,237,0.15)] origin-top-right overflow-hidden"
+                    >
+                      {/* Premium Rainbow Accent Line */}
+                      <div className="absolute top-0 left-0 right-0 h-[5px] bg-gradient-to-r from-[#7C3AED] via-[#A855F7] to-[#EC4899]" />
+                      
+                      {/* Header Row */}
+                      <div className="flex items-center justify-between pb-4 border-b border-neutral-100 dark:border-white/8 mb-4">
+                        <h2 className="text-sm font-extrabold text-[#0F172A] dark:text-white flex items-center gap-2">
+                          <Heart className="w-4.5 h-4.5 text-rose-500 fill-rose-500 shrink-0" />
+                          <span className="tracking-tight bg-gradient-to-r from-neutral-900 via-neutral-800 to-neutral-700 dark:from-white dark:to-neutral-300 bg-clip-text text-transparent">
+                            {language === 'bn' ? 'আমার উইশলিস্ট' : language === 'ar' ? 'مفضلتي' : 'My Wishlist'}
+                          </span>
+                          <span className="ml-1 px-2.5 py-0.5 text-[10px] font-black rounded-full bg-gradient-to-r from-[#7C3AED] via-[#A855F7] to-[#EC4899] text-white shadow-sm shadow-[#A855F7]/25 animate-pulse">
+                            {wishlist.length}
+                          </span>
+                        </h2>
+                        
+                        <button
+                          onClick={() => setWishlistOpen(false)}
+                          className="p-1.5 text-neutral-400 hover:text-[#EC4899] dark:text-neutral-500 dark:hover:text-[#EC4899] rounded-xl hover:bg-neutral-50 dark:hover:bg-slate-800/60 transition-all duration-150 cursor-pointer"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      {/* Scrollable list */}
+                      <div className="max-h-[360px] overflow-y-auto pr-1 text-left scrollbar-thin scrollbar-thumb-neutral-200 dark:scrollbar-thumb-slate-800">
+                        {wishlist.length === 0 ? (
+                          <div className="text-center py-10 px-4 flex flex-col items-center">
+                            <div className="w-20 h-20 rounded-[24px] bg-gradient-to-tr from-[#7C3AED]/8 via-[#A855F7]/8 to-[#EC4899]/8 border border-[#7C3AED]/10 dark:border-white/5 flex items-center justify-center mb-5 shadow-inner relative">
+                              <Heart className="w-9 h-9 text-[#A855F7] stroke-[1.5] animate-pulse" />
+                            </div>
+                            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 tracking-tight">
+                              {language === 'bn' ? 'আপনার উইশলিস্ট খালি!' : language === 'ar' ? 'المفضلة فارغة حالياً!' : 'Your Wishlist is Empty!'}
+                            </h3>
+                            <p className="text-[10.5px] text-neutral-500 dark:text-neutral-450 mt-2 max-w-[260px] leading-relaxed">
+                              {language === 'bn' ? 'আমাদের নতুন প্রিমিয়াম স্ক্রিপ্ট ও থিমগুলো দেখতে আজই ডিজিটাল স্টোর ভিজিট করুন।' : 'Browse our premium script catalogs and add outstanding products to your wishlist!'}
+                            </p>
+                            <button
+                              onClick={() => {
+                                setWishlistOpen(false);
+                                setCurrentPage('marketplace');
+                              }}
+                              className="mt-6 flex items-center justify-center gap-2 h-[44px] px-6 bg-gradient-to-r from-[#7C3AED] via-[#A855F7] to-[#EC4899] hover:scale-[1.02] active:scale-[0.98] text-[11px] font-bold text-white rounded-[14px] shadow-lg shadow-[#7C3AED]/25 hover:shadow-[#7C3AED]/40 transition-all duration-300 cursor-pointer"
+                            >
+                              <span>{language === 'bn' ? 'ডিজিটাল স্টোর ব্রাউজ করুন' : 'Browse Products Store'}</span>
+                              <ArrowRight className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="space-y-3 pb-2">
+                            {getWishlistDetails().map((item, idx) => {
+                              const isProduct = item.type === 'product';
+                              const isService = item.type === 'service';
+                              const isPackage = item.type === 'package';
+                              const isBlog = item.type === 'blog';
+
+                              const activePrice = item.discountPrice || item.price;
+                              const titleText = language === 'bn' ? item.titleBn : language === 'ar' ? item.titleAr : item.title;
+                              const descText = language === 'bn' ? item.shortDetailsBn : language === 'ar' ? item.shortDetailsAr : item.shortDetails;
+
+                              // Badge classes for premium category labels
+                              let badgeClasses = '';
+                              let badgeLabel = '';
+                              if (isProduct) {
+                                badgeClasses = 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20';
+                                badgeLabel = language === 'bn' ? 'প্রোডাক্ট 🛒' : 'Product 🛒';
+                              } else if (isService) {
+                                badgeClasses = 'text-cyan-600 dark:text-cyan-400 bg-cyan-500/10 border border-cyan-500/20';
+                                badgeLabel = language === 'bn' ? 'সার্ভিস 💼' : 'Service 💼';
+                              } else if (isPackage) {
+                                badgeClasses = 'text-indigo-600 dark:text-indigo-400 bg-indigo-500/10 border border-indigo-500/20';
+                                badgeLabel = language === 'bn' ? 'প্যাকেজ 📦' : 'Package 📦';
+                              } else if (isBlog) {
+                                badgeClasses = 'text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20';
+                                badgeLabel = language === 'bn' ? 'ব্লগ 📰' : 'Blog 📰';
+                              }
+
+                              return (
+                                <div 
+                                  key={`${item.type}-${item.id}`} 
+                                  className="flex gap-3.5 items-start p-3 bg-[#F8FAFC]/70 dark:bg-[#111827]/40 border border-[#E2E8F0]/50 dark:border-white/5 hover:border-[#7C3AED]/30 dark:hover:border-[#7C3AED]/30 hover:bg-white dark:hover:bg-[#111827] rounded-[18px] shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 group/item"
+                                >
+                                  {/* Preview Thumbnail */}
+                                  <div className="h-14 w-16 shrink-0 overflow-hidden rounded-[12px] border border-neutral-200/60 dark:border-white/10 bg-[#F8FAFC] dark:bg-slate-950 relative shadow-inner">
+                                    <img
+                                      src={item.image}
+                                      alt={titleText}
+                                      className="h-full w-full object-cover object-center group-hover/item:scale-110 duration-500 transition-all"
+                                      referrerPolicy="no-referrer"
+                                    />
+                                  </div>
+
+                                  {/* Item Details */}
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-start justify-between gap-2 mb-1">
+                                      <span className={`inline-block px-1.5 py-0.5 text-[8.5px] font-bold rounded-md tracking-wider uppercase ${badgeClasses}`}>
+                                        {badgeLabel}
+                                      </span>
+                                      
+                                      {item.price !== undefined && (
+                                        <div className="text-right shrink-0">
+                                          {item.discountPrice && (
+                                            <span className="text-[9.5px] text-neutral-400 line-through font-mono mr-1">
+                                              {formatPriceInCart(item.price)}
+                                            </span>
+                                          )}
+                                          <span className="bg-gradient-to-r from-[#7C3AED] via-[#A855F7] to-[#EC4899] bg-clip-text text-transparent font-black text-xs font-mono">
+                                            {formatPriceInCart(activePrice)}
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    <h3 
+                                      className="line-clamp-2 text-xs font-bold text-neutral-800 dark:text-white hover:text-[#7C3AED] dark:hover:text-[#A855F7] transition cursor-pointer leading-snug"
+                                      onClick={() => {
+                                        setWishlistOpen(false);
+                                        if (isProduct) setCurrentPage('marketplace');
+                                        else if (isService || isPackage) {
+                                          localStorage.setItem('webzone_target_service_details_id', item.id);
+                                          setCurrentPage('services');
+                                        } else if (isBlog) {
+                                          setCurrentPage('blog');
+                                        }
+                                      }}
+                                    >
+                                      {titleText}
+                                    </h3>
+
+                                    {/* Subtitle / desc */}
+                                    {descText && (
+                                      <p className="text-[9.5px] text-neutral-400 dark:text-neutral-500 line-clamp-1 mt-1 leading-normal">
+                                        {descText}
+                                      </p>
+                                    )}
+
+                                    {/* Action row */}
+                                    <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-dashed border-neutral-100 dark:border-white/5">
+                                      {isProduct && (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            if (addToCart) {
+                                              addToCart(item.originalItem);
+                                            } else {
+                                              triggerToast('Added to Cart');
+                                            }
+                                          }}
+                                          className="inline-flex items-center justify-center gap-1.5 h-[32px] px-3 bg-gradient-to-r from-[#7C3AED] via-[#A855F7] to-[#EC4899] text-white font-bold rounded-[10px] text-[9.5px] uppercase tracking-wide hover:scale-105 active:scale-[0.98] duration-200 transition-all cursor-pointer shadow-sm shadow-[#7C3AED]/25 hover:shadow-[#7C3AED]/40"
+                                        >
+                                          <ShoppingBag className="w-2.5 h-2.5 text-white" />
+                                          <span>{language === 'bn' ? 'কিনুন 🛒' : 'Order Now 🛒'}</span>
+                                        </button>
+                                      )}
+
+                                      {(isService || isPackage) && (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setWishlistOpen(false);
+                                            localStorage.setItem('webzone_target_service_details_id', item.id);
+                                            setCurrentPage('services');
+                                          }}
+                                          className="inline-flex items-center justify-center gap-1.5 h-[32px] px-3 bg-white dark:bg-[#111827] border border-neutral-200/80 dark:border-white/10 hover:border-[#7C3AED] hover:bg-[#7C3AED]/5 text-neutral-700 dark:text-neutral-300 hover:text-[#7C3AED] dark:hover:text-violet-400 dark:hover:border-[#7C3AED]/30 font-bold rounded-[10px] text-[9.5px] uppercase tracking-wide hover:scale-105 active:scale-[0.98] duration-200 transition-all cursor-pointer"
+                                        >
+                                          <Layers className="w-2.5 h-2.5 text-[#7C3AED] dark:text-[#A855F7]" />
+                                          <span>{language === 'bn' ? 'সার্ভিস দেখুন' : 'Explore Service'}</span>
+                                        </button>
+                                      )}
+
+                                      {isBlog && (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setWishlistOpen(false);
+                                            setCurrentPage('blog');
+                                          }}
+                                          className="inline-flex items-center justify-center gap-1.5 h-[32px] px-3 bg-white dark:bg-[#111827] border border-neutral-200/80 dark:border-white/10 hover:border-amber-500 hover:bg-amber-500/5 text-neutral-700 dark:text-neutral-300 hover:text-amber-600 dark:hover:text-amber-400 dark:hover:border-amber-500/30 font-bold rounded-[10px] text-[9.5px] uppercase tracking-wide hover:scale-105 active:scale-[0.98] duration-200 transition-all cursor-pointer"
+                                        >
+                                          <BookOpen className="w-2.5 h-2.5 text-amber-550" />
+                                          <span>{language === 'bn' ? 'পড়ুন 📖' : 'Read Article 📖'}</span>
+                                        </button>
+                                      )}
+
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          if (toggleWishlist) {
+                                            toggleWishlist(item.id);
+                                          } else {
+                                            triggerToast('Removed from Wishlist');
+                                          }
+                                        }}
+                                        className="p-1.5 text-neutral-400 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-rose-500/10 rounded-[10px] transition-all duration-200 cursor-pointer"
+                                        title={language === 'bn' ? 'সরিয়ে ফেলুন' : 'Remove Item'}
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" strokeWidth={2.2} />
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Footer Row */}
+                      {wishlist.length > 0 && (
+                        <div className="pt-4 border-t border-neutral-100 dark:border-white/8 mt-3">
+                          <button
+                            onClick={() => {
+                              setWishlistOpen(false);
+                              setCurrentPage('marketplace');
+                            }}
+                            className="w-full h-[46px] bg-gradient-to-r from-[#7C3AED] via-[#A855F7] to-[#EC4899] hover:scale-[1.02] hover:shadow-lg hover:shadow-[#7C3AED]/35 active:scale-98 text-white font-bold text-xs uppercase tracking-wider rounded-[14px] cursor-pointer duration-200 transition-all flex items-center justify-center gap-2"
+                          >
+                            <Heart className="w-3.5 h-3.5 fill-white text-white" />
+                            <span>{language === 'bn' ? 'ডিজিটাল স্টোর এ আরও দেখুন' : 'Explore More Digital Scripts'}</span>
+                          </button>
+                        </div>
+                      )}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
 
               {/* Notifications bell icon & static alert panel */}
               <div className="relative hidden md:block">
@@ -1304,6 +2053,8 @@ export default function Header({
                   )}
                 </AnimatePresence>
               </div>
+
+
 
               {/* Cart Button */}
               <button 
@@ -1361,10 +2112,10 @@ export default function Header({
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 12, scale: 0.95 }}
                         transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-                        className="absolute right-0 top-full mt-3 w-80 bg-white/95 dark:bg-[#000000]/95 backdrop-blur-md border border-neutral-200/60 dark:border-slate-800 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] z-50 overflow-hidden text-left font-sans"
+                        className="absolute right-0 top-full mt-3 w-80 bg-white/80 dark:bg-[#0F172A]/80 backdrop-blur-xl border border-neutral-200/50 dark:border-white/[0.08] rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.18)] z-50 overflow-hidden text-left font-sans transition-all duration-300"
                       >
                         {/* Premium Gradient Customer Header Card */}
-                        <div className="p-4 bg-gradient-to-r from-[#2563EB] via-[#7C3AED] to-[#06B6D4] text-white relative overflow-hidden border-b border-white/10">
+                        <div className="p-4 bg-gradient-to-r from-[#4F46E5] to-[#06B6D4] text-white relative overflow-hidden border-b border-white/[0.08]">
                           {/* Ambient background decoration */}
                           <div className="absolute -top-10 -right-10 w-24 h-24 bg-white/15 rounded-full blur-xl pointer-events-none animate-pulse-slow" />
                           <div className="absolute -bottom-8 -left-8 w-16 h-16 bg-cyan-400/25 rounded-full blur-lg pointer-events-none" />
@@ -1383,7 +2134,7 @@ export default function Header({
                                   )}
                                 </div>
                               </div>
-                              <span className="absolute bottom-0 right-0 w-3 h-3 bg-[#10B981] rounded-full border-2 border-[#2563EB] flex items-center justify-center shadow-sm">
+                              <span className="absolute bottom-0 right-0 w-3 h-3 bg-[#10B981] rounded-full border-2 border-[#4F46E5] flex items-center justify-center shadow-sm">
                                 <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
                               </span>
                             </div>
@@ -1391,56 +2142,121 @@ export default function Header({
                             <div className="min-w-0 flex-1">
                               <h4 className="text-xs font-black text-white truncate tracking-tight">{user.name}</h4>
                               <p className="text-[10px] text-cyan-100/90 font-mono truncate mt-0.5">{user.email}</p>
-                              <div className="inline-flex items-center gap-1 text-[8px] font-black uppercase font-mono text-emerald-300 mt-1 bg-white/10 px-1.5 py-0.5 rounded border border-white/10">
-                                👑 PREMIUM CLIENT
+                              <div className="inline-flex items-center gap-1 text-[8px] font-black uppercase font-mono text-cyan-200 mt-1 bg-white/10 px-1.5 py-0.5 rounded border border-white/10 animate-pulse" id="header-desktop-superadmin-badge">
+                                {(user.role === 'admin' || user.role === 'super_admin') ? '👑 SYSTEM SUPER ADMIN' : '👑 PREMIUM CLIENT'}
                               </div>
                             </div>
                           </div>
                         </div>
 
                         {/* Dropdown Scrollable Custom Navigation Items with individual aesthetic icons */}
-                        <div className="p-2.5 max-h-96 overflow-y-auto space-y-1" id="profile-dropdown-menu-list">
-                          {[
-                            { id: 'dashboard', label: '👤 Dashboard', labelBn: '👤 ড্যাশবোর্ড' },
-                            { id: 'my-orders', label: '📦 My Orders', labelBn: '📦 আমার অর্ডার' },
-                            { id: 'downloads', label: '⬇️ Downloads', labelBn: '⬇️ ডাউনলোডস' },
-                            { id: 'my-wallet', label: '💰 My Wallet', labelBn: '💰 আমার ওয়ালেট' },
-                            { id: 'wishlist', label: '❤️ Wishlist', labelBn: '❤️ উইশলিস্ট' },
-                            { id: 'affiliate-program', label: '🤝 Affiliate Program', labelBn: '🤝 এফিলিয়েট প্রোগ্রাম' },
-                            { id: 'tickets', label: '🎫 Support Tickets', labelBn: '🎫 সাপোর্ট টিকেট' },
-                            { id: 'profile', label: '⚙️ Account Settings', labelBn: '⚙️ অ্যাকাউন্ট সেটিংস' },
-                          ].map((item) => (
-                            <button
-                              key={item.id}
-                              onClick={() => {
-                                localStorage.setItem('webzone_dashboard_active_tab', item.id);
-                                setCurrentPage('dashboard');
-                                setProfileDropdownOpen(false);
-                              }}
-                              style={{ minHeight: '38px' }}
-                              className="w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold text-neutral-600 dark:text-neutral-350 hover:text-white hover:bg-gradient-to-r hover:from-[#4F46E5]/90 hover:to-[#7C3AED]/90 hover:shadow-lg hover:shadow-indigo-500/10 hover:translate-x-1.5 transition-all duration-200 cursor-pointer flex items-center justify-between group active:scale-95"
-                            >
-                              <span className="flex items-center gap-1.5">
-                                <span className="group-hover:scale-110 transition-transform duration-300">
-                                  {language === 'bn' ? item.labelBn : item.label}
+                        <div className="p-2.5 max-h-96 overflow-y-auto space-y-1.5" id="profile-dropdown-menu-list">
+                          {(user.role === 'admin' || isAdmin) && (
+                            <div className="pb-2 mb-1 border-b border-neutral-150 dark:border-slate-800">
+                              <button
+                                onClick={() => {
+                                  if (currentPage === 'admin') {
+                                    setCurrentPage('marketplace');
+                                    triggerToast(language === 'bn' ? "প্রিমিয়াম ডিজিটাল স্টোরে ফেরত যাওয়া হয়েছে 💼" : "Switched back to Premium Digital Store 💼");
+                                  } else {
+                                    setCurrentPage('admin');
+                                    triggerToast(language === 'bn' ? "সিস্টেম ডাটা এন্ট্রি ও এডমিন প্যানেলে প্রবেশ করা হয়েছে ⚙️" : "Switched to System Data Entry & Admin Panel ⚙️");
+                                  }
+                                  setProfileDropdownOpen(false);
+                                }}
+                                className={`w-full py-2.5 px-3 rounded-xl text-xs font-black transition-all duration-300 flex items-center justify-between cursor-pointer border ${
+                                  currentPage === 'admin'
+                                    ? 'bg-rose-600 hover:bg-rose-700 text-white border-rose-500 shadow-rose-600/30'
+                                    : 'bg-gradient-to-r from-[#4F46E5] to-[#06B6D4] hover:scale-[1.02] text-white border-transparent shadow-indigo-500/20 shadow-md'
+                                }`}
+                              >
+                                <span className="flex items-center gap-1.5 text-left">
+                                  <Settings className="w-3.5 h-3.5 animate-spin-slow" />
+                                  <span>{currentPage === 'admin' ? "Switch to Store View" : "Store Admin Mode 🛠️"}</span>
                                 </span>
-                              </span>
-                              <ChevronRight className="w-3.5 h-3.5 text-neutral-450 opacity-40 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all animate-none" />
-                            </button>
-                          ))}
+                                <ChevronRight className="w-3.5 h-3.5 text-white/80" />
+                              </button>
+                            </div>
+                          )}
+
+                          {user.role === 'admin' || user.role === 'super_admin' || user.role === 'editor' || isAdmin ? (
+                            // SUPER ADMIN PROFILE MENU
+                            [
+                              { id: 'dashboard', label: '🏠 Super Admin Dashboard', labelBn: '🏠 সুপার এডমিন ড্যাশবোর্ড' },
+                              { id: 'customers', label: '👥 Customers & Users', labelBn: '👥 গ্রাহক ও ইউজার কন্ট্রোল' },
+                              { id: 'orders', label: '📦 Super Orders Hub', labelBn: '📦 অর্ডার প্রসেসিং হাব' },
+                              { id: 'projects', label: '📂 Projects Kanban', labelBn: '📂 প্রজেক্ট কানবান বোর্ড' },
+                              { id: 'support', label: '🎫 Support Tickets Feed', labelBn: '🎫 টিকেট হেল্পডেস্ক ফিড' },
+                              { id: 'settings', label: '⚙️ Cloud System Settings', labelBn: '⚙️ ক্লাউড সিস্টেম সেটিংস' },
+                              { id: 'client_workspace', label: '💼 Client Dashboard Workspace', labelBn: '💼 ক্লায়েন্ট ড্যাশবোর্ড ওয়ার্কস্পেস' }
+                            ].map((item) => (
+                              <button
+                                key={item.id}
+                                onClick={() => {
+                                  if (item.id === 'client_workspace') {
+                                    localStorage.setItem('webzone_dashboard_active_tab', 'dashboard');
+                                    window.dispatchEvent(new Event('storage'));
+                                    setCurrentPage('dashboard');
+                                  } else {
+                                    localStorage.setItem('webzone_admin_active_menu', item.id);
+                                    setCurrentPage('admin');
+                                  }
+                                  setProfileDropdownOpen(false);
+                                }}
+                                style={{ minHeight: '38px' }}
+                                className="w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300 bg-neutral-100/30 dark:bg-white/[0.01] border border-neutral-200/40 dark:border-white/[0.04] hover:text-white hover:bg-gradient-to-r hover:from-[#4F46E5] hover:to-[#06B6D4] hover:border-transparent hover:shadow-[0_8px_20px_rgba(79,70,229,0.25)] hover:-translate-y-0.5 active:scale-95 transition-all duration-300 cursor-pointer flex items-center justify-between group"
+                              >
+                                <span className="flex items-center gap-1.5">
+                                  <span className="group-hover:scale-105 transition-transform duration-300">
+                                    {language === 'bn' ? item.labelBn : item.label}
+                                  </span>
+                                </span>
+                                <ChevronRight className="w-3.5 h-3.5 text-neutral-450 opacity-40 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all duration-300" />
+                              </button>
+                            ))
+                          ) : (
+                            // STANDARD CUSTOMER ACCOUNT ZONE MENU
+                            [
+                              { id: 'dashboard', label: '👤 Dashboard', labelBn: '👤 ড্যাশবোর্ড' },
+                              { id: 'my-orders', label: '📦 My Orders', labelBn: '📦 আমার অর্ডার' },
+                              { id: 'downloads', label: '⬇️ Downloads', labelBn: '⬇️ ডাউনলোডস' },
+                              { id: 'my-wallet', label: '💰 My Wallet', labelBn: '💰 আমার ওয়ালেট' },
+                              { id: 'wishlist', label: '❤️ Wishlist', labelBn: '❤️ উইশলিস্ট' },
+                              { id: 'affiliate-program', label: '🤝 Affiliate Program', labelBn: '🤝 এফিলিয়েট প্রোগ্রাম' },
+                              { id: 'profile', label: '⚙️ Account Settings', labelBn: '⚙️ অ্যাকাউন্ট সেটিংস' },
+                            ].map((item) => (
+                              <button
+                                key={item.id}
+                                onClick={() => {
+                                  localStorage.setItem('webzone_dashboard_active_tab', item.id);
+                                  setCurrentPage('dashboard');
+                                  setProfileDropdownOpen(false);
+                                }}
+                                style={{ minHeight: '38px' }}
+                                className="w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300 bg-neutral-100/30 dark:bg-white/[0.01] border border-neutral-200/40 dark:border-white/[0.04] hover:text-white hover:bg-gradient-to-r hover:from-[#4F46E5] hover:to-[#06B6D4] hover:border-transparent hover:shadow-[0_8px_20px_rgba(79,70,229,0.25)] hover:-translate-y-0.5 active:scale-95 transition-all duration-300 cursor-pointer flex items-center justify-between group"
+                              >
+                                <span className="flex items-center gap-1.5">
+                                  <span className="group-hover:scale-105 transition-transform duration-300">
+                                    {language === 'bn' ? item.labelBn : item.label}
+                                  </span>
+                                </span>
+                                <ChevronRight className="w-3.5 h-3.5 text-neutral-450 opacity-40 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all duration-300" />
+                              </button>
+                            ))
+                          )}
                         </div>
 
                         {/* Sign Out Section */}
-                        <div className="p-2.5 border-t border-neutral-200/65 dark:border-slate-800 bg-neutral-50/60 dark:bg-slate-950/40">
+                        <div className="p-2.5 border-t border-neutral-200/65 dark:border-slate-800/80 bg-neutral-50/60 dark:bg-[#0F172A]/40">
                           <button
                             onClick={() => {
                               onLogout();
                               setProfileDropdownOpen(false);
                             }}
                             style={{ minHeight: '40px' }}
-                            className="w-full flex items-center gap-2 px-3.5 py-2.5 text-xs font-black text-red-500 hover:bg-red-550/10 dark:hover:bg-red-500/10 rounded-xl transition-all duration-300 cursor-pointer text-left active:scale-95 hover:shadow-sm"
+                            className="w-full flex items-center justify-center gap-2 px-3.5 py-2.5 text-xs font-black text-red-500 hover:text-white hover:bg-gradient-to-r hover:from-red-500 hover:to-rose-600 hover:shadow-[0_8px_20px_rgba(239,68,68,0.2)] rounded-xl transition-all duration-300 cursor-pointer text-center active:scale-95 group"
                           >
-                            <LogOut className="w-4 h-4 text-red-500" />
+                            <LogOut className="w-4 h-4 text-red-500 group-hover:text-white transition-colors duration-300" />
                             <span>🚪 Logout Client Portal</span>
                           </button>
                         </div>
@@ -1454,7 +2270,7 @@ export default function Header({
                   <div className="relative">
                     <button
                       onClick={() => setGuestDropdownOpenDesktop(!guestDropdownOpenDesktop)}
-                      className="relative h-8.5 w-8.5 rounded-full bg-gradient-to-tr from-blue-600/10 to-cyan-500/10 border border-blue-500/25 text-blue-600 dark:text-cyan-400 hover:bg-gradient-to-tr hover:from-blue-600 hover:to-cyan-550 hover:text-white transition-all duration-200 cursor-pointer flex items-center justify-center pointer-events-auto"
+                      className="relative h-8.5 w-8.5 rounded-full bg-gradient-to-tr from-[#4F46E5]/10 to-[#06B6D4]/10 border border-[#4F46E5]/25 text-[#4F46E5] dark:text-[#06B6D4] hover:bg-gradient-to-tr hover:from-[#4F46E5] hover:to-[#06B6D4] hover:text-white transition-all duration-300 cursor-pointer flex items-center justify-center pointer-events-auto shadow-sm hover:shadow-[0_4px_12px_rgba(79,70,229,0.25)] hover:scale-105"
                       aria-label="Quick Portal Gate"
                       title="Client Area"
                     >
@@ -1470,10 +2286,10 @@ export default function Header({
                           animate={{ opacity: 1, y: 0, scale: 1 }}
                           exit={{ opacity: 0, y: 12, scale: 0.95 }}
                           transition={{ duration: 0.22, ease: "easeOut" }}
-                          className="absolute right-0 top-full mt-3 w-72 bg-white dark:bg-[#0F172A] border border-neutral-200 dark:border-slate-800 rounded-3xl shadow-2xl z-50 overflow-hidden text-left font-sans"
+                          className="absolute right-0 top-full mt-3 w-72 bg-white/80 dark:bg-[#0F172A]/80 backdrop-blur-xl border border-neutral-200/50 dark:border-white/[0.08] rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.18)] z-50 overflow-hidden text-left font-sans transition-all duration-300"
                         >
                           {/* Short/Compact Header matching modern Sidebar layout */}
-                          <div className="p-3.5 bg-gradient-to-r from-[#2563EB] to-[#06B6D4] text-white relative overflow-hidden border-b border-white/10 text-left">
+                          <div className="p-3.5 bg-gradient-to-r from-[#4F46E5] to-[#06B6D4] text-white relative overflow-hidden border-b border-white/[0.08] text-left">
                             {/* Ambient Background decoration */}
                             <div className="absolute -top-10 -right-10 w-20 h-20 bg-white/10 rounded-full blur-xl pointer-events-none animate-pulse-slow" />
                             <div className="absolute -bottom-8 -left-8 w-16 h-16 bg-cyan-400/20 rounded-full blur-md pointer-events-none" />
@@ -1481,7 +2297,7 @@ export default function Header({
                             <div className="relative z-10 flex items-center gap-3">
                               {/* Guest Icon */}
                               <div className="relative shrink-0">
-                                <div className="p-[2px] rounded-full bg-white/20">
+                                <div className="p-[2px] rounded-full bg-white/20 animate-pulse">
                                   <div className="w-8 h-8 rounded-full bg-slate-900/40 backdrop-blur-md text-white flex items-center justify-center font-bold border border-white/10">
                                     <User className="w-3.5 h-3.5 text-white" />
                                   </div>
@@ -1495,7 +2311,7 @@ export default function Header({
                                 <p className="text-[9.5px] text-cyan-100/90 font-mono truncate mt-0.5">
                                   {language === 'bn' ? 'অ্যাক্সেস করতে লগইন করুন' : 'Login to view account'}
                                 </p>
-                                <div className="inline-flex items-center gap-1 text-[8px] font-black uppercase font-mono text-cyan-200 mt-1 bg-white/10 px-1.5 py-0.5 rounded border border-white/10">
+                                <div className="inline-flex items-center gap-1 text-[8px] font-black uppercase font-mono text-cyan-200 mt-1 bg-white/10 px-1.5 py-0.5 rounded border border-white/10 animate-pulse">
                                   ✨ PORTAL ACTIVE
                                 </div>
                               </div>
@@ -1503,7 +2319,7 @@ export default function Header({
                           </div>
 
                           {/* Dropdown Options List */}
-                          <div className="p-2 py-1.5 space-y-1 bg-white/95 dark:bg-[#0F172A]/95 text-[#0F172A] dark:text-[#F8FAFC]">
+                          <div className="p-2.5 py-2 space-y-1.5 bg-transparent">
                             {/* Option 1: Login */}
                             <button
                               onClick={() => {
@@ -1511,13 +2327,13 @@ export default function Header({
                                 setGuestDropdownOpenDesktop(false);
                               }}
                               style={{ minHeight: '44px' }}
-                              className="w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold text-neutral-750 dark:text-slate-200 hover:text-white hover:bg-gradient-to-r hover:from-[#2563EB] hover:to-[#06B6D4] transition-all duration-200 cursor-pointer flex items-center justify-between group active:scale-95"
+                              className="w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold text-[#0F172A] dark:text-slate-200 hover:text-white hover:bg-gradient-to-r hover:from-[#4F46E5] hover:to-[#06B6D4] hover:shadow-[0_8px_20px_rgba(79,70,229,0.25)] hover:-translate-y-0.5 transition-all duration-300 cursor-pointer flex items-center justify-between group active:scale-95"
                             >
                               <div className="flex items-center gap-2">
                                 <span className="transition-transform group-hover:scale-115">🔐</span>
                                 <span>{language === 'bn' ? 'লগইন করুন' : 'Login'}</span>
                               </div>
-                              <ChevronRight className="w-3.5 h-3.5 text-neutral-450 opacity-60 group-hover:text-white" />
+                              <ChevronRight className="w-3.5 h-3.5 text-neutral-450 opacity-60 group-hover:text-white transition-all duration-300 group-hover:translate-x-0.5" />
                             </button>
 
                             {/* Option 2: Register */}
@@ -1527,13 +2343,13 @@ export default function Header({
                                 setGuestDropdownOpenDesktop(false);
                               }}
                               style={{ minHeight: '44px' }}
-                              className="w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold text-neutral-750 dark:text-slate-200 hover:text-white hover:bg-gradient-to-r hover:from-[#8B5CF6] hover:to-[#EC4899] transition-all duration-200 cursor-pointer flex items-center justify-between group active:scale-95"
+                              className="w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold text-[#0F172A] dark:text-slate-200 hover:text-white hover:bg-gradient-to-r hover:from-[#4F46E5] hover:to-[#06B6D4] hover:shadow-[0_8px_20px_rgba(79,70,229,0.25)] hover:-translate-y-0.5 transition-all duration-300 cursor-pointer flex items-center justify-between group active:scale-95"
                             >
                               <div className="flex items-center gap-2">
                                 <span className="transition-transform group-hover:scale-115">📝</span>
                                 <span>{language === 'bn' ? 'নিবন্ধন করুন' : 'Register'}</span>
                               </div>
-                              <ChevronRight className="w-3.5 h-3.5 text-neutral-450 opacity-60 group-hover:text-white" />
+                              <ChevronRight className="w-3.5 h-3.5 text-neutral-450 opacity-60 group-hover:text-white transition-all duration-300 group-hover:translate-x-0.5" />
                             </button>
                           </div>
                         </motion.div>
@@ -1545,6 +2361,8 @@ export default function Header({
 
               {/* Mobile Header Quick Actions Layout (Like Techbari.com) */}
               <div className="md:hidden flex items-center gap-1.5">
+
+
                 {/* Secure Client Area trigger */}
                 <div className="relative" ref={profileDropdownRefMobile}>
                   {user ? (
@@ -1574,13 +2392,13 @@ export default function Header({
                         {profileDropdownOpenMobile && (
                           <motion.div
                             initial={{ opacity: 0, y: 12, scale: 0.95 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            animate={isLoggingOut ? { opacity: 0, y: 55, scale: 0.92 } : { opacity: 1, y: 0, scale: 1 }}
                             exit={{ opacity: 0, y: 12, scale: 0.95 }}
-                            transition={{ duration: 0.22, ease: "easeOut" }}
-                            className="absolute right-0 top-full mt-2 w-72 bg-white/95 dark:bg-[#000000]/95 backdrop-blur-md border border-neutral-200 dark:border-neutral-850 rounded-2xl shadow-2xl z-50 overflow-hidden text-left font-sans animate-fade-in"
+                            transition={{ duration: isLoggingOut ? 0.38 : 0.22, ease: "easeInOut" }}
+                            className="absolute right-0 top-full mt-2 w-72 bg-white/80 dark:bg-[#0F172A]/80 backdrop-blur-xl border border-neutral-200/50 dark:border-white/[0.08] rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.18)] z-50 overflow-hidden text-left font-sans transition-all duration-300 animate-fade-in"
                           >
                             {/* Profile Info Header */}
-                            <div className="p-3.5 bg-gradient-to-r from-[#2563EB] via-[#7C3AED] to-[#06B6D4] text-white relative overflow-hidden border-b border-white/10 text-left">
+                            <div className="p-3.5 bg-gradient-to-r from-[#4F46E5] to-[#06B6D4] text-white relative overflow-hidden border-b border-white/[0.08] text-left">
                               {/* Ambient background decoration */}
                               <div className="absolute -top-10 -right-10 w-24 h-24 bg-white/15 rounded-full blur-xl pointer-events-none" />
                               <div className="absolute -bottom-8 -left-8 w-16 h-16 bg-cyan-400/25 rounded-full blur-lg pointer-events-none" />
@@ -1599,7 +2417,7 @@ export default function Header({
                                       )}
                                     </div>
                                   </div>
-                                  <span className="absolute bottom-0 right-0 w-3 h-3 bg-[#10B981] rounded-full border-2 border-[#2563EB] flex items-center justify-center shadow-sm">
+                                  <span className="absolute bottom-0 right-0 w-3 h-3 bg-[#10B981] rounded-full border-2 border-[#4F46E5] flex items-center justify-center shadow-sm">
                                     <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
                                   </span>
                                 </div>
@@ -1607,53 +2425,118 @@ export default function Header({
                                 <div className="min-w-0 flex-1">
                                   <h4 className="text-xs font-black text-white truncate tracking-tight">{user.name}</h4>
                                   <p className="text-[10px] text-cyan-100/90 font-mono truncate mt-0.5">{user.email}</p>
-                                  <div className="inline-flex items-center gap-1 text-[8px] font-black uppercase font-mono text-emerald-300 mt-1 bg-white/10 px-1.5 py-0.5 rounded border border-white/10">
-                                    👑 PREMIUM MEMBER
+                                  <div className="inline-flex items-center gap-1 text-[8px] font-black uppercase font-mono text-cyan-200 mt-1 bg-white/10 px-1.5 py-0.5 rounded border border-white/10 animate-pulse" id="header-mobile-superadmin-badge">
+                                    {(user.role === 'admin' || user.role === 'super_admin') ? '👑 SYSTEM SUPER ADMIN' : '👑 PREMIUM MEMBER'}
                                   </div>
                                 </div>
                               </div>
                             </div>
 
                             {/* Dropdown Navigation Menu */}
-                            <div className="p-2 py-1.5 max-h-80 overflow-y-auto space-y-0.5" id="profile-dropdown-menu-list-mobile">
-                              {[
-                                { id: 'dashboard', label: '👤 Dashboard', labelBn: '👤 ড্যাশবোর্ড' },
-                                { id: 'my-orders', label: '📦 My Orders', labelBn: '📦 আমার অর্ডার' },
-                                { id: 'downloads', label: '⬇️ Downloads', labelBn: '⬇️ ডাউনলোডস' },
-                                { id: 'my-wallet', label: '💰 My Wallet', labelBn: '💰 আমার ওয়ালেট' },
-                                { id: 'wishlist', label: '❤️ Wishlist', labelBn: '❤️ উইশলিস্ট' },
-                                { id: 'affiliate-program', label: '🤝 Affiliate Program', labelBn: '🤝 এফিলিয়েট প্রোগ্রাম' },
-                                { id: 'tickets', label: '🎫 Support Tickets', labelBn: '🎫 সাপোর্ট টিকেট' },
-                                { id: 'profile', label: '⚙️ Account Settings', labelBn: '⚙️ অ্যাকাউন্ট সেটিংস' },
-                              ].map((item) => (
-                                <button
-                                  key={item.id}
-                                  onClick={() => {
-                                    localStorage.setItem('webzone_dashboard_active_tab', item.id);
-                                    setCurrentPage('dashboard');
-                                    setProfileDropdownOpenMobile(false);
-                                  }}
-                                  style={{ minHeight: '38px' }}
-                                  className="w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold text-neutral-600 dark:text-neutral-350 hover:text-white hover:bg-gradient-to-r hover:from-[#4F46E5] hover:to-[#7C3AED] transition-all duration-200 cursor-pointer flex items-center justify-between"
-                                >
-                                  <span>{language === 'bn' ? item.labelBn : item.label}</span>
-                                  <ChevronRight className="w-3.5 h-3.5 text-neutral-450 opacity-55" />
-                                </button>
-                              ))}
+                            <div className="p-2.5 py-2 max-h-80 overflow-y-auto space-y-1.5" id="profile-dropdown-menu-list-mobile">
+                              {(user.role === 'admin' || isAdmin) && (
+                                <div className="pb-1.5 mb-1 border-b border-neutral-100 dark:border-slate-800">
+                                  <button
+                                    onClick={() => {
+                                      if (currentPage === 'admin') {
+                                        setCurrentPage('marketplace');
+                                        triggerToast(language === 'bn' ? "প্রিমিয়াম ডিজিটাল স্টোরে ফেরত যাওয়া হয়েছে 💼" : "Switched back to Premium Digital Store 💼");
+                                      } else {
+                                        setCurrentPage('admin');
+                                        triggerToast(language === 'bn' ? "সিস্টেম ডাটা এন্ট্রি ও এডমিন প্যানেলে প্রবেশ করা হয়েছে ⚙️" : "Switched to System Data Entry & Admin Panel ⚙️");
+                                      }
+                                      setProfileDropdownOpenMobile(false);
+                                    }}
+                                    className={`w-full py-2.5 px-3 rounded-xl text-xs font-black transition-all duration-300 flex items-center justify-between cursor-pointer border ${
+                                      currentPage === 'admin'
+                                        ? 'bg-rose-600 hover:bg-rose-700 text-white border-rose-500 shadow-rose-600/20 shadow-sm'
+                                        : 'bg-gradient-to-r from-[#4F46E5] to-[#06B6D4] hover:scale-[1.02] text-white border-transparent shadow-indigo-500/20 shadow-md'
+                                    }`}
+                                  >
+                                    <span className="flex items-center gap-1.5 text-left">
+                                      <Settings className="w-3.5 h-3.5 animate-spin-slow" />
+                                      <span>{currentPage === 'admin' ? "Switch to Store View" : "Store Admin Mode 🛠️"}</span>
+                                    </span>
+                                    <ChevronRight className="w-3.5 h-3.5 text-white/80" />
+                                  </button>
+                                </div>
+                              )}
+
+                              {user.role === 'admin' || user.role === 'super_admin' || user.role === 'editor' || isAdmin ? (
+                                // SUPER ADMIN MOBILE OPTIONS
+                                [
+                                  { id: 'dashboard', label: '🏠 Super Admin Dashboard', labelBn: '🏠 সুপার এডমিন ড্যাশবোর্ড' },
+                                  { id: 'customers', label: '👥 Customers & Users', labelBn: '👥 গ্রাহক ও ইউজার কন্ট্রোল' },
+                                  { id: 'orders', label: '📦 Super Orders Hub', labelBn: '📦 অর্ডার প্রসেসিং হাব' },
+                                  { id: 'projects', label: '📂 Projects Kanban', labelBn: '📂 প্রজেক্ট কানবান বোর্ড' },
+                                  { id: 'support', label: '🎫 Support Tickets Feed', labelBn: '🎫 টিকেট হেল্পডেস্ক ফিড' },
+                                  { id: 'settings', label: '⚙️ Cloud System Settings', labelBn: '⚙️ ক্লাউড সিস্টেম সেটিংস' },
+                                  { id: 'client_workspace', label: '💼 Client Dashboard Workspace', labelBn: '💼 ক্লায়েন্ট ড্যাশবোর্ড ওয়ার্কস্পেস' }
+                                ].map((item) => (
+                                  <button
+                                    key={item.id}
+                                    onClick={() => {
+                                      if (item.id === 'client_workspace') {
+                                        localStorage.setItem('webzone_dashboard_active_tab', 'dashboard');
+                                        window.dispatchEvent(new Event('storage'));
+                                        setCurrentPage('dashboard');
+                                      } else {
+                                        localStorage.setItem('webzone_admin_active_menu', item.id);
+                                        setCurrentPage('admin');
+                                      }
+                                      setProfileDropdownOpenMobile(false);
+                                    }}
+                                    style={{ minHeight: '38px' }}
+                                    className="w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300 bg-neutral-100/30 dark:bg-white/[0.01] border border-neutral-200/40 dark:border-white/[0.04] hover:text-white hover:bg-gradient-to-r hover:from-[#4F46E5] hover:to-[#06B6D4] hover:border-transparent hover:shadow-[0_8px_20px_rgba(79,70,229,0.25)] hover:-translate-y-0.5 active:scale-95 transition-all duration-300 cursor-pointer flex items-center justify-between group"
+                                  >
+                                    <span>{language === 'bn' ? item.labelBn : item.label}</span>
+                                    <ChevronRight className="w-3.5 h-3.5 text-neutral-450 opacity-40 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all duration-300" />
+                                  </button>
+                                ))
+                              ) : (
+                                // STANDARD CLIENT MOBILE OPTIONS
+                                [
+                                  { id: 'dashboard', label: '👤 Dashboard', labelBn: '👤 ড্যাশবোর্ড' },
+                                  { id: 'my-orders', label: '📦 My Orders', labelBn: '📦 আমার অর্ডার' },
+                                  { id: 'downloads', label: '⬇️ Downloads', labelBn: '⬇️ ডাউনলোডস' },
+                                  { id: 'my-wallet', label: '💰 My Wallet', labelBn: '💰 আমার ওয়ালেট' },
+                                  { id: 'wishlist', label: '❤️ Wishlist', labelBn: '❤️ উইশলিস্ট' },
+                                  { id: 'affiliate-program', label: '🤝 Affiliate Program', labelBn: '🤝 এফিলিয়েট প্রোগ্রাম' },
+                                  { id: 'profile', label: '⚙️ Account Settings', labelBn: '⚙️ অ্যাকাউন্ট সেটিংস' },
+                                ].map((item) => (
+                                  <button
+                                    key={item.id}
+                                    onClick={() => {
+                                      localStorage.setItem('webzone_dashboard_active_tab', item.id);
+                                      setCurrentPage('dashboard');
+                                      setProfileDropdownOpenMobile(false);
+                                    }}
+                                    style={{ minHeight: '38px' }}
+                                    className="w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300 bg-neutral-100/30 dark:bg-white/[0.01] border border-neutral-200/40 dark:border-white/[0.04] hover:text-white hover:bg-gradient-to-r hover:from-[#4F46E5] hover:to-[#06B6D4] hover:border-transparent hover:shadow-[0_8px_20px_rgba(79,70,229,0.25)] hover:-translate-y-0.5 active:scale-95 transition-all duration-300 cursor-pointer flex items-center justify-between group"
+                                  >
+                                    <span>{language === 'bn' ? item.labelBn : item.label}</span>
+                                    <ChevronRight className="w-3.5 h-3.5 text-neutral-450 opacity-40 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all duration-300" />
+                                  </button>
+                                ))
+                              )}
                             </div>
 
                             {/* Sign Out Section */}
-                            <div className="p-2 border-t border-neutral-200 dark:border-slate-800 bg-neutral-50/50 dark:bg-slate-950/20">
+                            <div className="p-2.5 border-t border-neutral-200/65 dark:border-slate-800/80 bg-neutral-50/60 dark:bg-[#0F172A]/40">
                               <button
                                 onClick={() => {
-                                  onLogout();
-                                  setProfileDropdownOpenMobile(false);
+                                  setIsLoggingOut(true);
+                                  setTimeout(() => {
+                                    onLogout();
+                                    setProfileDropdownOpenMobile(false);
+                                    setIsLoggingOut(false);
+                                  }, 400);
                                 }}
-                                style={{ minHeight: '38px' }}
-                                className="w-full flex items-center gap-2 px-3 py-2 text-xs font-black text-red-500 hover:bg-red-550/10 rounded-xl transition cursor-pointer text-left"
+                                style={{ minHeight: '40px' }}
+                                className="w-full flex items-center justify-center gap-2 px-3.5 py-2.5 text-xs font-black text-red-500 hover:text-white hover:bg-gradient-to-r hover:from-red-500 hover:to-rose-600 hover:shadow-[0_8px_20px_rgba(239,68,68,0.2)] rounded-xl transition-all duration-300 cursor-pointer text-center active:scale-95 group"
                               >
-                                <LogOut className="w-3.5 h-3.5 text-red-500" />
-                                <span>🚪 Logout Client Portal</span>
+                                <LogOut className="w-4 h-4 text-red-500 group-hover:text-white transition-colors duration-300" />
+                                <span>{language === 'bn' ? 'লগআউট করুন 🚪' : 'Logout Portal 🚪'}</span>
                               </button>
                             </div>
                           </motion.div>
@@ -1664,13 +2547,13 @@ export default function Header({
                     <>
                       <button
                         onClick={() => setProfileDropdownOpenMobile(!profileDropdownOpenMobile)}
-                        className="relative h-8.5 w-8.5 rounded-full bg-gradient-to-tr from-blue-600/10 to-cyan-500/10 border border-blue-500/25 text-blue-600 dark:text-cyan-450 hover:bg-gradient-to-tr hover:from-blue-600 hover:to-cyan-500 hover:text-white transition-all duration-200 cursor-pointer flex items-center justify-center pointer-events-auto"
+                        className="relative h-8.5 w-8.5 rounded-full bg-gradient-to-tr from-[#4F46E5]/10 to-[#06B6D4]/10 border border-[#4F46E5]/25 text-[#4F46E5] dark:text-[#06B6D4] hover:bg-gradient-to-tr hover:from-[#4F46E5] hover:to-[#06B6D4] hover:text-white transition-all duration-300 cursor-pointer flex items-center justify-center pointer-events-auto shadow-sm hover:shadow-[0_4px_12px_rgba(79,70,229,0.25)] hover:scale-105"
                         aria-label="Quick Portal Gate"
                         title="Client Area"
                       >
                         <User className="h-4 w-4" />
                         {/* Status Indicator Dot */}
-                        <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-white dark:border-neutral-950" />
+                        <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-white dark:border-neutral-950 animate-pulse" />
                       </button>
 
                       <AnimatePresence>
@@ -1680,10 +2563,10 @@ export default function Header({
                             animate={{ opacity: 1, y: 0, scale: 1 }}
                             exit={{ opacity: 0, y: 12, scale: 0.95 }}
                             transition={{ duration: 0.22, ease: "easeOut" }}
-                            className="absolute right-0 top-full mt-2 w-72 bg-white dark:bg-[#0F172A] border border-neutral-200 dark:border-slate-800 rounded-3xl shadow-2xl z-50 overflow-hidden text-left font-sans"
+                            className="absolute right-0 top-full mt-2 w-72 bg-white/80 dark:bg-[#0F172A]/80 backdrop-blur-xl border border-neutral-200/50 dark:border-white/[0.08] rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.18)] z-50 overflow-hidden text-left font-sans transition-all duration-300"
                           >
                             {/* Short/Compact Header matching modern Sidebar layout */}
-                            <div className="p-3.5 bg-gradient-to-r from-[#2563EB] to-[#06B6D4] text-white relative overflow-hidden border-b border-white/10 text-left">
+                            <div className="p-3.5 bg-gradient-to-r from-[#4F46E5] to-[#06B6D4] text-white relative overflow-hidden border-b border-white/[0.08] text-left">
                               {/* Ambient Background decoration */}
                               <div className="absolute -top-10 -right-10 w-20 h-20 bg-white/10 rounded-full blur-xl pointer-events-none animate-pulse-slow" />
                               <div className="absolute -bottom-8 -left-8 w-16 h-16 bg-cyan-400/20 rounded-full blur-md pointer-events-none" />
@@ -1691,7 +2574,7 @@ export default function Header({
                               <div className="relative z-10 flex items-center gap-3">
                                 {/* Guest Icon */}
                                 <div className="relative shrink-0">
-                                  <div className="p-[2px] rounded-full bg-white/20">
+                                  <div className="p-[2px] rounded-full bg-white/20 animate-pulse">
                                     <div className="w-8 h-8 rounded-full bg-slate-900/40 backdrop-blur-md text-white flex items-center justify-center font-bold border border-white/10">
                                       <User className="w-3.5 h-3.5 text-white" />
                                     </div>
@@ -1705,7 +2588,7 @@ export default function Header({
                                   <p className="text-[9.5px] text-cyan-100/90 font-mono truncate mt-0.5">
                                     {language === 'bn' ? 'অ্যাক্সেস করতে লগইন করুন' : 'Login to view account'}
                                   </p>
-                                  <div className="inline-flex items-center gap-1 text-[8px] font-black uppercase font-mono text-cyan-200 mt-1 bg-white/10 px-1.5 py-0.5 rounded border border-white/10">
+                                  <div className="inline-flex items-center gap-1 text-[8px] font-black uppercase font-mono text-cyan-200 mt-1 bg-white/10 px-1.5 py-0.5 rounded border border-white/10 animate-pulse">
                                     ✨ PORTAL ACTIVE
                                   </div>
                                 </div>
@@ -1713,7 +2596,7 @@ export default function Header({
                             </div>
 
                             {/* Dropdown Options List */}
-                            <div className="p-2 py-1.5 space-y-1 bg-white/95 dark:bg-[#0F172A]/95 text-[#0F172A] dark:text-[#F8FAFC]">
+                            <div className="p-2.5 py-2 space-y-1.5 bg-transparent">
                               {/* Option 1: Login */}
                               <button
                                 onClick={() => {
@@ -1721,13 +2604,13 @@ export default function Header({
                                   setProfileDropdownOpenMobile(false);
                                 }}
                                 style={{ minHeight: '44px' }}
-                                className="w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold text-neutral-750 dark:text-slate-200 hover:text-white hover:bg-gradient-to-r hover:from-[#2563EB] hover:to-[#06B6D4] transition-all duration-200 cursor-pointer flex items-center justify-between group active:scale-95"
+                                className="w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold text-[#0F172A] dark:text-slate-200 hover:text-white hover:bg-gradient-to-r hover:from-[#4F46E5] hover:to-[#06B6D4] hover:shadow-[0_8px_20px_rgba(79,70,229,0.25)] hover:-translate-y-0.5 transition-all duration-300 cursor-pointer flex items-center justify-between group active:scale-95"
                               >
                                 <div className="flex items-center gap-2">
                                   <span className="transition-transform group-hover:scale-115">🔐</span>
                                   <span>{language === 'bn' ? 'লগইন করুন' : 'Login'}</span>
                                 </div>
-                                <ChevronRight className="w-3.5 h-3.5 text-neutral-450 opacity-60 group-hover:text-white" />
+                                <ChevronRight className="w-3.5 h-3.5 text-neutral-450 opacity-60 group-hover:text-white transition-all duration-300 group-hover:translate-x-0.5" />
                               </button>
 
                               {/* Option 2: Register */}
@@ -1737,13 +2620,13 @@ export default function Header({
                                   setProfileDropdownOpenMobile(false);
                                 }}
                                 style={{ minHeight: '44px' }}
-                                className="w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold text-neutral-750 dark:text-slate-200 hover:text-white hover:bg-gradient-to-r hover:from-[#8B5CF6] hover:to-[#EC4899] transition-all duration-200 cursor-pointer flex items-center justify-between group active:scale-95"
+                                className="w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold text-[#0F172A] dark:text-slate-200 hover:text-white hover:bg-gradient-to-r hover:from-[#4F46E5] hover:to-[#06B6D4] hover:shadow-[0_8px_20px_rgba(79,70,229,0.25)] hover:-translate-y-0.5 transition-all duration-300 cursor-pointer flex items-center justify-between group active:scale-95"
                               >
                                 <div className="flex items-center gap-2">
                                   <span className="transition-transform group-hover:scale-115">📝</span>
-                                  <span>{language === 'bn' ? 'নিবন্ধন করুন' : 'Registerer'}</span>
+                                  <span>{language === 'bn' ? 'নিবন্ধন করুন' : 'Register'}</span>
                                 </div>
-                                <ChevronRight className="w-3.5 h-3.5 text-neutral-450 opacity-60 group-hover:text-white" />
+                                <ChevronRight className="w-3.5 h-3.5 text-neutral-450 opacity-60 group-hover:text-white transition-all duration-300 group-hover:translate-x-0.5" />
                               </button>
                             </div>
                           </motion.div>
@@ -1755,11 +2638,16 @@ export default function Header({
 
                 {/* Mobile hamburger menu toggle */}
                 <button
-                  className="p-1.5 h-8 w-8 rounded-lg bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-700 transition cursor-pointer flex items-center justify-center"
                   onClick={() => setMobileMenuOpen(true)}
+                  className="p-2 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-650 dark:text-cyan-400 rounded-xl border border-indigo-100/30 dark:border-indigo-900/15 focus:outline-none transition-all duration-300 active:scale-95 cursor-pointer flex items-center justify-center group"
                   aria-label="Open Mobile Menu"
                 >
-                  <Menu className="h-4.5 w-4.5 stroke-[2.5]" />
+                  {/* Premium Asymmetrical Interactive Mini Hamburger Indicator */}
+                  <div className="flex flex-col gap-1 w-5 h-5 justify-center items-center">
+                    <span className="w-5 h-0.5 bg-gradient-to-r from-indigo-600 via-indigo-500 to-indigo-700 dark:from-cyan-400 dark:via-teal-300 dark:to-cyan-400 rounded-full transition-all duration-300 group-hover:w-3.5" />
+                    <span className="w-3.5 h-0.5 bg-gradient-to-r from-indigo-500 via-indigo-600 to-indigo-700 dark:from-cyan-300 dark:via-teal-300 dark:to-cyan-400 rounded-full transition-all duration-300 mr-auto group-hover:w-5" />
+                    <span className="w-4.5 h-0.5 bg-gradient-to-r from-indigo-600 via-indigo-500 to-indigo-700 dark:from-cyan-400 dark:via-teal-300 dark:to-cyan-400 rounded-full transition-all duration-300 mr-auto" />
+                  </div>
                 </button>
               </div>
 
@@ -1784,16 +2672,16 @@ export default function Header({
               className="absolute inset-0 bg-neutral-950/80 backdrop-blur-xs transition-opacity cursor-pointer duration-300"
             />
 
-            {/* Sliding Drawer element (Width: 85% Screen Width) */}
+            {/* Sliding Drawer element (Width: 85% Screen Width) with Premium Glassmorphism & Gradient Background */}
             <motion.div 
               initial={{ x: '-100%' }}
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
               transition={{ type: 'spring', damping: 26, stiffness: 210 }}
-              className="relative w-[85%] max-w-[340px] h-full bg-slate-50 dark:bg-[#0F172A] border-r border-neutral-205 dark:border-slate-800 text-neutral-850 dark:text-neutral-100 flex flex-col shadow-2xl overflow-hidden"
+              className="relative w-[85%] max-w-[340px] h-full bg-gradient-to-br from-[#4F46E5]/95 via-[#1E1B4B]/98 to-[#06B6D4]/95 text-white flex flex-col shadow-[25px_0_60px_rgba(79,70,229,0.35)] border-r border-white/20 overflow-hidden backdrop-blur-2xl"
             >
               {/* Top Row: Logo & Close Toggle */}
-              <div className="p-4 border-b border-neutral-200/60 dark:border-slate-800 bg-white dark:bg-[#0F172A]/85 backdrop-blur-sm flex items-center justify-between">
+              <div className="p-4 border-b border-white/10 bg-white/5 backdrop-blur-md flex items-center justify-between">
                 <div 
                   className="flex items-center space-x-1.5 cursor-pointer"
                   onClick={() => {
@@ -1801,14 +2689,14 @@ export default function Header({
                     setMobileMenuOpen(false);
                   }}
                 >
-                  <div className="p-1 px-1.5 bg-gradient-to-tr from-blue-600 to-cyan-500 rounded-lg text-white">
+                  <div className="p-1 px-1.5 bg-white text-[#4F46E5] rounded-lg font-black animate-pulse shadow-md">
                     <Globe className="h-4 w-4 stroke-[2.5]" />
                   </div>
                   <div className="flex flex-col text-left">
-                    <span className="text-[11px] font-black tracking-tight bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent dark:from-blue-400 dark:to-cyan-400">
+                    <span className="text-[11px] font-black tracking-tight text-white">
                       WebzoneBD
                     </span>
-                    <span className="text-[6.5px] uppercase tracking-wider font-mono text-neutral-500 dark:text-neutral-450 font-black">
+                    <span className="text-[6.5px] uppercase tracking-wider font-mono text-cyan-200/80 font-black">
                       IT Solution
                     </span>
                   </div>
@@ -1816,73 +2704,82 @@ export default function Header({
 
                 <button
                   onClick={() => setMobileMenuOpen(false)}
-                  className="p-1.5 bg-neutral-100 hover:bg-neutral-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white rounded-lg border border-neutral-200 dark:border-slate-700 transition cursor-pointer"
+                  className="p-1.5 bg-white/10 hover:bg-white/20 text-white rounded-lg border border-white/10 transition duration-300 cursor-pointer hover:scale-105"
                   aria-label="Close Sidebar"
                 >
-                  <X className="h-4.5 w-4.5" />
+                  <X className="h-4 w-4" />
                 </button>
               </div>
 
               {/* Sidebar Header Block with Client Profile Onboarding */}
-              <div className="p-4 border-b border-neutral-200/60 dark:border-slate-800 bg-neutral-50/80 dark:bg-[#0F172A]/40 flex flex-col gap-3">
+              <div className="p-4 border-b border-white/10 bg-white/5 flex flex-col gap-3">
                 {/* 2. Client Profile / Onboarding Block */}
                 <div>
                   {user ? (
-                    <div className="p-3 bg-gradient-to-tr from-neutral-50 to-neutral-100 dark:from-slate-900 dark:to-[#0b1324] border border-neutral-250 dark:border-emerald-500/20 rounded-2xl shadow-md space-y-3">
+                    <div className="p-3 bg-white/10 border border-white/15 rounded-2xl shadow-lg shadow-indigo-950/20 space-y-3">
                       <div className="flex items-center gap-2.5">
                         <div className="relative">
                           {user.avatar ? (
                             <img 
                               src={user.avatar} 
                               alt="Profile" 
-                              className="w-10 h-10 rounded-xl object-cover ring-2 ring-emerald-500/30"
+                              className="w-10 h-10 rounded-xl object-cover ring-2 ring-cyan-300/40"
                               referrerPolicy="no-referrer"
                             />
                           ) : (
-                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-cyan-400 text-slate-950 font-black flex items-center justify-center text-sm uppercase">
+                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-500 text-white font-black flex items-center justify-center text-sm uppercase shadow-sm">
                               {user.name.slice(0, 2)}
                             </div>
                           )}
-                          <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-white dark:border-[#070b13] rounded-full animate-pulse" />
+                          <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-400 border-2 border-indigo-600 rounded-full animate-pulse" />
                         </div>
                         <div className="text-left flex-1 min-w-0">
-                          <p className="font-extrabold text-xs text-neutral-900 dark:text-white truncate leading-tight">{user.name}</p>
-                          <p className="text-[9px] font-mono text-emerald-600 dark:text-emerald-400 uppercase tracking-widest mt-0.5 font-bold">
-                            👑 {user.role === 'admin' ? 'SYSTEM ADMIN' : 'PREMIUM MEMBER'}
+                          <p className="font-extrabold text-xs text-white truncate leading-tight">{user.name}</p>
+                          <p className="text-[9px] font-mono text-cyan-300 uppercase tracking-widest mt-0.5 font-bold flex items-center gap-1">
+                            <span>👑</span>
+                            <span>{(user.role === 'admin' || user.role === 'super_admin') ? 'SYSTEM ADMIN' : 'PREMIUM MEMBER'}</span>
                           </p>
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-2 pt-1.5 border-t border-neutral-200 dark:border-slate-800">
+                       <div className="grid grid-cols-2 gap-2 pt-1.5 border-t border-white/10">
                         <button
                           onClick={() => {
-                            localStorage.setItem('webzone_dashboard_active_tab', 'profile');
-                            setCurrentPage('dashboard');
+                            if (user.role === 'admin' || user.role === 'super_admin') {
+                              setCurrentPage('admin');
+                            } else {
+                              localStorage.setItem('webzone_dashboard_active_tab', 'profile');
+                              setCurrentPage('dashboard');
+                            }
                             setMobileMenuOpen(false);
                           }}
-                          className="py-1.5 px-3 bg-neutral-200 hover:bg-neutral-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-neutral-800 dark:text-neutral-200 text-[10px] font-bold rounded-xl cursor-pointer text-center transition"
+                          className="py-1.5 px-3 bg-white/10 hover:bg-white/20 text-white text-[10px] font-extrabold rounded-xl cursor-pointer text-center transition duration-300 border border-white/10 hover:scale-[1.03] shadow-sm"
                         >
                           {language === 'bn' ? 'অ্যাকাউন্ট সেটিংস' : 'Account Settings'}
                         </button>
                         <button
                           onClick={() => {
-                            localStorage.setItem('webzone_dashboard_active_tab', 'wallet-funds');
-                            setCurrentPage('dashboard');
+                            if (user.role === 'admin' || user.role === 'super_admin') {
+                              setCurrentPage('admin');
+                            } else {
+                              localStorage.setItem('webzone_dashboard_active_tab', 'wallet-funds');
+                              setCurrentPage('dashboard');
+                            }
                             setMobileMenuOpen(false);
                           }}
-                          className="py-1.5 px-3 bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold rounded-xl cursor-pointer text-center shadow-md transition"
+                          className="py-1.5 px-3 bg-white hover:bg-slate-100 text-[#4F46E5] text-[10px] font-extrabold rounded-xl cursor-pointer text-center shadow-lg shadow-indigo-950/20 transition duration-300 hover:scale-[1.03]"
                         >
                           {language === 'bn' ? 'ব্যালেন্স' : 'Balance'}
                         </button>
                       </div>
                     </div>
                   ) : (
-                    <div className="p-3 bg-gradient-to-br from-blue-600/5 to-cyan-500/10 border border-blue-500/15 rounded-2xl text-left space-y-2.5 shadow-sm">
+                    <div className="p-3 bg-white/10 border border-white/15 rounded-2xl text-left space-y-2.5 shadow-lg shadow-indigo-950/20">
                       <div className="flex items-center justify-between">
-                        <span className="text-[10px] uppercase font-mono font-black text-blue-600 dark:text-cyan-400 tracking-wider">
+                        <span className="text-[10px] uppercase font-mono font-black text-cyan-300 tracking-wider">
                           {language === 'bn' ? 'কাস্টমার জোন' : 'Client Hub Portal'}
                         </span>
-                        <span className="bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-cyan-300 text-[8px] font-black uppercase rounded px-1.5 py-0.5">
+                        <span className="bg-white/20 text-white text-[8px] font-black uppercase rounded px-1.5 py-0.5 border border-white/10">
                           SECURE
                         </span>
                       </div>
@@ -1893,7 +2790,7 @@ export default function Header({
                             onLoginClick('login');
                             setMobileMenuOpen(false);
                           }}
-                          className="flex items-center justify-center gap-1 py-1.5 px-2 bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-black text-[11px] rounded-xl shadow-md cursor-pointer hover:opacity-90 transition"
+                          className="flex items-center justify-center gap-1 py-1.5 px-2 bg-white text-[#4F46E5] font-black text-[11px] rounded-xl shadow-lg hover:bg-slate-100 transition duration-300 hover:scale-[1.03] cursor-pointer"
                         >
                           <Key className="w-3.5 h-3.5" />
                           <span>{language === 'bn' ? 'লগইন' : 'Login'}</span>
@@ -1903,32 +2800,20 @@ export default function Header({
                             onLoginClick('register');
                             setMobileMenuOpen(false);
                           }}
-                          className="py-1.5 px-2 border border-neutral-250 dark:border-slate-700 hover:bg-neutral-100 dark:hover:bg-slate-800 text-neutral-700 dark:text-neutral-200 text-[11px] font-bold rounded-xl cursor-pointer text-center transition"
+                          className="py-1.5 px-2 border border-white/20 hover:bg-white/10 text-white text-[11px] font-bold rounded-xl cursor-pointer text-center transition duration-300 hover:scale-[1.03]"
                         >
                           {language === 'bn' ? 'নিবন্ধন' : 'Register'}
                         </button>
                       </div>
-
-                      <button
-                        onClick={() => {
-                          onLoginClick('register', 'affiliate');
-                          setMobileMenuOpen(false);
-                        }}
-                        className="w-full py-2 bg-gradient-to-r from-[#10B981] to-[#06B6D4] text-slate-950 font-black text-[10px] uppercase tracking-wider rounded-xl shadow-sm cursor-pointer hover:opacity-90 transition flex items-center justify-center gap-1.5"
-                      >
-                        <Coins className="w-3.5 h-3.5" />
-                        <span>{language === 'bn' ? 'অ্যাফিলিয়েট পার্টনার' : 'Partner Affiliate Program'}</span>
-                      </button>
                     </div>
                   )}
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-4 space-y-4 font-sans text-left dynamic-sidebar-scroller bg-white dark:bg-[#0F172A] text-neutral-850 dark:text-neutral-250">
-                
+              <div className="flex-1 overflow-y-auto p-4 space-y-4 font-sans text-left dynamic-sidebar-scroller bg-transparent text-white">
                 {/* Standard Links & Custom Dropdowns */}
                 <div className="space-y-1">
-                  <span className="text-[9px] uppercase tracking-widest text-neutral-450 dark:text-neutral-500 font-mono font-bold block px-2 mb-2">Webzone Navigator</span>
+                  <span className="text-[9px] uppercase tracking-widest text-white/50 font-mono font-bold block px-2 mb-2">Webzone Navigator</span>
 
                   {/* Home */}
                   <button
@@ -1936,29 +2821,56 @@ export default function Header({
                       setCurrentPage('home');
                       setMobileMenuOpen(false);
                     }}
-                    className={`flex items-center gap-3 w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                    className={`flex items-center gap-3 w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold transition-all duration-300 hover:scale-[1.02] cursor-pointer shadow-sm ${
                       currentPage === 'home'
-                        ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-extrabold shadow-md shadow-blue-500/10 border-none'
-                        : 'text-neutral-600 dark:text-neutral-300 hover:text-blue-600 dark:hover:text-cyan-400 hover:bg-neutral-100 dark:hover:bg-slate-800/40'
+                        ? 'bg-white/20 text-white font-extrabold border border-white/25 shadow-lg'
+                        : 'text-white/80 hover:text-white hover:bg-white/10'
                     }`}
                   >
-                    <Globe2 className={`w-4 h-4 ${currentPage === 'home' ? 'text-white' : 'text-blue-500 dark:text-cyan-400'}`} />
+                    <Globe className={`w-4 h-4 ${currentPage === 'home' ? 'text-white' : 'text-cyan-200'}`} />
                     <span>Home</span>
+                  </button>
+
+                  {/* Marketplace Direct Nav Link without category submenu */}
+                  <button
+                    onClick={() => {
+                      if (setSearchTerm) {
+                        setSearchTerm('');
+                      }
+                      localStorage.removeItem('webzone_target_marketplace_search_keyword_cache');
+                      window.dispatchEvent(new Event('storage'));
+                      setCurrentPage('marketplace');
+                      setMobileMenuOpen(false);
+                    }}
+                    className={`flex items-center gap-3 w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold transition-all duration-300 hover:scale-[1.02] cursor-pointer shadow-sm ${
+                      currentPage === 'marketplace'
+                        ? 'bg-white/20 text-white font-extrabold border border-white/25 shadow-lg'
+                        : 'text-white/80 hover:text-white hover:bg-white/10'
+                    }`}
+                  >
+                    <Sparkles className={`w-4 h-4 ${currentPage === 'marketplace' ? 'text-white' : 'text-cyan-200'}`} />
+                    <span>{language === 'bn' ? 'ডিজিটাল স্টোর' : language === 'ar' ? 'المتجر الرقمي' : 'Digital Store'}</span>
                   </button>
 
                   {/* Hosting Accordion expandable */}
                   <div className="space-y-1">
                     <button
                       onClick={() => toggleAccordion('hosting')}
-                      className={`flex items-center justify-between gap-3 w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                        currentPage === 'hosting' || expandedAccordion === 'hosting' ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-black shadow-md border-none' : 'text-neutral-600 dark:text-neutral-300 hover:text-blue-600 dark:hover:text-cyan-400 hover:bg-neutral-100 dark:hover:bg-slate-800/40'
+                      className={`flex items-center justify-between gap-3 w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold transition-all duration-300 hover:scale-[1.02] cursor-pointer shadow-sm ${
+                        currentPage === 'hosting' || expandedAccordion === 'hosting' 
+                          ? 'bg-white/20 text-white font-black border border-white/25 shadow-lg' 
+                          : 'text-white/80 hover:text-white hover:bg-white/10'
                       }`}
                     >
                       <span className="flex items-center gap-3">
-                        <Database className={`w-4 h-4 ${currentPage === 'hosting' || expandedAccordion === 'hosting' ? 'text-white' : 'text-blue-500 dark:text-cyan-400'}`} />
+                        <Database className={`w-4 h-4 ${currentPage === 'hosting' || expandedAccordion === 'hosting' ? 'text-white' : 'text-cyan-200'}`} />
                         <span>{t.hosting}</span>
                       </span>
-                      {expandedAccordion === 'hosting' ? <ChevronUp className={`w-3.5 h-3.5 ${currentPage === 'hosting' || expandedAccordion === 'hosting' ? 'text-white' : 'text-neutral-400'}`} /> : <ChevronDown className={`w-3.5 h-3.5 ${currentPage === 'hosting' || expandedAccordion === 'hosting' ? 'text-white' : 'text-neutral-400'}`} />}
+                      {expandedAccordion === 'hosting' ? (
+                        <ChevronUp className={`w-3.5 h-3.5 ${currentPage === 'hosting' || expandedAccordion === 'hosting' ? 'text-white' : 'text-white/60'}`} />
+                      ) : (
+                        <ChevronDown className={`w-3.5 h-3.5 ${currentPage === 'hosting' || expandedAccordion === 'hosting' ? 'text-white' : 'text-white/60'}`} />
+                      )}
                     </button>
                     <AnimatePresence>
                       {expandedAccordion === 'hosting' && (
@@ -1973,7 +2885,7 @@ export default function Header({
                               setCurrentPage('domain');
                               setMobileMenuOpen(false);
                             }}
-                            className="block w-full text-left py-2 px-2 text-[11px] text-neutral-500 dark:text-neutral-400 hover:text-blue-650 dark:hover:text-emerald-400 border-l border-neutral-200 dark:border-slate-800 pl-3 font-semibold hover:border-blue-500 dark:hover:border-emerald-500 transition cursor-pointer"
+                            className="block w-full text-left py-2 px-2 text-[11px] text-white/70 hover:text-white border-l border-white/10 pl-3 font-semibold hover:border-white transition duration-300 hover:scale-[1.02] cursor-pointer"
                           >
                             {language === 'bn' ? 'ডোমেন রেজিস্ট্রেশন' : 'Domain Registration'}
                           </button>
@@ -1984,7 +2896,7 @@ export default function Header({
                               setCurrentPage('hosting');
                               setMobileMenuOpen(false);
                             }}
-                            className="block w-full text-left py-2 px-2 text-[11px] text-neutral-500 dark:text-neutral-400 hover:text-blue-650 dark:hover:text-emerald-400 border-l border-neutral-200 dark:border-slate-800 pl-3 font-semibold hover:border-blue-500 dark:hover:border-emerald-500 transition cursor-pointer"
+                            className="block w-full text-left py-2 px-2 text-[11px] text-white/70 hover:text-white border-l border-white/10 pl-3 font-semibold hover:border-white transition duration-300 hover:scale-[1.02] cursor-pointer"
                           >
                             {t.hostingShared}
                           </button>
@@ -1995,7 +2907,7 @@ export default function Header({
                               setCurrentPage('hosting');
                               setMobileMenuOpen(false);
                             }}
-                            className="block w-full text-left py-2 px-2 text-[11px] text-neutral-500 dark:text-neutral-400 hover:text-blue-650 dark:hover:text-emerald-400 border-l border-neutral-200 dark:border-slate-800 pl-3 font-semibold hover:border-blue-500 dark:hover:border-emerald-500 transition cursor-pointer"
+                            className="block w-full text-left py-2 px-2 text-[11px] text-white/70 hover:text-white border-l border-white/10 pl-3 font-semibold hover:border-white transition duration-300 hover:scale-[1.02] cursor-pointer"
                           >
                             {t.hostingVps}
                           </button>
@@ -2006,7 +2918,7 @@ export default function Header({
                               setCurrentPage('hosting');
                               setMobileMenuOpen(false);
                             }}
-                            className="block w-full text-left py-2 px-2 text-[11px] text-neutral-500 dark:text-neutral-400 hover:text-blue-650 dark:hover:text-emerald-400 border-l border-neutral-200 dark:border-slate-800 pl-3 font-semibold hover:border-blue-500 dark:hover:border-emerald-500 transition cursor-pointer"
+                            className="block w-full text-left py-2 px-2 text-[11px] text-white/70 hover:text-white border-l border-white/10 pl-3 font-semibold hover:border-white transition duration-300 hover:scale-[1.02] cursor-pointer"
                           >
                             {t.hostingReseller}
                           </button>
@@ -2016,7 +2928,7 @@ export default function Header({
                   </div>
 
                   {/* Services - Direct Button Link with Expandable Sub-options */}
-                  <div className="space-y-1 bg-neutral-50/40 dark:bg-slate-900/10 p-1.5 rounded-2xl border border-neutral-200/40 dark:border-slate-800/20">
+                  <div className="space-y-1 bg-white/5 p-1.5 rounded-2xl border border-white/10 shadow-inner">
                     <button
                       onClick={() => {
                         localStorage.setItem('webzone_target_services_tab', 'all');
@@ -2025,16 +2937,16 @@ export default function Header({
                         setCurrentPage('services');
                         setMobileMenuOpen(false);
                       }}
-                      className={`flex items-center gap-3 w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      className={`flex items-center gap-3 w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold transition-all duration-300 hover:scale-[1.02] cursor-pointer shadow-sm ${
                         currentPage === 'services'
-                          ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-extrabold shadow-md shadow-blue-500/10 border-none'
-                          : 'text-neutral-600 dark:text-neutral-300 hover:text-blue-600 dark:hover:text-cyan-400 hover:bg-neutral-100 dark:hover:bg-slate-800/40'
+                          ? 'bg-white/20 text-white font-extrabold border border-white/25 shadow-lg'
+                          : 'text-white/80 hover:text-white hover:bg-white/10'
                       }`}
                     >
-                      <Laptop className={`w-4 h-4 ${currentPage === 'services' ? 'text-white' : 'text-blue-500 dark:text-cyan-400'}`} />
+                      <Laptop className={`w-4 h-4 ${currentPage === 'services' ? 'text-white' : 'text-cyan-200'}`} />
                       <span>{t.services}</span>
                     </button>
-                    <div className="pl-6 pt-1.5 pb-2.5 flex flex-col gap-2.5 text-[11px] font-black text-neutral-500 dark:text-neutral-300">
+                    <div className="pl-6 pt-1.5 pb-2.5 flex flex-col gap-2.5 text-[11px] font-black text-white/80">
                       <button 
                         onClick={() => {
                           localStorage.setItem('webzone_target_services_tab', 'digital-web-dev');
@@ -2042,7 +2954,7 @@ export default function Header({
                           setCurrentPage('services');
                           setMobileMenuOpen(false);
                         }}
-                        className="text-left font-black hover:text-blue-600 dark:hover:text-cyan-455 transition flex items-center gap-1.5 animate-pulse cursor-pointer"
+                        className="text-left font-semibold hover:text-white transition duration-300 flex items-center gap-1.5 hover:scale-[1.02] cursor-pointer"
                       >
                         <span>🚀</span>
                         <span>{language === 'bn' ? 'ডিজিটাল ওয়েব ডেভেলপমেন্ট' : 'Digital Web Development'}</span>
@@ -2054,7 +2966,7 @@ export default function Header({
                           setCurrentPage('services');
                           setMobileMenuOpen(false);
                         }}
-                        className="text-left font-black hover:text-blue-600 dark:hover:text-cyan-455 transition flex items-center gap-1.5 cursor-pointer"
+                        className="text-left font-semibold hover:text-white transition duration-300 flex items-center gap-1.5 hover:scale-[1.02] cursor-pointer"
                       >
                         <span>📍</span>
                         <span>{language === 'bn' ? 'গুগল মাই বিজনেস সেটআপ' : 'Google Business Setup'}</span>
@@ -2066,7 +2978,7 @@ export default function Header({
                           setCurrentPage('services');
                           setMobileMenuOpen(false);
                         }}
-                        className="text-left font-black hover:text-blue-600 dark:hover:text-cyan-455 transition flex items-center gap-1.5 cursor-pointer"
+                        className="text-left font-semibold hover:text-white transition duration-300 flex items-center gap-1.5 hover:scale-[1.02] cursor-pointer"
                       >
                         <span>📈</span>
                         <span>{language === 'bn' ? 'বিজনেস গ্রোথ প্যাকেজ' : 'Business Growth Package'}</span>
@@ -2074,66 +2986,24 @@ export default function Header({
                     </div>
                   </div>
 
-                  {/* Marketplace Accordion expandable */}
-                  <div className="space-y-1">
-                    <button
-                      onClick={() => toggleAccordion('marketplace')}
-                      className={`flex items-center justify-between gap-3 w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                        currentPage === 'marketplace' || expandedAccordion === 'marketplace'
-                          ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-black shadow-md border-none'
-                          : 'text-neutral-600 dark:text-neutral-300 hover:text-blue-600 dark:hover:text-cyan-400 hover:bg-neutral-100 dark:hover:bg-slate-800/40'
-                      }`}
-                    >
-                      <span className="flex items-center gap-3">
-                        <Sparkles className={`w-4 h-4 ${currentPage === 'marketplace' || expandedAccordion === 'marketplace' ? 'text-white' : 'text-blue-505 dark:text-cyan-400'}`} />
-                        <span>{language === 'bn' ? 'ডিজিটাল স্টোর' : language === 'ar' ? 'المتجر الرقمي' : 'Digital Store'}</span>
-                      </span>
-                      {expandedAccordion === 'marketplace' ? (
-                        <ChevronUp className={`w-3.5 h-3.5 ${currentPage === 'marketplace' || expandedAccordion === 'marketplace' ? 'text-white' : 'text-neutral-400'}`} />
-                      ) : (
-                        <ChevronDown className={`w-3.5 h-3.5 ${currentPage === 'marketplace' || expandedAccordion === 'marketplace' ? 'text-white' : 'text-neutral-400'}`} />
-                      )}
-                    </button>
-                    <AnimatePresence>
-                      {expandedAccordion === 'marketplace' && (
-                        <motion.div
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: 'auto', opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          className="pl-7 pr-3 space-y-1 overflow-hidden"
-                        >
-                          {marketplaceList.map((mkt, idx) => (
-                            <button
-                              key={idx}
-                              onClick={() => handleMobileSubitemClick(mkt, 'marketplace')}
-                              className="block w-full text-left py-2 px-2 text-[11px] text-neutral-500 dark:text-neutral-400 hover:text-blue-600 dark:hover:text-emerald-450 border-l border-neutral-200 dark:border-slate-800 pl-3 font-semibold hover:border-blue-500 dark:hover:border-emerald-500 transition"
-                            >
-                              {mkt.title}
-                            </button>
-                          ))}
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-
                   {/* Solutions Accordion expandable */}
                   <div className="space-y-1">
                     <button
                       onClick={() => toggleAccordion('solutions')}
-                      className={`flex items-center justify-between gap-3 w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      className={`flex items-center justify-between gap-3 w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold transition-all duration-300 hover:scale-[1.02] cursor-pointer shadow-sm ${
                         currentPage === 'solutions' || expandedAccordion === 'solutions'
-                          ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-black shadow-md border-none'
-                          : 'text-neutral-600 dark:text-neutral-300 hover:text-blue-600 dark:hover:text-cyan-400 hover:bg-neutral-100 dark:hover:bg-slate-800/40'
+                          ? 'bg-white/20 text-white font-black border border-white/25 shadow-lg'
+                          : 'text-white/80 hover:text-white hover:bg-white/10'
                       }`}
                     >
                       <span className="flex items-center gap-3">
-                        <Layers className={`w-4 h-4 ${currentPage === 'solutions' || expandedAccordion === 'solutions' ? 'text-white' : 'text-blue-505 dark:text-cyan-400'}`} />
+                        <Layers className={`w-4 h-4 ${currentPage === 'solutions' || expandedAccordion === 'solutions' ? 'text-white' : 'text-cyan-200'}`} />
                         <span>Solutions</span>
                       </span>
                       {expandedAccordion === 'solutions' ? (
-                        <ChevronUp className={`w-3.5 h-3.5 ${currentPage === 'solutions' || expandedAccordion === 'solutions' ? 'text-white' : 'text-neutral-400'}`} />
+                        <ChevronUp className={`w-3.5 h-3.5 ${currentPage === 'solutions' || expandedAccordion === 'solutions' ? 'text-white' : 'text-white/60'}`} />
                       ) : (
-                        <ChevronDown className={`w-3.5 h-3.5 ${currentPage === 'solutions' || expandedAccordion === 'solutions' ? 'text-white' : 'text-neutral-400'}`} />
+                        <ChevronDown className={`w-3.5 h-3.5 ${currentPage === 'solutions' || expandedAccordion === 'solutions' ? 'text-white' : 'text-white/60'}`} />
                       )}
                     </button>
                     <AnimatePresence>
@@ -2148,7 +3018,7 @@ export default function Header({
                             <button
                               key={index}
                               onClick={() => handleMobileSubitemClick(sol, 'solution')}
-                              className="block w-full text-left py-2 px-2 text-[11px] text-neutral-500 dark:text-neutral-400 hover:text-blue-600 dark:hover:text-emerald-400 border-l border-neutral-200 dark:border-slate-800 pl-3 font-semibold hover:border-blue-505 dark:hover:border-emerald-500 transition"
+                              className="block w-full text-left py-2 px-2 text-[11px] text-white/70 hover:text-white border-l border-white/10 pl-3 font-semibold hover:border-white transition duration-300 hover:scale-[1.02] cursor-pointer"
                             >
                               {sol.title}
                             </button>
@@ -2164,13 +3034,13 @@ export default function Header({
                       setCurrentPage('portfolio');
                       setMobileMenuOpen(false);
                     }}
-                    className={`flex items-center gap-3 w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                    className={`flex items-center gap-3 w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold transition-all duration-300 hover:scale-[1.02] cursor-pointer shadow-sm ${
                       currentPage === 'portfolio'
-                        ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-extrabold shadow-md shadow-blue-500/10 border-none'
-                        : 'text-neutral-600 dark:text-neutral-300 hover:text-blue-600 dark:hover:text-cyan-400 hover:bg-neutral-100 dark:hover:bg-slate-800/40'
+                        ? 'bg-white/20 text-white font-extrabold border border-white/25 shadow-lg'
+                        : 'text-white/80 hover:text-white hover:bg-white/10'
                     }`}
                   >
-                    <Briefcase className={`w-4 h-4 ${currentPage === 'portfolio' ? 'text-white' : 'text-blue-500 dark:text-cyan-400'}`} />
+                    <Briefcase className={`w-4 h-4 ${currentPage === 'portfolio' ? 'text-white' : 'text-cyan-200'}`} />
                     <span>Portfolio</span>
                   </button>
 
@@ -2180,13 +3050,13 @@ export default function Header({
                       setCurrentPage('blog');
                       setMobileMenuOpen(false);
                     }}
-                    className={`flex items-center gap-3 w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                    className={`flex items-center gap-3 w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold transition-all duration-300 hover:scale-[1.02] cursor-pointer shadow-sm ${
                       currentPage === 'blog'
-                        ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-extrabold shadow-md shadow-blue-500/10 border-none'
-                        : 'text-neutral-600 dark:text-neutral-300 hover:text-blue-600 dark:hover:text-cyan-400 hover:bg-neutral-100 dark:hover:bg-slate-800/40'
+                        ? 'bg-white/20 text-white font-extrabold border border-white/25 shadow-lg'
+                        : 'text-white/80 hover:text-white hover:bg-white/10'
                     }`}
                   >
-                    <BookOpen className={`w-4 h-4 ${currentPage === 'blog' ? 'text-white' : 'text-blue-500 dark:text-cyan-400'}`} />
+                    <BookOpen className={`w-4 h-4 ${currentPage === 'blog' ? 'text-white' : 'text-cyan-200'}`} />
                     <span>Blog</span>
                   </button>
 
@@ -2196,13 +3066,13 @@ export default function Header({
                       setCurrentPage('affiliate');
                       setMobileMenuOpen(false);
                     }}
-                    className={`flex items-center gap-3 w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                    className={`flex items-center gap-3 w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold transition-all duration-300 hover:scale-[1.02] cursor-pointer shadow-sm ${
                       currentPage === 'affiliate'
-                        ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-extrabold shadow-md shadow-blue-500/10 border-none'
-                        : 'text-neutral-600 dark:text-neutral-300 hover:text-blue-600 dark:hover:text-cyan-400 hover:bg-neutral-100 dark:hover:bg-slate-800/40'
+                        ? 'bg-white/20 text-white font-extrabold border border-white/25 shadow-lg'
+                        : 'text-white/80 hover:text-white hover:bg-white/10'
                     }`}
                   >
-                    <Coins className={`w-4 h-4 ${currentPage === 'affiliate' ? 'text-white' : 'text-blue-500 dark:text-cyan-400'} animate-pulse`} />
+                    <Coins className={`w-4 h-4 ${currentPage === 'affiliate' ? 'text-white' : 'text-cyan-200'} animate-pulse`} />
                     <span>{language === 'bn' ? "অ্যাফিলিয়েট প্রোগ্রাম" : language === 'ar' ? "التسويق بالعمولة" : "Affiliate Program"}</span>
                   </button>
 
@@ -2212,26 +3082,26 @@ export default function Header({
                       setCurrentPage('contact');
                       setMobileMenuOpen(false);
                     }}
-                    className={`flex items-center gap-3 w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                    className={`flex items-center gap-3 w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold transition-all duration-300 hover:scale-[1.02] cursor-pointer shadow-sm ${
                       currentPage === 'contact'
-                        ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-extrabold shadow-md shadow-blue-500/10 border-none'
-                        : 'text-neutral-600 dark:text-neutral-300 hover:text-blue-600 dark:hover:text-cyan-400 hover:bg-neutral-100 dark:hover:bg-slate-800/40'
+                        ? 'bg-white/20 text-white font-extrabold border border-white/25 shadow-lg'
+                        : 'text-white/80 hover:text-white hover:bg-white/10'
                     }`}
                   >
-                    <Mail className={`w-4 h-4 ${currentPage === 'contact' ? 'text-white' : 'text-blue-500 dark:text-cyan-400'}`} />
+                    <Mail className={`w-4 h-4 ${currentPage === 'contact' ? 'text-white' : 'text-cyan-200'}`} />
                     <span>Contact</span>
                   </button>
                 </div>
 
                 {/* Hosting & Domain - Separate Highlights Block */}
                 <div className="pt-2">
-                  <div className="p-3 bg-gradient-to-br from-neutral-50 to-neutral-100 dark:from-emerald-950/40 dark:to-slate-900 border border-neutral-200 dark:border-emerald-400/25 rounded-2xl space-y-2.5 shadow-md">
+                  <div className="p-3 bg-white/10 border border-white/15 rounded-2xl space-y-2.5 shadow-lg shadow-indigo-950/20">
                     <div className="flex items-center justify-between px-1">
-                      <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-450 uppercase tracking-widest flex items-center gap-1">
-                        <Server className="w-3.5 h-3.5 text-blue-550 dark:text-cyan-400" />
+                      <span className="text-[10px] font-bold text-white uppercase tracking-widest flex items-center gap-1">
+                        <Server className="w-3.5 h-3.5 text-cyan-200" />
                         <span>Hosting & domains</span>
                       </span>
-                      <span className="bg-emerald-100/60 dark:bg-emerald-400/20 text-emerald-650 dark:text-emerald-400 text-[8px] font-black uppercase rounded-lg px-1.5 py-0.5 tracking-wider">Secure Hosting</span>
+                      <span className="bg-white/20 text-white text-[8px] font-black uppercase rounded-lg px-1.5 py-0.5 tracking-wider border border-white/10">Secure Hosting</span>
                     </div>
 
                     <div className="grid grid-cols-2 gap-1.5">
@@ -2239,7 +3109,7 @@ export default function Header({
                         <button
                           key={index}
                           onClick={() => handleMobileSubitemClick(hst, 'hosting')}
-                          className="py-1.5 px-2 bg-neutral-200/50 dark:bg-slate-950/60 rounded-lg text-[9.5px] font-bold border border-neutral-250/25 dark:border-slate-800 text-neutral-700 dark:text-neutral-350 hover:text-blue-600 dark:hover:text-white hover:border-blue-600/30 dark:hover:border-emerald-500/40 transition text-left truncate block"
+                          className="py-1.5 px-2 bg-white/5 rounded-lg text-[9.5px] font-bold border border-white/10 text-white/90 hover:text-white hover:bg-white/15 hover:border-white/20 transition-all duration-300 text-left truncate block cursor-pointer hover:scale-[1.02]"
                         >
                           {hst.title}
                         </button>
@@ -2249,18 +3119,18 @@ export default function Header({
                 </div>
 
                 {/* Premium Theme Switching section within drawer */}
-                <div className="pt-2 border-t border-neutral-200 dark:border-slate-800">
-                  <p className="text-[10px] text-neutral-500 dark:text-neutral-400 uppercase tracking-widest block mb-2 font-mono font-bold px-1 flex items-center gap-1">
-                    <Sun className="w-3 h-3 text-blue-500 dark:text-cyan-400" />
+                <div className="pt-2 border-t border-white/10">
+                  <p className="text-[10px] text-white/50 uppercase tracking-widest block mb-2 font-mono font-bold px-1 flex items-center gap-1">
+                    <Sun className="w-3 h-3 text-cyan-200" />
                     <span>Theme settings</span>
                   </p>
                   <div className="grid grid-cols-2 gap-1.5 font-sans text-[10px] font-extrabold">
                     <button 
                       onClick={() => setTheme('light')}
-                      className={`py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer duration-300 ${
+                      className={`py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer duration-300 hover:scale-[1.02] ${
                         theme === 'light' 
-                          ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-black shadow-lg shadow-blue-500/20' 
-                          : 'bg-neutral-100 hover:bg-neutral-200 dark:bg-slate-850 dark:hover:bg-slate-800 text-neutral-600 dark:text-neutral-400 hover:text-[#000] dark:hover:text-white'
+                          ? 'bg-white text-[#4F46E5] font-black shadow-lg shadow-indigo-950/25' 
+                          : 'bg-white/10 hover:bg-white/20 text-white border border-white/5'
                       }`}
                     >
                       <span className="text-[11px]">☀</span>
@@ -2268,10 +3138,10 @@ export default function Header({
                     </button>
                     <button 
                       onClick={() => setTheme('dark')}
-                      className={`py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer duration-300 ${
+                      className={`py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer duration-300 hover:scale-[1.02] ${
                         theme === 'dark' 
-                          ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-black shadow-lg shadow-blue-500/20' 
-                          : 'bg-neutral-100 hover:bg-neutral-200 dark:bg-slate-850 dark:hover:bg-slate-800 text-neutral-600 dark:text-neutral-400 hover:text-[#000] dark:hover:text-white'
+                          ? 'bg-white text-[#4F46E5] font-black shadow-lg shadow-indigo-950/25' 
+                          : 'bg-white/10 hover:bg-white/20 text-white border border-white/5'
                       }`}
                     >
                       <span className="text-[11px]">🌙</span>
@@ -2280,168 +3150,49 @@ export default function Header({
                   </div>
                 </div>
 
-                {/* Custom Language Switching section within drawer */}
-                <div className="pt-2 border-t border-neutral-200 dark:border-slate-800">
-                  <p className="text-[10px] text-neutral-500 dark:text-neutral-400 uppercase tracking-widest block mb-2 font-mono font-bold px-1 flex items-center gap-1">
-                    <Globe className="w-3 h-3 text-blue-500 dark:text-cyan-400" />
-                    <span>Language settings</span>
-                  </p>
-                  <div className="grid grid-cols-3 gap-1.5 font-sans text-[9px] font-bold">
-                    {[
-                      { code: 'en', flag: '🇺🇸', label: 'English' },
-                      { code: 'bn', flag: '🇧🇩', label: 'বাংলা' },
-                      { code: 'ar', flag: '🇸🇦', label: 'العربية' }
-                    ].map((lang) => (
-                      <button
-                        key={lang.code}
-                        onClick={() => setLanguage(lang.code as 'en' | 'bn' | 'ar')}
-                        className={`py-1.5 rounded-lg flex items-center justify-center gap-1 transition-all cursor-pointer ${
-                          language === lang.code 
-                            ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-black' 
-                            : 'bg-neutral-100 hover:bg-neutral-200 dark:bg-slate-850 dark:hover:bg-slate-800 text-neutral-600 dark:text-neutral-400 hover:text-[#000] dark:hover:text-white'
-                        }`}
-                      >
-                        <span>{lang.flag}</span>
-                        <span>{lang.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Custom Currency Switching section within drawer */}
-                <div className="pt-2 border-t border-neutral-200 dark:border-slate-800">
-                  <p className="text-[10px] text-neutral-500 dark:text-neutral-400 uppercase tracking-widest block mb-2 font-mono font-bold px-1 flex items-center gap-1">
-                    <Globe className="w-3 h-3 text-blue-500 dark:text-cyan-400" />
-                    <span>Currency settings</span>
-                  </p>
-                  <div className="grid grid-cols-3 gap-1.5 font-mono text-[9px] font-bold">
-                    {[
-                      { code: 'USD', flag: '🇺🇸', symbol: '$' },
-                      { code: 'BDT', flag: '🇧🇩', symbol: '৳' },
-                      { code: 'SAR', flag: '🇸🇦', symbol: 'ر.س' }
-                    ].filter(cur => {
-                      if (currencySettings && currencySettings.enabled) {
-                        return currencySettings.enabled[cur.code as Currency];
-                      }
-                      return true;
-                    }).map((cur) => (
-                      <button
-                        key={cur.code}
-                        onClick={() => setCurrency(cur.code as Currency)}
-                        className={`py-1.5 rounded-lg flex items-center justify-center gap-1 transition-all cursor-pointer ${
-                          currency === cur.code 
-                            ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white dark:from-emerald-500 dark:to-cyan-400 dark:text-slate-950 font-black' 
-                            : 'bg-neutral-100 hover:bg-neutral-200 dark:bg-slate-850 dark:hover:bg-slate-800 text-neutral-600 dark:text-neutral-400 hover:text-[#000] dark:hover:text-white'
-                        }`}
-                      >
-                        <span>{cur.flag}</span>
-                        <span>{cur.code}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Quick Action Navigation CTAs */}
-                <div className="grid grid-cols-1 gap-2 pt-2 border-t border-neutral-200 dark:border-slate-800">
-                  <p className="text-[10px] text-neutral-500 dark:text-neutral-400 uppercase tracking-widest block mb-1 font-mono font-bold px-1">Quick Actions</p>
-                  
-                  {/* Get Quote */}
-                  <button
-                    onClick={() => {
-                      setCurrentPage('contact');
-                      setMobileMenuOpen(false);
-                      setTimeout(() => {
-                        const el = document.getElementById('contact-form-card') || document.getElementById('contact-us-heading');
-                        if (el) el.scrollIntoView({ behavior: 'smooth' });
-                      }, 400);
-                    }}
-                    className="w-full py-2 bg-gradient-to-r from-cyan-600 to-emerald-600 text-white hover:opacity-90 transition rounded-xl text-xs font-extrabold shadow-sm text-center"
-                  >
-                    Get Quote
-                  </button>
-
-                  {/* Start Project */}
-                  <button
-                    onClick={() => {
-                      setCurrentPage('contact');
-                      setMobileMenuOpen(false);
-                      setTimeout(() => {
-                        const el = document.getElementById('contact-form-card') || document.getElementById('contact-us-heading');
-                        if (el) el.scrollIntoView({ behavior: 'smooth' });
-                      }, 400);
-                    }}
-                    className="w-full py-2 bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-805 border border-neutral-300 dark:border-slate-700 text-neutral-800 dark:text-white transition rounded-xl text-xs font-black text-center animate-none"
-                  >
-                    Start Project
-                  </button>
-
-                  {/* WhatsApp Support Live Chat */}
-                  <a
-                    href="https://wa.me/966570511931"
-                    target="_blank"
-                    referrerPolicy="no-referrer"
-                    className="w-full py-2 bg-emerald-500 text-slate-950 hover:bg-emerald-450 transition rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5"
-                  >
-                    <Smartphone className="w-3.5 h-3.5 shrink-0" />
-                    <span>WhatsApp Chat</span>
-                  </a>
-                </div>
-
-                {/* Footer Area inside Mobile Sidebar */}
-                <div className="pt-3 border-t border-neutral-200 dark:border-slate-800 space-y-2.5 text-neutral-500 dark:text-neutral-400 text-[10px]">
-                  <p className="font-mono text-[9px] uppercase font-bold tracking-widest text-neutral-500 dark:text-neutral-450">Company Contact</p>
-                  <div className="space-y-1 text-[10.5px]">
-                    <div className="flex items-center gap-1.5">
-                      <Mail className="w-3.5 h-3.5 text-blue-500 dark:text-cyan-400 shrink-0" />
-                      <a href="mailto:info@webzonebd.com" className="hover:text-blue-600 dark:hover:text-white transition">info@webzonebd.com</a>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <Phone className="w-3.5 h-3.5 text-blue-500 dark:text-cyan-400 shrink-0" />
-                      <a href="tel:+966570511931" className="hover:text-blue-600 dark:hover:text-white transition">+966570511931</a>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <Globe className="w-3.5 h-3.5 text-blue-500 dark:text-cyan-400 shrink-0" />
-                      <a href="https://www.webzonebd.com" className="hover:text-blue-600 dark:hover:text-white transition">www.webzonebd.com</a>
-                    </div>
-                  </div>
-
+                {/* Company Contact & Social Footer */}
+                <div className="pt-3 border-t border-white/10 space-y-2.5 text-white/55 text-[10px]">
                   {/* Social Icons links block */}
                   <div className="flex items-center gap-3 pt-1">
                     <a 
                       href="https://facebook.com" 
                       target="_blank" 
                       referrerPolicy="no-referrer"
-                      className="p-1.5 bg-neutral-100 hover:bg-neutral-200 dark:bg-slate-850 dark:hover:bg-slate-800 text-neutral-600 dark:text-neutral-300 hover:text-blue-600 hover:text-white rounded-lg transition"
+                      className="p-2 bg-white/10 hover:bg-[#1877F2] text-white rounded-xl transition-all duration-300 shadow-sm flex items-center justify-center cursor-pointer hover:scale-110 border border-white/10"
                       aria-label="Facebook Profile Link"
                     >
-                      <Facebook className="w-3.5 h-3.5 shrink-0" />
+                      <Facebook className="w-4 h-4 shrink-0" />
                     </a>
                     <a 
                       href="https://linkedin.com" 
                       target="_blank" 
                       referrerPolicy="no-referrer"
-                      className="p-1.5 bg-neutral-100 hover:bg-neutral-200 dark:bg-slate-850 dark:hover:bg-slate-800 text-neutral-600 dark:text-neutral-300 hover:text-blue-600 hover:text-white rounded-lg transition"
+                      className="p-2 bg-white/10 hover:bg-[#0A66C2] text-white rounded-xl transition-all duration-300 shadow-sm flex items-center justify-center cursor-pointer hover:scale-110 border border-white/10"
                       aria-label="LinkedIn Profile Link"
                     >
-                      <Linkedin className="w-3.5 h-3.5 shrink-0" />
+                      <Linkedin className="w-4 h-4 shrink-0" />
                     </a>
                     <a 
                       href="https://youtube.com" 
                       target="_blank" 
                       referrerPolicy="no-referrer"
-                      className="p-1.5 bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-600 dark:text-neutral-300 hover:text-blue-600 rounded-lg transition"
+                      className="p-2 bg-white/10 hover:bg-[#FF0000] text-white rounded-xl transition-all duration-300 shadow-sm flex items-center justify-center cursor-pointer hover:scale-110 border border-white/10"
                       aria-label="YouTube Profile Link"
                     >
-                      <Youtube className="w-3.5 h-3.5 shrink-0" />
+                      <Youtube className="w-4 h-4 shrink-0" />
                     </a>
                   </div>
 
-                  <p className="text-[8px] text-neutral-400 dark:text-neutral-505 pt-2 text-center border-t border-neutral-200 dark:border-slate-850 leading-normal">
+                  <p className="text-[8px] text-white/40 pt-2 text-center border-t border-white/10 leading-normal">
                     © {new Date().getFullYear()} WebzoneBD IT Solution. All codes clean validated secures.
                   </p>
                 </div>
 
               </div>
+
+              {/* Pin-to-Bottom Secure Admin Panel Login System Bar */}
+              <div className="hidden"></div>
+
             </motion.div>
           </div>
         )}
@@ -2742,133 +3493,318 @@ export default function Header({
                   )}
 
                   {/* VIEW 2: REGISTER FORM */}
-                  {drawerAuthView === 'register' && (
-                    <div className="space-y-3.5 text-left animate-in duration-200 slide-in-from-right-3">
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block font-mono">Client Full Name</label>
-                        <div className="relative">
-                          <span className="absolute left-3 top-2.5 text-neutral-400">
-                            <User className="w-4 h-4" />
-                          </span>
-                          <input
-                            type="text"
-                            placeholder="e.g. Asif Rahman"
-                            value={custFullName}
-                            onChange={(e) => setCustFullName(e.target.value)}
-                            className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-2 pl-9 rounded-xl text-xs font-bold text-neutral-900 dark:text-white focus:ring-1 focus:ring-emerald-500 focus:outline-none"
-                          />
-                        </div>
-                      </div>
+                  {drawerAuthView === 'register' && (() => {
+                    // Internal evaluation values
+                    const fullNameError = (() => {
+                      if (!custFullNameTouched) return '';
+                      const sanitized = custFullName.replace(/<[^>]*>?/gm, '').replace(/\s{2,}/g, ' ');
+                      if (!sanitized || sanitized.trim() === '') return 'Full Name is required.';
+                      if (sanitized.length < 2) return 'Full Name must be at least 2 characters.';
+                      if (sanitized.length > 100) return 'Full Name must be at most 100 characters.';
+                      if (!/^[A-Za-z\s]+$/.test(sanitized)) return 'Full Name must contain letters and spaces only.';
+                      return '';
+                    })();
 
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block font-mono">Email Address</label>
-                        <div className="relative">
-                          <span className="absolute left-3 top-2.5 text-neutral-400">
-                            <Mail className="w-4 h-4" />
-                          </span>
-                          <input
-                            type="email"
-                            placeholder="asif@example.com"
-                            value={custEmail}
-                            onChange={(e) => setCustEmail(e.target.value)}
-                            className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-2 pl-9 rounded-xl text-xs font-bold text-neutral-900 dark:text-white focus:ring-1 focus:ring-emerald-500 focus:outline-none"
-                          />
-                        </div>
-                      </div>
+                    const emailError = (() => {
+                      if (!custEmailTouched) return '';
+                      if (!custEmail) return 'Email Address is required.';
+                      const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+                      if (!emailRegex.test(custEmail)) return 'Please enter a valid email address.';
+                      return '';
+                    })();
 
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block font-mono">WhatsApp/Phone Number (For OTP)</label>
-                        <div className="relative">
-                          <span className="absolute left-3 top-2.5 text-neutral-400">
-                            <Phone className="w-4 h-4" />
-                          </span>
-                          <input
-                            type="tel"
-                            placeholder="+8801700000000"
-                            value={custPhone}
-                            onChange={(e) => setCustPhone(e.target.value)}
-                            className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-2 pl-9 rounded-xl text-xs font-bold text-neutral-900 dark:text-white focus:ring-1 focus:ring-emerald-500 focus:outline-none"
-                          />
-                        </div>
-                      </div>
+                    const phoneError = (() => {
+                      if (!custPhoneTouched) return '';
+                      if (!custPhone) return 'Phone Number is required.';
+                      if (!/^\+?[0-9]+$/.test(custPhone)) return 'Please enter a valid phone number.';
+                      const digitsOnly = custPhone.replace(/[^\d]/g, '');
+                      if (digitsOnly.length < 8 || digitsOnly.length > 15) {
+                        return 'Please enter a valid phone number.';
+                      }
+                      return '';
+                    })();
 
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block font-mono">Password</label>
-                        <div className="relative">
-                          <span className="absolute left-3 top-2.5 text-neutral-400">
-                            <Key className="w-4 h-4" />
-                          </span>
-                          <input
-                            type="password"
-                            placeholder="••••••••"
-                            value={custPass}
-                            onChange={(e) => setCustPass(e.target.value)}
-                            className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-2 pl-9 rounded-xl text-xs font-bold text-neutral-900 dark:text-white focus:ring-1 focus:ring-emerald-500 focus:outline-none"
-                          />
-                        </div>
-                      </div>
+                    const passError = (() => {
+                      if (!custPassTouched) return '';
+                      if (!custPass) return 'Password is required.';
+                      if (custPass.length < 8) return 'Password must be at least 8 characters.';
+                      if (!/[A-Z]/.test(custPass)) return 'Password must contain at least one uppercase letter.';
+                      if (!/[a-z]/.test(custPass)) return 'Password must contain at least one lowercase letter.';
+                      if (!/[0-9]/.test(custPass)) return 'Password must contain at least one number.';
+                      if (!/[^A-Za-z0-9]/.test(custPass)) return 'Password must contain at least one special character.';
+                      return '';
+                    })();
 
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block font-mono">Confirm Password</label>
-                        <div className="relative">
-                          <span className="absolute left-3 top-2.5 text-neutral-400">
-                            <Key className="w-4 h-4" />
-                          </span>
-                          <input
-                            type="password"
-                            placeholder="••••••••"
-                            value={custPassConfirm}
-                            onChange={(e) => setCustPassConfirm(e.target.value)}
-                            className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-2 pl-9 rounded-xl text-xs font-bold text-neutral-900 dark:text-white focus:ring-1 focus:ring-emerald-500 focus:outline-none"
-                          />
-                        </div>
-                      </div>
+                    const passConfirmError = (() => {
+                      if (!custPassConfirmTouched) return '';
+                      if (!custPassConfirm) return 'Confirm Password is required.';
+                      if (custPassConfirm !== custPass) return 'Passwords do not match.';
+                      return '';
+                    })();
 
-                      <div className="pt-2">
-                        <button
-                          onClick={() => {
-                            if (!custFullName || !custEmail || !custPass || !custPhone) {
-                              setAuthDrawerError("Please populate all registration tokens.");
-                              return;
-                            }
-                            if (custPass !== custPassConfirm) {
-                              setAuthDrawerError("Passwords do not match.");
-                              return;
-                            }
-                            setAuthDrawerLoading(true);
-                            setAuthDrawerError('');
+                    const strength = getPasswordStrength(custPass);
+                    const barColor = strength === 'Weak' ? 'bg-red-500' : strength === 'Medium' ? 'bg-amber-500' : 'bg-emerald-500';
+                    const barWidth = strength === 'Weak' ? 'w-1/3' : strength === 'Medium' ? 'w-2/3' : 'w-full';
 
-                            setTimeout(() => {
-                              setAuthDrawerLoading(false);
-                              // Create User template
-                              const reggedUser: UserSession = {
-                                id: 'usr-' + Math.floor(1000 + Math.random() * 9000),
-                                name: custFullName,
-                                username: custFullName.toLowerCase().replace(/[^a-z0-9]/g, '') || 'newcustomer',
-                                email: custEmail,
-                                phone: custPhone,
-                                role: 'customer',
-                                isVerified: false,
-                                createdAt: new Date().toISOString().split('T')[0],
-                                status: 'active',
-                                wishlistedProductIds: []
-                              };
-                              setTempRegUser(reggedUser);
-                              setAuthDrawerSuccess("Account template prepared! Dispatching verification code.");
-                              setDrawerAuthView('otp');
-                            }, 800);
-                          }}
-                          disabled={authDrawerLoading}
-                          className="w-full py-2.5 bg-[#0284C7] hover:bg-sky-600 text-white font-black text-xs rounded-xl transition active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
-                        >
-                          {authDrawerLoading ? (
-                            <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          ) : (
-                            <UserPlus className="w-4 h-4" />
+                    return (
+                      <div className="space-y-3.5 text-left animate-in duration-200 slide-in-from-right-3">
+                        {/* FULL NAME */}
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block font-mono">Client Full Name</label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-2.5 text-neutral-400">
+                              <User className="w-4 h-4" />
+                            </span>
+                            <input
+                              type="text"
+                              placeholder="e.g. Asif Rahman"
+                              value={custFullName}
+                              onChange={(e) => {
+                                // Strip HTML/Script tags and collapse excessive spaces
+                                const cleaned = e.target.value.replace(/<[^>]*>?/gm, '').replace(/\s{2,}/g, ' ');
+                                setCustFullName(cleaned);
+                                setCustFullNameTouched(true);
+                              }}
+                              onBlur={() => setCustFullNameTouched(true)}
+                              className={`w-full bg-neutral-50 dark:bg-neutral-900 border p-2 pl-9 rounded-xl text-xs font-bold text-neutral-900 dark:text-white focus:ring-1 focus:outline-none ${
+                                fullNameError ? 'border-red-500 focus:ring-red-500' : 'border-neutral-200 dark:border-neutral-800 focus:ring-emerald-500'
+                              }`}
+                            />
+                          </div>
+                          {fullNameError && (
+                            <p className="text-[10px] text-red-500 font-semibold">{fullNameError}</p>
                           )}
-                          <span>Register New Account</span>
-                        </button>
-                      </div>
+                        </div>
+
+                        {/* EMAIL ADDRESS */}
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block font-mono">Email Address</label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-2.5 text-neutral-400">
+                              <Mail className="w-4 h-4" />
+                            </span>
+                            <input
+                              type="email"
+                              placeholder="asif@example.com"
+                              value={custEmail}
+                              onChange={(e) => {
+                                setCustEmail(e.target.value);
+                                setCustEmailTouched(true);
+                              }}
+                              onBlur={() => setCustEmailTouched(true)}
+                              className={`w-full bg-neutral-50 dark:bg-neutral-900 border p-2 pl-9 rounded-xl text-xs font-bold text-neutral-900 dark:text-white focus:ring-1 focus:outline-none ${
+                                emailError ? 'border-red-500 focus:ring-red-500' : 'border-neutral-200 dark:border-neutral-800 focus:ring-emerald-500'
+                              }`}
+                            />
+                          </div>
+                          {emailError && (
+                            <p className="text-[10px] text-red-500 font-semibold">{emailError}</p>
+                          )}
+                        </div>
+
+                        {/* PHONE NUMBER */}
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block font-mono">WhatsApp/Phone Number</label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-2.5 text-neutral-400">
+                              <Phone className="w-4 h-4" />
+                            </span>
+                            <input
+                              type="tel"
+                              placeholder="+8801864000000"
+                              value={custPhone}
+                              onChange={(e) => {
+                                // Automatically block letters and special characters (keeping digits and optional single leading +)
+                                const val = e.target.value.replace(/(?!^\+)[^\d]/g, '');
+                                setCustPhone(val);
+                                setCustPhoneTouched(true);
+                              }}
+                              onBlur={() => setCustPhoneTouched(true)}
+                              className={`w-full bg-neutral-50 dark:bg-neutral-900 border p-2 pl-9 rounded-xl text-xs font-bold text-neutral-900 dark:text-white focus:ring-1 focus:outline-none ${
+                                phoneError ? 'border-red-500 focus:ring-red-500' : 'border-neutral-200 dark:border-neutral-800 focus:ring-emerald-500'
+                              }`}
+                            />
+                          </div>
+                          {phoneError && (
+                            <p className="text-[10px] text-red-500 font-semibold">{phoneError}</p>
+                          )}
+                        </div>
+
+                        {/* PASSWORD */}
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block font-mono">Password</label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-2.5 text-neutral-400">
+                              <Key className="w-4 h-4" />
+                            </span>
+                            <input
+                              type={showPass ? "text" : "password"}
+                              placeholder="••••••••"
+                              value={custPass}
+                              onChange={(e) => {
+                                setCustPass(e.target.value);
+                                setCustPassTouched(true);
+                              }}
+                              onBlur={() => setCustPassTouched(true)}
+                              className={`w-full bg-neutral-50 dark:bg-neutral-900 border p-2 pl-9 pr-9 rounded-xl text-xs font-bold text-neutral-900 dark:text-white focus:ring-1 focus:outline-none ${
+                                passError ? 'border-red-500 focus:ring-red-500' : 'border-neutral-200 dark:border-neutral-800 focus:ring-emerald-500'
+                              }`}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowPass(!showPass)}
+                              className="absolute right-3 top-2 text-neutral-400 hover:text-neutral-200 focus:outline-none"
+                            >
+                              {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </button>
+                          </div>
+                          {custPass && (
+                            <div className="mt-1 space-y-1 bg-neutral-100 dark:bg-neutral-950/40 p-2 rounded-lg border border-neutral-200 dark:border-slate-800">
+                              <div className="flex justify-between items-center">
+                                <span className="text-[9px] text-neutral-500 dark:text-neutral-400">Password Strength:</span>
+                                <span className={`text-[9px] font-black uppercase tracking-wider ${
+                                  strength === 'Weak' ? 'text-red-500' : strength === 'Medium' ? 'text-amber-500' : 'text-emerald-500'
+                                }`}>{strength}</span>
+                              </div>
+                              <div className="w-full bg-neutral-200 dark:bg-neutral-800 h-1 rounded-full overflow-hidden">
+                                <div className={`h-full ${barColor} ${barWidth} transition-all duration-300`} />
+                              </div>
+                              <p className="text-[9px] text-neutral-400 leading-tight">
+                                Must be at least 8 chars with 1 uppercase, 1 lowercase, 1 digit, & 1 symbol.
+                              </p>
+                            </div>
+                          )}
+                          {passError && (
+                            <p className="text-[10px] text-red-500 font-semibold">{passError}</p>
+                          )}
+                        </div>
+
+                        {/* CONFIRM PASSWORD */}
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block font-mono">Confirm Password</label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-2.5 text-neutral-400">
+                              <Key className="w-4 h-4" />
+                            </span>
+                            <input
+                              type={showPassConfirm ? "text" : "password"}
+                              placeholder="••••••••"
+                              value={custPassConfirm}
+                              onChange={(e) => {
+                                setCustPassConfirm(e.target.value);
+                                setCustPassConfirmTouched(true);
+                              }}
+                              onBlur={() => setCustPassConfirmTouched(true)}
+                              className={`w-full bg-neutral-50 dark:bg-neutral-900 border p-2 pl-9 pr-9 rounded-xl text-xs font-bold text-neutral-900 dark:text-white focus:ring-1 focus:outline-none ${
+                                passConfirmError ? 'border-red-500 focus:ring-red-500' : 'border-neutral-200 dark:border-neutral-800 focus:ring-emerald-500'
+                              }`}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowPassConfirm(!showPassConfirm)}
+                              className="absolute right-3 top-2 text-neutral-400 hover:text-neutral-200 focus:outline-none"
+                            >
+                              {showPassConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </button>
+                          </div>
+                          {passConfirmError && (
+                            <p className="text-[10px] text-red-500 font-semibold">{passConfirmError}</p>
+                          )}
+                        </div>
+
+                        <div className="pt-2">
+                          <button
+                            onClick={() => {
+                              // Mark all fields as touched for strict display of errors
+                              setCustFullNameTouched(true);
+                              setCustEmailTouched(true);
+                              setCustPhoneTouched(true);
+                              setCustPassTouched(true);
+                              setCustPassConfirmTouched(true);
+
+                              const nameCheck = (() => {
+                                const sanitized = custFullName.replace(/<[^>]*>?/gm, '').replace(/\s{2,}/g, ' ').trim();
+                                if (!sanitized) return 'Full Name is required.';
+                                if (sanitized.length < 2) return 'Full Name must be at least 2 characters.';
+                                if (sanitized.length > 100) return 'Full Name must be at most 100 characters.';
+                                if (!/^[A-Za-z\s]+$/.test(sanitized)) return 'Full Name must contain letters and spaces only.';
+                                return '';
+                              })();
+
+                              const emailCheck = (() => {
+                                if (!custEmail) return 'Email Address is required.';
+                                const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+                                if (!emailRegex.test(custEmail)) return 'Please enter a valid email address.';
+                                return '';
+                              })();
+
+                              const phoneCheck = (() => {
+                                if (!custPhone) return 'Phone Number is required.';
+                                if (!/^\+?[0-9]+$/.test(custPhone)) return 'Please enter a valid phone number.';
+                                const digitsOnly = custPhone.replace(/[^\d]/g, '');
+                                if (digitsOnly.length < 8 || digitsOnly.length > 15) {
+                                  return 'Please enter a valid phone number.';
+                                }
+                                return '';
+                              })();
+
+                              const passCheck = (() => {
+                                if (!custPass) return 'Password is required.';
+                                if (custPass.length < 8) return 'Password must be at least 8 characters.';
+                                if (!/[A-Z]/.test(custPass)) return 'Password must contain at least one uppercase letter.';
+                                if (!/[a-z]/.test(custPass)) return 'Password must contain at least one lowercase letter.';
+                                if (!/[0-9]/.test(custPass)) return 'Password must contain at least one number.';
+                                if (!/[^A-Za-z0-9]/.test(custPass)) return 'Password must contain at least one special character.';
+                                return '';
+                              })();
+
+                              const confirmCheck = (() => {
+                                if (!custPassConfirm) return 'Confirm Password is required.';
+                                if (custPassConfirm !== custPass) return 'Passwords do not match.';
+                                return '';
+                              })();
+
+                              const primaryError = nameCheck || emailCheck || phoneCheck || passCheck || confirmCheck;
+                              if (primaryError) {
+                                setAuthDrawerError(primaryError);
+                                return;
+                              }
+
+                              setAuthDrawerLoading(true);
+                              setAuthDrawerError('');
+
+                              setTimeout(() => {
+                                setAuthDrawerLoading(false);
+                                // Create User template with sanitized name
+                                const cleanRegName = custFullName.replace(/<[^>]*>?/gm, '').replace(/\s{2,}/g, ' ').trim();
+                                const reggedUser: UserSession = {
+                                  id: 'usr-' + Math.floor(1000 + Math.random() * 9000),
+                                  name: cleanRegName,
+                                  username: cleanRegName.toLowerCase().replace(/[^a-z0-9]/g, '') || 'newcustomer',
+                                  email: custEmail.trim(),
+                                  phone: custPhone.trim(),
+                                  role: 'customer',
+                                  isVerified: false,
+                                  createdAt: new Date().toISOString().split('T')[0],
+                                  status: 'active',
+                                  wishlistedProductIds: []
+                                };
+                                setTempRegUser(reggedUser);
+                                setAuthDrawerSuccess("Account template prepared! Dispatching verification code.");
+                                setDrawerAuthView('otp');
+                              }, 800);
+                            }}
+                            disabled={authDrawerLoading}
+                            className="w-full py-2.5 bg-[#0284C7] hover:bg-sky-600 text-white font-black text-xs rounded-xl transition active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
+                          >
+                            {authDrawerLoading ? (
+                              <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <UserPlus className="w-4 h-4" />
+                            )}
+                            <span>Register New Account</span>
+                          </button>
+                        </div>
 
                       <div className="text-center pt-1">
                         <span className="text-[10px] text-neutral-400">
@@ -2886,7 +3822,8 @@ export default function Header({
                         </span>
                       </div>
                     </div>
-                  )}
+                    );
+                  })()}
 
                   {/* VIEW 3: FORGOT PASSWORD */}
                   {drawerAuthView === 'forgot' && (
@@ -3215,94 +4152,179 @@ export default function Header({
       {/* Shopping Cart Slider Drawer with conversion outputs */}
       {cartOpen && (
         <div className="fixed inset-0 z-50 overflow-hidden" id="shopping-cart-slideover-panel">
-          <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-xs transition-opacity" onClick={() => setCartOpen(false)} />
+          <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm transition-opacity" onClick={() => setCartOpen(false)} />
 
           <div className="pointer-events-none fixed inset-y-0 right-0 flex max-w-full pl-10">
             <div className="pointer-events-auto w-screen max-w-md animate-in slide-in-from-right duration-250">
-              <div className="flex h-full flex-col bg-white dark:bg-slate-900 shadow-2xl">
-                <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-6">
-                  <div className="flex items-start justify-between">
-                    <h2 className="text-lg font-black text-neutral-900 dark:text-white flex items-center gap-1.5">
-                      <ShoppingBag className="w-5 h-5 text-emerald-500 shrink-0" />
-                      <span>{t.cart} ({cart.length})</span>
+              <div className="flex h-full flex-col bg-white/95 dark:bg-[#0F172A]/95 backdrop-blur-[20px] shadow-[0_20px_50px_rgba(0,0,0,0.12)] border-l border-neutral-200/50 dark:border-white/8 rounded-l-[24px]">
+                <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-6 scrollbar-thin scrollbar-thumb-violet-500/20">
+                  <div className="flex items-center justify-between pb-4 border-b border-neutral-200/65 dark:border-white/8">
+                    <h2 className="text-lg font-bold flex items-center gap-2">
+                      <div className="p-2 bg-gradient-to-tr from-[#7C3AED] via-[#A855F7] to-[#EC4899] rounded-xl text-white shadow-md shadow-purple-500/10 shrink-0">
+                        <ShoppingBag className="w-5 h-5" />
+                      </div>
+                      <span className="bg-gradient-to-r from-[#7C3AED] via-[#A855F7] to-[#EC4899] bg-clip-text text-transparent font-black">{t.cart} ({cart.length})</span>
                     </h2>
                     <button
                       onClick={() => setCartOpen(false)}
-                      className="p-1 text-neutral-450 hover:text-black dark:text-white rounded-lg border border-neutral-205 dark:border-slate-800"
+                      className="p-2 text-[#475569] dark:text-[#CBD5E1] hover:text-[#0F172A] dark:hover:text-white rounded-full bg-[#F8FAFC] dark:bg-[#111827] hover:bg-neutral-200/50 dark:hover:bg-[#1E293B] border border-[#E2E8F0] dark:border-white/5 shadow-xs transition-all duration-300 active:scale-95 cursor-pointer"
+                      title="Close"
                     >
-                      X
+                      <X className="w-4 h-4" />
                     </button>
                   </div>
 
-                  <div className="mt-8 text-left">
+                  <div className="mt-6 text-left">
                     {cart.length === 0 ? (
-                      <div className="text-center py-12 text-neutral-450">
-                        <ShoppingBag className="w-12 h-12 mx-auto mb-3 stroke-[1.5]" />
-                        <p className="text-sm font-bold">{t.cartEmpty}</p>
-                        <button
-                          onClick={() => {
-                            setCartOpen(false);
-                            setCurrentPage('marketplace');
-                          }}
-                          className="mt-4 inline-flex items-center gap-1.5 text-xs text-emerald-505 font-black underline hover:text-emerald-400 transition"
-                        >
-                          Browse WebzoneBD Digital Store <ArrowRight className="w-3.5 h-3.5" />
-                        </button>
+                      <div className="text-center py-16 text-neutral-450 px-4">
+                        <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-neutral-100 dark:bg-slate-800/60 flex items-center justify-center text-[#CBD5E1] dark:text-[#475569] border border-neutral-200/40 dark:border-white/5 shadow-inner">
+                          <ShoppingBag className="w-10 h-10 stroke-[1.5]" />
+                        </div>
+                        <p className="text-sm font-bold text-neutral-700 dark:text-neutral-300 mb-2">{t.cartEmpty}</p>
+                        <p className="text-xs text-neutral-450 dark:text-neutral-500 max-w-xs mx-auto mb-6">Explore our curated marketplace for scripts, license keys, high-speed domains, and premium hosting.</p>
+                        <div className="flex flex-col gap-2.5 items-center justify-center">
+                          <button
+                            onClick={() => {
+                              setCartOpen(false);
+                              setCurrentPage('marketplace');
+                            }}
+                            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs text-white font-semibold bg-gradient-to-r from-[#7C3AED] via-[#A855F7] to-[#EC4899] hover:scale-[1.02] shadow-[0_8px_20px_rgba(124,58,237,0.2)] active:scale-95 transition-all duration-300 cursor-pointer"
+                          >
+                            <span>Browse Digital Store</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </button>
+                          
+                          <button
+                            onClick={() => {
+                              setCartOpen(false);
+                              setCurrentPage('services');
+                            }}
+                            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-semibold bg-neutral-100 dark:bg-slate-800 text-neutral-800 dark:text-neutral-200 hover:bg-neutral-200 dark:hover:bg-slate-700 hover:scale-[1.02] border border-neutral-200 dark:border-white/5 active:scale-95 transition-all duration-300 cursor-pointer"
+                          >
+                            <span>Browse Services</span>
+                            <ArrowRight className="w-3.5 h-3.5 text-[#7C3AED] dark:text-[#A855F7]" />
+                          </button>
+                        </div>
                       </div>
                     ) : (
-                      <div className="flow-root">
-                        <ul role="list" className="-my-6 divide-y divide-neutral-100 dark:divide-slate-800">
-                          {cart.map((item, idx) => {
-                            const activePrice = item.product.discountPrice || item.product.price;
-                            return (
-                              <li key={idx} className="flex py-6">
-                                <div className="h-20 w-24 flex-shrink-0 overflow-hidden rounded-lg border border-neutral-200 dark:border-neutral-800">
-                                  <img
-                                    src={item.product.image}
-                                    alt={item.product.name}
-                                    className="h-full w-full object-cover object-center"
-                                    referrerPolicy="no-referrer"
-                                  />
-                                </div>
-
-                                <div className="ml-4 flex flex-1 flex-col">
-                                  <div>
-                                    <div className="flex justify-between text-sm font-semibold text-neutral-900 dark:text-white gap-2">
-                                      <h3 className="line-clamp-2 text-xs md:text-sm">
-                                        {language === 'bn' ? item.product.nameBn : language === 'ar' ? item.product.nameAr : item.product.name}
-                                      </h3>
-                                      <p className="ml-4 text-emerald-500 font-bold whitespace-nowrap">{formatPriceInCart(activePrice)}</p>
+                      <div className="flow-root mt-4">
+                        <ul role="list" className="space-y-4">
+                          <AnimatePresence initial={false}>
+                            {cart.map((item, idx) => {
+                              const activePrice = item.product.discountPrice || item.product.price;
+                              return (
+                                <motion.li
+                                  key={item.product.id}
+                                  layout
+                                  initial={{ opacity: 0, height: 0, scale: 0.95, y: -15 }}
+                                  animate={{ opacity: 1, height: "auto", scale: 1, y: 0 }}
+                                  exit={{ opacity: 0, height: 0, scale: 0.9, y: -15, transition: { duration: 0.25 } }}
+                                  transition={{ type: "spring", bounce: 0.1, duration: 0.35 }}
+                                  className="relative flex p-4 bg-white/60 dark:bg-[#111827]/40 border border-neutral-200/80 dark:border-white/8 rounded-[20px] shadow-[0_4px_20px_rgba(0,0,0,0.02)] hover:shadow-[0_8px_30px_rgba(124,58,237,0.06)] hover:-translate-y-0.5 transition-all duration-300 overflow-hidden"
+                                >
+                                  {deletingCartIndex === idx && (
+                                    <div className="absolute inset-0 bg-white/95 dark:bg-[#0F172A]/95 backdrop-blur-[8px] z-20 flex flex-col items-center justify-center text-center p-3 animate-in fade-in zoom-in-95 duration-200">
+                                      <p className="text-xs font-semibold text-red-500 mb-1 flex items-center justify-center gap-1.5 uppercase tracking-wide">
+                                        <Trash2 className="w-4 h-4 text-[#EF4444] animate-pulse" />
+                                        <span>{language === 'bn' ? 'আপনি কি নিশ্চিত?' : language === 'ar' ? 'هل أنت متأكد؟' : 'Are you sure?'}</span>
+                                      </p>
+                                      <p className="text-[11px] text-[#475569] dark:text-[#CBD5E1] mb-3 max-w-[90%] leading-relaxed text-center truncate w-full font-medium">
+                                        {language === 'bn' 
+                                          ? `"${item.product.nameBn || item.product.name}" কার্ট থেকে বাদ দিতে চান?` 
+                                          : language === 'ar' 
+                                            ? `إزالة "${item.product.nameAr || item.product.name}"؟` 
+                                            : `Remove "${item.product.name}"?`}
+                                      </p>
+                                      <div className="flex gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            removeFromCart(idx);
+                                            setDeletingCartIndex(null);
+                                          }}
+                                          className="px-3.5 py-1.5 text-[11px] font-semibold text-white bg-gradient-to-r from-[#7C3AED] to-[#EC4899] rounded-lg hover:opacity-90 shadow-md hover:shadow-red-500/10 active:scale-95 transition-all cursor-pointer"
+                                        >
+                                          {language === 'bn' ? 'হ্যাঁ, বাদ দিন' : language === 'ar' ? 'نعم، حذف' : 'Yes, Delete'}
+                                        </button>
+                                        <button
+                                          type="button"
+                                          className="px-3.5 py-1.5 text-[11px] font-semibold text-neutral-600 dark:text-neutral-300 bg-neutral-100 dark:bg-slate-800 hover:bg-neutral-200 dark:hover:bg-slate-700 rounded-lg active:scale-95 transition-all cursor-pointer border border-neutral-200/50 dark:border-white/5"
+                                          onClick={() => setDeletingCartIndex(null)}
+                                        >
+                                          {language === 'bn' ? 'বাতিল' : language === 'ar' ? 'إلغاء' : 'Cancel'}
+                                        </button>
+                                      </div>
                                     </div>
-                                    <p className="mt-1 text-[10px] text-neutral-500 uppercase tracking-wider font-mono">
-                                      {item.product.category}
-                                    </p>
+                                  )}
+
+                                  <div className="h-20 w-24 flex-shrink-0 overflow-hidden rounded-[14px] border border-neutral-200/60 dark:border-white/10 shadow-inner bg-[#F8FAFC] dark:bg-[#111827] flex items-center justify-center">
+                                    <img
+                                      src={item.product.image}
+                                      alt={item.product.name}
+                                      className="h-full w-full object-cover object-center"
+                                      referrerPolicy="no-referrer"
+                                    />
                                   </div>
-                                  <div className="flex flex-1 items-end justify-between text-xs">
-                                    <div className="flex items-center text-neutral-500">
-                                      {item.appliedCoupon ? (
-                                        <span className="inline-flex items-center gap-1 text-emerald-500 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                                          <Percent className="w-3 h-3" />
-                                          {item.appliedCoupon.code} (-{item.appliedCoupon.discountPercent}%)
-                                        </span>
-                                      ) : (
-                                        <span className="text-[10px] text-neutral-400">Standard License</span>
+
+                                  <div className="ml-4 flex flex-1 flex-col justify-between">
+                                    <div>
+                                      <div className="flex justify-between items-start text-sm font-semibold gap-2">
+                                        <h3 className="line-clamp-2 text-xs font-bold leading-tight text-neutral-900 dark:text-white">
+                                          {language === 'bn' ? item.product.nameBn : language === 'ar' ? item.product.nameAr : item.product.name}
+                                        </h3>
+                                        <p className="ml-2 text-[#7C3AED] dark:text-[#A855F7] font-black whitespace-nowrap text-sm">{formatPriceInCart(activePrice)}</p>
+                                      </div>
+                                      {item.product.advancePercent !== undefined && item.product.advancePercent < 100 && (
+                                        <div className="mt-1.5 space-y-0.5 text-left text-[11px] leading-tight">
+                                          <div className="flex items-center gap-1.5 text-[#7C3AED] dark:text-[#A855F7] font-bold">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-gradient-to-r from-[#7C3AED] to-[#EC4899] animate-pulse" />
+                                            <span>
+                                              {language === 'bn' 
+                                                ? `অগ্রিম: ${item.product.advancePercent}% (${formatPriceInCart(item.product.advanceAmount || 0)})`
+                                                : `Advance: ${item.product.advancePercent}% (${formatPriceInCart(item.product.advanceAmount || 0)})`
+                                              }
+                                            </span>
+                                          </div>
+                                          <div className="text-[#EC4899] font-bold ml-3">
+                                            {language === 'bn'
+                                              ? `বকেয়া (Due): ${formatPriceInCart(item.product.dueAmount || 0)}`
+                                              : `Due Amount: ${formatPriceInCart(item.product.dueAmount || 0)}`
+                                            }
+                                          </div>
+                                        </div>
                                       )}
+                                      <p className="mt-1 text-[9px] text-[#475569] dark:text-[#CBD5E1] uppercase tracking-wider font-semibold font-mono">
+                                        {item.product.category}
+                                      </p>
                                     </div>
+                                    <div className="flex flex-1 items-end justify-between text-xs mt-2">
+                                      <div className="flex items-center">
+                                        {item.appliedCoupon ? (
+                                          <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full text-[10px] border border-emerald-500/10">
+                                            <Percent className="w-3 h-3" />
+                                            {item.appliedCoupon.code} (-{item.appliedCoupon.discountPercent}%)
+                                          </span>
+                                        ) : (
+                                          <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-medium">Standard License</span>
+                                        )}
+                                      </div>
 
-                                    <div className="flex">
-                                      <button
-                                        type="button"
-                                        onClick={() => removeFromCart(idx)}
-                                        className="font-medium text-red-500 hover:text-red-600 flex items-center gap-1 transition-all"
-                                      >
-                                        <Trash2 className="w-3.5 h-3.5" strokeWidth={2.5} />
-                                      </button>
+                                      <div className="flex">
+                                        <button
+                                          type="button"
+                                          onClick={() => setDeletingCartIndex(idx)}
+                                          className="p-1.5 text-red-500 hover:text-red-600 hover:bg-red-500/10 rounded-lg transition-all cursor-pointer"
+                                          title="Remove"
+                                        >
+                                          <Trash2 className="w-4 h-4" strokeWidth={2} />
+                                        </button>
+                                      </div>
                                     </div>
                                   </div>
-                                </div>
-                              </li>
-                            );
-                          })}
+                                </motion.li>
+                              );
+                            })}
+                          </AnimatePresence>
                         </ul>
                       </div>
                     )}
@@ -3310,76 +4332,951 @@ export default function Header({
 
                   {/* Coupon overlay and summary options */}
                   {cart.length > 0 && (
-                    <div className="border-t border-neutral-200 dark:border-neutral-800 pt-4 space-y-4">
+                    <div className="border-t border-neutral-200/65 dark:border-white/8 pt-6 space-y-5">
                       {/* Apply coupon */}
-                      <div className="space-y-1.5 text-left">
-                        <label className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 flex items-center gap-1.5">
-                          <Tag className="w-3.5 h-3.5 text-emerald-400" />
-                          <span>{t.discountCode}</span>
-                        </label>
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            placeholder="e.g. WEBZONE20"
-                            value={couponCode}
-                            onChange={(e) => setCouponCode(e.target.value)}
-                            className="flex-1 rounded-lg border bg-neutral-50 dark:bg-neutral-900 border-neutral-300 dark:border-slate-800 px-3 py-1.5 text-xs font-mono font-bold uppercase transition focus:border-emerald-500 focus:outline-none text-neutral-900 dark:text-white"
-                          />
-                          <button
-                            onClick={handleApplyCoupon}
-                            className="px-4 py-1.5 bg-neutral-800 dark:bg-neutral-700 hover:bg-neutral-950 dark:hover:bg-neutral-600 text-xs text-white rounded-lg font-bold transition-all"
-                          >
-                            {t.apply}
-                          </button>
+                      <div className="relative mt-2" id="coupon-field-group">
+                        <div className="flex gap-2.5 items-center">
+                          <div className="relative flex-1">
+                            <input
+                              type="text"
+                              id="cart-coupon-code"
+                              placeholder={language === 'bn' ? "কুপন কোড লিখুন" : "Enter Coupon Code"}
+                              value={couponCode}
+                              disabled={cart.some(item => item.appliedCoupon)}
+                              onChange={(e) => setCouponCode(e.target.value)}
+                              className="w-full h-[48px] bg-[#F8FAFC] dark:bg-[#111827] border border-[#E2E8F0] dark:border-[#374151] rounded-[14px] pl-10 pr-3 text-xs sm:text-sm font-semibold uppercase font-mono text-[#0F172A] dark:text-white placeholder-transparent focus:outline-none focus:ring-[4px] focus:ring-[#7C3AED]/18 focus:border-[#7C3AED] dark:focus:border-[#A855F7] transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed"
+                            />
+                            <Tag className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400 dark:text-[#CBD5E1]" />
+                          </div>
+                          {cart.some(item => item.appliedCoupon) ? (
+                            <button
+                              type="button"
+                              onClick={handleRemoveCoupon}
+                              className="h-[48px] px-4 border border-red-200 dark:border-red-905/30 bg-red-500/10 text-red-600 hover:bg-red-500 hover:text-white text-xs font-semibold uppercase tracking-wider rounded-[14px] active:scale-95 transition-all duration-300 cursor-pointer flex items-center justify-center shrink-0"
+                            >
+                              {language === 'bn' ? 'মুছে ফেলুন' : 'Remove'}
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={handleApplyCoupon}
+                              className="h-[48px] px-6 bg-gradient-to-r from-[#7C3AED] via-[#A855F7] to-[#EC4899] text-xs text-white rounded-[14px] font-semibold uppercase tracking-wider hover:scale-[1.02] hover:shadow-[0_12px_30px_rgba(124,58,237,0.35)] active:scale-95 transition-all duration-300 cursor-pointer flex items-center justify-center shrink-0"
+                            >
+                              {t.apply}
+                            </button>
+                          )}
                         </div>
-                        {couponError && <p className="text-[11px] text-red-500 font-bold">{couponError}</p>}
-                        {couponSuccess && <p className="text-[11px] text-emerald-500 font-bold">{couponSuccess}</p>}
+                        {couponError && (
+                          <div className="mt-2.5 p-3 rounded-[14px] bg-[#FEE2E2] border border-[#EF4444] text-[#EF4444] text-[11px] sm:text-xs font-semibold flex items-center gap-2 animate-in fade-in duration-200 shadow-sm">
+                            <div className="w-4 h-4 bg-[#EF4444] text-white rounded-full flex items-center justify-center shrink-0 text-[10px] font-black">!</div>
+                            <span>{couponError}</span>
+                          </div>
+                        )}
+                        {couponSuccess && (
+                          <div className="mt-2.5 p-3 rounded-[14px] bg-[#DCFCE7] border border-[#22C55E] text-[#22C55E] text-[11px] sm:text-xs font-semibold flex items-center gap-2 animate-in fade-in duration-200 shadow-sm">
+                            <CheckCircle className="w-4 h-4 text-[#22C55E] shrink-0" />
+                            <span>{couponSuccess}</span>
+                          </div>
+                        )}
                       </div>
 
                       {/* Currency output rates block */}
-                      <div className="space-y-1 text-sm bg-neutral-50 dark:bg-neutral-950 p-3 rounded-lg border border-neutral-200/50 dark:border-slate-800 text-left">
-                        <div className="flex justify-between text-neutral-500">
+                      <div className="space-y-2 text-sm bg-[#F8FAFC]/50 dark:bg-[#111827]/40 p-4 rounded-[20px] border border-neutral-200/60 dark:border-white/8 text-left shadow-sm">
+                        <div className="flex justify-between text-[#475569] dark:text-[#CBD5E1] text-xs sm:text-sm font-semibold">
                           <span>{t.subtotal}</span>
-                          <span className="font-mono font-bold text-neutral-700 dark:text-neutral-300">{formatPriceInCart(subtotal)}</span>
+                          <span className="font-mono font-bold text-[#0F172A] dark:text-white">{formatPriceInCart(subtotal)}</span>
                         </div>
                         {discountAmount > 0 && (
-                          <div className="flex justify-between text-emerald-500 font-bold">
+                          <div className="flex justify-between text-[#22C55E] text-xs sm:text-sm font-bold animate-pulse">
                              <span>Savings Discount</span>
                              <span className="font-mono">-{formatPriceInCart(discountAmount)}</span>
                           </div>
                         )}
-                        <div className="flex justify-between font-extrabold text-neutral-900 dark:text-white pt-1.5 border-t border-neutral-200 dark:border-neutral-800 text-base">
+                        <div className="flex justify-between font-black text-neutral-900 dark:text-white pt-2.5 border-t border-neutral-200/60 dark:border-white/8 text-sm sm:text-base">
                           <span>{t.total}</span>
-                          <span className="text-emerald-500 font-mono">{formatPriceInCart(total)}</span>
+                          <span className="text-transparent bg-gradient-to-r from-[#7C3AED] via-[#A855F7] to-[#EC4899] bg-clip-text font-black font-mono">{formatPriceInCart(total)}</span>
                         </div>
+                        {(() => {
+                          const hasAdvanceItem = cart.some(item => item.product.advancePercent !== undefined && item.product.advancePercent < 100);
+                          if (!hasAdvanceItem) return null;
+
+                          // calculate sum of advances + regular items (less discount)
+                          const totalPayableNow = cart.reduce((acc, item) => {
+                            if (item.product.advanceAmount !== undefined) {
+                              return acc + item.product.advanceAmount;
+                            }
+                            return acc + (item.product.discountPrice || item.product.price);
+                          }, 0) - discountAmount;
+
+                          const totalDueRemaining = cart.reduce((acc, item) => {
+                            return acc + (item.product.dueAmount || 0);
+                          }, 0);
+
+                          return (
+                            <>
+                              <div className="flex justify-between text-indigo-600 dark:text-cyan-400 font-black pt-2.5 border-t border-dashed border-neutral-200/60 dark:border-white/5 text-xs sm:text-sm">
+                                <span>{language === 'bn' ? 'অগ্রিম পরিশোধযোগ্য (Payable Now):' : 'Payable Now (Advance):'}</span>
+                                <span className="font-mono font-black">{formatPriceInCart(Math.max(0, totalPayableNow))}</span>
+                              </div>
+                              <div className="flex justify-between text-amber-500 font-bold text-[11px] sm:text-xs">
+                                <span>{language === 'bn' ? 'বকেয়া বাকি (Remaining Due):' : 'Remaining Due:'}</span>
+                                <span className="font-mono">{formatPriceInCart(totalDueRemaining)}</span>
+                              </div>
+                            </>
+                          );
+                        })()}
+                      </div>
+                      {/* Optional Order Notes */}
+                      <div className="relative mt-2" id="order-notes-group-container">
+                        <textarea
+                          id="checkout-order-notes"
+                          rows={2}
+                          placeholder=" "
+                          value={orderNotes}
+                          onChange={(e) => setOrderNotes(e.target.value)}
+                          className="peer w-full min-h-[110px] bg-[#F8FAFC] dark:bg-[#111827] border border-[#E2E8F0] dark:border-[#374151] rounded-[14px] px-4 pt-6 pb-2 text-xs sm:text-sm font-semibold text-[#0F172A] dark:text-white placeholder-transparent focus:outline-none focus:ring-[4px] focus:ring-[#7C3AED]/18 focus:border-[#7C3AED] dark:focus:border-[#A855F7] transition-all duration-300 resize-y"
+                        />
+                        <label
+                          htmlFor="checkout-order-notes"
+                          className="absolute left-4 top-2 text-[10px] font-semibold text-[#475569] dark:text-[#CBD5E1] transition-all duration-300 peer-placeholder-shown:text-xs peer-placeholder-shown:top-4 peer-focus:top-2 peer-focus:text-[10px] uppercase tracking-wider flex items-center gap-1 pointer-events-none cursor-text"
+                        >
+                          <span>📝</span>
+                          <span>{language === 'bn' ? 'অর্ডার নোট (ঐচ্ছিক)' : language === 'ar' ? 'ملاحظات الطلب (اختياري)' : 'Order Notes (Optional)'}</span>
+                        </label>
                       </div>
 
                       {/* Checkout Gateway System */}
-                      <div className="space-y-3 bg-neutral-100 dark:bg-neutral-900/50 p-4 rounded-xl border border-neutral-200 dark:border-neutral-800">
-                        <h4 className="text-[10px] uppercase font-bold font-mono tracking-widest text-neutral-500 text-left">
-                          {t.checkoutTitle}
-                        </h4>
-
+                      <div className="space-y-4 bg-neutral-50/60 dark:bg-[#111827]/40 p-5 rounded-[24px] border border-neutral-200/60 dark:border-white/8 shadow-xs">
                         {checkoutSuccess ? (
-                          <div className="py-6 text-center text-emerald-500 space-y-2 animate-pulse">
-                            <span className="font-extrabold text-xs block text-slate-900 dark:text-white">🔗 CONNECTING WEBZONE SECURE HANDSHAKE...</span>
-                            <p className="text-xs font-semibold text-neutral-400">Verifying secure digital token for payment via {checkoutSelectedMethod}</p>
+                          <div className="py-8 text-center text-[#22C55E] dark:text-[#22C55E] space-y-3 animate-pulse">
+                            <span className="font-extrabold text-xs block text-slate-900 dark:text-white tracking-widest font-mono">🔗 CONNECTING WEBZONE SECURE HANDSHAKE...</span>
+                            <p className="text-xs font-semibold text-neutral-450 dark:text-neutral-450">Verifying secure digital token...</p>
                           </div>
                         ) : !user ? (
-                          <div className="w-full text-center py-2 space-y-3">
-                            <p className="text-[10px] leading-relaxed font-sans text-neutral-500 dark:text-neutral-400">
-                              🔒 Guest checkout state detected. Please authenticate your customer account or register as an affiliate partner to purchase scripts, licenses & hosting packages.
-                            </p>
-                            <button
-                              onClick={() => {
-                                setCartOpen(false);
-                                onLoginClick('login');
-                              }}
-                              className="w-full py-3 bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-extrabold text-xs uppercase tracking-wider rounded-xl shadow-md cursor-pointer hover:opacity-90 transition inline-flex items-center justify-center gap-1.5"
-                            >
-                              <ShieldCheck className="w-4 h-4" />
-                              <span>Login & Check Out</span>
-                            </button>
+                          <div className="w-full space-y-4">
+                            {/* Toggle switcher */}
+                            <div className="grid grid-cols-2 p-1 bg-neutral-100 dark:bg-slate-950/80 border border-neutral-200/50 dark:border-white/5 rounded-[14px]" id="guest-checkout-switcher">
+                              <button
+                                type="button"
+                                onClick={() => setCheckoutMode('guest')}
+                                className={`py-2 text-center text-xs font-bold rounded-[10px] transition-all duration-300 cursor-pointer ${
+                                  checkoutMode === 'guest'
+                                    ? 'bg-white dark:bg-[#1E293B] text-[#7C3AED] dark:text-[#A855F7] shadow-[0_4px_12px_rgba(124,58,237,0.12)] border border-neutral-200/20 dark:border-white/5'
+                                    : 'text-[#475569] dark:text-[#CBD5E1] hover:text-[#0F172A] dark:hover:text-white'
+                                }`}
+                              >
+                                {language === 'bn' ? 'গেস্ট চেকআউট' : language === 'ar' ? 'دفع كزائر' : 'Guest Checkout'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setCheckoutMode('login')}
+                                className={`py-2 text-center text-xs font-bold rounded-[10px] transition-all duration-300 cursor-pointer ${
+                                  checkoutMode === 'login'
+                                    ? 'bg-white dark:bg-[#1E293B] text-[#7C3AED] dark:text-[#A855F7] shadow-[0_4px_12px_rgba(124,58,237,0.12)] border border-neutral-200/20 dark:border-white/5'
+                                    : 'text-[#475569] dark:text-[#CBD5E1] hover:text-[#0F172A] dark:hover:text-white'
+                                }`}
+                              >
+                                {language === 'bn' ? 'লগইন করুন' : language === 'ar' ? 'سجل دخول' : 'Sign In'}
+                              </button>
+                            </div>
+
+                            {checkoutMode === 'login' ? (
+                              <div className="w-full text-center py-2 space-y-4">
+                                <p className="text-xs leading-relaxed text-neutral-500 dark:text-[#CBD5E1]">
+                                  🔒 Securely access your customer account or register as an affiliate partner to purchase scripts, licenses & hosting packages.
+                                </p>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setCartOpen(false);
+                                    onLoginClick('login');
+                                  }}
+                                  className="w-full h-[54px] bg-gradient-to-r from-[#7C3AED] via-[#A855F7] to-[#EC4899] text-white font-bold text-xs uppercase tracking-wider rounded-[14px] shadow-[0_12px_30px_rgba(124,58,237,0.35)] cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 inline-flex items-center justify-center gap-1.5"
+                                >
+                                  <ShieldCheck className="w-4 h-4" />
+                                  <span>{language === 'bn' ? 'লগইন এবং চেকআউট' : language === 'ar' ? 'الولوج والدفع' : 'Login & Check Out'}</span>
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="w-full space-y-4">
+                                <p className="text-[11px] leading-relaxed font-semibold text-neutral-500 dark:text-[#CBD5E1] bg-[#F8FAFC]/80 dark:bg-[#111827]/40 p-3 rounded-[14px] border border-neutral-200/50 dark:border-white/5">
+                                  ⚡ Enter your details below for instant Guest Checkout. Download links are safely shared.
+                                </p>
+                                
+                                <div className="space-y-4 text-left">
+                                  {/* Full Name */}
+                                  <div className="relative">
+                                    <input
+                                      type="text"
+                                      id="guest-name-field"
+                                      placeholder=" "
+                                      value={guestName}
+                                      onChange={(e) => setGuestName(e.target.value)}
+                                      className="peer w-full h-[56px] bg-[#F8FAFC] dark:bg-[#111827] border border-[#E2E8F0] dark:border-[#374151] rounded-[14px] px-4 pt-5 pb-1.5 text-xs sm:text-sm font-semibold text-[#0F172A] dark:text-white placeholder-transparent focus:outline-none focus:ring-[4px] focus:ring-[#7C3AED]/18 focus:border-[#7C3AED] dark:focus:border-[#A855F7] transition-all duration-300"
+                                      required
+                                    />
+                                    <label
+                                      htmlFor="guest-name-field"
+                                      className="absolute left-4 top-1.5 text-[10px] font-semibold text-[#475569] dark:text-[#CBD5E1] transition-all duration-300 peer-placeholder-shown:text-xs peer-placeholder-shown:top-4 peer-focus:top-1.5 peer-focus:text-[10px] uppercase tracking-wider cursor-text pointer-events-none"
+                                    >
+                                      Full Name *
+                                    </label>
+                                  </div>
+
+                                  {/* Phone */}
+                                  <div className="relative">
+                                    <input
+                                      type="text"
+                                      id="guest-phone-field"
+                                      placeholder=" "
+                                      value={guestPhone}
+                                      onChange={(e) => setGuestPhone(e.target.value)}
+                                      className="peer w-full h-[56px] bg-[#F8FAFC] dark:bg-[#111827] border border-[#E2E8F0] dark:border-[#374151] rounded-[14px] px-4 pt-5 pb-1.5 text-xs sm:text-sm font-semibold text-[#0F172A] dark:text-white placeholder-transparent focus:outline-none focus:ring-[4px] focus:ring-[#7C3AED]/18 focus:border-[#7C3AED] dark:focus:border-[#A855F7] transition-all duration-300"
+                                      required
+                                    />
+                                    <label
+                                      htmlFor="guest-phone-field"
+                                      className="absolute left-4 top-1.5 text-[10px] font-semibold text-[#475569] dark:text-[#CBD5E1] transition-all duration-300 peer-placeholder-shown:text-xs peer-placeholder-shown:top-4 peer-focus:top-1.5 peer-focus:text-[10px] uppercase tracking-wider cursor-text pointer-events-none"
+                                    >
+                                      WhatsApp / Phone No *
+                                    </label>
+                                  </div>
+
+                                  {/* Email */}
+                                  <div className="relative">
+                                    <input
+                                      type="email"
+                                      id="guest-email-field"
+                                      placeholder=" "
+                                      value={guestEmail}
+                                      onChange={(e) => setGuestEmail(e.target.value)}
+                                      className="peer w-full h-[56px] bg-[#F8FAFC] dark:bg-[#111827] border border-[#E2E8F0] dark:border-[#374151] rounded-[14px] px-4 pt-5 pb-1.5 text-xs sm:text-sm font-semibold text-[#0F172A] dark:text-white placeholder-transparent focus:outline-none focus:ring-4 focus:ring-violet-500/18 focus:border-violet-500 transition-all duration-300"
+                                      required
+                                    />
+                                    <label
+                                      htmlFor="guest-email-field"
+                                      className="absolute left-4 top-1.5 text-[10px] font-semibold text-[#475569] dark:text-[#CBD5E1] transition-all duration-300 peer-placeholder-shown:text-xs peer-placeholder-shown:top-4 peer-focus:top-1.5 peer-focus:text-[10px] uppercase tracking-wider cursor-text pointer-events-none"
+                                    >
+                                      Email Address *
+                                    </label>
+                                  </div>
+
+                                  {/* Transaction ID */}
+                                  <div className="relative">
+                                    <input
+                                      type="text"
+                                      id="guest-trxid-field"
+                                      placeholder=" "
+                                      value={guestTransactionId}
+                                      onChange={(e) => setGuestTransactionId(e.target.value)}
+                                      className="peer w-full h-[56px] bg-[#F8FAFC] dark:bg-[#111827] border border-[#E2E8F0] dark:border-[#374151] rounded-[14px] px-4 pt-5 pb-1.5 text-xs sm:text-sm font-mono font-bold text-[#0F172A] dark:text-white placeholder-transparent focus:outline-none focus:ring-4 focus:ring-violet-500/18 focus:border-violet-500 transition-all duration-300"
+                                      required
+                                    />
+                                    <label
+                                      htmlFor="guest-trxid-field"
+                                      className="absolute left-4 top-1.5 text-[10px] font-semibold text-[#475569] dark:text-[#CBD5E1] transition-all duration-300 peer-placeholder-shown:text-xs peer-placeholder-shown:top-4 peer-focus:top-1.5 peer-focus:text-[10px] uppercase tracking-wider cursor-text pointer-events-none"
+                                    >
+                                      Transaction ID (TrxID) *
+                                    </label>
+                                  </div>
+
+                                  {/* Upload Receipt */}
+                                  <div className="space-y-2">
+                                    <span className="text-[10px] font-semibold text-[#475569] dark:text-[#CBD5E1] uppercase tracking-wider block">
+                                      {language === 'bn' ? 'টাকা পাঠানোর রসিদ (ঐচ্ছিক)' : 'Transaction Receipt Image (Optional)'}
+                                    </span>
+                                    <div className="flex items-center gap-3">
+                                      <input
+                                        type="file"
+                                        id="guest-receipt-file-input"
+                                        accept="image/*"
+                                        className="hidden"
+                                        onChange={(e) => {
+                                          const file = e.target.files?.[0];
+                                          if (file) {
+                                            setGuestReceiptName(file.name);
+                                            const reader = new FileReader();
+                                            reader.onload = (event) => {
+                                              if (event.target?.result) {
+                                                setGuestReceipt(event.target.result as string);
+                                              }
+                                            };
+                                            reader.readAsDataURL(file);
+                                          }
+                                        }}
+                                      />
+                                      <label
+                                        htmlFor="guest-receipt-file-input"
+                                        className="flex items-center gap-2 px-4 h-[44px] rounded-[12px] border border-dashed border-[#E2E8F0] dark:border-[#374151] hover:border-[#7C3AED] dark:hover:border-[#A855F7] bg-[#F8FAFC] dark:bg-[#111827] hover:bg-[#F1F5F9] dark:hover:bg-[#1E293B] cursor-pointer text-xs font-bold text-[#475569] dark:text-[#CBD5E1] transition-all duration-300 select-none shadow-sm active:scale-95"
+                                      >
+                                        <Upload className="w-4 h-4 text-[#7C3AED] dark:text-[#A855F7] shrink-0" />
+                                        <span>{guestReceiptName ? (language === 'bn' ? 'রসিদ পরিবর্তন' : 'Change Receipt') : (language === 'bn' ? 'রসিদ আপলোড' : 'Upload Receipt')}</span>
+                                      </label>
+                                      {guestReceiptName && (
+                                        <span className="text-[11px] text-[#475569] dark:text-[#CBD5E1] font-mono truncate max-w-[150px] bg-neutral-100 dark:bg-neutral-800 px-2 py-1 rounded" title={guestReceiptName}>
+                                          {guestReceiptName}
+                                        </span>
+                                      )}
+                                    </div>
+                                    {guestReceipt && (
+                                      <div className="mt-2 relative w-12 h-12 border border-neutral-300 dark:border-slate-800 rounded bg-neutral-100 overflow-hidden group">
+                                        <img src={guestReceipt} alt="Receipt preview" className="w-full h-full object-cover" />
+                                        <button 
+                                          type="button"
+                                          onClick={() => {
+                                            setGuestReceipt('');
+                                            setGuestReceiptName('');
+                                          }}
+                                          className="absolute inset-0 bg-red-600/90 hover:bg-red-700 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center text-white text-[9px] font-bold"
+                                        >
+                                          {language === 'bn' ? 'মুছুন' : 'Del'}
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {guestValidationError && (
+                                  <p className="text-[11px] text-red-500 font-bold text-left">{guestValidationError}</p>
+                                )}
+
+                                {/* Render payment gateways immediately for instant guest checkout */}
+                                <div className="mt-4 pt-4 border-t border-neutral-200/60 dark:border-slate-800/80">
+                                  <h4 className="text-[10px] uppercase font-bold font-mono tracking-widest text-neutral-500 mb-2.5 text-left flex items-center justify-between">
+                                    <span>{t.checkoutTitle}</span>
+                                    <span className="text-[9px] text-indigo-500 dark:text-cyan-405 font-sans lowercase">Select a gateway below</span>
+                                  </h4>
+
+                                  {currency === 'USD' && (
+                                    <div className="grid grid-cols-1 gap-2 w-full">
+                                      <button
+                                        type="button"
+                                        onClick={() => setSelectedGuestGateway('USD Bank Transfer')}
+                                        className={`flex flex-col items-center justify-center p-3 rounded-lg border transition-all cursor-pointer w-full text-center ${
+                                          selectedGuestGateway === 'USD Bank Transfer'
+                                            ? 'border-emerald-600 bg-emerald-500/10 ring-2 ring-emerald-650/40 dark:bg-emerald-950/20'
+                                            : 'border-neutral-200 dark:border-slate-800 bg-white dark:bg-neutral-950 hover:border-emerald-500'
+                                        }`}
+                                      >
+                                        <span className="text-xs font-black text-emerald-600">USD Bank Transfer</span>
+                                        <span className="text-[9px] text-neutral-450 mt-1">Direct Bank Wire / SWIFT / routing</span>
+                                      </button>
+                                    </div>
+                                  )}
+
+                                  {currency === 'BDT' && (
+                                    <div className="grid grid-cols-2 gap-2 w-full font-sans">
+                                      {/* bKash */}
+                                      {finalBdMethods.bkash?.enabled && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setSelectedGuestGateway('bKash Wallet')}
+                                          className={`flex flex-col items-center justify-center p-2 rounded-lg border transition-all cursor-pointer text-center ${
+                                            selectedGuestGateway === 'bKash Wallet'
+                                              ? 'border-pink-550 bg-pink-500/10 ring-2 ring-pink-500/40 dark:bg-pink-950/20'
+                                              : 'border-neutral-200 dark:border-slate-800 bg-white dark:bg-neutral-950 hover:border-pink-505'
+                                          }`}
+                                        >
+                                          <span className="text-xs font-black text-pink-600 font-sans">bKash (বিকাশ)</span>
+                                          <span className="text-[9px] text-neutral-400">Instant Verification</span>
+                                        </button>
+                                      )}
+
+                                      {/* Nagad */}
+                                      {finalBdMethods.nagad?.enabled && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setSelectedGuestGateway('Nagad Digital')}
+                                          className={`flex flex-col items-center justify-center p-2 rounded-lg border transition-all cursor-pointer text-center relative overflow-hidden ${
+                                            selectedGuestGateway === 'Nagad Digital'
+                                              ? 'border-orange-500 bg-orange-500/10 ring-2 ring-orange-500/40 dark:bg-orange-950/20'
+                                              : 'border-neutral-200 dark:border-slate-800 bg-white dark:bg-neutral-950 hover:border-orange-500 hover:shadow-xs'
+                                          }`}
+                                        >
+                                          <span className="text-xs font-black text-orange-600 font-sans">Nagad (নগদ)</span>
+                                          <span className="text-[9px] text-neutral-400">Secure BD Wallet</span>
+                                        </button>
+                                      )}
+
+                                      {/* Rocket */}
+                                      {finalBdMethods.rocket?.enabled && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setSelectedGuestGateway('Rocket Wallet')}
+                                          className={`flex flex-col items-center justify-center p-2 rounded-lg border transition-all cursor-pointer text-center ${
+                                            selectedGuestGateway === 'Rocket Wallet'
+                                              ? 'border-purple-600 bg-purple-500/10 ring-2 ring-purple-600/40 dark:bg-purple-950/20'
+                                              : 'border-neutral-200 dark:border-slate-800 bg-white dark:bg-neutral-950 hover:border-purple-550 hover:shadow-xs'
+                                          }`}
+                                        >
+                                          <span className="text-xs font-black text-purple-600 font-sans">Rocket (রকেট)</span>
+                                          <span className="text-[9px] text-neutral-400 font-sans">Dutch-Bangla Bank</span>
+                                        </button>
+                                      )}
+
+                                      {/* Cellfin */}
+                                      {finalBdMethods.cellfin?.enabled && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setSelectedGuestGateway('Cellfin Payment')}
+                                          className={`flex flex-col items-center justify-center p-2 rounded-lg border transition-all cursor-pointer text-center ${
+                                            selectedGuestGateway === 'Cellfin Payment'
+                                              ? 'border-sky-500 bg-sky-500/10 ring-2 ring-sky-500/40 dark:bg-sky-950/20'
+                                              : 'border-neutral-200 dark:border-slate-800 bg-white dark:bg-neutral-950 hover:border-sky-500 hover:shadow-xs'
+                                          }`}
+                                        >
+                                          <span className="text-xs font-black text-sky-600 font-sans">Cellfin Card</span>
+                                          <span className="text-[9px] text-neutral-400 font-sans">Cellfin Wallet</span>
+                                        </button>
+                                      )}
+
+                                      {/* Bank Transfer */}
+                                      {finalBdMethods.islamiBank?.enabled && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setSelectedGuestGateway('Islami Bank Transfer')}
+                                          className={`flex flex-col items-center justify-center p-2 rounded-lg border transition-all cursor-pointer col-span-2 text-center ${
+                                            selectedGuestGateway === 'Islami Bank Transfer'
+                                              ? 'border-emerald-600 bg-emerald-500/10 ring-2 ring-emerald-600/40 dark:bg-emerald-950/20'
+                                              : 'border-neutral-200 dark:border-slate-800 bg-white dark:bg-neutral-950 hover:border-emerald-500 hover:shadow-xs'
+                                          }`}
+                                        >
+                                          <span className="text-xs font-black text-emerald-600 font-sans">Islami Bank Transfer</span>
+                                          <span className="text-[9px] text-neutral-400 font-sans">Direct IBB Internet Net Banking</span>
+                                        </button>
+                                      )}
+
+                                      {/* SSLCommerz */}
+                                      <button
+                                        type="button"
+                                        onClick={() => setSelectedGuestGateway('SSLCommerz Gateway')}
+                                        className={`flex flex-col items-center justify-center p-2.5 rounded-lg border transition-all cursor-pointer col-span-2 text-center ${
+                                          selectedGuestGateway === 'SSLCommerz Gateway'
+                                            ? 'border-cyan-500 bg-cyan-500/10 ring-2 ring-cyan-500/40 dark:bg-cyan-950/20'
+                                            : 'border-neutral-200 dark:border-slate-800 bg-white dark:bg-neutral-950 hover:border-cyan-550 hover:shadow-xs'
+                                        }`}
+                                      >
+                                        <span className="text-xs font-bold text-cyan-600 font-sans">SSLCommerz BD Checkout</span>
+                                        <span className="text-[9px] text-neutral-400 font-sans">Cards / Net Banking / Mobiles</span>
+                                      </button>
+
+                                      {/* Custom methods for BDT */}
+                                      {customMethods && customMethods.filter(m => m.enabled && m.currency === 'BDT').map((m, idx) => (
+                                        <button
+                                          key={idx}
+                                          type="button"
+                                          onClick={() => setSelectedGuestGateway(m.name)}
+                                          className={`flex flex-col items-center justify-center p-2 rounded-lg border transition-all cursor-pointer col-span-2 text-center ${
+                                            selectedGuestGateway === m.name
+                                              ? 'border-indigo-600 bg-indigo-500/10 ring-2 ring-indigo-600/40 dark:bg-indigo-950/20'
+                                              : 'border-neutral-200 dark:border-slate-800 bg-white dark:bg-neutral-950 hover:border-indigo-500'
+                                          }`}
+                                        >
+                                          <span className="text-xs font-black text-indigo-650">{m.name}</span>
+                                          <span className="text-[9px] text-neutral-400">{m.instructions?.slice(0, 45) || 'Custom Added Gateway'}</span>
+                                        </button>
+                                      ))}
+
+                                      {/* Expanded payment description for BDT */}
+                                      {['bKash Wallet', 'Nagad Digital', 'Rocket Wallet', 'Cellfin Payment'].includes(selectedGuestGateway) && (() => {
+                                        const activeMfs = getActiveMfsDetails(selectedGuestGateway);
+                                        return (
+                                          <div className="mt-4 p-3 rounded-xl border border-neutral-300 dark:border-slate-800 bg-neutral-50 dark:bg-[#0b0f19] text-center animate-in fade-in slide-in-from-top-2 duration-205 col-span-2 text-neutral-800 dark:text-neutral-100 font-sans">
+                                            <div className="flex flex-col items-center w-full">
+                                              {/* Header */}
+                                              <div className="flex items-center gap-2 mb-2">
+                                                <span className="w-3 h-3 rounded-full animate-pulse" style={{ backgroundColor: `#${activeMfs.qrColor}` }} />
+                                                <span className="text-xs font-black tracking-tight font-sans">
+                                                  {activeMfs.name} Account Info ({activeMfs.type === 'agent' ? 'এজেন্ট ওয়ালেট' : 'পার্সোনাল ওয়ালেট'})
+                                                </span>
+                                              </div>
+
+                                              {/* QR Code */}
+                                              <div className="flex flex-col items-center p-2.5 bg-white dark:bg-[#0c1222] rounded-xl border border-neutral-200 dark:border-slate-800 shadow-sm max-w-[150px] mb-2.5">
+                                                <span className="text-[9px] font-bold text-neutral-500 mb-1.5">{language === 'bn' ? 'স্ক্যান করুন' : 'Scan to Pay'}</span>
+                                                <div className="w-[110px] h-[110px] flex items-center justify-center bg-neutral-100/30 rounded border border-neutral-150 dark:border-slate-800 overflow-hidden">
+                                                  <img 
+                                                    src={activeMfs.qrCodeUrl || `https://api.qrserver.com/v1/create-qr-code/?size=140x140&color=${activeMfs.qrColor}&data=tel:${activeMfs.number.replace(/\s/g, '')}`} 
+                                                    alt={`${activeMfs.name} QR Code`}
+                                                    className="max-w-full max-h-full object-contain rounded pointer-events-none"
+                                                    referrerPolicy="no-referrer"
+                                                  />
+                                                </div>
+                                              </div>
+
+                                              {/* Instructions & Phone Number */}
+                                              <p className="text-[10px] text-neutral-500 dark:text-neutral-400 mb-3 leading-relaxed max-w-sm">
+                                                {activeMfs.instructions}
+                                              </p>
+
+                                              <div className="w-full flex flex-col items-center bg-neutral-100 dark:bg-neutral-950 p-2.5 rounded-xl border border-neutral-205 dark:border-slate-800 max-w-xs">
+                                                <span className="text-[9px] text-neutral-400 uppercase tracking-widest font-mono font-black block mb-0.5">{language === 'bn' ? 'ওয়ালেট নাম্বার' : 'WALLET NUMBER'}</span>
+                                                <span className="text-base font-extrabold font-mono tracking-wider text-neutral-900 dark:text-white">{activeMfs.number}</span>
+                                                
+                                                {/* Copy Number Button */}
+                                                <motion.button
+                                                  type="button"
+                                                  whileHover={{ scale: 1.02 }}
+                                                  whileTap={{ scale: 0.98 }}
+                                                  onClick={() => {
+                                                    navigator.clipboard.writeText(activeMfs.number.replace(/\s/g, ''));
+                                                    setBdtPaymentCopied(true);
+                                                    setTimeout(() => setBdtPaymentCopied(false), 2000);
+                                                  }}
+                                                  className="mt-2 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] uppercase font-black tracking-wider transition-all duration-300 cursor-pointer w-full shadow-md"
+                                                  style={{ backgroundColor: `#${activeMfs.qrColor}` }}
+                                                >
+                                                  {bdtPaymentCopied ? (
+                                                    <span className="flex items-center gap-1"><Check className="w-3.5 h-3.5 text-white" /> {language === 'bn' ? 'কপি সফল হয়েছে!' : 'Number Copied!'}</span>
+                                                  ) : (
+                                                    <span className="flex items-center gap-1"><Copy className="w-3.5 h-3.5" /> {language === 'bn' ? 'নাম্বার কপি করুন' : 'Copy Number'}</span>
+                                                  )}
+                                                </motion.button>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        );
+                                      })()}
+
+                                      {/* Islami Bank Transfer Expanded Panel (Guest Checkout) */}
+                                      {selectedGuestGateway === 'Islami Bank Transfer' && (
+                                        <div className="mt-4 p-4 rounded-xl border border-emerald-500/30 dark:border-emerald-500/20 bg-neutral-50 dark:bg-[#0b0f19] text-left animate-in fade-in slide-in-from-top-2 duration-205 col-span-2 text-neutral-800 dark:text-neutral-100">
+                                          <div className="flex flex-col gap-4">
+                                            {/* Bank Header */}
+                                            <div className="flex items-center gap-3 pb-3 border-b border-neutral-200 dark:border-slate-800">
+                                              <div className="p-2 bg-emerald-600 rounded-lg text-white font-black tracking-wider text-xs">
+                                                IBBL
+                                              </div>
+                                              <div>
+                                                <h4 className="text-xs font-black tracking-tight text-neutral-900 dark:text-white">
+                                                  {language === 'bn' ? 'ইসলামী ব্যাংক বাংলাদেশ লিমিটেড' : 'Islami Bank Bangladesh Ltd.'}
+                                                </h4>
+                                                <span className="text-[10px] text-emerald-600 dark:text-emerald-450 font-mono font-bold block">
+                                                  Direct IBBL Online Banking Transfer
+                                                </span>
+                                              </div>
+                                            </div>
+
+                                            {/* Grid layout for bank details and QR code */}
+                                            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-stretch">
+                                              
+                                              {/* Details */}
+                                              <div className="md:col-span-7 flex flex-col gap-2">
+                                                
+                                                {/* Account Name */}
+                                                <div className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-neutral-900 border border-neutral-150 dark:border-slate-800 shadow-xs">
+                                                  <div className="flex flex-col">
+                                                    <span className="text-[8px] text-neutral-400 font-bold uppercase tracking-wider">{language === 'bn' ? 'অ্যাকাউন্ট নাম' : 'Account Name'}</span>
+                                                    <span className="text-xs font-black text-neutral-900 dark:text-white">MD IMRAN HOSSAIN</span>
+                                                  </div>
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                      navigator.clipboard.writeText('MD IMRAN HOSSAIN');
+                                                      setCopiedBankAccName(true);
+                                                      setTimeout(() => setCopiedBankAccName(false), 2000);
+                                                    }}
+                                                    className="p-1 px-1.5 rounded bg-neutral-100 dark:bg-neutral-800 hover:bg-emerald-600 hover:text-white transition-all text-[10px] flex items-center gap-1 cursor-pointer font-bold shrink-0 text-neutral-600 dark:text-neutral-300"
+                                                  >
+                                                    {copiedBankAccName ? (
+                                                      <>
+                                                        <Check className="w-3 h-3 text-emerald-500" />
+                                                        <span className="text-[9px] text-emerald-600 font-bold">{language === 'bn' ? 'কপিড' : 'Copied'}</span>
+                                                      </>
+                                                    ) : (
+                                                      <>
+                                                        <Copy className="w-3 h-3 text-neutral-400" />
+                                                        <span>{language === 'bn' ? 'কপি' : 'Copy'}</span>
+                                                      </>
+                                                    )}
+                                                  </button>
+                                                </div>
+
+                                                {/* Account No */}
+                                                <div className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-neutral-900 border border-neutral-150 dark:border-slate-800 shadow-xs">
+                                                  <div className="flex flex-col">
+                                                    <span className="text-[8px] text-neutral-400 font-bold uppercase tracking-wider">{language === 'bn' ? 'অ্যাকাউন্ট নাম্বার' : 'Account No'}</span>
+                                                    <span className="text-sm font-black font-mono tracking-wider text-neutral-900 dark:text-white">20501290204369912</span>
+                                                  </div>
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                      navigator.clipboard.writeText('20501290204369912');
+                                                      setCopiedBankAccNo(true);
+                                                      setTimeout(() => setCopiedBankAccNo(false), 2000);
+                                                    }}
+                                                    className="p-1 px-1.5 rounded bg-neutral-100 dark:bg-neutral-800 hover:bg-emerald-600 hover:text-white transition-all text-[10px] flex items-center gap-1 cursor-pointer font-bold shrink-0 text-neutral-600 dark:text-neutral-300"
+                                                  >
+                                                    {copiedBankAccNo ? (
+                                                      <>
+                                                        <Check className="w-3 h-3 text-emerald-500" />
+                                                        <span className="text-[9px] text-emerald-600 font-bold">{language === 'bn' ? 'কপিড' : 'Copied'}</span>
+                                                      </>
+                                                    ) : (
+                                                      <>
+                                                        <Copy className="w-3 h-3 text-neutral-400" />
+                                                        <span>{language === 'bn' ? 'কপি' : 'Copy'}</span>
+                                                      </>
+                                                    )}
+                                                  </button>
+                                                </div>
+
+                                                {/* Branch */}
+                                                <div className="p-2 rounded-lg bg-white dark:bg-neutral-900 border border-neutral-150 dark:border-slate-800 shadow-xs flex justify-between items-center text-xs">
+                                                  <div className="flex flex-col">
+                                                    <span className="text-[8px] text-neutral-400 font-bold uppercase tracking-wider">{language === 'bn' ? 'শাখা / ব্রাঞ্চ' : 'Branch'}</span>
+                                                    <span className="font-extrabold text-neutral-900 dark:text-white">New Market Dhaka</span>
+                                                  </div>
+                                                  <span className="text-[10px] text-emerald-600 font-bold font-mono">IBBL BD</span>
+                                                </div>
+
+                                                {/* Routing No */}
+                                                <div className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-neutral-900 border border-neutral-150 dark:border-slate-800 shadow-xs">
+                                                  <div className="flex flex-col">
+                                                    <span className="text-[8px] text-neutral-400 font-bold uppercase tracking-wider">{language === 'bn' ? 'রাউটিং নাম্বার' : 'Routing No'}</span>
+                                                    <span className="text-xs font-extrabold font-mono text-neutral-900 dark:text-white">125263522</span>
+                                                  </div>
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                      navigator.clipboard.writeText('125263522');
+                                                      setCopiedBankRouting(true);
+                                                      setTimeout(() => setCopiedBankRouting(false), 2000);
+                                                    }}
+                                                    className="p-1 px-1.5 rounded bg-neutral-100 dark:bg-neutral-800 hover:bg-emerald-600 hover:text-white transition-all text-[10px] flex items-center gap-1 cursor-pointer font-bold shrink-0 text-neutral-600 dark:text-neutral-300"
+                                                  >
+                                                    {copiedBankRouting ? (
+                                                      <>
+                                                        <Check className="w-3 h-3 text-emerald-500" />
+                                                        <span className="text-[9px] text-emerald-600 font-bold">{language === 'bn' ? 'কপিড' : 'Copied'}</span>
+                                                      </>
+                                                    ) : (
+                                                      <>
+                                                        <Copy className="w-3 h-3 text-neutral-400" />
+                                                        <span>{language === 'bn' ? 'কপি' : 'Copy'}</span>
+                                                      </>
+                                                    )}
+                                                  </button>
+                                                </div>
+
+                                              </div>
+
+                                              {/* QR System */}
+                                              <div className="md:col-span-5 flex flex-col items-center justify-center bg-white dark:bg-neutral-950 p-3 rounded-lg border border-neutral-150 dark:border-slate-800 shadow-xs text-center">
+                                                <span className="text-[9px] font-bold text-neural-500 dark:text-neutral-400 uppercase tracking-wider mb-2">{language === 'bn' ? 'কিউআর কোড (পেমেন্ট)' : 'Scan QR for Banking'}</span>
+                                                <div className="w-[115px] h-[115px] bg-neutral-50 dark:bg-[#0c1222] p-1.5 rounded border border-neutral-200 dark:border-slate-800 flex items-center justify-center">
+                                                  <img 
+                                                    src="https://api.qrserver.com/v1/create-qr-code/?size=140x140&color=059669&data=MD+IMRAN+HOSSAIN+A/C+20501290204369912+IBBL+New+Market+Dhaka+Routing+125263522" 
+                                                    alt="IBBL QR Code" 
+                                                    className="max-w-full max-h-full object-contain pointer-events-none"
+                                                    referrerPolicy="no-referrer"
+                                                  />
+                                                </div>
+                                                <span className="text-[8px] text-neutral-400 font-bold mt-2 leading-tight">
+                                                  {language === 'bn' ? 'ইসলামী ব্যাংক অ্যাপ বা যেকোনো সেলফিন দিয়ে স্ক্যান করুন' : 'Scan via Cellfin or IBBL Smart app'}
+                                                </span>
+                                              </div>
+
+                                            </div>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {currency === 'SAR' && (
+                                    <div className="grid grid-cols-2 gap-2 w-full font-sans animate-in fade-in duration-200">
+                                      {/* STC Pay Button */}
+                                      {finalSaMethods.stcPay?.enabled && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setSelectedGuestGateway('STC Pay')}
+                                          className={`flex flex-col items-center justify-center p-2 rounded-lg border transition-all cursor-pointer text-center ${
+                                            selectedGuestGateway === 'STC Pay'
+                                              ? 'border-purple-600 bg-purple-500/10 ring-2 ring-purple-600/40 dark:bg-purple-950/20'
+                                              : 'border-neutral-200 dark:border-slate-800 bg-white dark:bg-neutral-950 hover:border-purple-600'
+                                          }`}
+                                        >
+                                          <span className="text-xs font-black text-purple-600">STC Pay</span>
+                                          <span className="text-[9px] text-neutral-450 mt-0.5">Saudi Digital Wallet</span>
+                                        </button>
+                                      )}
+
+                                      {/* Alraji Bank Button */}
+                                      {finalSaMethods.alRajhi?.enabled && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setSelectedGuestGateway('Alraji Bank Transfer')}
+                                          className={`flex flex-col items-center justify-center p-2 rounded-lg border transition-all cursor-pointer text-center ${
+                                            selectedGuestGateway === 'Alraji Bank Transfer'
+                                              ? 'border-blue-600 bg-blue-500/10 ring-2 ring-blue-600/40 dark:bg-blue-950/20'
+                                              : 'border-neutral-200 dark:border-slate-800 bg-white dark:bg-neutral-950 hover:border-cyan-600'
+                                          }`}
+                                        >
+                                          <span className="text-xs font-black text-blue-600">Alraji Bank</span>
+                                          <span className="text-[9px] text-neutral-450 mt-0.5">Bank Wire Transfer</span>
+                                        </button>
+                                      )}
+
+                                      {/* STC Pay Expanded Details (Guest) */}
+                                      {selectedGuestGateway === 'STC Pay' && (
+                                        <div className="mt-2 p-3 rounded-xl border border-purple-500/30 bg-purple-50/50 dark:bg-purple-950/20 text-center animate-in fade-in slide-in-from-top-2 duration-205 col-span-2">
+                                          <p className="text-[11px] font-black text-purple-700 dark:text-purple-400 mb-1">
+                                            {finalSaMethods.stcPay?.instructions || (language === 'bn' ? 'কোড স্ক্যান করুন পেমেন্ট করার জন্য' : 'Scan QR code to pay using STC Pay app')}
+                                          </p>
+
+                                          {/* Single QR Code Presentation */}
+                                          <div className="flex justify-center my-3">
+                                            <div className="flex flex-col items-center p-2.5 bg-white dark:bg-[#0F172A] rounded-lg border border-purple-200 dark:border-slate-800 shadow-sm max-w-[170px]">
+                                              <span className="text-[10px] font-bold text-purple-600 mb-1.5">{language === 'bn' ? 'কিউআর কোড' : 'QR Code'}</span>
+                                              <div className="w-[130px] h-[130px] flex items-center justify-center overflow-hidden bg-purple-50/20 rounded border border-neutral-150 dark:border-slate-800">
+                                                <img 
+                                                  src={finalSaMethods.stcPay?.qrCode || `https://api.qrserver.com/v1/create-qr-code/?size=180x180&color=7c3aed&data=tel:${(finalSaMethods.stcPay?.walletNumber || '+966570511931').replace(/\s/g, '')}`} 
+                                                  alt="STC Pay QR Code"
+                                                  className="max-w-full max-h-full object-contain rounded pointer-events-none"
+                                                  referrerPolicy="no-referrer"
+                                                />
+                                              </div>
+                                            </div>
+                                          </div>
+
+                                          <div className="flex flex-col items-center">
+                                            <p className="text-[10px] text-purple-600 dark:text-purple-400 font-mono font-bold bg-purple-100/50 dark:bg-purple-950/40 py-1.5 rounded-md px-2 inline-block w-full text-center font-sans">
+                                              {language === 'bn' ? `ওয়ালেট নাম্বার: ${finalSaMethods.stcPay?.walletNumber || '+966 57 051 1931'}` : `Wallet Number: ${finalSaMethods.stcPay?.walletNumber || '+966 57 051 1931'}`}
+                                            </p>
+                                            <motion.button
+                                              type="button"
+                                              whileHover={{ scale: 1.02 }}
+                                              whileTap={{ scale: 0.96 }}
+                                              onClick={() => {
+                                                navigator.clipboard.writeText((finalSaMethods.stcPay?.walletNumber || '+966 57 051 1931').replace(/\s/g, ''));
+                                                setStcPayCopied(true);
+                                                setTimeout(() => setStcPayCopied(false), 2000);
+                                              }}
+                                              className={`mt-1.5 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-white text-[10px] uppercase font-bold transition-all duration-300 cursor-pointer w-full shadow-xs ${
+                                                stcPayCopied 
+                                                  ? 'bg-emerald-600 hover:bg-emerald-700' 
+                                                  : 'bg-purple-600 hover:bg-purple-750'
+                                              }`}
+                                            >
+                                              <AnimatePresence mode="wait">
+                                                {stcPayCopied ? (
+                                                  <motion.div
+                                                    key="copied"
+                                                    initial={{ opacity: 0, scale: 0.8 }}
+                                                    animate={{ opacity: 1, scale: 1 }}
+                                                    exit={{ opacity: 0, scale: 0.8 }}
+                                                    transition={{ duration: 0.15 }}
+                                                    className="flex items-center gap-1.5"
+                                                  >
+                                                    <Check className="w-3.5 h-3.5 text-white" />
+                                                    <span>{language === 'bn' ? 'কপি করা হয়েছে!' : 'Number Copied!'}</span>
+                                                  </motion.div>
+                                                ) : (
+                                                  <motion.div
+                                                    key="copy"
+                                                    initial={{ opacity: 0, scale: 0.8 }}
+                                                    animate={{ opacity: 1, scale: 1 }}
+                                                    exit={{ opacity: 0, scale: 0.8 }}
+                                                    transition={{ duration: 0.15 }}
+                                                    className="flex items-center gap-1.5"
+                                                  >
+                                                    <Copy className="w-3.5 h-3.5" />
+                                                    <span>{language === 'bn' ? 'নম্বর কপি করুন' : 'Copy Number'}</span>
+                                                  </motion.div>
+                                                )}
+                                              </AnimatePresence>
+                                            </motion.button>
+                                          </div>
+                                        </div>
+                                      )}
+
+                                      {/* Alraji Bank Details (Guest) */}
+                                      {selectedGuestGateway === 'Alraji Bank Transfer' && (
+                                        <div className="mt-4 p-4 rounded-xl border border-blue-500/30 dark:border-blue-500/25 bg-neutral-50 dark:bg-[#0b0f19] text-left animate-in fade-in slide-in-from-top-2 duration-205 col-span-2 text-neutral-800 dark:text-neutral-100 font-sans">
+                                          <div className="flex flex-col gap-4">
+                                            {/* Bank Header */}
+                                            <div className="flex items-center gap-3 pb-3 border-b border-neutral-200 dark:border-slate-800">
+                                              <div className="p-2 bg-blue-600 rounded-lg text-white font-black tracking-wider text-xs uppercase font-sans">
+                                                Alrajhi
+                                              </div>
+                                              <div>
+                                                <h4 className="text-xs font-black tracking-tight text-neutral-900 dark:text-white font-sans">
+                                                  {finalSaMethods.alRajhi?.bankName || (language === 'bn' ? 'আল রাজি ব্যাংক সৌদি আরব' : 'Al Rajhi Bank Saudi Arabia 🇸🇦')}
+                                                </h4>
+                                                <span className="text-[10px] text-blue-600 dark:text-blue-450 font-mono font-bold block">
+                                                  Direct Al Rajhi Bank Transfer Details
+                                                </span>
+                                              </div>
+                                            </div>
+
+                                            {/* Grid layout for bank details and QR code */}
+                                            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-stretch">
+                                              
+                                              {/* Details */}
+                                              <div className="md:col-span-12 lg:col-span-7 flex flex-col gap-2">
+                                                
+                                                {/* Account Name */}
+                                                <div className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-neutral-900 border border-neutral-150 dark:border-slate-800 shadow-xs">
+                                                  <div className="flex flex-col">
+                                                    <span className="text-[8px] text-neutral-400 font-bold uppercase tracking-wider">{language === 'bn' ? 'অ্যাকাউন্ট নাম (Account Name)' : 'Account Name'}</span>
+                                                    <span className="text-[11px] font-black text-neutral-900 dark:text-white">{finalSaMethods.alRajhi?.accountName || 'MD IMRAN HOSSAIN'}</span>
+                                                  </div>
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                      navigator.clipboard.writeText(finalSaMethods.alRajhi?.accountName || 'MD IMRAN HOSSAIN');
+                                                      setCopiedAlrajiAccName(true);
+                                                      setTimeout(() => setCopiedAlrajiAccName(false), 2000);
+                                                    }}
+                                                    className="p-1 px-1.5 rounded bg-neutral-100 dark:bg-neutral-800 hover:bg-blue-600 hover:text-white transition-all text-[10px] flex items-center gap-1 cursor-pointer font-bold shrink-0 text-neutral-600 dark:text-neutral-300"
+                                                  >
+                                                    {copiedAlrajiAccName ? (
+                                                      <>
+                                                        <Check className="w-3 h-3 text-emerald-500" />
+                                                        <span className="text-[9px] text-emerald-600 font-bold">{language === 'bn' ? 'কপিড' : 'Copied'}</span>
+                                                      </>
+                                                    ) : (
+                                                      <>
+                                                        <Copy className="w-3 h-3 text-neutral-400" />
+                                                        <span>{language === 'bn' ? 'কপি' : 'Copy'}</span>
+                                                      </>
+                                                    )}
+                                                  </button>
+                                                </div>
+
+                                                {/* Account No */}
+                                                <div className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-neutral-900 border border-neutral-150 dark:border-slate-800 shadow-xs">
+                                                  <div className="flex flex-col">
+                                                    <span className="text-[8px] text-neutral-400 font-bold uppercase tracking-wider">{language === 'bn' ? 'অ্যাকাউন্ট নাম্বার' : 'Account No'}</span>
+                                                    <span className="text-[11px] font-black font-mono tracking-wider text-neutral-900 dark:text-white">{finalSaMethods.alRajhi?.accountNumber || '621000010006086016528'}</span>
+                                                  </div>
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                      navigator.clipboard.writeText((finalSaMethods.alRajhi?.accountNumber || '621000010006086016528').replace(/\s/g, ''));
+                                                      setCopiedAlrajiAccNo(true);
+                                                      setTimeout(() => setCopiedAlrajiAccNo(false), 2000);
+                                                    }}
+                                                    className="p-1 px-1.5 rounded bg-neutral-100 dark:bg-neutral-800 hover:bg-blue-600 hover:text-white transition-all text-[10px] flex items-center gap-1 cursor-pointer font-bold shrink-0 text-neutral-600 dark:text-neutral-300"
+                                                  >
+                                                    {copiedAlrajiAccNo ? (
+                                                      <>
+                                                        <Check className="w-3 h-3 text-emerald-500" />
+                                                        <span className="text-[9px] text-emerald-600 font-bold">{language === 'bn' ? 'কপিড' : 'Copied'}</span>
+                                                      </>
+                                                    ) : (
+                                                      <>
+                                                        <Copy className="w-3 h-3 text-neutral-400" />
+                                                        <span>{language === 'bn' ? 'কপি' : 'Copy'}</span>
+                                                      </>
+                                                    )}
+                                                  </button>
+                                                </div>
+
+                                                {/* IBAN */}
+                                                <div className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-neutral-900 border border-neutral-150 dark:border-slate-800 shadow-xs">
+                                                  <div className="flex flex-col overflow-hidden max-w-[80%]">
+                                                    <span className="text-[8px] text-neutral-400 font-bold uppercase tracking-wider">IBAN</span>
+                                                    <span className="text-[10px] font-extrabold font-mono tracking-wider text-neutral-900 dark:text-white break-all">{finalSaMethods.alRajhi?.iban || 'SA56 8000 0621 6080 1601 6528'}</span>
+                                                  </div>
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                      navigator.clipboard.writeText((finalSaMethods.alRajhi?.iban || 'SA56 8000 0621 6080 1601 6528').replace(/\s/g, ''));
+                                                      setCopiedAlrajiIban(true);
+                                                      setTimeout(() => setCopiedAlrajiIban(false), 2000);
+                                                    }}
+                                                    className="p-1 px-1.5 rounded bg-neutral-100 dark:bg-neutral-800 hover:bg-blue-600 hover:text-white transition-all text-[10px] flex items-center gap-1 cursor-pointer font-bold shrink-0 text-neutral-600 dark:text-neutral-300"
+                                                  >
+                                                    {copiedAlrajiIban ? (
+                                                      <>
+                                                        <Check className="w-3 h-3 text-emerald-500" />
+                                                        <span className="text-[9px] text-emerald-600 font-bold">{language === 'bn' ? 'কপিড' : 'Copied'}</span>
+                                                      </>
+                                                    ) : (
+                                                      <>
+                                                        <Copy className="w-3 h-3 text-neutral-400" />
+                                                        <span>{language === 'bn' ? 'কপি' : 'Copy'}</span>
+                                                      </>
+                                                    )}
+                                                  </button>
+                                                </div>
+
+                                                {/* Swift Code */}
+                                                <div className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-neutral-900 border border-neutral-150 dark:border-slate-800 shadow-xs">
+                                                  <div className="flex flex-col">
+                                                    <span className="text-[8px] text-neutral-400 font-bold uppercase tracking-wider">Swift Code</span>
+                                                    <span className="text-[11px] font-black font-mono text-neutral-900 dark:text-white">{finalSaMethods.alRajhi?.swift || 'RJHISARI'}</span>
+                                                  </div>
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                      navigator.clipboard.writeText(finalSaMethods.alRajhi?.swift || 'RJHISARI');
+                                                      setCopiedAlrajiSwift(true);
+                                                      setTimeout(() => setCopiedAlrajiSwift(false), 2000);
+                                                    }}
+                                                    className="p-1 px-1.5 rounded bg-neutral-100 dark:bg-neutral-800 hover:bg-blue-600 hover:text-white transition-all text-[10px] flex items-center gap-1 cursor-pointer font-bold shrink-0 text-neutral-600 dark:text-neutral-300"
+                                                  >
+                                                    {copiedAlrajiSwift ? (
+                                                      <>
+                                                        <Check className="w-3 h-3 text-emerald-500" />
+                                                        <span className="text-[9px] text-emerald-600 font-bold">{language === 'bn' ? 'কপিড' : 'Copied'}</span>
+                                                      </>
+                                                    ) : (
+                                                      <>
+                                                        <Copy className="w-3 h-3 text-neutral-400" />
+                                                        <span>{language === 'bn' ? 'কপি' : 'Copy'}</span>
+                                                      </>
+                                                    )}
+                                                  </button>
+                                                </div>
+
+                                              </div>
+
+                                              {/* QR System */}
+                                              <div className="md:col-span-12 lg:col-span-5 flex flex-col items-center justify-center bg-white dark:bg-neutral-950 p-3 rounded-lg border border-neutral-150 dark:border-slate-800 shadow-xs text-center">
+                                                <span className="text-[9px] font-bold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider mb-2">{language === 'bn' ? 'কিউআর কোড (পেমেন্ট)' : 'Scan QR for Banking'}</span>
+                                                <div className="w-[115px] h-[115px] bg-neutral-50 dark:bg-[#0c1222] p-1.5 rounded border border-neutral-200 dark:border-slate-800 flex items-center justify-center">
+                                                  <img 
+                                                    src="https://api.qrserver.com/v1/create-qr-code/?size=140x140&color=1d4ed8&data=Al+Rajhi+Bank+Account+Name:+MD+IMRAN+HOSSAIN+Account+No:+621000010006086016528+IBAN:+SA5680000621608016016528+Swift+Code:+RJHISARI" 
+                                                    alt="Al Rajhi Bank QR Code" 
+                                                    className="max-w-full max-h-full object-contain pointer-events-none"
+                                                    referrerPolicy="no-referrer"
+                                                  />
+                                                </div>
+                                                <span className="text-[8px] text-neutral-400 font-bold mt-2 leading-tight">
+                                                  {language === 'bn' ? 'আল রাজি ব্যাংক অ্যাপ দিয়ে স্ক্যান করুন' : 'Scan via Al Rajhi Bank app'}
+                                                </span>
+                                              </div>
+
+                                            </div>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {/* Final Submit Guest Transaction Button block */}
+                                  <div className="mt-4 pt-4 border-t border-neutral-200 dark:border-slate-800">
+                                    <div className="flex flex-col gap-1 text-[11.5px] text-neutral-500 dark:text-neutral-400 mb-3 text-left font-sans">
+                                      <p className="flex items-center gap-1.5">
+                                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                                        <span>Selected Mode: <strong className="text-indigo-600 dark:text-indigo-400">{selectedGuestGateway || (currency === 'SAR' ? 'STC Pay (+966 57 051 1931)' : currency === 'BDT' ? 'bKash Wallet' : 'USD Bank Transfer')}</strong></span>
+                                      </p>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={handleSubmitGuestTransaction}
+                                      className="w-full py-3 px-4 font-bold rounded-xl text-white text-xs uppercase tracking-wide bg-gradient-to-r from-indigo-600 to-purple-650 hover:from-indigo-700 hover:to-purple-700 hover:shadow-lg active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer select-none"
+                                    >
+                                      <span>Submit Transaction</span>
+                                      <ArrowRight className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         ) : (
                           <div className="w-full">
@@ -3387,6 +5284,7 @@ export default function Header({
                               <div className="grid grid-cols-1 gap-2 w-full">
                                 {/* USD Bank Transfer */}
                                 <button
+                                  type="button"
                                   onClick={() => handleSimulatePayment('USD Bank Transfer')}
                                   className="flex flex-col items-center justify-center p-3 rounded-lg border border-neutral-200 dark:border-slate-800 bg-white dark:bg-neutral-950 hover:border-emerald-500 transition-all cursor-pointer w-full text-center"
                                 >
@@ -3400,8 +5298,13 @@ export default function Header({
                               <div className="grid grid-cols-2 gap-2 w-full">
                                 {/* bKash */}
                                 <button
-                                  onClick={() => handleSimulatePayment('bKash Wallet')}
-                                  className="flex flex-col items-center justify-center p-2 rounded-lg border border-neutral-200 dark:border-slate-800 bg-white dark:bg-neutral-950 hover:border-pink-500 transition-all cursor-pointer text-center"
+                                  type="button"
+                                  onClick={() => setSelectedRegisteredGateway('bKash Wallet')}
+                                  className={`flex flex-col items-center justify-center p-2 rounded-lg border transition-all cursor-pointer text-center ${
+                                    selectedRegisteredGateway === 'bKash Wallet'
+                                      ? 'border-pink-550 bg-pink-500/10 ring-2 ring-pink-500/40 dark:bg-pink-950/20'
+                                      : 'border-neutral-200 dark:border-slate-800 bg-white dark:bg-neutral-950 hover:border-pink-500'
+                                  }`}
                                 >
                                   <span className="text-xs font-black text-pink-600">bKash (বিকাশ)</span>
                                   <span className="text-[9px] text-neutral-400">Instant Verification</span>
@@ -3409,8 +5312,13 @@ export default function Header({
 
                                 {/* Nagad */}
                                 <button
-                                  onClick={() => handleSimulatePayment('Nagad Digital')}
-                                  className="flex flex-col items-center justify-center p-2 rounded-lg border border-neutral-200 dark:border-slate-800 bg-white dark:bg-neutral-950 hover:border-orange-500 transition-all cursor-pointer text-center"
+                                  type="button"
+                                  onClick={() => setSelectedRegisteredGateway('Nagad Digital')}
+                                  className={`flex flex-col items-center justify-center p-2 rounded-lg border transition-all cursor-pointer text-center ${
+                                    selectedRegisteredGateway === 'Nagad Digital'
+                                      ? 'border-orange-500 bg-orange-500/10 ring-2 ring-orange-500/40 dark:bg-orange-950/20'
+                                      : 'border-neutral-200 dark:border-slate-800 bg-white dark:bg-neutral-950 hover:border-orange-500'
+                                  }`}
                                 >
                                   <span className="text-xs font-black text-orange-600">Nagad (নগদ)</span>
                                   <span className="text-[9px] text-neutral-400">Secure BD Wallet</span>
@@ -3418,8 +5326,13 @@ export default function Header({
 
                                 {/* Rocket */}
                                 <button
-                                  onClick={() => handleSimulatePayment('Rocket Wallet')}
-                                  className="flex flex-col items-center justify-center p-2 rounded-lg border border-neutral-200 dark:border-slate-800 bg-white dark:bg-neutral-950 hover:border-purple-550 transition-all cursor-pointer text-center"
+                                  type="button"
+                                  onClick={() => setSelectedRegisteredGateway('Rocket Wallet')}
+                                  className={`flex flex-col items-center justify-center p-2 rounded-lg border transition-all cursor-pointer text-center ${
+                                    selectedRegisteredGateway === 'Rocket Wallet'
+                                      ? 'border-purple-600 bg-purple-500/10 ring-2 ring-purple-600/40 dark:bg-purple-950/20'
+                                      : 'border-neutral-200 dark:border-slate-800 bg-white dark:bg-neutral-950 hover:border-purple-550'
+                                  }`}
                                 >
                                   <span className="text-xs font-black text-purple-600">Rocket (রকেট)</span>
                                   <span className="text-[9px] text-neutral-400 font-sans">Dutch-Bangla Bank</span>
@@ -3427,8 +5340,13 @@ export default function Header({
 
                                 {/* Cellfin */}
                                 <button
-                                  onClick={() => handleSimulatePayment('Cellfin Payment')}
-                                  className="flex flex-col items-center justify-center p-2 rounded-lg border border-neutral-200 dark:border-slate-800 bg-white dark:bg-neutral-950 hover:border-sky-500 transition-all cursor-pointer text-center"
+                                  type="button"
+                                  onClick={() => setSelectedRegisteredGateway('Cellfin Payment')}
+                                  className={`flex flex-col items-center justify-center p-2 rounded-lg border transition-all cursor-pointer text-center ${
+                                    selectedRegisteredGateway === 'Cellfin Payment'
+                                      ? 'border-sky-500 bg-sky-500/10 ring-2 ring-sky-500/40 dark:bg-sky-950/20'
+                                      : 'border-neutral-200 dark:border-slate-800 bg-white dark:bg-neutral-950 hover:border-sky-500'
+                                  }`}
                                 >
                                   <span className="text-xs font-black text-sky-600">Cellfin Card</span>
                                   <span className="text-[9px] text-neutral-400 font-sans">Cellfin Wallet</span>
@@ -3436,8 +5354,9 @@ export default function Header({
 
                                 {/* Bank Transfer */}
                                 <button
-                                  onClick={() => handleSimulatePayment('Islami Bank Transfer')}
-                                  className="flex flex-col items-center justify-center p-2 rounded-lg border border-neutral-200 dark:border-slate-800 bg-white dark:bg-neutral-950 hover:border-emerald-500 transition-all cursor-pointer col-span-2 text-center"
+                                  type="button"
+                                  onClick={() => setSelectedRegisteredGateway('Islami Bank Transfer')}
+                                  className={`flex flex-col items-center justify-center p-2 rounded-lg border transition-all cursor-pointer col-span-2 text-center ${selectedRegisteredGateway === 'Islami Bank Transfer' ? 'border-emerald-600 bg-emerald-500/10 ring-2 ring-emerald-600/40 dark:bg-emerald-950/20' : 'border-neutral-200 dark:border-slate-800 bg-white dark:bg-neutral-950 hover:border-emerald-500 hover:shadow-xs'}`}
                                 >
                                   <span className="text-xs font-black text-emerald-600">Islami Bank Transfer</span>
                                   <span className="text-[9px] text-neutral-400 font-sans">Direct IBB Internet Net Banking</span>
@@ -3445,35 +5364,810 @@ export default function Header({
 
                                 {/* SSLCommerz */}
                                 <button
+                                  type="button"
                                   onClick={() => handleSimulatePayment('SSLCommerz Gateway')}
-                                  className="flex flex-col items-center justify-center p-2.5 rounded-lg border border-neutral-200 dark:border-slate-800 bg-white dark:bg-neutral-950 hover:border-cyan-500 transition-all cursor-pointer col-span-2 text-center animated pulse animate-duration-1000"
+                                  className="flex flex-col items-center justify-center p-2.5 rounded-lg border border-neutral-200 dark:border-slate-800 bg-white dark:bg-neutral-950 hover:border-cyan-500 transition-all cursor-pointer col-span-2 text-center"
                                 >
                                   <span className="text-xs font-bold text-cyan-600 font-sans">SSLCommerz BD Checkout</span>
                                   <span className="text-[9px] text-neutral-400 font-sans">Cards / Net Banking / Mobiles</span>
                                 </button>
+
+                                {/* Expanded payment description for BDT (Registered) */}
+                                {['bKash Wallet', 'Nagad Digital', 'Rocket Wallet', 'Cellfin Payment'].includes(selectedRegisteredGateway) && (
+                                  <div className="mt-4 p-3 rounded-xl border border-neutral-350 dark:border-slate-800 bg-neutral-50 dark:bg-[#070b14] text-center animate-in fade-in slide-in-from-top-2 duration-205 col-span-2 text-neutral-800 dark:text-neutral-100">
+                                    <div className="flex flex-col items-center">
+                                      {/* Header */}
+                                      <div className="flex items-center gap-2 mb-2">
+                                        <span className={`w-3 h-3 rounded-full animate-pulse ${
+                                          selectedRegisteredGateway === 'bKash Wallet' ? 'bg-[#d1245e]' :
+                                          selectedRegisteredGateway === 'Nagad Digital' ? 'bg-[#f15a22]' :
+                                          selectedRegisteredGateway === 'Rocket Wallet' ? 'bg-[#8c2aeb]' : 'bg-[#0081d6]'
+                                        }`} />
+                                        <span className="text-xs font-black tracking-tight font-sans">
+                                          {selectedRegisteredGateway === 'bKash Wallet' ? 'bKash Account Info (পার্সোনাল ওয়ালেট)' :
+                                           selectedRegisteredGateway === 'Nagad Digital' ? 'Nagad Account Info (পার্সোনাল ওয়ালেট)' :
+                                           selectedRegisteredGateway === 'Rocket Wallet' ? 'Rocket Account Info (রকেট ওয়ালেট)' : 'Cellfin Wallet Info (সেলফিন)'}
+                                        </span>
+                                      </div>
+
+                                      {/* QR Code */}
+                                      <div className="flex flex-col items-center p-2.5 bg-white dark:bg-[#0c1222] rounded-xl border border-neutral-200 dark:border-slate-800 shadow-sm max-w-[150px] mb-2.5">
+                                        <span className="text-[9px] font-bold text-neutral-500 mb-1.5">{language === 'bn' ? 'স্ক্যান করুন' : 'Scan to Pay'}</span>
+                                        <div className="w-[110px] h-[110px] flex items-center justify-center bg-neutral-100/30 rounded border border-neutral-150 dark:border-slate-800">
+                                          <img 
+                                            src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&color=${
+                                              selectedRegisteredGateway === 'bKash Wallet' ? 'd1245e' :
+                                              selectedRegisteredGateway === 'Nagad Digital' ? 'f15a22' :
+                                              selectedRegisteredGateway === 'Rocket Wallet' ? '8c2aeb' : '0081d6'
+                                            }&data=tel:01864000005`} 
+                                            alt="MFS QR Code"
+                                            className="max-w-full max-h-full object-contain rounded pointer-events-none"
+                                            referrerPolicy="no-referrer"
+                                          />
+                                        </div>
+                                      </div>
+
+                                      {/* Instructions & Phone Number */}
+                                      <p className="text-[10px] text-neutral-500 dark:text-neutral-400 mb-3 leading-relaxed max-w-sm">
+                                        {selectedRegisteredGateway === 'bKash Wallet' ? (language === 'bn' ? 'আমাদের বিকাশ নাম্বারে সেন্ড মানি অথবা পার্সোনাল টু পার্সোনাল ট্রান্সফার সম্পন্ন করুন।' : 'Send Money or Personal transfer directly to our bKash personal wallet.') :
+                                         selectedRegisteredGateway === 'Nagad Digital' ? (language === 'bn' ? 'আমাদের নগদ নাম্বারে সরাসরি টাকা পাঠিয়ে আপনার ট্রানজেকশন ক্লিয়ার করুন।' : 'Send Money directly to our secure Nagad Personal Wallet.') :
+                                         selectedRegisteredGateway === 'Rocket Wallet' ? (language === 'bn' ? 'ডাচ বাংলা ব্যাংক রকেট ওয়ালেট সার্ভিস ব্যবহার করে পেমেন্ট সম্পূর্ণ করুন।' : 'Direct Mobile Cash-in or Send Money via Rocket wallet.') :
+                                         (language === 'bn' ? 'ইসলামী ব্যাংক সেলফিন অ্যাকাউন্টে সহজে ফান্ড ট্রান্সফার বা টাকা পাঠান।' : 'Initiate prompt cellfin transfer directly to our wallet.')}
+                                      </p>
+
+                                      <div className="w-full flex flex-col items-center bg-neutral-100 dark:bg-neutral-950 p-2.5 rounded-xl border border-neutral-205 dark:border-slate-850 max-w-xs mb-3">
+                                        <span className="text-[9px] text-neutral-400 uppercase tracking-widest font-mono font-black block mb-0.5">{language === 'bn' ? 'ওয়ালেট নাম্বার' : 'WALLET NUMBER'}</span>
+                                        <span className="text-base font-extrabold font-mono tracking-wider text-neutral-900 dark:text-white">0186400 0005</span>
+                                        
+                                        {/* Copy Number Button */}
+                                        <motion.button
+                                          type="button"
+                                          whileHover={{ scale: 1.02 }}
+                                          whileTap={{ scale: 0.98 }}
+                                          onClick={() => {
+                                            navigator.clipboard.writeText('01864000005');
+                                            setBdtPaymentCopied(true);
+                                            setTimeout(() => setBdtPaymentCopied(false), 2000);
+                                          }}
+                                          className={`mt-2 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[10px] uppercase font-black tracking-wider transition-all duration-300 cursor-pointer w-full shadow-md ${
+                                            bdtPaymentCopied 
+                                              ? 'bg-emerald-600 shadow-emerald-600/20' 
+                                              : selectedRegisteredGateway === 'bKash Wallet' ? 'bg-[#d1245e] hover:bg-[#b01e4f] shadow-rose-600/10' :
+                                                selectedRegisteredGateway === 'Nagad Digital' ? 'bg-[#f15a22] hover:bg-[#d94815] shadow-orange-600/10' :
+                                                selectedRegisteredGateway === 'Rocket Wallet' ? 'bg-[#8c2aeb] hover:bg-[#771ecf] shadow-purple-600/10' : 'bg-[#0081d6] hover:bg-[#006cb3] shadow-sky-600/10'
+                                          }`}
+                                        >
+                                          {bdtPaymentCopied ? (
+                                            <span className="flex items-center gap-1"><Check className="w-3.5 h-3.5 text-white" /> {language === 'bn' ? 'কপি সফল হয়েছে!' : 'Number Copied!'}</span>
+                                          ) : (
+                                            <span className="flex items-center gap-1"><Copy className="w-3.5 h-3.5" /> {language === 'bn' ? 'নাম্বার কপি করুন' : 'Copy Number'}</span>
+                                          )}
+                                        </motion.button>
+                                      </div>
+
+                                      {/* Payment Sender Information Fields */}
+                                      <div className="w-full space-y-4 mt-3 mb-4 text-left border-t border-dashed border-neutral-200 dark:border-slate-800 pt-3">
+                                        <div className="flex items-center gap-1.5 mb-1.5">
+                                          <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />
+                                          <span className="text-[10px] font-extrabold text-neutral-800 dark:text-neutral-200 uppercase tracking-wider">
+                                            {language === 'bn' ? 'পেমেন্ট তথ্য প্রদান করুন' : 'Verify Payment Details'}
+                                          </span>
+                                        </div>
+                                        
+                                        {/* Sender Name */}
+                                        <div className="relative">
+                                          <input
+                                            type="text"
+                                            id="reg-mfs-sender-name"
+                                            placeholder=" "
+                                            value={senderName}
+                                            onChange={(e) => setSenderName(e.target.value)}
+                                            className="peer w-full h-[56px] bg-[#F8FAFC] dark:bg-[#111827] border border-[#E2E8F0] dark:border-[#374151] rounded-[14px] px-4 pt-5 pb-1.5 text-xs sm:text-sm font-semibold text-[#0F172A] dark:text-white placeholder-transparent focus:outline-none focus:ring-4 focus:ring-violet-500/18 focus:border-violet-500 transition-all duration-300"
+                                            required
+                                          />
+                                          <label
+                                            htmlFor="reg-mfs-sender-name"
+                                            className="absolute left-4 top-1.5 text-[10px] font-semibold text-[#475569] dark:text-[#CBD5E1] transition-all duration-300 peer-placeholder-shown:text-xs peer-placeholder-shown:top-4 peer-focus:top-1.5 peer-focus:text-[10px] uppercase tracking-wider cursor-text pointer-events-none"
+                                          >
+                                            {language === 'bn' ? 'প্রেরকের নাম (Sender Name) *' : 'Sender Name *'}
+                                          </label>
+                                        </div>
+
+                                        {/* Sender Phone */}
+                                        <div className="relative">
+                                          <input
+                                            type="text"
+                                            id="reg-mfs-sender-phone"
+                                            placeholder=" "
+                                            value={senderNumber}
+                                            onChange={(e) => setSenderNumber(e.target.value)}
+                                            className="peer w-full h-[56px] bg-[#F8FAFC] dark:bg-[#111827] border border-[#E2E8F0] dark:border-[#374151] rounded-[14px] px-4 pt-5 pb-1.5 text-xs sm:text-sm font-semibold text-[#0F172A] dark:text-white placeholder-transparent focus:outline-none focus:ring-4 focus:ring-violet-500/18 focus:border-violet-500 transition-all duration-300"
+                                            required
+                                          />
+                                          <label
+                                            htmlFor="reg-mfs-sender-phone"
+                                            className="absolute left-4 top-1.5 text-[10px] font-semibold text-[#475569] dark:text-[#CBD5E1] transition-all duration-300 peer-placeholder-shown:text-xs peer-placeholder-shown:top-4 peer-focus:top-1.5 peer-focus:text-[10px] uppercase tracking-wider cursor-text pointer-events-none"
+                                          >
+                                            {language === 'bn' ? 'প্রেরকের নম্বর (Sender Mobile/Acc Number) *' : 'Sender Phone / Account No *'}
+                                          </label>
+                                        </div>
+
+                                        {/* Transaction ID */}
+                                        <div className="relative">
+                                          <input
+                                            type="text"
+                                            id="reg-mfs-sender-trx"
+                                            placeholder=" "
+                                            value={senderTrxId}
+                                            onChange={(e) => setSenderTrxId(e.target.value)}
+                                            className="peer w-full h-[56px] bg-[#F8FAFC] dark:bg-[#111827] border border-[#E2E8F0] dark:border-[#374151] rounded-[14px] px-4 pt-5 pb-1.5 text-xs sm:text-sm font-mono font-bold text-[#0F172A] dark:text-white placeholder-transparent focus:outline-none focus:ring-4 focus:ring-violet-500/18 focus:border-violet-500 transition-all duration-300"
+                                            required
+                                          />
+                                          <label
+                                            htmlFor="reg-mfs-sender-trx"
+                                            className="absolute left-4 top-1.5 text-[10px] font-semibold text-[#475569] dark:text-[#CBD5E1] transition-all duration-300 peer-placeholder-shown:text-xs peer-placeholder-shown:top-4 peer-focus:top-1.5 peer-focus:text-[10px] uppercase tracking-wider cursor-text pointer-events-none"
+                                          >
+                                            {language === 'bn' ? 'ট্রানজেকশন আইডি (Transaction ID) *' : 'Transaction ID (TrxID) *'}
+                                          </label>
+                                        </div>
+                                      </div>
+
+                                      {/* Submit button for Registered */}
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          handleSimulatePayment(selectedRegisteredGateway);
+                                          setSelectedRegisteredGateway('');
+                                        }}
+                                        className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-indigo-650 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-black tracking-wide rounded-xl transition duration-200 shadow-md cursor-pointer"
+                                      >
+                                        {language === 'bn' ? 'আমি পেমেন্ট করেছি (অর্ডার প্লেস করুন)' : 'I Have Paid (Place Order Now)'}
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Islami Bank Transfer Expanded Panel (Registered Checkout) */}
+                                {selectedRegisteredGateway === 'Islami Bank Transfer' && (
+                                  <div className="mt-4 p-4 rounded-xl border border-emerald-500/30 dark:border-emerald-500/20 bg-neutral-50 dark:bg-[#0b0f19] text-left animate-in fade-in slide-in-from-top-2 duration-205 col-span-2 text-neutral-800 dark:text-neutral-100">
+                                    <div className="flex flex-col gap-4">
+                                      {/* Bank Header */}
+                                      <div className="flex items-center gap-3 pb-3 border-b border-neutral-200 dark:border-slate-800">
+                                        <div className="p-2 bg-emerald-600 rounded-lg text-white font-black tracking-wider text-xs font-sans">
+                                          IBBL
+                                        </div>
+                                        <div>
+                                          <h4 className="text-xs font-black tracking-tight text-neutral-900 dark:text-white font-sans">
+                                            {language === 'bn' ? 'ইসলামী ব্যাংক বাংলাদেশ লিমিটেড' : 'Islami Bank Bangladesh Ltd.'}
+                                          </h4>
+                                          <span className="text-[10px] text-emerald-600 dark:text-emerald-450 font-mono font-bold block">
+                                            Direct IBBL Online Banking Transfer
+                                          </span>
+                                        </div>
+                                      </div>
+
+                                      {/* Grid layout for bank details and QR code */}
+                                      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-stretch font-sans">
+                                        
+                                        {/* Details */}
+                                        <div className="md:col-span-7 flex flex-col gap-2">
+                                          
+                                          {/* Account Name */}
+                                          <div className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-neutral-900 border border-neutral-150 dark:border-slate-800 shadow-xs">
+                                            <div className="flex flex-col">
+                                              <span className="text-[8px] text-neutral-400 font-bold uppercase tracking-wider">{language === 'bn' ? 'অ্যাকাউন্ট নাম' : 'Account Name'}</span>
+                                              <span className="text-xs font-black text-neutral-900 dark:text-white">MD IMRAN HOSSAIN</span>
+                                            </div>
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                navigator.clipboard.writeText('MD IMRAN HOSSAIN');
+                                                setCopiedBankAccName(true);
+                                                setTimeout(() => setCopiedBankAccName(false), 2000);
+                                              }}
+                                              className="p-1 px-1.5 rounded bg-neutral-100 dark:bg-neutral-800 hover:bg-emerald-600 hover:text-white transition-all text-[10px] flex items-center gap-1 cursor-pointer font-bold shrink-0 text-neutral-600 dark:text-neutral-300"
+                                            >
+                                              {copiedBankAccName ? (
+                                                <>
+                                                  <Check className="w-3 h-3 text-emerald-500" />
+                                                  <span className="text-[9px] text-emerald-600 font-bold">{language === 'bn' ? 'কপিড' : 'Copied'}</span>
+                                                </>
+                                              ) : (
+                                                <>
+                                                  <Copy className="w-3 h-3 text-neutral-400" />
+                                                  <span>{language === 'bn' ? 'কপি' : 'Copy'}</span>
+                                                </>
+                                              )}
+                                            </button>
+                                          </div>
+
+                                          {/* Account No */}
+                                          <div className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-neutral-900 border border-neutral-150 dark:border-slate-800 shadow-xs">
+                                            <div className="flex flex-col">
+                                              <span className="text-[8px] text-neutral-400 font-bold uppercase tracking-wider">{language === 'bn' ? 'অ্যাকাউন্ট নাম্বার' : 'Account No'}</span>
+                                              <span className="text-sm font-black font-mono tracking-wider text-neutral-900 dark:text-white">20501290204369912</span>
+                                            </div>
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                navigator.clipboard.writeText('20501290204369912');
+                                                setCopiedBankAccNo(true);
+                                                setTimeout(() => setCopiedBankAccNo(false), 2000);
+                                              }}
+                                              className="p-1 px-1.5 rounded bg-neutral-100 dark:bg-neutral-800 hover:bg-emerald-600 hover:text-white transition-all text-[10px] flex items-center gap-1 cursor-pointer font-bold shrink-0 text-neutral-600 dark:text-neutral-300"
+                                            >
+                                              {copiedBankAccNo ? (
+                                                <>
+                                                  <Check className="w-3 h-3 text-emerald-500" />
+                                                  <span className="text-[9px] text-emerald-600 font-bold">{language === 'bn' ? 'কপিড' : 'Copied'}</span>
+                                                </>
+                                              ) : (
+                                                <>
+                                                  <Copy className="w-3 h-3 text-neutral-400" />
+                                                  <span>{language === 'bn' ? 'কপি' : 'Copy'}</span>
+                                                </>
+                                              )}
+                                            </button>
+                                          </div>
+
+                                          {/* Branch */}
+                                          <div className="p-2 rounded-lg bg-white dark:bg-neutral-900 border border-neutral-150 dark:border-slate-800 shadow-xs flex justify-between items-center text-xs">
+                                            <div className="flex flex-col">
+                                              <span className="text-[8px] text-neutral-400 font-bold uppercase tracking-wider">{language === 'bn' ? 'শাখা / ব্রাঞ্চ' : 'Branch'}</span>
+                                              <span className="font-extrabold text-neutral-900 dark:text-white">New Market Dhaka</span>
+                                            </div>
+                                            <span className="text-[10px] text-emerald-600 font-bold font-mono">IBBL BD</span>
+                                          </div>
+
+                                          {/* Routing No */}
+                                          <div className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-neutral-900 border border-neutral-150 dark:border-slate-800 shadow-xs">
+                                            <div className="flex flex-col">
+                                              <span className="text-[8px] text-neutral-400 font-bold uppercase tracking-wider">{language === 'bn' ? 'রাউটিং নাম্বার' : 'Routing No'}</span>
+                                              <span className="text-xs font-extrabold font-mono text-neutral-900 dark:text-white">125263522</span>
+                                            </div>
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                navigator.clipboard.writeText('125263522');
+                                                setCopiedBankRouting(true);
+                                                setTimeout(() => setCopiedBankRouting(false), 2000);
+                                              }}
+                                              className="p-1 px-1.5 rounded bg-neutral-100 dark:bg-neutral-800 hover:bg-emerald-600 hover:text-white transition-all text-[10px] flex items-center gap-1 cursor-pointer font-bold shrink-0 text-neutral-600 dark:text-neutral-300"
+                                            >
+                                              {copiedBankRouting ? (
+                                                <>
+                                                  <Check className="w-3 h-3 text-emerald-500" />
+                                                  <span className="text-[9px] text-emerald-600 font-bold">{language === 'bn' ? 'কপিড' : 'Copied'}</span>
+                                                </>
+                                              ) : (
+                                                <>
+                                                  <Copy className="w-3 h-3 text-neutral-400" />
+                                                  <span>{language === 'bn' ? 'কপি' : 'Copy'}</span>
+                                                </>
+                                              )}
+                                            </button>
+                                          </div>
+
+                                        </div>
+
+                                        {/* QR System */}
+                                        <div className="md:col-span-5 flex flex-col items-center justify-center bg-white dark:bg-neutral-950 p-3 rounded-lg border border-neutral-150 dark:border-slate-800 shadow-xs text-center">
+                                          <span className="text-[9px] font-bold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider mb-2">{language === 'bn' ? 'কিউআর কোড (পেমেন্ট)' : 'Scan QR for Banking'}</span>
+                                          <div className="w-[115px] h-[115px] bg-neutral-50 dark:bg-[#0c1222] p-1.5 rounded border border-neutral-200 dark:border-slate-800 flex items-center justify-center">
+                                            <img 
+                                              src="https://api.qrserver.com/v1/create-qr-code/?size=140x140&color=059669&data=MD+IMRAN+HOSSAIN+A/C+20501290204369912+IBBL+New+Market+Dhaka+Routing+125263522" 
+                                              alt="IBBL QR Code" 
+                                              className="max-w-full max-h-full object-contain pointer-events-none"
+                                              referrerPolicy="no-referrer"
+                                            />
+                                          </div>
+                                          <span className="text-[8px] text-neutral-400 font-bold mt-2 leading-tight">
+                                            {language === 'bn' ? 'ইসলামী ব্যাংক অ্যাপ বা যেকোনো সেলফিন দিয়ে স্ক্যান করুন' : 'Scan via Cellfin or IBBL Smart app'}
+                                          </span>
+                                        </div>
+
+                                      </div>
+
+                                      {/* Payment Sender Information Fields */}
+                                      <div className="w-full space-y-4 mt-3 mb-4 text-left border-t border-dashed border-neutral-200 dark:border-slate-800 pt-3 font-sans">
+                                        <div className="flex items-center gap-1.5 mb-1.5">
+                                          <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />
+                                          <span className="text-[10px] font-extrabold text-neutral-800 dark:text-neutral-200 uppercase tracking-wider">
+                                            {language === 'bn' ? 'পেমেন্ট তথ্য প্রদান করুন' : 'Verify Payment Details'}
+                                          </span>
+                                        </div>
+                                        
+                                        {/* Sender Name */}
+                                        <div className="relative">
+                                          <input
+                                            type="text"
+                                            id="reg-ibbl-sender-name"
+                                            placeholder=" "
+                                            value={senderName}
+                                            onChange={(e) => setSenderName(e.target.value)}
+                                            className="peer w-full h-[56px] bg-[#F8FAFC] dark:bg-[#111827] border border-[#E2E8F0] dark:border-[#374151] rounded-[14px] px-4 pt-5 pb-1.5 text-xs sm:text-sm font-semibold text-[#0F172A] dark:text-white placeholder-transparent focus:outline-none focus:ring-4 focus:ring-violet-500/18 focus:border-violet-500 transition-all duration-300"
+                                            required
+                                          />
+                                          <label
+                                            htmlFor="reg-ibbl-sender-name"
+                                            className="absolute left-4 top-1.5 text-[10px] font-semibold text-[#475569] dark:text-[#CBD5E1] transition-all duration-300 peer-placeholder-shown:text-xs peer-placeholder-shown:top-4 peer-focus:top-1.5 peer-focus:text-[10px] uppercase tracking-wider cursor-text pointer-events-none"
+                                          >
+                                            {language === 'bn' ? 'প্রেরকের নাম (Sender Name) *' : 'Sender Name *'}
+                                          </label>
+                                        </div>
+
+                                        {/* Sender Phone */}
+                                        <div className="relative">
+                                          <input
+                                            type="text"
+                                            id="reg-ibbl-sender-phone"
+                                            placeholder=" "
+                                            value={senderNumber}
+                                            onChange={(e) => setSenderNumber(e.target.value)}
+                                            className="peer w-full h-[56px] bg-[#F8FAFC] dark:bg-[#111827] border border-[#E2E8F0] dark:border-[#374151] rounded-[14px] px-4 pt-5 pb-1.5 text-xs sm:text-sm font-semibold text-[#0F172A] dark:text-white placeholder-transparent focus:outline-none focus:ring-4 focus:ring-violet-500/18 focus:border-violet-500 transition-all duration-300"
+                                            required
+                                          />
+                                          <label
+                                            htmlFor="reg-ibbl-sender-phone"
+                                            className="absolute left-4 top-1.5 text-[10px] font-semibold text-[#475569] dark:text-[#CBD5E1] transition-all duration-300 peer-placeholder-shown:text-xs peer-placeholder-shown:top-4 peer-focus:top-1.5 peer-focus:text-[10px] uppercase tracking-wider cursor-text pointer-events-none"
+                                          >
+                                            {language === 'bn' ? 'প্রেরকের নম্বর (Sender Mobile/Acc Number) *' : 'Sender Phone / Account No *'}
+                                          </label>
+                                        </div>
+
+                                        {/* Transaction ID */}
+                                        <div className="relative">
+                                          <input
+                                            type="text"
+                                            id="reg-ibbl-sender-trx"
+                                            placeholder=" "
+                                            value={senderTrxId}
+                                            onChange={(e) => setSenderTrxId(e.target.value)}
+                                            className="peer w-full h-[56px] bg-[#F8FAFC] dark:bg-[#111827] border border-[#E2E8F0] dark:border-[#374151] rounded-[14px] px-4 pt-5 pb-1.5 text-xs sm:text-sm font-mono font-bold text-[#0F172A] dark:text-white placeholder-transparent focus:outline-none focus:ring-4 focus:ring-violet-500/18 focus:border-violet-500 transition-all duration-300"
+                                            required
+                                          />
+                                          <label
+                                            htmlFor="reg-ibbl-sender-trx"
+                                            className="absolute left-4 top-1.5 text-[10px] font-semibold text-[#475569] dark:text-[#CBD5E1] transition-all duration-300 peer-placeholder-shown:text-xs peer-placeholder-shown:top-4 peer-focus:top-1.5 peer-focus:text-[10px] uppercase tracking-wider cursor-text pointer-events-none"
+                                          >
+                                            {language === 'bn' ? 'ট্রানজেকশন আইডি (Transaction ID) *' : 'Transaction ID (TrxID) *'}
+                                          </label>
+                                        </div>
+                                      </div>
+
+                                      {/* Place Order Button */}
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          handleSimulatePayment('Islami Bank Transfer');
+                                          setSelectedRegisteredGateway('');
+                                        }}
+                                        className="w-full mt-2 py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white text-xs font-black tracking-wide rounded-xl transition duration-200 shadow-md cursor-pointer font-sans"
+                                      >
+                                        {language === 'bn' ? 'আমি পেমেন্ট করেছি (অর্ডার প্লেস করুন)' : 'I Have Paid (Place Order Now)'}
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             )}
 
                             {currency === 'SAR' && (
-                              <div className="grid grid-cols-1 gap-2 w-full">
+                              <div className="grid grid-cols-2 gap-2 w-full font-sans">
                                 {/* STC Pay */}
                                 <button
-                                  onClick={() => handleSimulatePayment('STC Pay (0570511931)')}
-                                  className="flex flex-col items-center justify-center p-3 rounded-lg border border-neutral-200 dark:border-slate-800 bg-white dark:bg-neutral-950 hover:border-purple-600 transition-all cursor-pointer w-full text-center"
+                                  type="button"
+                                  onClick={() => setSelectedRegisteredGateway('STC Pay (+966 57 051 1931)')}
+                                  className={`flex flex-col items-center justify-center p-2 rounded-lg border transition-all cursor-pointer text-center ${
+                                    selectedRegisteredGateway === 'STC Pay (+966 57 051 1931)'
+                                      ? 'border-purple-600 bg-purple-500/10 ring-2 ring-purple-600/40 dark:bg-purple-950/20'
+                                      : 'border-neutral-200 dark:border-slate-800 bg-white dark:bg-neutral-950 hover:border-purple-600'
+                                  }`}
                                 >
                                   <span className="text-xs font-black text-purple-600">STC Pay</span>
-                                  <span className="text-[11px] text-slate-800 dark:text-slate-100 font-mono font-bold mt-0.5">Wallet: 0570511931</span>
-                                  <span className="text-[9px] text-neutral-400 font-normal">Instant Transfer System</span>
+                                  <span className="text-[9px] text-neutral-450 mt-0.5">Saudi Digital Wallet</span>
                                 </button>
 
-                                {/* Alraji Bank Transfer */}
+                                {/* Alrajhi Bank Transfer */}
                                 <button
-                                  onClick={() => handleSimulatePayment('Alraji Bank Transfer')}
-                                  className="flex flex-col items-center justify-center p-3 rounded-lg border border-neutral-200 dark:border-slate-800 bg-white dark:bg-neutral-950 hover:border-cyan-600 transition-all cursor-pointer w-full text-center"
+                                  type="button"
+                                  onClick={() => setSelectedRegisteredGateway('Alraji Bank Transfer')}
+                                  className={`flex flex-col items-center justify-center p-2 rounded-lg border transition-all cursor-pointer text-center ${
+                                    selectedRegisteredGateway === 'Alraji Bank Transfer'
+                                      ? 'border-blue-600 bg-blue-500/10 ring-2 ring-blue-600/40 dark:bg-blue-950/20'
+                                      : 'border-neutral-200 dark:border-slate-800 bg-white dark:bg-neutral-950 hover:border-cyan-600'
+                                  }`}
                                 >
-                                  <span className="text-xs font-black text-blue-600">Alraji Bank Transfer</span>
-                                  <span className="text-[9px] text-neutral-400">Local Saudi Bank Transfer</span>
+                                  <span className="text-xs font-black text-blue-600">Alraji Bank</span>
+                                  <span className="text-[9px] text-neutral-450 mt-0.5">Bank Wire Transfer</span>
                                 </button>
+
+                                {/* STC Pay Expanded Block details */}
+                                {selectedRegisteredGateway === 'STC Pay (+966 57 051 1931)' && (
+                                  <div className="mt-2 p-3 rounded-xl border border-purple-500/30 bg-purple-50/50 dark:bg-purple-950/20 text-center animate-in fade-in slide-in-from-top-2 duration-205 col-span-2">
+                                    <p className="text-[11px] font-black text-purple-700 dark:text-purple-400 mb-1">
+                                      {language === 'bn' ? 'কোড স্ক্যান করুন পেমেন্ট করার জন্য' : 'Scan QR code to pay using STC Pay app'}
+                                    </p>
+
+                                    {/* Single QR Code Presentation */}
+                                    <div className="flex justify-center my-3">
+                                      <div className="flex flex-col items-center p-2.5 bg-white dark:bg-[#0F172A] rounded-lg border border-purple-200 dark:border-slate-800 shadow-sm max-w-[170px]">
+                                        <span className="text-[10px] font-bold text-purple-600 mb-1.5">{language === 'bn' ? 'কিউআর কোড' : 'QR Code'}</span>
+                                        <div className="w-[130px] h-[130px] flex items-center justify-center overflow-hidden bg-purple-50/20 rounded border border-neutral-150 dark:border-slate-800">
+                                          <img 
+                                            src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&color=7c3aed&data=tel:%2B966570511931" 
+                                            alt="STC Pay QR Code"
+                                            className="max-w-full max-h-full object-contain rounded pointer-events-none"
+                                            referrerPolicy="no-referrer"
+                                          />
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    <div className="flex flex-col items-center mb-3">
+                                      <p className="text-[10px] text-purple-600 dark:text-purple-400 font-mono font-bold bg-purple-100/50 dark:bg-purple-950/40 py-1.5 rounded-md px-2 inline-block w-full text-center">
+                                        {language === 'bn' ? 'নম্বর: +966 57 051 1931 (ইমরান হাসান)' : 'Wallet Number: +966 57 051 1931 (Imran Hasan)'}
+                                      </p>
+                                      <motion.button
+                                        type="button"
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.96 }}
+                                        onClick={() => {
+                                          navigator.clipboard.writeText('+966 57 051 1931');
+                                          setStcPayCopied(true);
+                                          setTimeout(() => setStcPayCopied(false), 2000);
+                                        }}
+                                        className={`mt-1.5 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-white text-[10px] uppercase font-bold transition-all duration-300 cursor-pointer w-full shadow-xs ${
+                                          stcPayCopied 
+                                            ? 'bg-emerald-600 hover:bg-emerald-700' 
+                                            : 'bg-purple-600 hover:bg-purple-750'
+                                        }`}
+                                      >
+                                        <AnimatePresence mode="wait">
+                                          {stcPayCopied ? (
+                                            <motion.div
+                                              key="copied"
+                                              initial={{ opacity: 0, scale: 0.8 }}
+                                              animate={{ opacity: 1, scale: 1 }}
+                                              exit={{ opacity: 0, scale: 0.8 }}
+                                              transition={{ duration: 0.15 }}
+                                              className="flex items-center gap-1.5"
+                                            >
+                                              <Check className="w-3.5 h-3.5 text-white" />
+                                              <span>{language === 'bn' ? 'কপি করা হয়েছে!' : 'Number Copied!'}</span>
+                                            </motion.div>
+                                          ) : (
+                                            <motion.div
+                                              key="copy"
+                                              initial={{ opacity: 0, scale: 0.8 }}
+                                              animate={{ opacity: 1, scale: 1 }}
+                                              exit={{ opacity: 0, scale: 0.8 }}
+                                              transition={{ duration: 0.15 }}
+                                              className="flex items-center gap-1.5"
+                                            >
+                                              <Copy className="w-3.5 h-3.5" />
+                                              <span>{language === 'bn' ? 'নম্বর কপি করুন' : 'Copy Number'}</span>
+                                            </motion.div>
+                                          )}
+                                        </AnimatePresence>
+                                      </motion.button>
+                                    </div>
+
+                                    {/* 3 Verification Fields */}
+                                    <div className="w-full space-y-2.5 mt-4 text-left border-t border-dashed border-neutral-300 dark:border-slate-800 pt-3">
+                                      <div className="flex items-center gap-1.5 mb-1.5">
+                                        <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />
+                                        <span className="text-[10px] font-extrabold text-neutral-800 dark:text-neutral-200 uppercase tracking-wider">
+                                          {language === 'bn' ? 'পেমেন্ট তথ্য প্রদান করুন' : 'Verify Payment Details'}
+                                        </span>
+                                      </div>
+                                      
+                                      {/* Sender Name */}
+                                      <div className="relative">
+                                        <input
+                                          type="text"
+                                          id="reg-stc-sender-name"
+                                          placeholder=" "
+                                          value={senderName}
+                                          onChange={(e) => setSenderName(e.target.value)}
+                                          className="peer w-full h-[56px] bg-[#F8FAFC] dark:bg-[#111827] border border-[#E2E8F0] dark:border-[#374151] rounded-[14px] px-4 pt-5 pb-1.5 text-xs sm:text-sm font-semibold text-[#0F172A] dark:text-white placeholder-transparent focus:outline-none focus:ring-4 focus:ring-violet-500/18 focus:border-violet-500 transition-all duration-300"
+                                          required
+                                        />
+                                        <label
+                                          htmlFor="reg-stc-sender-name"
+                                          className="absolute left-4 top-1.5 text-[10px] font-semibold text-[#475569] dark:text-[#CBD5E1] transition-all duration-300 peer-placeholder-shown:text-xs peer-placeholder-shown:top-4 peer-focus:top-1.5 peer-focus:text-[10px] uppercase tracking-wider cursor-text pointer-events-none"
+                                        >
+                                          {language === 'bn' ? 'প্রেরকের নাম (Sender Name) *' : 'Sender Name *'}
+                                        </label>
+                                      </div>
+
+                                      {/* Sender Phone */}
+                                      <div className="relative">
+                                        <input
+                                          type="text"
+                                          id="reg-stc-sender-phone"
+                                          placeholder=" "
+                                          value={senderNumber}
+                                          onChange={(e) => setSenderNumber(e.target.value)}
+                                          className="peer w-full h-[56px] bg-[#F8FAFC] dark:bg-[#111827] border border-[#E2E8F0] dark:border-[#374151] rounded-[14px] px-4 pt-5 pb-1.5 text-xs sm:text-sm font-semibold text-[#0F172A] dark:text-white placeholder-transparent focus:outline-none focus:ring-4 focus:ring-violet-500/18 focus:border-violet-500 transition-all duration-300"
+                                          required
+                                        />
+                                        <label
+                                          htmlFor="reg-stc-sender-phone"
+                                          className="absolute left-4 top-1.5 text-[10px] font-semibold text-[#475569] dark:text-[#CBD5E1] transition-all duration-300 peer-placeholder-shown:text-xs peer-placeholder-shown:top-4 peer-focus:top-1.5 peer-focus:text-[10px] uppercase tracking-wider cursor-text pointer-events-none"
+                                        >
+                                          {language === 'bn' ? 'প্রেরকের নম্বর (Sender Mobile/Acc Number) *' : 'Sender Phone / Account No *'}
+                                        </label>
+                                      </div>
+
+                                      {/* Transaction ID */}
+                                      <div className="relative">
+                                        <input
+                                          type="text"
+                                          id="reg-stc-sender-trx"
+                                          placeholder=" "
+                                          value={senderTrxId}
+                                          onChange={(e) => setSenderTrxId(e.target.value)}
+                                          className="peer w-full h-[56px] bg-[#F8FAFC] dark:bg-[#111827] border border-[#E2E8F0] dark:border-[#374151] rounded-[14px] px-4 pt-5 pb-1.5 text-xs sm:text-sm font-mono font-bold text-[#0F172A] dark:text-white placeholder-transparent focus:outline-none focus:ring-4 focus:ring-violet-500/18 focus:border-violet-500 transition-all duration-300"
+                                          required
+                                        />
+                                        <label
+                                          htmlFor="reg-stc-sender-trx"
+                                          className="absolute left-4 top-1.5 text-[10px] font-semibold text-[#475569] dark:text-[#CBD5E1] transition-all duration-300 peer-placeholder-shown:text-xs peer-placeholder-shown:top-4 peer-focus:top-1.5 peer-focus:text-[10px] uppercase tracking-wider cursor-text pointer-events-none"
+                                        >
+                                          {language === 'bn' ? 'ট্রানজেকশন আইডি (Transaction ID) *' : 'Transaction ID *'}
+                                        </label>
+                                      </div>
+                                    </div>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSimulatePayment('STC Pay (+966 57 051 1931)')}
+                                      className="w-full mt-4 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-650 hover:from-purple-700 hover:to-indigo-700 text-white font-extrabold rounded-lg text-xs tracking-wider transition duration-200 shadow-md uppercase select-none cursor-pointer"
+                                    >
+                                      {language === 'bn' ? 'আমি পেমেন্ট করেছি (Place Order Now)' : 'I have paid (Place Order Now)'}
+                                    </button>
+                                  </div>
+                                )}
+
+                                {/* Alraji Bank Expanded Block details */}
+                                {selectedRegisteredGateway === 'Alraji Bank Transfer' && (
+                                  <div className="mt-4 p-4 rounded-xl border border-blue-500/30 dark:border-blue-500/25 bg-neutral-50 dark:bg-[#0b0f19] text-left animate-in fade-in slide-in-from-top-2 duration-205 col-span-2 text-neutral-800 dark:text-neutral-100 font-sans">
+                                    <div className="flex flex-col gap-4">
+                                      {/* Bank Header */}
+                                      <div className="flex items-center gap-3 pb-3 border-b border-neutral-200 dark:border-slate-800">
+                                        <div className="p-2 bg-blue-600 rounded-lg text-white font-black tracking-wider text-xs uppercase font-sans">
+                                          Alrajhi
+                                        </div>
+                                        <div>
+                                          <h4 className="text-xs font-black tracking-tight text-neutral-900 dark:text-white font-sans">
+                                            {language === 'bn' ? 'আল রাজি ব্যাংক সৌদি আরব' : 'Al Rajhi Bank Saudi Arabia 🇸🇦'}
+                                          </h4>
+                                          <span className="text-[10px] text-blue-600 dark:text-blue-450 font-mono font-bold block">
+                                            Direct Al Rajhi Bank Transfer Details
+                                          </span>
+                                        </div>
+                                      </div>
+
+                                      {/* Grid layout for bank details and QR code */}
+                                      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-stretch">
+                                        
+                                        {/* Details */}
+                                        <div className="md:col-span-12 lg:col-span-7 flex flex-col gap-2">
+                                          
+                                          {/* Account Name */}
+                                          <div className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-neutral-900 border border-neutral-150 dark:border-slate-800 shadow-xs">
+                                            <div className="flex flex-col">
+                                              <span className="text-[8px] text-neutral-400 font-bold uppercase tracking-wider">{language === 'bn' ? 'অ্যাকাউন্ট নাম (Account Name)' : 'Account Name'}</span>
+                                              <span className="text-[11px] font-black text-neutral-900 dark:text-white">MD IMRAN HOSSAIN</span>
+                                            </div>
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                navigator.clipboard.writeText('MD IMRAN HOSSAIN');
+                                                setCopiedAlrajiAccName(true);
+                                                setTimeout(() => setCopiedAlrajiAccName(false), 2000);
+                                              }}
+                                              className="p-1 px-1.5 rounded bg-neutral-100 dark:bg-neutral-800 hover:bg-blue-600 hover:text-white transition-all text-[10px] flex items-center gap-1 cursor-pointer font-bold shrink-0 text-neutral-600 dark:text-neutral-300"
+                                            >
+                                              {copiedAlrajiAccName ? (
+                                                <>
+                                                  <Check className="w-3 h-3 text-emerald-500" />
+                                                  <span className="text-[9px] text-emerald-600 font-bold">{language === 'bn' ? 'কপিড' : 'Copied'}</span>
+                                                </>
+                                              ) : (
+                                                <>
+                                                  <Copy className="w-3 h-3 text-neutral-400" />
+                                                  <span>{language === 'bn' ? 'কপি' : 'Copy'}</span>
+                                                </>
+                                              )}
+                                            </button>
+                                          </div>
+
+                                          {/* Account No */}
+                                          <div className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-neutral-900 border border-neutral-150 dark:border-slate-800 shadow-xs">
+                                            <div className="flex flex-col">
+                                              <span className="text-[8px] text-neutral-400 font-bold uppercase tracking-wider">{language === 'bn' ? 'অ্যাকাউন্ট নাম্বার' : 'Account No'}</span>
+                                              <span className="text-[11px] font-black font-mono tracking-wider text-neutral-900 dark:text-white">621000010006086016528</span>
+                                            </div>
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                navigator.clipboard.writeText('621000010006086016528');
+                                                setCopiedAlrajiAccNo(true);
+                                                setTimeout(() => setCopiedAlrajiAccNo(false), 2000);
+                                              }}
+                                              className="p-1 px-1.5 rounded bg-neutral-100 dark:bg-neutral-800 hover:bg-blue-600 hover:text-white transition-all text-[10px] flex items-center gap-1 cursor-pointer font-bold shrink-0 text-neutral-600 dark:text-neutral-300"
+                                            >
+                                              {copiedAlrajiAccNo ? (
+                                                <>
+                                                  <Check className="w-3 h-3 text-emerald-500" />
+                                                  <span className="text-[9px] text-emerald-600 font-bold">{language === 'bn' ? 'কপিড' : 'Copied'}</span>
+                                                </>
+                                              ) : (
+                                                <>
+                                                  <Copy className="w-3 h-3 text-neutral-400" />
+                                                  <span>{language === 'bn' ? 'কপি' : 'Copy'}</span>
+                                                </>
+                                              )}
+                                            </button>
+                                          </div>
+
+                                          {/* IBAN */}
+                                          <div className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-neutral-900 border border-neutral-150 dark:border-slate-800 shadow-xs">
+                                            <div className="flex flex-col overflow-hidden max-w-[80%]">
+                                              <span className="text-[8px] text-neutral-400 font-bold uppercase tracking-wider">IBAN</span>
+                                              <span className="text-[10px] font-extrabold font-mono tracking-wider text-neutral-900 dark:text-white break-all">SA56 8000 0621 6080 1601 6528</span>
+                                            </div>
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                navigator.clipboard.writeText('SA5680000621608016016528');
+                                                setCopiedAlrajiIban(true);
+                                                setTimeout(() => setCopiedAlrajiIban(false), 2000);
+                                              }}
+                                              className="p-1 px-1.5 rounded bg-neutral-100 dark:bg-neutral-800 hover:bg-blue-600 hover:text-white transition-all text-[10px] flex items-center gap-1 cursor-pointer font-bold shrink-0 text-neutral-600 dark:text-neutral-300"
+                                            >
+                                              {copiedAlrajiIban ? (
+                                                <>
+                                                  <Check className="w-3 h-3 text-emerald-500" />
+                                                  <span className="text-[9px] text-emerald-600 font-bold">{language === 'bn' ? 'কপিড' : 'Copied'}</span>
+                                                </>
+                                              ) : (
+                                                <>
+                                                  <Copy className="w-3 h-3 text-neutral-400" />
+                                                  <span>{language === 'bn' ? 'কপি' : 'Copy'}</span>
+                                                </>
+                                              )}
+                                            </button>
+                                          </div>
+
+                                          {/* Swift Code */}
+                                          <div className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-neutral-900 border border-neutral-150 dark:border-slate-800 shadow-xs">
+                                            <div className="flex flex-col">
+                                              <span className="text-[8px] text-neutral-400 font-bold uppercase tracking-wider">Swift Code</span>
+                                              <span className="text-[11px] font-black font-mono text-neutral-900 dark:text-white">RJHISARI</span>
+                                            </div>
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                navigator.clipboard.writeText('RJHISARI');
+                                                setCopiedAlrajiSwift(true);
+                                                setTimeout(() => setCopiedAlrajiSwift(false), 2000);
+                                              }}
+                                              className="p-1 px-1.5 rounded bg-neutral-100 dark:bg-neutral-800 hover:bg-blue-600 hover:text-white transition-all text-[10px] flex items-center gap-1 cursor-pointer font-bold shrink-0 text-neutral-600 dark:text-neutral-300"
+                                            >
+                                              {copiedAlrajiSwift ? (
+                                                <>
+                                                  <Check className="w-3 h-3 text-emerald-500" />
+                                                  <span className="text-[9px] text-emerald-600 font-bold">{language === 'bn' ? 'কপিড' : 'Copied'}</span>
+                                                </>
+                                              ) : (
+                                                <>
+                                                  <Copy className="w-3 h-3 text-neutral-400" />
+                                                  <span>{language === 'bn' ? 'কপি' : 'Copy'}</span>
+                                                </>
+                                              )}
+                                            </button>
+                                          </div>
+
+                                        </div>
+
+                                        {/* QR System */}
+                                        <div className="md:col-span-12 lg:col-span-5 flex flex-col items-center justify-center bg-white dark:bg-neutral-950 p-3 rounded-lg border border-neutral-150 dark:border-slate-800 shadow-xs text-center">
+                                          <span className="text-[9px] font-bold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider mb-2">{language === 'bn' ? 'কিউআর কোড (পেমেন্ট)' : 'Scan QR for Banking'}</span>
+                                          <div className="w-[115px] h-[115px] bg-neutral-50 dark:bg-[#0c1222] p-1.5 rounded border border-neutral-200 dark:border-slate-800 flex items-center justify-center">
+                                            <img 
+                                              src="https://api.qrserver.com/v1/create-qr-code/?size=140x140&color=1d4ed8&data=Al+Rajhi+Bank+Account+Name:+MD+IMRAN+HOSSAIN+Account+No:+621000010006086016528+IBAN:+SA5680000621608016016528+Swift+Code:+RJHISARI" 
+                                              alt="Al Rajhi Bank QR Code" 
+                                              className="max-w-full max-h-full object-contain pointer-events-none"
+                                              referrerPolicy="no-referrer"
+                                            />
+                                          </div>
+                                          <span className="text-[8px] text-neutral-400 font-bold mt-2 leading-tight">
+                                            {language === 'bn' ? 'আল রাজি ব্যাংক অ্যাপ দিয়ে স্ক্যান করুন' : 'Scan via Al Rajhi Bank app'}
+                                          </span>
+                                        </div>
+
+                                      </div>
+                                    </div>
+
+                                    {/* 3 Verification Fields */}
+                                    <div className="w-full space-y-2.5 mt-4 text-left border-t border-dashed border-neutral-350 dark:border-slate-800 pt-3 text-neutral-800 dark:text-neutral-100">
+                                      <div className="flex items-center gap-1.5 mb-1.5">
+                                        <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />
+                                        <span className="text-[10px] font-extrabold text-neutral-800 dark:text-neutral-200 uppercase tracking-wider">
+                                          {language === 'bn' ? 'পেমেন্ট তথ্য প্রদান করুন' : 'Verify Payment Details'}
+                                        </span>
+                                      </div>
+                                      
+                                      {/* Sender Name */}
+                                      <div className="relative">
+                                        <input
+                                          type="text"
+                                          id="reg-alraji-sender-name"
+                                          placeholder=" "
+                                          value={senderName}
+                                          onChange={(e) => setSenderName(e.target.value)}
+                                          className="peer w-full h-[56px] bg-[#F8FAFC] dark:bg-[#111827] border border-[#E2E8F0] dark:border-[#374151] rounded-[14px] px-4 pt-5 pb-1.5 text-xs sm:text-sm font-semibold text-[#0F172A] dark:text-white placeholder-transparent focus:outline-none focus:ring-4 focus:ring-violet-500/18 focus:border-violet-500 transition-all duration-300"
+                                          required
+                                        />
+                                        <label
+                                          htmlFor="reg-alraji-sender-name"
+                                          className="absolute left-4 top-1.5 text-[10px] font-semibold text-[#475569] dark:text-[#CBD5E1] transition-all duration-300 peer-placeholder-shown:text-xs peer-placeholder-shown:top-4 peer-focus:top-1.5 peer-focus:text-[10px] uppercase tracking-wider cursor-text pointer-events-none"
+                                        >
+                                          {language === 'bn' ? 'প্রেরকের নাম (Sender Name) *' : 'Sender Name *'}
+                                        </label>
+                                      </div>
+
+                                      {/* Sender Phone */}
+                                      <div className="relative">
+                                        <input
+                                          type="text"
+                                          id="reg-alraji-sender-phone"
+                                          placeholder=" "
+                                          value={senderNumber}
+                                          onChange={(e) => setSenderNumber(e.target.value)}
+                                          className="peer w-full h-[56px] bg-[#F8FAFC] dark:bg-[#111827] border border-[#E2E8F0] dark:border-[#374151] rounded-[14px] px-4 pt-5 pb-1.5 text-xs sm:text-sm font-semibold text-[#0F172A] dark:text-white placeholder-transparent focus:outline-none focus:ring-4 focus:ring-violet-500/18 focus:border-violet-500 transition-all duration-300"
+                                          required
+                                        />
+                                        <label
+                                          htmlFor="reg-alraji-sender-phone"
+                                          className="absolute left-4 top-1.5 text-[10px] font-semibold text-[#475569] dark:text-[#CBD5E1] transition-all duration-300 peer-placeholder-shown:text-xs peer-placeholder-shown:top-4 peer-focus:top-1.5 peer-focus:text-[10px] uppercase tracking-wider cursor-text pointer-events-none"
+                                        >
+                                          {language === 'bn' ? 'প্রেরকের নম্বর (Sender Mobile/Acc Number) *' : 'Sender Phone / Account No *'}
+                                        </label>
+                                      </div>
+
+                                      {/* Transaction ID */}
+                                      <div className="relative">
+                                        <input
+                                          type="text"
+                                          id="reg-alraji-sender-trx"
+                                          placeholder=" "
+                                          value={senderTrxId}
+                                          onChange={(e) => setSenderTrxId(e.target.value)}
+                                          className="peer w-full h-[56px] bg-[#F8FAFC] dark:bg-[#111827] border border-[#E2E8F0] dark:border-[#374151] rounded-[14px] px-4 pt-5 pb-1.5 text-xs sm:text-sm font-mono font-bold text-[#0F172A] dark:text-white placeholder-transparent focus:outline-none focus:ring-4 focus:ring-violet-500/18 focus:border-violet-500 transition-all duration-300"
+                                          required
+                                        />
+                                        <label
+                                          htmlFor="reg-alraji-sender-trx"
+                                          className="absolute left-4 top-1.5 text-[10px] font-semibold text-[#475569] dark:text-[#CBD5E1] transition-all duration-300 peer-placeholder-shown:text-xs peer-placeholder-shown:top-4 peer-focus:top-1.5 peer-focus:text-[10px] uppercase tracking-wider cursor-text pointer-events-none"
+                                        >
+                                          {language === 'bn' ? 'ট্রানজেকশন আইডি (Transaction ID) *' : 'Transaction ID *'}
+                                        </label>
+                                      </div>
+                                    </div>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSimulatePayment('Alraji Bank Transfer')}
+                                      className="w-full mt-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-650 hover:from-blue-700 hover:to-indigo-700 text-white font-extrabold rounded-lg text-xs tracking-wider transition duration-200 shadow-md uppercase select-none cursor-pointer"
+                                    >
+                                      {language === 'bn' ? 'আমি পেমেন্ট করেছি (Place Order Now)' : 'I have paid (Place Order Now)'}
+                                    </button>
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>
@@ -3492,169 +6186,7 @@ export default function Header({
         </div>
       )}
 
-      {/* Wishlist Sliding-from-Right Drawer Panel */}
-      {wishlistOpen && (
-        <div className="fixed inset-0 z-50 overflow-hidden" id="wishlist-slideover-panel">
-          {/* Backdrop blur overlay */}
-          <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-xs transition-opacity cursor-pointer animate-fade-in" onClick={() => setWishlistOpen(false)} />
 
-          <div className="pointer-events-none fixed inset-y-0 right-0 flex max-w-full pl-10">
-            <div className="pointer-events-auto w-screen max-w-md animate-in slide-in-from-right duration-250">
-              <div className="flex h-full flex-col bg-white dark:bg-slate-900 shadow-2xl">
-                
-                {/* Drawer Header Row */}
-                <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-6">
-                  <div className="flex items-center justify-between border-b border-neutral-100 dark:border-slate-800 pb-4">
-                    <h2 className="text-lg font-black text-neutral-900 dark:text-white flex items-center gap-2">
-                      <Heart className="w-5 h-5 text-rose-500 shrink-0 fill-rose-500 animate-pulse" />
-                      <span>
-                        {language === 'bn' ? 'আমার উইশলিস্ট' : language === 'ar' ? 'مفضلتي' : 'My Wishlist'} 
-                        <span className="ml-1.5 px-2 py-0.5 text-xs bg-rose-100 dark:bg-rose-500/15 text-rose-600 dark:text-rose-455 rounded-full font-mono font-bold">
-                          {wishlist.length}
-                        </span>
-                      </span>
-                    </h2>
-                    <button
-                      onClick={() => setWishlistOpen(false)}
-                      className="p-1.5 text-neutral-450 hover:text-black dark:text-white rounded-lg border border-neutral-205 dark:border-slate-800 hover:bg-neutral-50 dark:hover:bg-slate-850 duration-150 text-xs font-bold font-mono transition"
-                    >
-                      X
-                    </button>
-                  </div>
-
-                  {/* Scrollable Products List Container */}
-                  <div className="mt-6 text-left">
-                    {wishlist.length === 0 ? (
-                      <div className="text-center py-20 text-neutral-450">
-                        <Heart className="w-16 h-16 mx-auto mb-4 stroke-[1.5] text-neutral-300 dark:text-slate-700" />
-                        <p className="text-sm font-bold text-neutral-600 dark:text-neutral-400">
-                          {language === 'bn' ? 'আপনার পছন্দ তালিকায় কোনো পণ্য নেই!' : language === 'ar' ? 'قائمة المفضلة لديك فارغة حالياً!' : 'Your Wishlist is Empty!'}
-                        </p>
-                        <p className="text-xs text-neutral-405 dark:text-neutral-500 mt-1.5 max-w-[250px] mx-auto">
-                          {language === 'bn' ? 'আমাদের নতুন প্রিমিয়াম স্ক্রিপ্ট ও থিমগুলো দেখতে আজই ডিজিটাল স্টোর ভিজিট করুন।' : 'Browse our premium script catalogs and add outstanding products to your wishlist!'}
-                        </p>
-                        <button
-                          onClick={() => {
-                            setWishlistOpen(false);
-                            setCurrentPage('marketplace');
-                          }}
-                          className="mt-6 inline-flex items-center gap-2 px-5 py-2.5 bg-rose-500 hover:bg-rose-650 dark:bg-rose-600 dark:hover:bg-rose-700 text-xs text-white font-black rounded-xl shadow-md shadow-rose-500/10 hover:shadow-rose-500/20 active:scale-95 duration-150 transition"
-                        >
-                          <span>{language === 'bn' ? 'ডিজিটাল স্টোর ব্রাউজ করুন' : 'Browse Products Store'}</span>
-                          <ArrowRight className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flow-root">
-                        <ul role="list" className="-my-6 divide-y divide-neutral-100 dark:divide-slate-800">
-                          {sampleProducts
-                            .filter(prod => wishlist.includes(prod.id))
-                            .map((product) => {
-                              const activePrice = product.discountPrice || product.price;
-                              return (
-                                <li key={product.id} className="flex py-5">
-                                  {/* Product Preview Thumbnail */}
-                                  <div className="h-16 w-20 flex-shrink-0 overflow-hidden rounded-xl border border-neutral-200/60 dark:border-slate-800 bg-neutral-50 dark:bg-slate-950">
-                                    <img
-                                      src={product.image}
-                                      alt={product.name}
-                                      className="h-full w-full object-cover object-center"
-                                      referrerPolicy="no-referrer"
-                                    />
-                                  </div>
-
-                                  {/* Metadata Column */}
-                                  <div className="ml-4 flex flex-1 flex-col">
-                                    <div>
-                                      <div className="flex justify-between text-sm font-semibold text-neutral-900 dark:text-white gap-2">
-                                        <h3 
-                                          className="line-clamp-2 text-xs font-black dark:text-white hover:text-rose-500 dark:hover:text-rose-455 transition cursor-pointer leading-normal text-slate-850" 
-                                          onClick={() => {
-                                            setWishlistOpen(false);
-                                            setCurrentPage('marketplace');
-                                          }}
-                                        >
-                                          {language === 'bn' ? product.nameBn : language === 'ar' ? product.nameAr : product.name}
-                                        </h3>
-                                        <div className="text-right shrink-0">
-                                          {product.discountPrice && (
-                                            <p className="text-[10px] text-neutral-400 line-through font-mono leading-none mb-0.5">
-                                              {formatPriceInCart(product.price)}
-                                            </p>
-                                          )}
-                                          <p className="text-rose-500 dark:text-rose-455 font-black whitespace-nowrap text-xs md:text-sm font-mono leading-none">
-                                            {formatPriceInCart(activePrice)}
-                                          </p>
-                                        </div>
-                                      </div>
-                                      <span className="inline-block mt-1 px-1.5 py-0.5 text-[9px] font-mono uppercase font-black text-blue-600 dark:text-cyan-405 bg-blue-50 dark:bg-cyan-950/30 rounded border border-blue-100/50 dark:border-cyan-950/20">
-                                        {product.category}
-                                      </span>
-                                    </div>
-
-                                    {/* Actions Row */}
-                                    <div className="flex flex-1 items-end justify-between mt-2.5">
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          if (addToCart) {
-                                            addToCart(product);
-                                            triggerToast(language === 'bn' ? `${product.nameBn} কার্টে যোগ করা হয়েছে` : `Added ${product.name} to cart`);
-                                          } else {
-                                            triggerToast('Added to Cart');
-                                          }
-                                        }}
-                                        className="inline-flex items-center gap-1.5 px-3 py-1 bg-neutral-900 hover:bg-black dark:bg-rose-500/10 dark:hover:bg-rose-500/20 text-white dark:text-rose-400 font-extrabold rounded-lg text-[10px] uppercase tracking-wider duration-150 transition-all cursor-pointer active:scale-95"
-                                      >
-                                        <ShoppingBag className="w-3 h-3 text-emerald-400" />
-                                        <span>{language === 'bn' ? 'কিনুন 🛒' : 'Order Now 🛒'}</span>
-                                      </button>
-
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          if (toggleWishlist) {
-                                            toggleWishlist(product.id);
-                                          } else {
-                                            triggerToast('Removed from Wishlist');
-                                          }
-                                        }}
-                                        className="p-1.5 text-neutral-400 hover:text-rose-600 dark:hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded-lg transition-all duration-150 mr-1"
-                                        title={language === 'bn' ? 'সরিয়ে ফেলুন' : 'Remove Item'}
-                                      >
-                                        <Trash2 className="w-3.5 h-3.5" strokeWidth={2.2} />
-                                      </button>
-                                    </div>
-                                  </div>
-                                </li>
-                              );
-                            })}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Drawer Footer Row */}
-                {wishlist.length > 0 && (
-                  <div className="border-t border-neutral-150 dark:border-slate-800 p-4 bg-neutral-50 dark:bg-slate-900/40 space-y-3">
-                    <button
-                      onClick={() => {
-                        setWishlistOpen(false);
-                        setCurrentPage('marketplace');
-                      }}
-                      className="w-full py-3 bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-605 hover:to-rose-650 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-md cursor-pointer duration-150 transition active:scale-98 flex items-center justify-center gap-2"
-                    >
-                      <Heart className="w-3.5 h-3.5 fill-white text-white" />
-                      <span>{language === 'bn' ? 'ডিজিটাল স্টোর এ আরও দেখুন' : 'Explore More Digital Scripts'}</span>
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 }

@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { 
   Search, Globe, Star, Sparkles, 
-  ArrowRight, RefreshCw, Layers, Check, Zap
+  ArrowRight, RefreshCw, Layers, Check, Zap,
+  Database, Cpu
 } from 'lucide-react';
 import { Language, Currency, Product } from '../types';
 
@@ -392,38 +393,42 @@ export default function DomainSearch({
         <div className="max-w-3xl mx-auto mb-4">
           <div className="relative p-1.5 sm:p-2 bg-slate-950/60 backdrop-blur-md rounded-2xl sm:rounded-3xl border border-slate-800/80 focus-within:border-cyan-500/50 shadow-2xl focus-within:shadow-cyan-500/10 transition-all duration-500">
             <form onSubmit={handleCheckAvailability} className="flex flex-col sm:flex-row items-stretch gap-1.5">
-              <div className="relative flex-1 flex items-center min-w-0">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-                <input
-                  ref={searchInputRef}
-                  type="text"
-                  placeholder={currentTrans.placeholder}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-transparent pl-11 pr-4 py-3.5 text-sm sm:text-base font-medium text-white placeholder-slate-500 focus:outline-none"
-                />
-              </div>
+              
+              {/* Domain Input & Extension selector grouped on a single line for mobile & desktop */}
+              <div className="flex-1 flex items-center min-w-0 bg-transparent">
+                <div className="relative flex-1 flex items-center min-w-0">
+                  <Search className="absolute left-3.5 sm:left-4 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 sm:w-5 h-5" />
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    placeholder={currentTrans.placeholder}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full bg-transparent pl-10 sm:pl-11 pr-2 sm:pr-4 py-3 sm:py-3.5 text-sm sm:text-base font-medium text-white placeholder-slate-500 focus:outline-none"
+                  />
+                </div>
 
-              {/* Selector Extension dropdown chip */}
-              <div className="relative flex items-center px-2 border-y sm:border-y-0 sm:border-x border-slate-800/80 py-1.5">
-                <select
-                  value={selectedExt}
-                  onChange={(e) => setSelectedExt(e.target.value)}
-                  className="bg-transparent text-xs sm:text-sm font-bold text-cyan-400 cursor-pointer pr-4 pl-2 focus:outline-none uppercase"
-                >
-                  {Object.keys(domainExtensionsPrices).map((ext) => (
-                    <option key={ext} value={ext} className="bg-slate-900 text-white font-sans text-xs">
-                      {ext}
-                    </option>
-                  ))}
-                </select>
+                {/* Selector Extension dropdown chip */}
+                <div className="relative flex items-center px-1.5 sm:px-2 border-l border-slate-800/85 my-1 py-0.5 shrink-0">
+                  <select
+                    value={selectedExt}
+                    onChange={(e) => setSelectedExt(e.target.value)}
+                    className="bg-transparent text-xs sm:text-sm font-bold text-cyan-400 cursor-pointer pr-3 sm:pr-4 pl-1 sm:pl-2 focus:outline-none uppercase"
+                  >
+                    {Object.keys(domainExtensionsPrices).map((ext) => (
+                      <option key={ext} value={ext} className="bg-slate-900 text-white font-sans text-xs">
+                        {ext}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               {/* Action trigger Button */}
               <button
                 type="submit"
                 disabled={isSearching || !searchQuery.trim()}
-                className="px-6 py-3.5 bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 disabled:opacity-50 text-white font-black text-xs sm:text-sm rounded-xl sm:rounded-2xl transition-all duration-300 flex items-center justify-center gap-2 hover:scale-[1.01]"
+                className="px-6 py-3 sm:py-3.5 bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 disabled:opacity-50 text-white font-black text-xs sm:text-sm rounded-xl sm:rounded-2xl transition-all duration-300 flex items-center justify-center gap-2 hover:scale-[1.01]"
               >
                 {isSearching ? (
                   <>
@@ -600,7 +605,185 @@ export default function DomainSearch({
           </div>
         )}
 
+        {/* ================================= AUTOMATED SLIDING HOSTING CATEGORIES ================================= */}
+        <div className="mt-12 pt-8 border-t border-slate-800/50">
+          <div className="text-center max-w-3xl mx-auto mb-8">
+            <h3 className="text-lg sm:text-xl font-extrabold text-white tracking-tight leading-tight flex items-center justify-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
+              <span>
+                {language === 'bn' ? 'বিশেষায়িত হোস্টিং ক্যাটাগরি' : language === 'ar' ? 'فئات الاستضافة السحابية' : 'Tailored Hosting Categories'}
+              </span>
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-400 mt-1.5">
+              {language === 'bn' 
+                ? 'আপনার ইউনিক ট্রাফিক স্কেল এবং প্রয়োজনীয়তার জন্য ডিজাইন করা কম্পিউটিং আর্কিটেকচারগুলো বেছে নিন।' 
+                : language === 'ar' 
+                ? 'اختر البنية الحسابية المصممة لخصائص حركة المرور الفريدة لمتجرك أو موقعك الالكتروني.' 
+                : 'Choose the computing architectures designed for your unique traffic scales and requirements.'}
+            </p>
+          </div>
 
+          {/* Marquee Outer Container with horizontal overflow hidden */}
+          <div className="relative w-full overflow-hidden py-4 select-none">
+            {/* Smooth Edge Fades */}
+            <div className="absolute left-0 top-0 bottom-0 w-16 bg-gradient-to-r from-slate-900 to-transparent z-10 pointer-events-none" />
+            <div className="absolute right-0 top-0 bottom-0 w-16 bg-gradient-to-l from-slate-900 to-transparent z-10 pointer-events-none" />
+
+            {/* Framer Motion Infinite Loop Container */}
+            {/* Since we want to move from left to right (scrolling right), we animate x: ['-50%', '0%'] */}
+            <motion.div 
+              className="flex gap-6 w-max"
+              animate={{ x: ['-50%', '0%'] }}
+              transition={{
+                ease: "linear",
+                duration: 25,
+                repeat: Infinity,
+              }}
+            >
+              {/* Double or triple the cards to ensure seamless infinite scroll */}
+              {[
+                {
+                  id: 'bdix',
+                  title: language === 'bn' ? 'শেয়ার্ড বিডিআইএক্স হোস্টিং' : language === 'ar' ? 'استضافة BDIX المشتركة' : 'Shared BDIX Hosting',
+                  desc: language === 'bn' 
+                    ? 'বিডিআইএক্স-অপ্টিমাইজড হোস্টিং যা বাংলাদেশে ৫ মিলি-সেকেন্ডের কম লেটেন্সি দেয়।' 
+                    : language === 'ar' 
+                    ? 'استضافة محسنة لنطاق BDIX تقدم سرعة استجابة فائقة تقل عن 5 ملّي ثانية.' 
+                    : 'BDIX-optimized hosting delivering sub-5ms rendering speeds in Bangladesh.',
+                  price: language === 'bn' ? '৳১২০/মাস' : language === 'ar' ? '$0.99/شهرياً' : '$0.99/mo',
+                  icon: Database
+                },
+                {
+                  id: 'vps',
+                  title: language === 'bn' ? 'ম্যানেজড ভিপিএস হোস্টিং' : language === 'ar' ? 'خوادم VPS المدارة' : 'Managed VPS Hosting',
+                  desc: language === 'bn' 
+                    ? 'ডেডিকেটেড সার্ভার-গ্রেড সিপিইউ এবং ওএস এনভায়রনমেন্ট সহ হাই-পারফরম্যান্স নোড।' 
+                    : language === 'ar' 
+                    ? 'خوادم عالية الأداء مع معالجات مخصصة وبيئة نظام تشغيل مستقلة بالكامل.' 
+                    : 'High-performance nodes with dedicated server-grade CPUs and OS environments.',
+                  price: language === 'bn' ? '৳১৮০০/মাস' : language === 'ar' ? '$14.99/شهرياً' : '$14.99/mo',
+                  icon: Cpu
+                },
+                {
+                  id: 'reseller',
+                  title: language === 'bn' ? 'রিসেলার হোস্টিং' : language === 'ar' ? 'استضافة الموزعين' : 'Reseller Hosting',
+                  desc: language === 'bn' 
+                    ? 'কাস্টম নেম সার্ভার এবং WHM কন্ট্রোল সহ আপনার হোয়াইট-লেবেল ব্যবসা শুরু করুন।' 
+                    : language === 'ar' 
+                    ? 'ابدأ أعمالك التجارية الخاصة مع خوادم أسماء مخصصة ولوحة تحكم WHM كاملة.' 
+                    : 'Start your white-label business with custom name servers and WHM control.',
+                  price: language === 'bn' ? '৳১৪৫০/মাস' : language === 'ar' ? '$11.99/شهرياً' : '$11.99/mo',
+                  icon: Layers
+                }
+              ].concat([
+                {
+                  id: 'bdix',
+                  title: language === 'bn' ? 'শেয়ার্ড বিডিআইএক্স হোস্টিং' : language === 'ar' ? 'استضافة BDIX المشتركة' : 'Shared BDIX Hosting',
+                  desc: language === 'bn' 
+                    ? 'বিডিআইএক্স-অপ্টিমাইজড হোস্টিং যা বাংলাদেশে ৫ মিলি-সেকেন্ডের কম লেটেন্সি দেয়।' 
+                    : language === 'ar' 
+                    ? 'استضافة محسنة لنطاق BDIX تقدم سرعة استجابة فائقة تقل عن 5 ملّي ثانية.' 
+                    : 'BDIX-optimized hosting delivering sub-5ms rendering speeds in Bangladesh.',
+                  price: language === 'bn' ? '৳১২০/মাস' : language === 'ar' ? '$0.99/شهرياً' : '$0.99/mo',
+                  icon: Database
+                },
+                {
+                  id: 'vps',
+                  title: language === 'bn' ? 'ম্যানেজড ভিপিএস হোস্টিং' : language === 'ar' ? 'خوادم VPS المدارة' : 'Managed VPS Hosting',
+                  desc: language === 'bn' 
+                    ? 'ডেডিকেটেড সার্ভার-গ্রেড সিপিইউ এবং ওএস এনভায়রনমেন্ট সহ হাই-পারফরম্যান্স নোড।' 
+                    : language === 'ar' 
+                    ? 'خوادم عالية الأداء مع معالجات مخصصة وبيئة نظام تشغيل مستقلة بالكامل.' 
+                    : 'High-performance nodes with dedicated server-grade CPUs and OS environments.',
+                  price: language === 'bn' ? '৳১৮০০/মাস' : language === 'ar' ? '$14.99/شهرياً' : '$14.99/mo',
+                  icon: Cpu
+                },
+                {
+                  id: 'reseller',
+                  title: language === 'bn' ? 'রিসেলার হোস্টিং' : language === 'ar' ? 'استضافة الموزعين' : 'Reseller Hosting',
+                  desc: language === 'bn' 
+                    ? 'কাস্টম নেম সার্ভার এবং WHM কন্ট্রোল সহ আপনার হোয়াইট-লেবেল ব্যবসা শুরু করুন।' 
+                    : language === 'ar' 
+                    ? 'ابدأ أعمالك التجارية الخاصة مع خوادم أسماء مخصصة ولوحة تحكم WHM كاملة.' 
+                    : 'Start your white-label business with custom name servers and WHM control.',
+                  price: language === 'bn' ? '৳১৪৫০/মাস' : language === 'ar' ? '$11.99/شهرياً' : '$11.99/mo',
+                  icon: Layers
+                }
+              ]).concat([
+                {
+                  id: 'bdix',
+                  title: language === 'bn' ? 'শেয়ার্ড বিডিআইএক্স হোস্টিং' : language === 'ar' ? 'استضافة BDIX المشتركة' : 'Shared BDIX Hosting',
+                  desc: language === 'bn' 
+                    ? 'বিডিআইএক্স-অপ্টিমাইজড হোস্টিং যা বাংলাদেশে ৫ মিলি-সেকেন্ডের কম লেটেন্সি দেয়।' 
+                    : language === 'ar' 
+                    ? 'استضافة محسنة لنطاق BDIX تقدم سرعة استجابة فائقة تقل عن 5 ملّي ثانية.' 
+                    : 'BDIX-optimized hosting delivering sub-5ms rendering speeds in Bangladesh.',
+                  price: language === 'bn' ? '৳১২০/মাস' : language === 'ar' ? '$0.99/شهرياً' : '$0.99/mo',
+                  icon: Database
+                },
+                {
+                  id: 'vps',
+                  title: language === 'bn' ? 'ম্যানেজড ভিপিএস হোস্টিং' : language === 'ar' ? 'خوادم VPS المدارة' : 'Managed VPS Hosting',
+                  desc: language === 'bn' 
+                    ? 'ডেডিকেটেড সার্ভার-গ্রেড সিপিইউ এবং ওএস এনভায়রনমেন্ট সহ হাই-পারফরম্যান্স নোড।' 
+                    : language === 'ar' 
+                    ? 'خوادم عالية الأداء مع معالجات مخصصة وبيئة نظام تشغيل مستقلة بالكامل.' 
+                    : 'High-performance nodes with dedicated server-grade CPUs and OS environments.',
+                  price: language === 'bn' ? '৳১৮০০/মাস' : language === 'ar' ? '$14.99/شهرياً' : '$14.99/mo',
+                  icon: Cpu
+                },
+                {
+                  id: 'reseller',
+                  title: language === 'bn' ? 'রিসেলার হোস্টিং' : language === 'ar' ? 'استضافة الموزعين' : 'Reseller Hosting',
+                  desc: language === 'bn' 
+                    ? 'কাস্টম নেম সার্ভার এবং WHM কন্ট্রোল সহ আপনার হোয়াইট-লেবেল ব্যবসা শুরু করুন।' 
+                    : language === 'ar' 
+                    ? 'ابدأ أعمالك التجارية الخاصة مع خوادم أسماء مخصصة ولوحة تحكم WHM كاملة.' 
+                    : 'Start your white-label business with custom name servers and WHM control.',
+                  price: language === 'bn' ? '৳১৪৫০/মাস' : language === 'ar' ? '$11.99/شهرياً' : '$11.99/mo',
+                  icon: Layers
+                }
+              ]).map((card, idx) => {
+                const IconComponent = card.icon;
+                return (
+                  <div
+                    key={`${card.id}-${idx}`}
+                    onClick={() => {
+                      setCurrentPage('hosting');
+                      setTimeout(() => {
+                        const el = document.getElementById('redesigned-categories');
+                        if (el) el.scrollIntoView({ behavior: 'smooth' });
+                      }, 100);
+                    }}
+                    className="w-[280px] sm:w-[320px] p-5 sm:p-6 bg-slate-950/80 hover:bg-slate-900 rounded-2xl border border-slate-800/60 hover:border-cyan-500/30 transition-all duration-300 shadow-lg cursor-pointer group shrink-0 relative overflow-hidden"
+                  >
+                    {/* Hover Glow Accent */}
+                    <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-gradient-to-tr from-cyan-500/10 to-transparent blur-lg pointer-events-none group-hover:scale-125 transition duration-500" />
+                    
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-cyan-400 group-hover:text-white group-hover:bg-gradient-to-tr group-hover:from-blue-600 group-hover:to-cyan-400 transition-all duration-300">
+                        <IconComponent className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs sm:text-sm font-black text-white group-hover:text-cyan-300 transition duration-300">
+                          {card.title}
+                        </h4>
+                        <p className="text-[10px] text-slate-500 font-mono mt-0.5">
+                          {language === 'bn' ? 'শুরু মাত্র' : language === 'ar' ? 'يبدأ من' : 'Starting from'}{' '}
+                          <span className="text-cyan-400 font-bold">{card.price}</span>
+                        </p>
+                      </div>
+                    </div>
+
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      {card.desc}
+                    </p>
+                  </div>
+                );
+              })}
+            </motion.div>
+          </div>
+        </div>
       </div>
     </section>
   );

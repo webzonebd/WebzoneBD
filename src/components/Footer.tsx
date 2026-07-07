@@ -29,6 +29,74 @@ export default function Footer({
   const [showFooterAdminLogin, setShowFooterAdminLogin] = useState(false);
   const [footerEmail, setFooterEmail] = useState('');
   const [footerPassword, setFooterPassword] = useState('');
+
+  const paymentGateways = [
+    {
+      name: 'bKash',
+      logo: (
+        <div className="flex items-center gap-1.5 font-sans font-black">
+          <span className="w-5 h-5 rounded-full bg-[#E2125B] flex items-center justify-center text-white text-[10px] shadow-sm shadow-[#E2125B]/30 animate-pulse font-bold">৳</span>
+          <span className="text-[#E2125B] tracking-tight text-xs">bKash</span>
+        </div>
+      ),
+      badge: language === 'bn' ? 'বিকাশ পেমেন্ট' : language === 'ar' ? 'بوابة بكاش' : 'bKash Instant'
+    },
+    {
+      name: 'Nagad',
+      logo: (
+        <div className="flex items-center gap-1.5 font-sans font-black">
+          <span className="w-5 h-5 rounded-full bg-gradient-to-tr from-[#EA4335] to-[#FBBC05] flex items-center justify-center text-white text-[9px] shadow-sm font-bold">৳</span>
+          <span className="bg-gradient-to-r from-[#EA4335] to-[#FBBC05] bg-clip-text text-transparent tracking-tight text-xs">nagad</span>
+        </div>
+      ),
+      badge: language === 'bn' ? 'নগদ পেমেন্ট' : language === 'ar' ? 'بوابة نقد' : 'Nagad Instant'
+    },
+    {
+      name: 'Roket',
+      logo: (
+        <div className="flex items-center gap-1.5 font-sans font-black">
+          <span className="w-5 h-5 rounded-full bg-[#8C3B91] flex items-center justify-center text-white text-[10px] shadow-sm shadow-[#8C3B91]/30 font-bold">৳</span>
+          <span className="text-[#8C3B91] tracking-tight text-xs">Rocket</span>
+        </div>
+      ),
+      badge: language === 'bn' ? 'রকেট ওয়ালেট' : language === 'ar' ? 'محفظة روكيت' : 'Rocket DBBL'
+    },
+    {
+      name: 'Bangla QR',
+      logo: (
+        <div className="flex items-center gap-1.5 font-sans font-black">
+          <div className="grid grid-cols-2 gap-0.5 p-0.5 bg-neutral-800 dark:bg-neutral-950 rounded border border-emerald-500/30">
+            <div className="w-1.5 h-1.5 bg-emerald-400 rounded-sm"></div>
+            <div className="w-1.5 h-1.5 bg-red-400 rounded-sm"></div>
+            <div className="w-1.5 h-1.5 bg-emerald-400 rounded-sm"></div>
+            <div className="w-1.5 h-1.5 bg-emerald-400 rounded-sm"></div>
+          </div>
+          <span className="text-emerald-400 tracking-tight text-xs">Bangla QR</span>
+        </div>
+      ),
+      badge: language === 'bn' ? 'বাংলা কিউআর' : language === 'ar' ? 'رمز الاستجابة' : 'Unified QR'
+    },
+    {
+      name: 'Cellfin',
+      logo: (
+        <div className="flex items-center gap-1.5 font-sans font-black">
+          <span className="w-5 h-5 rounded-lg bg-gradient-to-br from-[#0284C7] to-[#0D9488] flex items-center justify-center text-white text-[10px] shadow-sm font-bold">c</span>
+          <span className="text-[#0284C7] dark:text-[#38BDF8] tracking-tight text-xs font-black">cellfin</span>
+        </div>
+      ),
+      badge: language === 'bn' ? 'সেলফিন ওয়ালেট' : language === 'ar' ? 'محفظة سيلفين' : 'Cellfin Wallet'
+    },
+    {
+      name: 'IBBL Bank',
+      logo: (
+        <div className="flex items-center gap-1.5 font-sans font-black">
+          <span className="w-5 h-5 rounded-full bg-[#059669] flex items-center justify-center text-white text-[9px] shadow-sm shadow-emerald-500/20 font-bold">i</span>
+          <span className="text-[#059669] dark:text-[#34D399] tracking-tight text-xs">IBBL</span>
+        </div>
+      ),
+      badge: language === 'bn' ? 'ইসলামী ব্যাংক' : language === 'ar' ? 'بنك إسلامي' : 'IBBL NetBanking'
+    }
+  ];
   const handleNewsletterSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const email = (e.currentTarget.elements.namedItem('email') as HTMLInputElement)?.value;
@@ -40,50 +108,50 @@ export default function Footer({
 
   const t = {
     en: {
-      aboutTitle: "WebzoneBD IT Solution",
-      aboutDesc: "Starting a new business or growing an existing one? WebzoneBD IT Solution provides complete IT and digital services including website development, eCommerce, software solutions, branding, SEO, digital marketing, hosting, and technical support to help your business grow faster and smarter.",
+      aboutTitle: "WebzoneBD IT Agency",
+      aboutDesc: "Starting a new business or growing an existing one? WebzoneBD IT Agency provides complete IT and digital services including website development, eCommerce, software solutions, branding, SEO, digital marketing, hosting, and technical support to help your business grow faster and smarter.",
       quickTitle: "Quick Navigation",
       legalTitle: "Contract Terms",
       newsTitle: "Digital Weekly Newsletter",
       newsDesc: "Get coupon alerts and PHP scripts updates.",
       placeholder: "Your Email Address",
       subscribe: "Subscribe",
-      rights: "© 2026 WebzoneBD IT Solution. All Rights Reserved. Trusted on Cloud Run."
+      rights: "© 2026 WebzoneBD IT Agency. All Rights Reserved. Trusted on Cloud Run."
     },
     bn: {
-      aboutTitle: "ওয়েবজোনবিডি আইটি সলিউশন",
-      aboutDesc: "নতুন ব্যবসা শুরু করছেন বা চলমান ব্যবসা বাড়াতে চান? ওয়েবজোনবিডি আইটি সলিউশন দিচ্ছে ওয়েবসাইট ডেভেলপমেন্ট, ই-কমার্স, সফটওয়্যার সলিউশন, ব্র্যান্ডিং, এসইও, ডিজিটাল মার্কেটিং, হোস্টিং এবং টেকনিক্যাল সাপোর্ট সহ সম্পূর্ণ আইটি ও ডিজিটাল সেবা, যা আপনার ব্যবসাকে দ্রুত এবং স্মার্টভাবে এগিয়ে নিতে সাহায্য করবে।",
+      aboutTitle: "ওয়েবজোনবিডি আইটি এজেন্সি",
+      aboutDesc: "নতুন ব্যবসা শুরু করছেন বা চলমান ব্যবসা বাড়াতে চান? ওয়েবজোনবিডি আইটি এজেন্সি দিচ্ছে ওয়েবসাইট ডেভেলপমেন্ট, ই-কমার্স, সফটওয়্যার সলিউশন, ব্র্যান্ডিং, এসইও, ডিজিটাল মার্কেটিং, হোস্টিং এবং টেকনিক্যাল সাপোর্ট সহ সম্পূর্ণ আইটি ও ডিজিটাল সেবা, যা আপনার ব্যবসাকে দ্রুত এবং স্মার্টভাবে এগিয়ে নিতে সাহায্য করবে।",
       quickTitle: "সহজ লিংকসমূহ",
       legalTitle: "শর্তাবলী ও পলিসি",
       newsTitle: "উপযোগী নিউজলেটার",
       newsDesc: "নতুন স্ক্রিপ্ট এর রিলিজ এবং কুপন অফারগুলো ইমেইল এর মাধ্যমে ফ্রিতে পান।",
       placeholder: "আপনার ইমেইল অ্যাড্রেস লিখুন",
       subscribe: "সাবস্ক্রাইব",
-      rights: "© ২০২৬ ওয়েবজোনবিডি আইটি সলিউশন। সর্বস্বত্ব সংরক্ষিত।"
+      rights: "© ২০২৬ ওয়েবজোনবিডি আইটি এজেন্সি। সর্বস্বত্ব সংরক্ষিত।"
     },
     ar: {
-      aboutTitle: "ويب زون بي دي للحلول",
-      aboutDesc: "هل تبدأ مشروعاً جديداً أم تطور مشروعاً قائماً؟ تقدم ويب زون بي دي للحلول التقنية خدمات رقمية وتكنولوجية متكاملة تشمل تطوير المواقع، التجارة الإلكترونية، البرمجيات، الهوية البصرية، السيو، التسويق الرقمي، الاستضافة والدعم الفني لمساعدتك على النمو بشكل أسرع وأذكى.",
+      aboutTitle: "وكالة ويب زون بي دي لتقنية المعلومات",
+      aboutDesc: "هل تبدأ مشروعاً جديداً أم تطور مشروعاً قائماً؟ تقدم وكالة ويب زون بي دي لتقنية المعلومات خدمات رقمية وتكنولوجية متكاملة تشمل تطوير المواقع، التجارة الإلكترونية، البرمجيات، الهوية البصرية، السيو، التسويق الرقمي، الاستضافة والدعم الفني لمساعدتك على النمو بشكل أسرع وأذكى.",
       quickTitle: "روابط التنقل السريعة",
       legalTitle: "الخصوصية والترخيص",
       newsTitle: "النشرة البريدية الرقمية",
       newsDesc: "احصل على بوابات الخصم والتحديثات البرمجية الفورية.",
       placeholder: "البريد الإلكتروني الكريم...",
       subscribe: "اشتراك مجاني",
-      rights: "© 2026 ويب زون بي دي للحلول التقنية. جميع الحقوق محفوظة."
+      rights: "© 2026 WebzoneBD IT Agency. All Rights Reserved. Trusted on Cloud Run."
     }
   }[language];
 
   return (
-    <footer className="bg-neutral-900 text-neutral-400 py-12 border-t border-neutral-800" id="agency-footer">
+    <footer className="bg-neutral-900 text-neutral-400 py-6 sm:py-12 border-t border-neutral-800" id="agency-footer">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-8">
           {/* Brand block */}
           <div className="space-y-4">
             <div className="flex items-center space-x-2 text-white">
               <Globe className="h-6 w-6 text-blue-500 stroke-[2.5]" />
               <span className="text-xl font-extrabold tracking-tight bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
-                WebzoneBD
+                WebzoneBD IT Agency
               </span>
             </div>
             <p className="text-xs sm:text-sm leading-relaxed text-neutral-400">
@@ -196,7 +264,7 @@ export default function Footer({
                   <span>{language === 'bn' ? "রিফান্ড পলিসি" : language === 'ar' ? "سياسة الاسترجاع" : "Refund Policy"}</span>
                 </button>
               </li>
-              <li className="pt-2">
+              <li className="pt-2" id="admin-portal-handshake">
                 <button
                   type="button"
                   onClick={() => setShowFooterAdminLogin(!showFooterAdminLogin)}
@@ -207,7 +275,7 @@ export default function Footer({
                   }`}
                 >
                   <ShieldCheck className={`w-4 h-4 text-blue-505 shrink-0 ${showFooterAdminLogin ? "animate-pulse stroke-[2.5]" : ""}`} />
-                  <span>Malware-Scan Verified cPanel ready</span>
+                  <span>{language === 'bn' ? 'ম্যালওয়্যার-স্ক্যানড অ্যাডমিন পোর্টাল' : 'Malware-Scan Verified cPanel ready'}</span>
                 </button>
 
                 <AnimatePresence>
@@ -244,22 +312,24 @@ export default function Footer({
                               triggerToast("All admin login options required.");
                               return;
                             }
-                            if (footerEmail === 'admin@webzonebd.com' && footerPassword === 'admin123') {
+                            const formattedEmail = footerEmail.trim().toLowerCase();
+                            if ((formattedEmail === 'admin@webzonebd.com' || formattedEmail === 'webzonebd@yahoo.com') && footerPassword === 'admin123') {
                               const adminUserSession = {
-                                id: 'usr-admin',
-                                name: 'Super Admin Manager',
-                                username: 'admin_root',
-                                email: 'admin@webzonebd.com',
-                                phone: '+8801799887766',
+                                id: formattedEmail === 'webzonebd@yahoo.com' ? 'usr-webzonebd-admin' : 'usr-admin',
+                                name: formattedEmail === 'webzonebd@yahoo.com' ? 'WebzoneBD Admin Office' : 'Super Admin Manager',
+                                username: formattedEmail === 'webzonebd@yahoo.com' ? 'webzonebd' : 'admin_root',
+                                email: formattedEmail,
+                                phone: formattedEmail === 'webzonebd@yahoo.com' ? '+8801864000123' : '+8801799887766',
                                 role: 'admin',
                                 isVerified: true,
-                                createdAt: '2026-06-01',
+                                createdAt: '2026-06-10',
                                 status: 'active',
                                 wishlistedProductIds: []
                               } as any;
                               if (setUser) setUser(adminUserSession);
                               if (setIsAdmin) setIsAdmin(true);
-                              triggerToast("Welcome back, Chief Architect! Authorized Super Admin session.");
+                              triggerToast(language === 'bn' ? "স্বাগতম! আপনি অ্যাডমিন প্যানেলে সফলভাবে প্রবেশ করেছেন।" : "Welcome back, Chief Architect! Authorized WebzoneBD Super Admin session.");
+                              setCurrentPage('dashboard');
                               setShowFooterAdminLogin(false);
                             } else {
                               triggerToast("❌ Handshake failed: Incorrect credentials.");
@@ -276,7 +346,7 @@ export default function Footer({
                               required
                               value={footerEmail}
                               onChange={(e) => setFooterEmail(e.target.value)}
-                              placeholder="admin@webzonebd.com"
+                              placeholder="webzonebd@yahoo.com"
                               className="w-full bg-neutral-900 border border-neutral-800 px-2.5 py-1.5 text-[11px] text-white rounded focus:outline-none focus:border-blue-500 font-mono"
                             />
                           </div>
@@ -323,11 +393,11 @@ export default function Footer({
                 required
                 name="email"
                 placeholder={t.placeholder}
-                className="flex-1 rounded-lg border bg-neutral-800 border-neutral-700 px-3 py-1.5 text-xs text-white placeholder-neutral-500"
+                className="flex-1 h-8 sm:h-10 rounded-lg border bg-neutral-800 border-neutral-700 px-3 text-xs text-white placeholder-neutral-500 focus:outline-none"
               />
               <button
                 type="submit"
-                className="px-4 py-1.5 bg-gradient-to-r from-blue-600 to-cyan-500 hover:opacity-90 text-white text-xs font-bold rounded-lg transition"
+                className="px-4 h-8 sm:h-10 bg-gradient-to-r from-blue-600 to-cyan-500 hover:opacity-90 text-white text-xs font-bold rounded-lg transition shrink-0"
               >
                 {t.subscribe}
               </button>
@@ -335,8 +405,61 @@ export default function Footer({
           </div>
         </div>
 
-        {/* Lower row */}
-        <div className="mt-12 pt-6 border-t border-neutral-800 text-center text-xs text-neutral-500">
+        {/* Trusted Payment Gateways Marquee Section */}
+        <div className="mt-10 pt-8 border-t border-neutral-800">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+            <div className="space-y-1 text-left">
+              <h4 className="text-sm font-black text-white flex items-center gap-2">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <span>
+                  {language === 'bn' ? 'বিশ্বস্ত পেমেন্ট গেটওয়ে সমূহ' : language === 'ar' ? 'بوابات دفع موثوقة وآمنة' : 'Trusted Payment Gateways'}
+                </span>
+              </h4>
+              <p className="text-xs text-neutral-500">
+                {language === 'bn' ? 'নিরাপদ ও স্বয়ংক্রিয় ইনস্ট্যান্ট ডেলিভারি সুরক্ষিত চ্যানেল' : language === 'ar' ? 'دفع وتفعيل تلقائي آمن وفوري ومؤمن تماماً' : 'Secure, end-to-end encrypted instant billing network'}
+              </p>
+            </div>
+          </div>
+
+          {/* Marquee Outer Container with horizontal overflow hidden */}
+          <div className="relative w-full overflow-hidden py-3 select-none">
+            {/* Smooth Edge Fades */}
+            <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-neutral-900 to-transparent z-10 pointer-events-none" />
+            <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-neutral-900 to-transparent z-10 pointer-events-none" />
+
+            <motion.div 
+              className="flex gap-4 w-max"
+              animate={{ x: ['0%', '-50%'] }}
+              transition={{
+                ease: "linear",
+                duration: 25,
+                repeat: Infinity,
+              }}
+            >
+              {/* Quadruple the list for a perfectly seamless infinite loop */}
+              {[...paymentGateways, ...paymentGateways, ...paymentGateways, ...paymentGateways].map((gateway, idx) => (
+                <div 
+                  key={idx}
+                  className="flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-neutral-950/45 border border-neutral-800/80 shadow-md backdrop-blur-md min-w-[200px] hover:border-neutral-750 transition-colors duration-300 group"
+                >
+                  <div className="flex-1 flex items-center justify-start">
+                    {gateway.logo}
+                  </div>
+                  <div className="h-5 w-px bg-neutral-800" />
+                  <span className="text-[9px] font-mono tracking-wide text-neutral-500 uppercase group-hover:text-neutral-400 transition-colors duration-300">
+                    {gateway.badge}
+                  </span>
+                </div>
+              ))}
+            </motion.div>
+          </div>
+        </div>
+
+        {/* Lower row - 50% smaller padding on mobile */}
+        <div className="mt-6 sm:mt-12 pt-3 sm:pt-6 border-t border-neutral-800 text-center text-xs text-neutral-500">
           <p>{t.rights}</p>
         </div>
       </div>

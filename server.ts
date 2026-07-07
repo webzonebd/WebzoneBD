@@ -1,8 +1,8 @@
 import express from "express";
 import path from "path";
 import dns from "dns";
-import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
+import nodemailer from "nodemailer";
 
 const app = express();
 const PORT = 3000;
@@ -250,9 +250,383 @@ Core constraints:
   }
 });
 
+// 3. API: AI Image Generator utilizing Gemini's 'gemini-2.5-flash-image'
+app.post("/api/generate-image", async (req, res) => {
+  const { prompt, style, aspectRatio } = req.body;
+
+  if (!prompt || typeof prompt !== "string") {
+    res.status(400).json({ error: "Prompt is required" });
+    return;
+  }
+
+  const cleanPrompt = `${prompt}. Style: ${style || "Modern minimalist design"}`;
+  const targetRatio = aspectRatio || "1:1";
+
+  try {
+    if (!process.env.GEMINI_API_KEY) {
+      // Fallback images based on keywords
+      const splitted = prompt.toLowerCase().split(/\s+/);
+      let unsplashId = "photo-1460925895917-afdab827c52f"; // default business layout
+      if (splitted.includes("server") || splitted.includes("hosting") || splitted.includes("vps")) {
+        unsplashId = "photo-1558494949-ef010cbdcc31"; // tech hardware/servers
+      } else if (splitted.includes("ecommerce") || splitted.includes("store") || splitted.includes("shopping") || splitted.includes("woo")) {
+        unsplashId = "photo-1511556532299-8f662fc26c06"; // store items, clean aesthetics
+      } else if (splitted.includes("banner") || splitted.includes("marketing") || splitted.includes("social")) {
+        unsplashId = "photo-1460925895917-afdab827c52f"; // stats banner/isometric
+      } else if (splitted.includes("code") || splitted.includes("script") || splitted.includes("software")) {
+        unsplashId = "photo-1555066931-4365d14bab8c"; // coding on screen
+      } else if (splitted.includes("graphic") || splitted.includes("art") || splitted.includes("logo")) {
+        unsplashId = "photo-1618005182384-a83a8bd57fbe"; // digital design/art
+      }
+
+      // Append standard dimensions matching the ratio
+      let dStr = "?auto=format&fit=crop&w=800&q=80";
+      if (targetRatio === "16:9") dStr = "?auto=format&fit=crop&w=1200&h=675&q=80";
+      else if (targetRatio === "4:3") dStr = "?auto=format&fit=crop&w=800&h=600&q=80";
+      else if (targetRatio === "3:4") dStr = "?auto=format&fit=crop&w=600&h=800&q=80";
+      else if (targetRatio === "9:16") dStr = "?auto=format&fit=crop&w=500&h=888&q=80";
+
+      const fallbackUrl = `https://images.unsplash.com/${unsplashId}${dStr}`;
+      res.json({ imageUrl: fallbackUrl, isFallback: true });
+      return;
+    }
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash-image",
+      contents: {
+        parts: [
+          {
+            text: cleanPrompt,
+          },
+        ],
+      },
+      config: {
+        imageConfig: {
+          aspectRatio: targetRatio as any,
+        },
+      },
+    });
+
+    let imageUrl: string | null = null;
+    if (response.candidates?.[0]?.content?.parts) {
+      for (const part of response.candidates[0].content.parts) {
+        if (part.inlineData) {
+          const base64Data = part.inlineData.data;
+          const mimeType = part.inlineData.mimeType || "image/png";
+          imageUrl = `data:${mimeType};base64,${base64Data}`;
+          break;
+        }
+      }
+    }
+
+    if (imageUrl) {
+      res.json({ imageUrl, isFallback: false });
+    } else {
+      throw new Error("No image data found in response parts");
+    }
+  } catch (error: any) {
+    console.error("AI Image Generation failed: ", error);
+    // Graceful fallback to Unsplash placeholder images
+    const unsplashId = "photo-1542744094-3a31f103e35f"; // office setup
+    res.json({ 
+      imageUrl: `https://images.unsplash.com/${unsplashId}?auto=format&fit=crop&w=800&q=80`,
+      warning: "AI generation key lookup or threshold error. Loaded fallback graphics successfully.",
+      isFallback: true 
+    });
+  }
+});
+
+// 4. API: Automated order confirmation and receipts email dispatcher
+app.post("/api/send-email", async (req, res) => {
+  const {
+    orderId,
+    customerName,
+    customerEmail,
+    itemTitle,
+    price,
+    currency,
+    date,
+    paymentMethod,
+    downloadUrl
+  } = req.body;
+
+  if (!orderId || !customerName || !customerEmail || !itemTitle) {
+    res.status(400).json({ error: "Required fields are missing: orderId, customerName, customerEmail, itemTitle" });
+    return;
+  }
+
+  const cleanPrice = price !== undefined ? price : 0;
+  const cleanCurrency = currency || "USD";
+  const cleanDate = date || new Date().toLocaleString();
+  const cleanMethod = paymentMethod || "Standard Gateway";
+
+  // Construct a premium high-contrast HTML Email Confirmation Voucher
+  const htmlContent = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Payment Receipt - WebzoneBD</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background-color: #f8fafc;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+    .wrapper {
+      width: 100%;
+      background-color: #f8fafc;
+      padding: 40px 20px;
+      box-sizing: border-box;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background-color: #ffffff;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+      border: 1px solid #e2e8f0;
+    }
+    .header {
+      background-color: #0c1220;
+      padding: 32px;
+      text-align: center;
+      color: #ffffff;
+    }
+    .logo {
+      font-size: 24px;
+      font-weight: 850;
+      letter-spacing: -0.025em;
+      color: #06b6d4;
+      text-decoration: none;
+    }
+    .logo span {
+      color: #ffffff;
+    }
+    .badge {
+      display: inline-block;
+      background-color: #10b981;
+      color: #ffffff;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 4px 12px;
+      border-radius: 20px;
+      margin-top: 16px;
+    }
+    .content {
+      padding: 32px;
+    }
+    .greeting {
+      font-size: 18px;
+      font-weight: 700;
+      color: #0f172a;
+      margin-top: 0;
+      margin-bottom: 8px;
+    }
+    .message {
+      font-size: 14px;
+      color: #475569;
+      line-height: 1.6;
+      margin: 0 0 24px 0;
+    }
+    .invoice-card {
+      background-color: #f8fafc;
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+      padding: 20px;
+      margin-bottom: 24px;
+    }
+    .invoice-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: #64748b;
+      letter-spacing: 0.05em;
+      margin-top: 0;
+      margin-bottom: 12px;
+    }
+    .invoice-row {
+      margin-bottom: 8px;
+      font-size: 13px;
+      color: #334155;
+    }
+    .invoice-label {
+      color: #64748b;
+      font-weight: 550;
+    }
+    .invoice-value {
+      color: #0f172a;
+      font-weight: bold;
+    }
+    .btn-container {
+      text-align: center;
+      margin: 32px 0 16px 0;
+    }
+    .btn {
+      display: inline-block;
+      background-color: #06b6d4;
+      color: #ffffff !important;
+      font-weight: bold;
+      font-size: 14px;
+      text-decoration: none;
+      padding: 12px 28px;
+      border-radius: 8px;
+      box-shadow: 0 4px 6px -1px rgba(6, 182, 212, 0.2);
+    }
+    .footer {
+      background-color: #f8fafc;
+      border-top: 1px solid #f1f5f9;
+      padding: 24px 32px;
+      text-align: center;
+      font-size: 12px;
+      color: #94a3b8;
+    }
+    .footer-support a {
+      color: #06b6d4;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="container">
+      <div class="header">
+        <a href="https://webzonebd.com" class="logo">Webzone<span>BD</span></a>
+        <div style="font-size: 12px; color: #94a3b8; margin-top: 4px;">Premium IT Solutions & Digital Marketplace</div>
+        <div><span class="badge">Order Confirmed</span></div>
+      </div>
+      <div class="content">
+        <h3 class="greeting">Assalamu Alaikum ${customerName},</h3>
+        <p class="message">
+          Thank you for choosing WebzoneBD. Your payment has been authorized and cleared successfully. Below are the details of your service order confirmation and invoice receipt.
+        </p>
+        
+        <div class="invoice-card">
+          <div class="invoice-title">Invoice & Payment Summary</div>
+          <div class="invoice-row">
+            <span class="invoice-label">Order Ref ID:</span> 
+            <span class="invoice-value" style="font-family: monospace;">#${orderId}</span>
+          </div>
+          <div class="invoice-row">
+            <span class="invoice-label">Order Item Name:</span> 
+            <span class="invoice-value" style="color: #000000;">${itemTitle}</span>
+          </div>
+          <div class="invoice-row">
+            <span class="invoice-label">Receipt Date:</span> 
+            <span class="invoice-value">${cleanDate}</span>
+          </div>
+          <div class="invoice-row">
+            <span class="invoice-label">Payment Mode:</span> 
+            <span class="invoice-value" style="font-family: monospace; font-size: 12px;">${cleanMethod}</span>
+          </div>
+          <div style="padding-top: 12px; border-top: 1px dashed #cbd5e1; font-size: 15px; font-weight: 700; margin-top: 12px; color: #000;">
+            <span>Paid Total Settled:</span>
+            <span style="float: right; color: #10b981;">$${cleanPrice} ${cleanCurrency}</span>
+          </div>
+        </div>
+
+        ${downloadUrl && downloadUrl !== "#" ? `
+        <p class="message" style="margin-bottom: 8px;">
+          <strong>📥 Digital Installation Package:</strong> Your purchased PHP scripts, templates, or system zip package is ready for download in your WebzoneBD account cabinet. Click the action button below to start:
+        </p>
+        <div class="btn-container">
+          <a href="${downloadUrl}" class="btn" style="color: #fff !important;">Download Files</a>
+        </div>
+        ` : `
+        <p class="message">
+          Our development staff has been notified of your project deployment specs. We are setting up your server workspace, connecting API callback loops, and will notify you within 24 hours.
+        </p>
+        <div class="btn-container">
+          <a href="https://ais-dev-z4aiwbs43hldall23o4qkt-316113368699.europe-west3.run.app" class="btn" style="color: #fff !important;">Enter Client Panel</a>
+        </div>
+        `}
+
+        <div style="margin-top: 32px; border-top: 1px solid #f1f5f9; padding-top: 20px;">
+          <h4 style="font-size: 13px; font-weight: 700; color: #334155; margin: 0 0 8px 0;">Need immediate installation or manual configuration?</h4>
+          <p class="message" style="margin: 0; font-size: 12px;">
+            Please open an answered Support Ticket or click the WhatsApp Live help button under your customer profile panel.
+          </p>
+        </div>
+      </div>
+      <div class="footer">
+        <div class="footer-support" style="margin-bottom: 12px;">
+          WebzoneBD Corporate Team &bull; Support: <a href="mailto:support@webzonebd.com">support@webzonebd.com</a>
+        </div>
+        <div>
+          &copy; ${new Date().getFullYear()} WebzoneBD. All rights reserved. cPanel Secured Network environment.
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+
+  const smtpHost = process.env.SMTP_HOST;
+  const smtpPort = parseInt(process.env.SMTP_PORT || "587");
+  const smtpUser = process.env.SMTP_USER;
+  const smtpPass = process.env.SMTP_PASS;
+  const smtpFrom = process.env.SMTP_FROM || "no-reply@webzonebd.com";
+
+  let sent = false;
+  let transmissionStatus = "Pending configuration credentials";
+  let transportError: string | null = null;
+
+  if (smtpHost && smtpUser && smtpPass) {
+    try {
+      const transporter = nodemailer.createTransport({
+        host: smtpHost,
+        port: smtpPort,
+        secure: smtpPort === 465,
+        auth: {
+          user: smtpUser,
+          pass: smtpPass
+        }
+      });
+
+      await transporter.sendMail({
+        from: `"WebzoneBD Invoice Manager" <${smtpFrom}>`,
+        to: customerEmail,
+        subject: `💳 Order Confirmation & Invoice Receipt - #${orderId}`,
+        html: htmlContent
+      });
+
+      sent = true;
+      transmissionStatus = "Transmitted directly to recipient mail server via SMTP";
+    } catch (err: any) {
+      console.error("Nodemailer SMTP Dispatch error: ", err);
+      transportError = err.message || "Unknown SMTP Connection Refused Error";
+      transmissionStatus = "Failed to dispatch via SMTP due to network/configuration limits";
+    }
+  } else {
+    transmissionStatus = "Environment is in secure sandbox mode. Generated complete responsive HTML receipt preview successfully.";
+  }
+
+  res.json({
+    success: true,
+    sent: sent,
+    status: transmissionStatus,
+    targetEmail: customerEmail,
+    subject: `💳 Order Confirmation & Invoice Receipt - #${orderId}`,
+    htmlTemplate: htmlContent,
+    details: {
+      smtpHost: smtpHost || "Not Specified (Use SMTP_HOST in .env)",
+      smtpUser: smtpUser || "Not Specified (Use SMTP_USER in .env)",
+      smtpPort: smtpPort,
+      smtpFrom: smtpFrom,
+      error: transportError
+    }
+  });
+});
+
 // Vite Middleware & Static Asset Serving Setup
 async function launchServer() {
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
@@ -261,7 +635,7 @@ async function launchServer() {
   } else {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
-    app.get("*all", (req, res) => {
+    app.get("*", (req, res) => {
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
@@ -271,4 +645,7 @@ async function launchServer() {
   });
 }
 
-launchServer();
+launchServer().catch((err) => {
+  console.error("FATAL: Failed to launch WebzoneBD server:", err);
+  process.exit(1);
+});

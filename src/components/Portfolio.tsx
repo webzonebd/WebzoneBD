@@ -13,15 +13,19 @@ import {
   Sparkles, 
   X, 
   ChevronRight, 
+  ChevronLeft,
   ShieldCheck, 
   Send, 
   Smile,
   Layers,
-  Heart
+  Heart,
+  Play
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { PortfolioItem, Language, Theme } from '../types';
 import { samplePortfolio } from '../data';
+import { db } from '../firebase';
+import { doc, onSnapshot } from 'firebase/firestore';
 
 interface PortfolioProps {
   language: Language;
@@ -29,10 +33,40 @@ interface PortfolioProps {
 }
 
 export default function Portfolio({ language, theme }: PortfolioProps) {
+  const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>(() => {
+    const saved = localStorage.getItem('wz_cms_portfolio');
+    return saved ? JSON.parse(saved) : samplePortfolio;
+  });
+
   const [filter, setFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedProject, setSelectedProject] = useState<PortfolioItem | null>(null);
-  
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [activeMediaTab, setActiveMediaTab] = useState<'image' | 'video'>('image');
+
+  // Real-time Firestore sync for dynamic client updates
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'cms_sync', 'portfolio'), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data && Array.isArray(data.items)) {
+          setPortfolioItems(data.items);
+          localStorage.setItem('wz_cms_portfolio', JSON.stringify(data.items));
+        }
+      }
+    }, (error) => {
+      console.info("Firestore portfolio listener standing by for offline/sandbox mode.");
+    });
+    return () => unsub();
+  }, []);
+
+  // Sync effect to reset activeMediaTab when a project is selected
+  useEffect(() => {
+    if (selectedProject) {
+      setActiveMediaTab('image');
+    }
+  }, [selectedProject]);
+
   // Quote Modal states
   const [isQuoteModalOpen, setIsQuoteModalOpen] = useState(false);
   const [quoteForm, setQuoteForm] = useState({
@@ -67,10 +101,12 @@ export default function Portfolio({ language, theme }: PortfolioProps) {
   const categories = [
     { id: 'all', en: "All Projects", bn: "সকল প্রজেক্ট", ar: "جميع المشاريع", icon: "💎" },
     { id: 'web', en: "Web Development", bn: "ওয়েব ডেভেলপমেন্ট", ar: "تطوير الويب", icon: "🌐" },
+    { id: 'marketing', en: "Digital Marketing", bn: "ডিজিটাল মার্কেটিং", ar: "التسويق الرقمي", icon: "📢" },
+    { id: 'graphic', en: "Graphic Design", bn: "গ্রাফিক ডিজাইন", ar: "تصميم الجرافيك", icon: "🖌️" },
     { id: 'news', en: "News Portal", bn: "নিউজ পোর্টাল", ar: "بوابة الأخبار", icon: "📰" },
     { id: 'blog', en: "Blogging Website", bn: "ব্লগিং সাইট", ar: "موقع مدونة", icon: "✍️" },
     { id: 'ecommerce', en: "E-Commerce Website", bn: "ই-কমার্স ওয়েবসাইট", ar: "التجارة الإلكترونية", icon: "🛒" },
-    { id: 'portfolio', en: "Customer Portfolio", bn: "কাস্টমার পোর্টফোলিও", ar: "معرض أعمال العملاء", icon: "🎨" },
+    { id: 'portfolio', en: "Customer Portfolio", bn: "কাস্টমার পোর্টফোলিও", ar: "معرض أعمال العملاء", icon: "💼" },
     { id: 'seoAds', en: "SEO & Google Ads", bn: "এসইও ও গুগল এডস", ar: "سيو وإعلانات جوجل", icon: "🚀" },
     { id: 'solutions', en: "ERP & POS Systems", bn: "সফটওয়্যার ও পস সিস্টেম", ar: "حلول البرمجيات وأنظمة الحسابات", icon: "📊" }
   ];
@@ -111,7 +147,7 @@ export default function Portfolio({ language, theme }: PortfolioProps) {
 
   // Filter & Search Logic
   const filteredItems = useMemo(() => {
-    return samplePortfolio.filter(item => {
+    return portfolioItems.filter(item => {
       // Category filter check
       const matchesCategory = filter === 'all' || item.category === filter;
       
@@ -132,6 +168,22 @@ export default function Portfolio({ language, theme }: PortfolioProps) {
       return matchesCategory && (titleMatches || clientMatches || categoryMatches || techMatches);
     });
   }, [filter, searchQuery]);
+
+  // Keyboard navigation for Lightbox modal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (lightboxIndex === null) return;
+      if (e.key === 'Escape') {
+        setLightboxIndex(null);
+      } else if (e.key === 'ArrowRight') {
+        setLightboxIndex((prev) => (prev !== null && prev < filteredItems.length - 1 ? prev + 1 : 0));
+      } else if (e.key === 'ArrowLeft') {
+        setLightboxIndex((prev) => (prev !== null && prev > 0 ? prev - 1 : filteredItems.length - 1));
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [lightboxIndex, filteredItems]);
 
   // Dictionary translations for robust UI
   const t = {
@@ -445,104 +497,155 @@ export default function Portfolio({ language, theme }: PortfolioProps) {
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6.5" id="interactive-grid-portfolio-posts">
-            {filteredItems.map((item, idx) => (
-              <div 
-                key={item.id}
-                className="bg-white dark:bg-[#0F172A] border border-neutral-200/60 dark:border-neutral-850 rounded-2xl overflow-hidden hover:shadow-xl hover:translate-y-[-3px] transition-all duration-300 flex flex-col justify-between group"
-              >
-                {/* Visual Banner Media */}
-                <div className="relative h-48 sm:h-52 w-full overflow-hidden bg-neutral-150 dark:bg-neutral-900 border-b border-neutral-100 dark:border-neutral-850">
-                  <img
-                    src={item.image}
-                    alt={item.title}
-                    className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-300"
-                    referrerPolicy="no-referrer"
-                    loading="lazy"
-                  />
-                  
-                  {/* Category overlay tags */}
-                  <span className="absolute bottom-3 left-3 bg-neutral-950/80 backdrop-blur-md text-white text-[9px] uppercase tracking-widest font-black px-2 py-0.5 rounded border border-neutral-800">
-                    {language === 'bn' ? item.categoryLabelBn : language === 'ar' ? item.categoryLabelAr : item.categoryLabel}
-                  </span>
+          <motion.div 
+            layout
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6.5" 
+            id="interactive-grid-portfolio-posts"
+          >
+            <AnimatePresence mode="popLayout">
+              {filteredItems.map((item, idx) => {
+                const hasVideo = !!item.videoUrl;
+                return (
+                  <motion.div 
+                    layout
+                    initial={{ opacity: 0, y: 15 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    whileHover={{ y: -6, scale: 1.01 }}
+                    transition={{ type: "spring", stiffness: 350, damping: 25 }}
+                    key={item.id}
+                    className="bg-white dark:bg-[#0F172A] border border-neutral-200/60 dark:border-neutral-800 rounded-2xl overflow-hidden hover:shadow-[0_20px_50px_rgba(124,58,237,0.12)] hover:border-purple-500/50 transition-all duration-300 flex flex-col justify-between group"
+                  >
+                    {/* Visual Banner Media */}
+                    <div 
+                      title={language === 'bn' ? 'বিস্তারিত দেখতে এখানে ক্লিক করুন' : language === 'ar' ? 'اضغط لعرض التفاصيل الكاملة' : 'Click to view complete case details'}
+                      onClick={() => setSelectedProject(item)}
+                      className="group/img relative h-48 sm:h-52 w-full overflow-hidden bg-neutral-150 dark:bg-neutral-900 border-b border-neutral-100 dark:border-neutral-850 cursor-pointer"
+                    >
+                      <img
+                        src={item.image}
+                        alt={item.title}
+                        className="w-full h-full object-cover object-center group-hover/img:scale-105 transition-transform duration-500"
+                        referrerPolicy="no-referrer"
+                        loading="lazy"
+                      />
 
-                  {/* Multi regional visual feedback for premium delivery */}
-                  {item.results && item.results.length > 0 && (
-                    <span className="absolute top-3 right-3 bg-emerald-500/90 backdrop-blur-xs text-white text-[9px] font-black tracking-tight px-2 py-0.5 rounded shadow-sm">
-                      🚀 {language === 'bn' ? item.resultsBn?.[0]?.value || item.results[0].value : language === 'ar' ? item.resultsAr?.[0]?.value || item.results[0].value : item.results[0].value}
-                    </span>
-                  )}
-                </div>
-
-                {/* Info and Descriptions */}
-                <div className="p-6 flex-1 flex flex-col justify-between space-y-4">
-                  <div className="space-y-3.5">
-                    
-                    {/* Title */}
-                    <h3 className="text-sm sm:text-base font-extrabold text-neutral-950 dark:text-white leading-snug group-hover:text-blue-600 dark:group-hover:text-cyan-400 transition-colors">
-                      {language === 'bn' ? item.titleBn : language === 'ar' ? item.titleAr : item.title}
-                    </h3>
-
-                    {/* Brief description */}
-                    <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed font-medium line-clamp-2">
-                      {language === 'bn' ? item.descriptionBn : language === 'ar' ? item.descriptionAr : item.description}
-                    </p>
-
-                    {/* Tech pills stack representation */}
-                    {item.techStack && (
-                      <div className="flex flex-wrap gap-1 pt-1">
-                        {item.techStack.map((tech, tIdx) => (
-                          <span 
-                            key={tIdx}
-                            className="text-[9px] font-black tracking-tight font-mono px-2 py-0.5 rounded bg-neutral-100 dark:bg-neutral-900 text-neutral-600 dark:text-neutral-400 border border-neutral-200/50 dark:border-neutral-800"
-                          >
-                            #{tech}
-                          </span>
-                        ))}
+                      {/* Touch & Hover Zoom Banner Overlay */}
+                      <div className="absolute inset-0 bg-neutral-950/40 opacity-0 group-hover/img:opacity-100 transition-opacity duration-300 flex items-center justify-center backdrop-blur-[2px]">
+                        {hasVideo ? (
+                          <div className="p-3.5 rounded-full bg-linear-to-r from-[#7C3AED] via-[#A855F7] to-[#EC4899] text-white shadow-xl transform scale-75 group-hover/img:scale-100 transition-all duration-300 animate-pulse">
+                            <Play className="w-5 h-5 fill-white ml-0.5" />
+                          </div>
+                        ) : (
+                          <div className="px-3.5 py-1.5 rounded-full bg-neutral-950/85 text-white font-extrabold text-[10px] uppercase tracking-wider flex items-center gap-1.5 border border-white/20 shadow-xl transform scale-90 group-hover/img:scale-100 transition-all duration-300">
+                            <Search className="w-3 h-3 text-purple-400" />
+                            <span>{language === 'bn' ? 'কেস স্টাডি' : language === 'ar' ? 'عرض تفاصيل' : 'Case Study'}</span>
+                          </div>
+                        )}
                       </div>
-                    )}
+                      
+                      {/* Video badge */}
+                      {hasVideo && (
+                        <span className="absolute top-3 left-3 bg-red-600 text-white text-[8px] font-black tracking-widest px-2 py-0.5 rounded-full flex items-center gap-1 z-10 shadow-lg shadow-red-500/20">
+                          <span className="relative flex h-1.5 w-1.5">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white"></span>
+                          </span>
+                          <span>VIDEO DEMO</span>
+                        </span>
+                      )}
 
-                    {/* Meta stats like partner & Timeline builds */}
-                    <div className="space-y-1.5 text-[11px] text-neutral-400 dark:text-neutral-500 border-t border-neutral-100 dark:border-neutral-900/60 pt-3.5">
-                      <p className="flex items-center gap-1.5 font-medium">
-                        <User className="w-3.5 h-3.5 text-blue-500 dark:text-cyan-400 shrink-0" />
-                        <span>{t.client}: <strong className="text-neutral-700 dark:text-neutral-300">{item.client}</strong></span>
-                      </p>
-                      <p className="flex items-center gap-1.5 font-medium">
-                        <Calendar className="w-3.5 h-3.5 text-blue-500 dark:text-cyan-400 shrink-0" />
-                        <span>{t.timeline}: <strong className="text-neutral-700 dark:text-neutral-300">{item.duration}</strong></span>
-                      </p>
+                      {/* Category overlay tags */}
+                      <div className="absolute bottom-3 left-3 flex flex-wrap gap-1.5 z-10">
+                        <span className="bg-neutral-950/80 backdrop-blur-md text-white text-[9px] uppercase tracking-widest font-black px-2 py-0.5 rounded border border-neutral-800">
+                          {language === 'bn' ? item.categoryLabelBn : language === 'ar' ? item.categoryLabelAr : item.categoryLabel}
+                        </span>
+                        {item.subCategory && (
+                          <span className="bg-purple-600/90 backdrop-blur-md text-white text-[9px] uppercase tracking-widest font-black px-2 py-0.5 rounded border border-purple-500/50">
+                            {language === 'bn' ? item.subCategoryBn || item.subCategory : language === 'ar' ? item.subCategoryAr || item.subCategory : item.subCategory}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Multi regional visual feedback for premium delivery */}
+                      {item.results && item.results.length > 0 && (
+                        <span className="absolute top-3 right-3 bg-emerald-500/90 backdrop-blur-xs text-white text-[9px] font-black tracking-tight px-2 py-0.5 rounded shadow-sm z-10">
+                          🚀 {language === 'bn' ? item.resultsBn?.[0]?.value || item.results[0].value : language === 'ar' ? item.resultsAr?.[0]?.value || item.results[0].value : item.results[0].value}
+                        </span>
+                      )}
                     </div>
 
-                  </div>
+                    {/* Info and Descriptions */}
+                    <div className="p-6 flex-1 flex flex-col justify-between space-y-4">
+                      <div className="space-y-3.5">
+                        
+                        {/* Title */}
+                        <h3 className="text-sm sm:text-base font-extrabold text-neutral-950 dark:text-white leading-snug group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors cursor-pointer" onClick={() => setSelectedProject(item)}>
+                          {language === 'bn' ? item.titleBn : language === 'ar' ? item.titleAr : item.title}
+                        </h3>
 
-                  {/* Operational Interactive Action buttons with case details launch */}
-                  <div className="flex items-center gap-2 pt-3 border-t border-neutral-100 dark:border-neutral-900/60 w-full">
-                    
-                    <button
-                      onClick={() => {
-                        window.open(item.demoUrl, '_blank');
-                      }}
-                      className="flex-1 py-2 text-xs font-bold rounded-xl border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-900 flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                      <span>{t.liveDemo}</span>
-                    </button>
+                        {/* Brief description */}
+                        <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed font-semibold line-clamp-2">
+                          {language === 'bn' ? item.descriptionBn : language === 'ar' ? item.descriptionAr : item.description}
+                        </p>
 
-                    <button
-                      onClick={() => setSelectedProject(item)}
-                      className="flex-1 py-2 text-xs font-bold rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-cyan-400 hover:text-white hover:bg-blue-605 dark:hover:bg-blue-600 flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95"
-                    >
-                      <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                      <span>{t.caseStudy}</span>
-                    </button>
+                        {/* Tech pills stack representation */}
+                        {item.techStack && (
+                          <div className="flex flex-wrap gap-1 pt-1">
+                            {item.techStack.map((tech, tIdx) => (
+                              <span 
+                                key={tIdx}
+                                className="text-[9px] font-black tracking-tight font-mono px-2 py-0.5 rounded bg-neutral-100 dark:bg-neutral-900 text-neutral-600 dark:text-neutral-400 border border-neutral-200/50 dark:border-neutral-800"
+                              >
+                                #{tech}
+                              </span>
+                            ))}
+                          </div>
+                        )}
 
-                  </div>
-                </div>
+                        {/* Meta stats like partner & Timeline builds */}
+                        <div className="space-y-1.5 text-[11px] text-neutral-400 dark:text-neutral-500 border-t border-neutral-100 dark:border-neutral-900/60 pt-3.5">
+                          <p className="flex items-center gap-1.5 font-medium">
+                            <User className="w-3.5 h-3.5 text-purple-500 dark:text-purple-400 shrink-0" />
+                            <span>{t.client}: <strong className="text-neutral-700 dark:text-neutral-300">{item.client}</strong></span>
+                          </p>
+                          <p className="flex items-center gap-1.5 font-medium">
+                            <Calendar className="w-3.5 h-3.5 text-purple-500 dark:text-purple-400 shrink-0" />
+                            <span>{t.timeline}: <strong className="text-neutral-700 dark:text-neutral-300">{item.duration}</strong></span>
+                          </p>
+                        </div>
 
-              </div>
-            ))}
-          </div>
+                      </div>
+
+                      {/* Operational Interactive Action buttons with case details launch */}
+                      <div className="flex items-center gap-2 pt-3 border-t border-neutral-100 dark:border-neutral-900/60 w-full">
+                        
+                        <button
+                          onClick={() => {
+                            window.open(item.demoUrl, '_blank');
+                          }}
+                          className="flex-1 py-2 text-xs font-bold rounded-xl border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-900 flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          <span>{t.liveDemo}</span>
+                        </button>
+
+                        <button
+                          onClick={() => setSelectedProject(item)}
+                          className="flex-1 py-2 text-xs font-bold rounded-xl bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 hover:text-white hover:bg-purple-600 dark:hover:bg-purple-600 flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95"
+                        >
+                          <Sparkles className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
+                          <span>{t.caseStudy}</span>
+                        </button>
+
+                      </div>
+                    </div>
+
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
+          </motion.div>
         )}
 
       </section>
@@ -578,24 +681,79 @@ export default function Portfolio({ language, theme }: PortfolioProps) {
 
               <div className="overflow-y-auto flex-1 pb-6">
                 
-                {/* Visual Poster representation */}
-                <div className="relative h-60 w-full bg-neutral-900">
-                  <img
-                    src={selectedProject.image}
-                    alt={selectedProject.title}
-                    className="w-full h-full object-cover"
-                    referrerPolicy="no-referrer"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-neutral-950/90 via-neutral-950/40 to-transparent" />
+                {/* Visual Poster or Video Walkthrough Player */}
+                <div className="relative h-64 sm:h-72 w-full bg-neutral-950 overflow-hidden">
+                  {selectedProject.videoUrl && activeMediaTab === 'video' ? (
+                    <div className="w-full h-full relative">
+                      <iframe
+                        src={`${selectedProject.videoUrl}?autoplay=1&mute=1&rel=0`}
+                        title={selectedProject.title}
+                        className="w-full h-full border-none"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      ></iframe>
+                    </div>
+                  ) : (
+                    <div className="w-full h-full relative">
+                      <img
+                        src={selectedProject.image}
+                        alt={selectedProject.title}
+                        className="w-full h-full object-cover"
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-neutral-950/95 via-neutral-950/40 to-transparent" />
+                    </div>
+                  )}
+
+                  {/* Top Header Controls / Tabs to Toggle media */}
+                  {selectedProject.videoUrl && (
+                    <div className="absolute top-4 left-4 flex items-center gap-1.5 bg-neutral-950/70 p-1 rounded-xl backdrop-blur-md border border-white/10 z-30">
+                      <button
+                        onClick={() => setActiveMediaTab('image')}
+                        className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1 ${
+                          activeMediaTab === 'image'
+                            ? 'bg-linear-to-r from-purple-600 to-pink-500 text-white shadow-md'
+                            : 'text-neutral-400 hover:text-white'
+                        }`}
+                      >
+                        <span>📸</span>
+                        <span>{language === 'bn' ? 'স্ক্রিনশট' : language === 'ar' ? 'لقطة شاشة' : 'Screenshot'}</span>
+                      </button>
+                      <button
+                        onClick={() => setActiveMediaTab('video')}
+                        className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1 ${
+                          activeMediaTab === 'video'
+                            ? 'bg-linear-to-r from-purple-600 to-pink-500 text-white shadow-md'
+                            : 'text-neutral-400 hover:text-white'
+                        }`}
+                      >
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                        </span>
+                        <span>{language === 'bn' ? 'ভিডিও ওয়াকথ্রু' : language === 'ar' ? 'عرض مرئي' : 'Video Demo'}</span>
+                      </button>
+                    </div>
+                  )}
                   
-                  <div className="absolute bottom-5 left-6 right-6 space-y-1.5">
-                    <span className="bg-blue-600 text-white text-[9px] uppercase tracking-wider font-extrabold px-2.5 py-0.5 rounded-md">
-                      {language === 'bn' ? selectedProject.categoryLabelBn : language === 'ar' ? selectedProject.categoryLabelAr : selectedProject.categoryLabel}
-                    </span>
-                    <h2 className="text-lg sm:text-xl md:text-2xl font-black text-white leading-tight">
-                      {language === 'bn' ? selectedProject.titleBn : language === 'ar' ? selectedProject.titleAr : selectedProject.title}
-                    </h2>
-                  </div>
+                  {/* Title overlay */}
+                  {(activeMediaTab === 'image' || !selectedProject.videoUrl) && (
+                    <div className="absolute bottom-5 left-6 right-6 space-y-1.5 z-10 pointer-events-none">
+                      <div className="flex flex-wrap gap-1.5">
+                        <span className="inline-block bg-purple-600 text-white text-[9px] uppercase tracking-wider font-extrabold px-2.5 py-0.5 rounded-md">
+                          {language === 'bn' ? selectedProject.categoryLabelBn : language === 'ar' ? selectedProject.categoryLabelAr : selectedProject.categoryLabel}
+                        </span>
+                        {selectedProject.subCategory && (
+                          <span className="inline-block bg-emerald-600 text-white text-[9px] uppercase tracking-wider font-extrabold px-2.5 py-0.5 rounded-md">
+                            {language === 'bn' ? selectedProject.subCategoryBn || selectedProject.subCategory : language === 'ar' ? selectedProject.subCategoryAr || selectedProject.subCategory : selectedProject.subCategory}
+                          </span>
+                        )}
+                      </div>
+                      <h2 className="text-lg sm:text-xl md:text-2xl font-black text-white leading-tight drop-shadow-md">
+                        {language === 'bn' ? selectedProject.titleBn : language === 'ar' ? selectedProject.titleAr : selectedProject.title}
+                      </h2>
+                    </div>
+                  )}
                 </div>
 
                 <div className="p-6 space-y-6">
@@ -695,6 +853,167 @@ export default function Portfolio({ language, theme }: PortfolioProps) {
             </motion.div>
           </motion.div>
         )}
+      </AnimatePresence>
+
+      {/* ================= HIGH-RESOLUTION SCREENSHOT LIGHTBOX MODAL ================= */}
+      <AnimatePresence>
+        {lightboxIndex !== null && filteredItems[lightboxIndex] && (() => {
+          const project = filteredItems[lightboxIndex];
+          const hasPrev = filteredItems.length > 1;
+          const hasNext = filteredItems.length > 1;
+
+          const handlePrev = (e?: React.MouseEvent) => {
+            if (e) e.stopPropagation();
+            setLightboxIndex((prev) => (prev !== null && prev > 0 ? prev - 1 : filteredItems.length - 1));
+          };
+
+          const handleNext = (e?: React.MouseEvent) => {
+            if (e) e.stopPropagation();
+            setLightboxIndex((prev) => (prev !== null && prev < filteredItems.length - 1 ? prev + 1 : 0));
+          };
+
+          const handleOpenCaseStudy = (e: React.MouseEvent) => {
+            e.stopPropagation();
+            setSelectedProject(project);
+            setLightboxIndex(null);
+          };
+
+          return (
+            <motion.div 
+              id="portfolio-lightbox-container"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-neutral-950/95 backdrop-blur-xl z-50 flex flex-col items-center justify-between p-4 sm:p-6 select-none"
+              onClick={() => setLightboxIndex(null)}
+            >
+              {/* Top Bar Controls */}
+              <div className="w-full flex items-center justify-between max-w-6xl z-10 pt-2 pb-4">
+                <div className="space-y-1 text-left">
+                  <span className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-[#06B6D4]">
+                    {language === 'bn' ? 'প্রজেক্ট স্ক্রিনশট গ্যালারি' : language === 'ar' ? 'معرض لقطات شاشة المشاريع' : 'Project Screenshot Spotlight'}
+                  </span>
+                  <div className="text-xs text-neutral-400 font-mono font-bold flex items-center gap-1.5">
+                    <span>{lightboxIndex + 1} / {filteredItems.length}</span>
+                    <span className="bg-neutral-800 text-neutral-300 font-mono text-[9px] px-1.5 py-0.5 rounded uppercase">
+                      {language === 'bn' ? project.categoryLabelBn : language === 'ar' ? project.categoryLabelAr : project.categoryLabel}
+                    </span>
+                    {project.subCategory && (
+                      <span className="bg-purple-900/60 text-purple-300 font-mono text-[9px] px-1.5 py-0.5 rounded uppercase">
+                        {language === 'bn' ? project.subCategoryBn || project.subCategory : language === 'ar' ? project.subCategoryAr || project.subCategory : project.subCategory}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="hidden md:inline-block text-[9px] font-mono bg-neutral-900 border border-neutral-805 text-neutral-500 rounded px-2 py-1 leading-none uppercase">
+                    ← / → navigate · esc close
+                  </span>
+                  <button
+                    onClick={() => setLightboxIndex(null)}
+                    className="p-2 sm:p-2.5 rounded-full bg-neutral-900 hover:bg-neutral-805 text-neutral-400 hover:text-white transition-all cursor-pointer border border-neutral-800 flex items-center justify-center active:scale-90"
+                    title={language === 'bn' ? 'বন্ধ করুন (Esc)' : language === 'ar' ? 'إغلاق (Esc)' : 'Close Spotlight (Esc)'}
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Main Image Stage area */}
+              <div className="relative w-full max-w-5xl flex-1 flex items-center justify-center min-h-0 py-4">
+                
+                {/* Previous trigger arrow */}
+                {hasPrev && (
+                  <button
+                    onClick={handlePrev}
+                    className="absolute left-0 sm:left-4 z-20 p-3 rounded-full bg-neutral-900/65 sm:bg-neutral-900/50 hover:bg-neutral-800 text-white hover:text-cyan-450 border border-neutral-850 backdrop-blur-xs transition-all active:scale-95 flex items-center justify-center cursor-pointer"
+                    title={language === 'bn' ? 'পূর্ববর্তী' : language === 'ar' ? 'السابق' : 'Previous'}
+                  >
+                    <ChevronLeft className="w-6 h-6 sm:w-8 sm:h-8" />
+                  </button>
+                )}
+
+                {/* Animated high-res showcase screenshot */}
+                <motion.div 
+                  key={project.id}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{ duration: 0.25 }}
+                  className="relative max-w-full max-h-[70vh] sm:max-h-[75vh] h-auto rounded-2xl overflow-hidden shadow-2xl border border-neutral-800 bg-neutral-900 flex items-center justify-center"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <img
+                    src={project.image}
+                    alt={project.title}
+                    className="max-w-full max-h-[70vh] sm:max-h-[75vh] w-auto h-auto object-contain cursor-zoom-out select-none"
+                    onClick={() => setLightboxIndex(null)}
+                    referrerPolicy="no-referrer"
+                  />
+                </motion.div>
+
+                {/* Next trigger arrow */}
+                {hasNext && (
+                  <button
+                    onClick={handleNext}
+                    className="absolute right-0 sm:right-4 z-20 p-3 rounded-full bg-neutral-900/65 sm:bg-neutral-900/50 hover:bg-neutral-800 text-white hover:text-cyan-455 border border-neutral-850 backdrop-blur-xs transition-all active:scale-95 flex items-center justify-center cursor-pointer"
+                    title={language === 'bn' ? 'পরবর্তী' : language === 'ar' ? 'التالي' : 'Next'}
+                  >
+                    <ChevronRight className="w-6 h-6 sm:w-8 sm:h-8" />
+                  </button>
+                )}
+
+              </div>
+
+              {/* Bottom Information and Actions Panel */}
+              <div 
+                className="w-full max-w-4xl bg-neutral-900/80 backdrop-blur-md border border-neutral-850 p-4 sm:p-5 rounded-2xl sm:rounded-3xl z-10 flex flex-col md:flex-row items-center md:items-center justify-between gap-4 text-center md:text-left mt-2 mb-4"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="space-y-1 flex-1">
+                  <h3 className="text-sm sm:text-base font-extrabold text-white leading-tight">
+                    {language === 'bn' ? project.titleBn : language === 'ar' ? project.titleAr : project.title}
+                  </h3>
+                  <p className="text-xs text-neutral-400 font-medium max-w-2xl line-clamp-2">
+                    {language === 'bn' ? project.descriptionBn : language === 'ar' ? project.descriptionAr : project.description}
+                  </p>
+                  <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-4 gap-y-1 text-[11px] text-neutral-400 pt-2 border-t border-neutral-800/40 mt-2">
+                    <span className="flex items-center gap-1">
+                      <User className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                      <span>{t.client}: <strong className="text-neutral-200">{project.client}</strong></span>
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Calendar className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                      <span>{t.timeline}: <strong className="text-neutral-200">{project.duration}</strong></span>
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-center gap-2 shrink-0 w-full md:w-auto">
+                  <button
+                    onClick={handleOpenCaseStudy}
+                    className="flex-1 md:flex-none px-4 py-2.5 text-xs font-bold rounded-xl bg-blue-600/20 text-cyan-400 hover:text-white hover:bg-blue-600 border border-blue-500/30 hover:border-blue-500 transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                    <span>{language === 'bn' ? 'কেস স্টাডি দেখুন' : language === 'ar' ? 'تفاصيل دراسة الحالة' : 'Case Details'}</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      window.open(project.demoUrl, '_blank');
+                    }}
+                    className="flex-1 md:flex-none px-4 py-2.5 text-xs font-bold rounded-xl bg-cyan-700 hover:bg-cyan-600 text-white shadow-md shadow-cyan-500/10 transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>{t.liveDemo}</span>
+                  </button>
+                </div>
+              </div>
+
+            </motion.div>
+          );
+        })()}
       </AnimatePresence>
 
       {/* ================= CLIENT TESTIMONIALS ================= */}

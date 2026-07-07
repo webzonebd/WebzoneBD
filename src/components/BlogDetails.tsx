@@ -3,11 +3,13 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   Calendar, User, Clock, Eye, Heart, Bookmark, Share2, 
   ArrowLeft, Copy, Check, MessageSquare, Send, ThumbsUp, Trash2, 
-  ChevronRight, Info, AlertTriangle, Play,
-  Facebook, Linkedin, Send as TelegramIcon, PhoneCall, Code, CheckSquare
+  ChevronRight, ChevronDown, Info, AlertTriangle, Play,
+  Facebook, Linkedin, Send as TelegramIcon, PhoneCall, Code, CheckSquare,
+  Twitter, MessageCircle
 } from 'lucide-react';
 import { LocalBlogPost } from './BlogData';
 import { Language, Theme } from '../types';
+import BdixBlogPostDetails from './BdixBlogPostDetails';
 
 interface CommentReply {
   id: string;
@@ -46,6 +48,50 @@ interface BlogDetailsProps {
   onLoginClick?: (view?: 'login' | 'register') => void;
 }
 
+// Hostinger/Kinsta-style premium code block with file icon, copy confirmation, and elegant styling
+function BlogCodeBlock({ code, language }: { code: string; language: string; key?: any }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="my-6 rounded-2xl overflow-hidden border border-neutral-200 dark:border-slate-800 shadow-[0_4px_25px_rgba(0,0,0,0.03)] dark:shadow-[0_4px_35px_rgba(0,0,0,0.25)]">
+      <div className="bg-neutral-50 dark:bg-slate-950 px-4 py-2.5 flex items-center justify-between border-b border-neutral-200 dark:border-slate-800">
+        <span className="flex items-center gap-2 text-xs font-mono font-bold text-neutral-550 dark:text-slate-400">
+          <span className="w-2.5 h-2.5 rounded-full bg-[#7C3AED]/40" />
+          <span className="w-2.5 h-2.5 rounded-full bg-[#00E5FF]/40" />
+          <span className="text-slate-500 uppercase font-bold text-[10px] tracking-wider">{language || 'CODE SNIPPET'}</span>
+        </span>
+        <button
+          onClick={handleCopy}
+          className="flex items-center gap-1.5 text-xs text-neutral-500 hover:text-[#7C3AED] dark:text-slate-400 dark:hover:text-[#00E5FF] transition-colors focus:outline-none cursor-pointer p-1 rounded hover:bg-neutral-100 dark:hover:bg-slate-900"
+        >
+          {copied ? (
+            <>
+              <Check className="w-3.5 h-3.5 text-emerald-500" />
+              <span className="text-emerald-500 font-semibold font-mono text-[11px]">Copied!</span>
+            </>
+          ) : (
+            <>
+              <Copy className="w-3.5 h-3.5" />
+              <span className="font-semibold font-mono text-[11px]">Copy</span>
+            </>
+          )}
+        </button>
+      </div>
+      <div className="relative">
+        <pre className="bg-[#FAF9FB] dark:bg-slate-950 p-5 text-xs sm:text-sm font-mono text-neutral-800 dark:text-slate-100 overflow-x-auto leading-relaxed max-h-[450px]">
+          <code>{code}</code>
+        </pre>
+      </div>
+    </div>
+  );
+}
+
 export default function BlogDetails({
   post,
   language,
@@ -61,33 +107,136 @@ export default function BlogDetails({
   user,
   onLoginClick
 }: BlogDetailsProps) {
+  if (post.id === 'bdix-hosting') {
+    return (
+      <BdixBlogPostDetails
+        post={post}
+        language={language}
+        theme={theme}
+        onBack={onBack}
+        isBookmarked={isBookmarked}
+        onBookmarkToggle={onBookmarkToggle}
+        onLikeToggle={onLikeToggle}
+        relatedPosts={relatedPosts}
+        onSelectRelated={onSelectRelated}
+      />
+    );
+  }
+
+  const articleRef = useRef<HTMLElement>(null);
   // Reading percentage state
   const [readingProgress, setReadingProgress] = useState(0);
   const [copiedLink, setCopiedLink] = useState(false);
   const [activeSection, setActiveSection] = useState('');
+  const [isMobileTocOpen, setIsMobileTocOpen] = useState(false);
 
-  // Active reading progress scroll dynamic calculations
+  // Auto-generate high-performance outline by parsing markdown headings from post content dynamically
+  const titleText = language === 'bn' ? post.titleBn || post.title : language === 'ar' ? post.titleAr || post.title : post.title;
+  const contentText = language === 'bn' ? post.contentBn || post.content : language === 'ar' ? post.contentAr || post.content : post.content;
+  const categoryText = language === 'bn' ? post.categoryBn || post.category : language === 'ar' ? post.categoryAr || post.category : post.category;
+
+  const generatedOutline = useMemo(() => {
+    const lines = contentText.split('\n');
+    const headings: { id: string; text: string; level: number }[] = [];
+    
+    lines.forEach((line) => {
+      const trimmed = line.trim();
+      if (trimmed.startsWith('#')) {
+        const match = trimmed.match(/^(#+)\s*(.*)$/);
+        if (match) {
+          const hashes = match[1];
+          const rawText = match[2].trim();
+          // Skip internal link/button line or bracket characters if any
+          if (rawText.startsWith('[') || rawText.startsWith('https://')) return;
+          
+          const text = rawText.replace(/\s*\(\s*.*?\s*\)\s*$/, '').trim(); 
+          const id = text.toLowerCase()
+            .replace(/[^a-zA-Z0-9\s-]/g, '')
+            .trim()
+            .replace(/\s+/g, '-');
+            
+          if (id && text && headings.findIndex(h => h.id === id) === -1) {
+            headings.push({
+              id,
+              text,
+              level: hashes.length
+            });
+          }
+        }
+      }
+    });
+
+    // Fallback to static post.outline if parsed output is sparse
+    if (headings.length === 0 && post.outline) {
+      return post.outline.map(o => ({
+        id: o.id,
+        text: language === 'bn' ? o.textBn : language === 'ar' ? o.textAr : o.text,
+        level: 3
+      }));
+    }
+
+    return headings;
+  }, [contentText, post.outline, language]);
+
+  // Active reading progress scroll dynamic calculations specifically over the blog post content area
   useEffect(() => {
     const handleScroll = () => {
-      const scrollHeight = document.documentElement.scrollHeight;
-      const clientHeight = document.documentElement.clientHeight;
-      const windowHeight = scrollHeight - clientHeight;
-      if (windowHeight > 0) {
-        const scrolled = (window.scrollY / windowHeight) * 105; // Added slight boost to hit 100% just before footer
-        setReadingProgress(Math.min(100, Math.max(0, scrolled)));
+      const el = articleRef.current;
+      if (!el) return;
+
+      const rect = el.getBoundingClientRect();
+      const headerHeight = 72; // Sticky Header height under which the progress bar sits
+      const viewportHeight = window.innerHeight;
+      const elementHeight = rect.height;
+
+      // Distance scrolled within the element bounds relative to sticky offset
+      const scrolled = -(rect.top - headerHeight);
+      const totalScrollable = elementHeight - (viewportHeight - headerHeight);
+
+      if (totalScrollable > 0) {
+        const percentage = (scrolled / totalScrollable) * 100;
+        setReadingProgress(Math.min(100, Math.max(0, percentage)));
       } else {
-        setReadingProgress(0);
+        setReadingProgress(rect.top < headerHeight ? 100 : 0);
+      }
+
+      // Sync active outline section based on which element is closest to the header viewport threshold
+      let currentActiveId = '';
+      let smallestDiff = Infinity;
+
+      generatedOutline.forEach((sect) => {
+        const sectionEl = document.getElementById(sect.id);
+        if (sectionEl) {
+          const sectionRect = sectionEl.getBoundingClientRect();
+          const topDiff = sectionRect.top - (headerHeight + 30);
+          
+          if (topDiff <= 100 && topDiff > -20) {
+            const absDiff = Math.abs(topDiff);
+            if (absDiff < smallestDiff) {
+              smallestDiff = absDiff;
+              currentActiveId = sect.id;
+            }
+          } else if (topDiff <= 0 && Math.abs(topDiff) < smallestDiff) {
+            smallestDiff = Math.abs(topDiff);
+            currentActiveId = sect.id;
+          }
+        }
+      });
+
+      if (currentActiveId) {
+        setActiveSection(currentActiveId);
       }
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
-    // Trigger initially on render/page mount
+    window.addEventListener('resize', handleScroll);
     handleScroll();
 
     return () => {
       window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('resize', handleScroll);
     };
-  }, [post.id]);
+  }, [post.id, generatedOutline]);
 
   // Floating Reactions counts in local state
   const [claps, setClaps] = useState(128);
@@ -96,6 +245,24 @@ export default function BlogDetails({
   const [loved, setLoved] = useState(false);
   const [insights, setInsights] = useState(45);
   const [insightActive, setInsightActive] = useState(false);
+
+  // YouTube playing state & URL helper function
+  const [isPlayingVideo, setIsPlayingVideo] = useState(false);
+
+  // Helper to convert raw YouTube URLs (e.g. watch?v=... or youtu.be/...) into valid embeddable URLs for iframes
+  const getYouTubeEmbedUrl = (url: string): string => {
+    if (!url) return '';
+    const cleaned = url.trim();
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=|shorts\/)([^#\&\?]*).*/;
+    const match = cleaned.match(regExp);
+    
+    if (match && match[2] && match[2].length === 11) {
+      const videoId = match[2];
+      return `https://www.youtube.com/embed/${videoId}`;
+    }
+    
+    return cleaned;
+  };
 
   // Comments entry form state
   const [commentName, setCommentName] = useState('');
@@ -273,31 +440,7 @@ export default function BlogDetails({
     );
   };
 
-  // Scroll tracker for reading status
-  useEffect(() => {
-    const handleScroll = () => {
-      const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
-      if (scrollHeight > 0) {
-        const scrolled = (window.scrollY / scrollHeight) * 100;
-        setReadingProgress(Math.min(scrolled, 100));
-      }
 
-      // Sync active section based on current scroll position
-      const outlineElements = post.outline || [];
-      for (const sect of outlineElements) {
-        const el = document.getElementById(sect.id);
-        if (el) {
-          const rect = el.getBoundingClientRect();
-          if (rect.top >= 0 && rect.top <= 200) {
-            setActiveSection(sect.id);
-          }
-        }
-      }
-    };
-
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [post]);
 
   const handleCopyLink = () => {
     const simulatedUrl = `${window.location.origin}/blog/${post.id}`;
@@ -381,23 +524,432 @@ export default function BlogDetails({
     }
   };
 
-  // Language selectors
-  const titleText = language === 'bn' ? post.titleBn || post.title : language === 'ar' ? post.titleAr || post.title : post.title;
-  const contentText = language === 'bn' ? post.contentBn || post.content : language === 'ar' ? post.contentAr || post.content : post.content;
-  const categoryText = language === 'bn' ? post.categoryBn || post.category : language === 'ar' ? post.categoryAr || post.category : post.category;
-
   // Render dummy galleries or content enhancements
   const segments = contentText.split('\n\n');
+
+  // Modern inline markup parser supporting bold, inline code backticks, and SEO-friendly hyperlinks
+  const parseInlineMarkup = (text: string): React.ReactNode[] => {
+    const tokens: React.ReactNode[] = [];
+    const parts = text.split(/(\*\*.*?\*\*|`.*?`|\[.*?\]\(.*?\))/g);
+
+    parts.forEach((part, index) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        const content = part.slice(2, -2);
+        tokens.push(
+          <strong key={index} className="font-extrabold text-[#7C3AED] dark:text-purple-400 bg-purple-550/5 dark:bg-purple-400/10 px-1 py-0.2 rounded transition-all duration-200">
+            {content}
+          </strong>
+        );
+      } else if (part.startsWith('`') && part.endsWith('`')) {
+        const content = part.slice(1, -1);
+        tokens.push(
+          <code key={index} className="font-mono text-[12px] font-bold bg-neutral-100 dark:bg-slate-900 text-pink-600 dark:text-cyan-400 border border-neutral-200 dark:border-slate-800 rounded px-1.5 py-0.5 select-all">
+            {content}
+          </code>
+        );
+      } else if (part.startsWith('[') && part.includes('](') && part.endsWith(')')) {
+        const match = part.match(/\[(.*?)\]\((.*?)\)/);
+        if (match) {
+          const textLabel = match[1];
+          const hrefUrl = match[2];
+          tokens.push(
+            <a 
+              key={index} 
+              href={hrefUrl} 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="text-[#7C3AED] dark:text-[#00E5FF] font-bold border-b-2 border-[#7C3AED]/30 dark:border-[#00E5FF]/30 hover:border-[#7C3AED] dark:hover:border-[#00E5FF] hover:bg-[#7C3AED]/5 dark:hover:bg-[#00E5FF]/5 transition-all duration-200 px-1.5 py-0.5 rounded"
+            >
+              {textLabel}
+            </a>
+          );
+        } else {
+          tokens.push(<span key={index}>{part}</span>);
+        }
+      } else {
+        tokens.push(<span key={index}>{part}</span>);
+      }
+    });
+
+    return tokens;
+  };
+
+  // Modern formatted content renderer for enhanced readability
+  const renderFormattedContent = (seg: string, idx: number, showOfferCard: boolean, showDomainOfferCard: boolean) => {
+    const cleanSeg = seg.trim();
+    if (!cleanSeg) return null;
+
+    // Check if the segment is a raw YouTube link to render a responsive embedded YouTube player
+    const isYTUrl = (text: string) => {
+      const urlPattern = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+$/i;
+      return urlPattern.test(text);
+    };
+
+    if (isYTUrl(cleanSeg)) {
+      const embedUrl = getYouTubeEmbedUrl(cleanSeg);
+      if (embedUrl) {
+        return (
+          <div key={idx} className="my-8 aspect-video w-full rounded-2xl overflow-hidden border border-neutral-200 dark:border-slate-800 shadow-[0_4px_25px_rgba(0,0,0,0.02)] bg-black relative">
+            <iframe
+              className="absolute inset-0 w-full h-full border-0"
+              src={embedUrl}
+              title="YouTube Video Embed"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
+            />
+          </div>
+        );
+      }
+    }
+
+    // A. Parse Code Blocks (surrounded by triple backticks)
+    if (cleanSeg.startsWith('```')) {
+      const parts = cleanSeg.split('```');
+      const innerContent = parts[1] || '';
+      const bLines = innerContent.split('\n');
+      let customLang = 'Terminal/PHP Code';
+      let cleanCode = innerContent;
+      
+      if (bLines[0] && bLines[0].length < 15 && !bLines[0].includes(' ') && !bLines[0].includes('=')) {
+        customLang = bLines[0].toUpperCase();
+        cleanCode = bLines.slice(1).join('\n').trim();
+      } else {
+        cleanCode = innerContent.trim();
+      }
+      return <BlogCodeBlock code={cleanCode} language={customLang} key={idx} />;
+    }
+
+    // B. Parse Callouts (Info, Warning, Success boxes)
+    if (cleanSeg.startsWith('[INFO]') || cleanSeg.startsWith('Info:')) {
+      const actualText = cleanSeg.replace(/^\[INFO\]\s*/i, '').replace(/^Info:\s*/i, '');
+      return (
+        <div key={idx} className="p-5 my-6 rounded-2xl bg-blue-50/70 dark:bg-blue-950/20 border-l-[5px] border-blue-500 flex gap-4 text-[16px] text-neutral-850 dark:text-slate-200 shadow-sm">
+          <Info className="w-5.5 h-5.5 text-blue-500 flex-none mt-0.5" />
+          <div className="space-y-0.5">
+            <strong className="block text-blue-700 dark:text-blue-400 font-extrabold uppercase text-[11px] tracking-wider font-mono">SEO Technical Insight</strong>
+            <p className="leading-relaxed font-sans text-sm sm:text-base font-medium">{parseInlineMarkup(actualText)}</p>
+          </div>
+        </div>
+      );
+    }
+
+    if (cleanSeg.startsWith('[WARNING]') || cleanSeg.startsWith('Critical Precaution:') || cleanSeg.startsWith('Warning:')) {
+      const actualText = cleanSeg.replace(/^\[WARNING\]\s*/i, '').replace(/^Critical Precaution:\s*/i, '').replace(/^Warning:\s*/i, '');
+      return (
+        <div key={idx} className="p-5 my-6 rounded-2xl bg-amber-50/70 dark:bg-amber-950/20 border-l-[5px] border-amber-500 flex gap-4 text-[16px] text-neutral-850 dark:text-slate-200 shadow-sm">
+          <AlertTriangle className="w-5.5 h-5.5 text-amber-500 flex-none mt-0.5" />
+          <div className="space-y-0.5">
+            <strong className="block text-amber-700 dark:text-amber-400 font-extrabold uppercase text-[11px] tracking-wider font-mono">Critical Configuration Warning</strong>
+            <p className="leading-relaxed font-sans text-sm sm:text-base font-medium">{parseInlineMarkup(actualText)}</p>
+          </div>
+        </div>
+      );
+    }
+
+    if (cleanSeg.startsWith('[SUCCESS]') || cleanSeg.startsWith('Success:') || cleanSeg.startsWith('Highly Recommended:')) {
+      const actualText = cleanSeg.replace(/^\[SUCCESS\]\s*/i, '').replace(/^Success:\s*/i, '').replace(/^Highly Recommended:\s*/i, '');
+      return (
+        <div key={idx} className="p-5 my-6 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/20 border-l-[5px] border-emerald-500 flex gap-4 text-[16px] text-neutral-850 dark:text-slate-200 shadow-sm">
+          <CheckSquare className="w-5.5 h-5.5 text-emerald-500 flex-none mt-0.5" />
+          <div className="space-y-0.5">
+            <strong className="block text-emerald-700 dark:text-emerald-400 font-extrabold uppercase text-[11px] tracking-wider font-mono">Conversion Best Practice</strong>
+            <p className="leading-relaxed font-sans text-sm sm:text-base font-medium">{parseInlineMarkup(actualText)}</p>
+          </div>
+        </div>
+      );
+    }
+
+    // C. Parse Blockquotes
+    if (cleanSeg.startsWith('>')) {
+      const quoteLines = cleanSeg.split('\n').map(line => line.trim().replace(/^>\s*/, ''));
+      const quoteText = quoteLines.filter(Boolean).join(' ');
+      return (
+        <blockquote key={idx} className="my-7 p-6 md:p-8 rounded-2xl border-l-[6px] border-[#7C3AED] bg-purple-500/5 dark:bg-purple-500/10 italic text-neutral-800 dark:text-slate-100 font-serif text-[18px] md:text-[20px] leading-relaxed relative overflow-hidden">
+          <span className="absolute -top-3 left-4 text-8xl text-[#7C3AED]/10 select-none font-serif">“</span>
+          <div className="relative z-10 leading-relaxed font-semibold">{parseInlineMarkup(quoteText)}</div>
+        </blockquote>
+      );
+    }
+
+    // D. Parse Tables (containing pipes | and separator ---)
+    const lines = cleanSeg.split('\n');
+    const isTable = lines.some(l => l.includes('|')) && lines.some(l => l.includes('---'));
+    if (isTable) {
+      const tableLines = lines.map(l => l.trim()).filter(Boolean);
+      const headersLine = tableLines[0];
+      if (headersLine) {
+        const headers = headersLine.split('|').map(h => h.trim()).filter((h, i, arr) => {
+          if (i === 0 && h === '') return false;
+          if (i === arr.length - 1 && h === '') return false;
+          return true;
+        });
+
+        const rows = tableLines.slice(2).map(rowLine => {
+          return rowLine.split('|').map(cell => cell.trim()).filter((cell, i, arr) => {
+            if (i === 0 && cell === '') return false;
+            if (i === arr.length - 1 && cell === '') return false;
+            return true;
+          });
+        });
+
+        return (
+          <div key={idx} className="my-8 overflow-x-auto border border-neutral-200 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-950/40 shadow-[0_2px_15px_rgba(0,0,0,0.02)]">
+            <table className="w-full text-left text-sm text-neutral-700 dark:text-slate-300 font-sans border-collapse">
+              <thead className="bg-neutral-50/80 dark:bg-slate-900 border-b border-neutral-200 dark:border-slate-800 text-neutral-900 dark:text-white font-bold tracking-tight">
+                <tr>
+                  {headers.map((hdr, hIdx) => (
+                    <th key={hIdx} className="p-4 uppercase text-[11px] text-[#7C3AED] dark:text-[#00E5FF] tracking-wider font-extrabold">{parseInlineMarkup(hdr)}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-neutral-150 dark:divide-slate-850">
+                {rows.map((row, rIdx) => (
+                  <tr key={rIdx} className="hover:bg-neutral-50/40 dark:hover:bg-slate-800/10 transition-colors">
+                    {row.map((cell, cIdx) => (
+                      <td key={cIdx} className="p-4 font-semibold text-neutral-850 dark:text-slate-200 text-sm sm:text-base">{parseInlineMarkup(cell)}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      }
+    }
+
+    // E. Parse Lists (Bullet or Numbered)
+    const isList = lines.some(line => {
+      const trimmed = line.trim();
+      return trimmed.startsWith('•') || trimmed.startsWith('-') || trimmed.startsWith('*') || /^\d+\./.test(trimmed) || /^[১-৯]+\./.test(trimmed) || trimmed.startsWith('✔');
+    });
+
+    if (isList) {
+      const listItems: React.ReactNode[] = [];
+      lines.forEach((line, lIdx) => {
+        const trimmed = line.trim();
+        if (!trimmed) return;
+
+        let isBullet = true;
+        let bulletChar = "⚡";
+        let bulletColor = "text-[#7C3AED] dark:text-[#00E5FF]";
+        let rawText = trimmed;
+
+        if (trimmed.startsWith('•')) {
+          bulletChar = "⚡";
+          bulletColor = "text-[#7C3AED] dark:text-[#00E5FF]";
+          rawText = trimmed.replace(/^•\s*/, '');
+        } else if (trimmed.startsWith('✔')) {
+          bulletChar = "✔";
+          bulletColor = "text-emerald-500";
+          rawText = trimmed.replace(/^✔\s*/, '');
+        } else if (trimmed.startsWith('-')) {
+          bulletChar = "–";
+          bulletColor = "text-slate-400";
+          rawText = trimmed.replace(/^-\s*/, '');
+        } else if (trimmed.startsWith('*')) {
+          bulletChar = "✦";
+          bulletColor = "text-[#7C3AED]";
+          rawText = trimmed.replace(/^\*\s*/, '');
+        } else if (/^\d+\./.test(trimmed)) {
+          isBullet = false;
+          const matches = trimmed.match(/^(\d+\.)\s*/);
+          bulletChar = matches ? matches[1] : "1.";
+          bulletColor = "text-[#7C3AED] dark:text-[#00E5FF]";
+          rawText = trimmed.replace(/^\d+\.\s*/, '');
+        } else if (/^[১-৯]+\./.test(trimmed)) {
+          isBullet = false;
+          const matches = trimmed.match(/^([১-৯]+\.)\s*/);
+          bulletChar = matches ? matches[1] : "১.";
+          bulletColor = "text-[#7C3AED] dark:text-[#00E5FF]";
+          rawText = trimmed.replace(/^[১-৯]+\.\s*/, '');
+        }
+
+        listItems.push(
+          <li key={lIdx} className="flex items-start gap-3 text-neutral-800 dark:text-slate-300 transition-colors duration-250 hover:text-black dark:hover:text-white group">
+            {isBullet ? (
+              <span className={`flex-none ${bulletColor} font-black font-sans select-none pt-0.5 text-base sm:text-lg shrink-0`}>
+                {bulletChar === "⚡" ? "⚡" : bulletChar === "✔" ? "✅" : bulletChar}
+              </span>
+            ) : (
+              <span className={`flex-none font-bold ${bulletColor} min-w-[24px] text-right text-sm pr-1 select-none shrink-0 font-mono`}>
+                {bulletChar}
+              </span>
+            )}
+            <span className="flex-1 text-slate-750 dark:text-slate-350 leading-[1.8] text-[16px] sm:text-[18px] font-medium">
+              {parseInlineMarkup(rawText)}
+            </span>
+          </li>
+        );
+      });
+
+      return (
+        <motion.ul
+          initial={{ opacity: 0, y: 10 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-10px" }}
+          className="my-6 pl-1 sm:pl-3 space-y-4 font-sans text-[17px] md:text-[18px] leading-[1.8]"
+          key={idx}
+        >
+          {listItems}
+        </motion.ul>
+      );
+    }
+
+    // F. Default paragraphs or Headings (if inline # headings are grouped inside double spacing, render appropriately)
+    const parsedBlocks: React.ReactNode[] = [];
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const trimmedLine = line.trim();
+      if (!trimmedLine) continue;
+
+      if (trimmedLine.startsWith('#')) {
+        const level = (trimmedLine.match(/^#+/) || ['#'])[0].length;
+        const text = trimmedLine.replace(/^#+\s*/, '');
+        const id = text.toLowerCase()
+          .replace(/[^a-zA-Z0-9\s-]/g, '')
+          .trim()
+          .replace(/\s+/g, '-');
+
+        if (level === 1 || level === 2) {
+          parsedBlocks.push(
+            <motion.div
+              initial={{ opacity: 0, y: 15 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-12px" }}
+              className="pt-10 pb-4 text-left group"
+              id={id}
+              key={`heading-${idx}-${i}`}
+            >
+              <div className="flex items-center gap-3">
+                <span className="w-2 h-7 rounded-full bg-gradient-to-b from-purple-600 to-[#7C3AED] shadow-[0_0_12px_rgba(124,58,237,0.4)]" />
+                <h2 className="text-xl md:text-2xl font-black text-[#7C3AED] dark:text-purple-400 tracking-tight leading-snug group-hover:text-purple-600 dark:group-hover:text-purple-300 transition-colors duration-200">
+                  {parseInlineMarkup(text)}
+                </h2>
+              </div>
+              <div className="h-[2px] w-full bg-gradient-to-r from-purple-100 to-transparent dark:from-purple-900/30 dark:to-transparent mt-4 group-hover:from-purple-500/20 transition-all duration-300" />
+            </motion.div>
+          );
+        } else if (level === 3) {
+          parsedBlocks.push(
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-10px" }}
+              className="pt-8 pb-3 text-left group"
+              id={id}
+              key={`heading-${idx}-${i}`}
+            >
+              <div className="flex items-center gap-2.5">
+                <span className="w-1.5 h-5 rounded-full bg-slate-400 dark:bg-slate-600" />
+                <h3 className="text-lg md:text-xl font-bold text-neutral-800 dark:text-white tracking-tight leading-snug hover:text-[#7C3AED] transition-colors duration-200">
+                  {parseInlineMarkup(text)}
+                </h3>
+              </div>
+              <div className="h-[1px] w-full bg-slate-150 dark:bg-slate-800/60 mt-3" />
+            </motion.div>
+          );
+        } else {
+          parsedBlocks.push(
+            <h4 id={id} className="text-base font-extrabold text-neutral-800 dark:text-neutral-100 tracking-tight pt-5 pb-2" key={`heading-${idx}-${i}`}>
+              {parseInlineMarkup(text)}
+            </h4>
+          );
+        }
+        continue;
+      }
+
+      // Default high-converting optimized paragraph (18px paragraph, 1.85 line-height)
+      const isFirstParagraph = idx === 0 && i === 0;
+      const canHaveDropCap = isFirstParagraph && language === 'en' && /^[A-Za-z]/.test(trimmedLine);
+
+      if (canHaveDropCap) {
+        const firstLetter = trimmedLine[0];
+        const remainingText = trimmedLine.substring(1);
+        parsedBlocks.push(
+          <motion.p
+            initial={{ opacity: 0, y: 10 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-40px" }}
+            className="text-slate-800 dark:text-slate-200 text-[17px] md:text-[18px] leading-[1.8] md:leading-[1.85] text-justify md:text-left font-sans transition-colors duration-250 hover:text-black dark:hover:text-white first-letter:font-bold my-5"
+            key={`p-drop-${idx}-${i}`}
+          >
+            <span className="float-left text-5xl md:text-6xl font-black mr-3 text-transparent bg-clip-text bg-gradient-to-br from-[#00E5FF] via-[#3B82F6] to-[#7C3AED] leading-none mt-1 font-sans select-none">
+              {firstLetter}
+            </span>
+            <span className="font-medium text-slate-850 dark:text-slate-200">{parseInlineMarkup(remainingText)}</span>
+          </motion.p>
+        );
+      } else {
+        parsedBlocks.push(
+          <motion.p
+            initial={{ opacity: 0, y: 10 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-40px" }}
+            className="text-slate-800 dark:text-slate-200 text-[17px] md:text-[18px] leading-[1.8] md:leading-[1.85] text-justify md:text-left font-sans transition-colors duration-250 hover:text-black dark:hover:text-white font-medium my-5"
+            key={`p-std-${idx}-${i}`}
+          >
+            {parseInlineMarkup(trimmedLine)}
+          </motion.p>
+        );
+      }
+    }
+
+    return <div className="space-y-2">{parsedBlocks}</div>;
+  };
 
   return (
     <div className="space-y-8 relative pb-16">
       
-      {/* Sticky Top Reading Progress Bar */}
-      <div className="fixed top-0 left-0 w-full h-[3.5px] bg-neutral-100 dark:bg-slate-950 z-50">
+      {/* Fixed Full-Width Reading Progress Bar at the very top (under the header) */}
+      <div className="fixed top-16 left-0 w-full h-[4px] z-50 pointer-events-none">
         <div 
-          className="h-full bg-gradient-to-r from-emerald-500 via-violet-500 to-pink-500 transition-all duration-75" 
+          className="h-full bg-gradient-to-r from-[#00E5FF] via-[#3B82F6] via-[#7C3AED] to-[#EC4899] transition-all duration-150 ease-out shadow-[0_2px_12px_rgba(0,229,255,0.7)]" 
           style={{ width: `${readingProgress}%` }}
         />
+      </div>
+
+      {/* Sticky Top Reading Progress Bar */}
+      <div className="sticky top-[64px] left-0 w-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-neutral-200/50 dark:border-slate-800/85 z-40 transition-all duration-300 shadow-xs mr-auto">
+        {/* Subtle, hyper-smooth premium progress line inside the container */}
+        <div className="w-full h-[4px] bg-neutral-100 dark:bg-slate-950">
+          <div 
+            className="h-full bg-gradient-to-r from-[#00E5FF] via-[#3B82F6] via-[#7C3AED] to-[#EC4899] transition-all duration-150 ease-out" 
+            style={{ width: `${readingProgress}%` }}
+          />
+        </div>
+        
+        {/* Sub-Header info section inside sticky area */}
+        <div className="max-w-7xl mx-auto px-4 py-2 sm:px-6 lg:px-8 flex items-center justify-between text-xs font-semibold text-neutral-550 dark:text-slate-450">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className={`px-2 py-0.5 rounded text-white text-[9px] font-black uppercase tracking-wider font-mono shrink-0 bg-gradient-to-r ${getCategoryGradient(post.category)}`}>
+              {categoryText}
+            </span>
+            <span className="truncate text-neutral-800 dark:text-slate-200 text-[11px] font-sans md:max-w-md hidden sm:block font-bold">
+              {titleText}
+            </span>
+            {activeSection && (
+              <>
+                <ChevronRight className="w-3 h-3 text-neutral-400 shrink-0 hidden md:block" />
+                <span className="text-violet-500 text-[11px] truncate md:max-w-xs shrink-0 font-bold hidden md:block uppercase font-mono">
+                  {generatedOutline.find(o => o.id === activeSection)?.text || activeSection}
+                </span>
+              </>
+            )}
+          </div>
+          <div className="flex items-center gap-4 text-xs font-mono font-bold text-neutral-550 dark:text-slate-405 shrink-0">
+            <span className="flex items-center gap-1.5">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00E5FF] to-[#7C3AED] font-black text-sm">
+                {Math.round(readingProgress)}%
+              </span> 
+              <span>read</span>
+            </span>
+            <span className="h-3 w-px bg-neutral-200 dark:bg-slate-800 hidden sm:block" />
+            <span className="hidden sm:inline-flex items-center gap-1">
+              <Clock className="w-3.5 h-3.5 text-violet-500" />
+              <span>{post.readTime} left</span>
+            </span>
+          </div>
+        </div>
       </div>
 
       {/* Back button Row & breadcrumbs */}
@@ -628,21 +1180,20 @@ export default function BlogDetails({
         </div>
       )}
 
-      {/* Primary Layout Card */}
+      {/* Primary Layout Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
         
         {/* Left column: Sticky TOC and shares */}
-        <div className="lg:col-span-1 space-y-6 lg:sticky lg:top-12 h-fit">
+        <div className="lg:col-span-1 space-y-6 lg:sticky lg:top-24 h-fit">
           
-          {/* Table of Contents Widget */}
-          <div className="p-6 bg-white dark:bg-slate-900 rounded-3xl border border-neutral-200 dark:border-slate-800 shadow-sm">
-            <h4 className="text-xs font-extrabold uppercase tracking-widest text-neutral-900 dark:text-white mb-3.5 flex items-center gap-1.5">
-              <Info className="w-4 h-4 text-violet-500" />
-              <span>Table of Contents</span>
+          {/* Table of Contents Widget - Hostinger & Kinsta Inspired */}
+          <div className="p-6 bg-[#FCFCFD] dark:bg-[#0D1527] rounded-3xl border border-neutral-200 dark:border-slate-800 shadow-[0_4px_20px_rgba(0,0,0,0.015)]">
+            <h4 className="text-[11px] font-black uppercase tracking-wider text-[#7C3AED] dark:text-[#00E5FF] mb-4 flex items-center gap-1.5 border-b border-purple-100 dark:border-purple-950/40 pb-2.5 select-none animate-pulse">
+              <Info className="w-4 h-4" />
+              <span>Outline Guide</span>
             </h4>
-            <div className="space-y-2">
-              {post.outline && post.outline.map((o) => {
-                const label = language === 'bn' ? o.textBn : language === 'ar' ? o.textAr : o.text;
+            <div className="space-y-1">
+              {generatedOutline.map((o) => {
                 const isCurrent = activeSection === o.id;
 
                 return (
@@ -651,67 +1202,29 @@ export default function BlogDetails({
                     href={`#${o.id}`}
                     onClick={(e) => {
                       e.preventDefault();
-                      document.getElementById(o.id)?.scrollIntoView({ behavior: 'smooth' });
-                      setActiveSection(o.id);
+                      const target = document.getElementById(o.id);
+                      if (target) {
+                        const headerOffset = 110; // offset of sticky header & progress bar
+                        const elementPosition = target.getBoundingClientRect().top + window.scrollY;
+                        const offsetPosition = elementPosition - headerOffset;
+                        window.scrollTo({
+                          top: offsetPosition,
+                          behavior: 'smooth'
+                        });
+                        setActiveSection(o.id);
+                      }
                     }}
-                    className={`block py-1.5 px-2 rounded-lg text-xs font-medium cursor-pointer transition-all border-l-2 leading-tight ${
+                    style={{ paddingLeft: `${Math.max(0, (o.level - 2) * 12)}px` }}
+                    className={`block py-1.5 pr-2 rounded-lg text-xs font-semibold cursor-pointer transition-all border-l-2 leading-tight ${
                       isCurrent 
-                        ? 'border-violet-500 bg-violet-50/50 text-violet-600 dark:bg-violet-950/20 dark:text-violet-400 font-semibold'
-                        : 'border-transparent text-neutral-600 dark:text-slate-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-50 dark:hover:bg-slate-800/30'
+                        ? 'border-[#7C3AED] bg-purple-500/5 text-[#7C3AED] dark:bg-purple-950/20 dark:text-purple-400 font-extrabold shadow-2xs'
+                        : 'border-transparent text-neutral-650 dark:text-slate-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100/50 dark:hover:bg-slate-800/20'
                     }`}
                   >
-                    {label}
+                    <span className="truncate block">{o.text}</span>
                   </a>
                 );
               })}
-            </div>
-          </div>
-
-          {/* High-Performance Premium Newsletter Signup Panel */}
-          <div className="p-6 bg-gradient-to-br from-neutral-50 to-neutral-100 dark:from-slate-900 dark:to-slate-950 rounded-3xl border border-neutral-200 dark:border-slate-800 shadow-lg relative overflow-hidden group">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-[#00E5FF]/10 rounded-full blur-2xl pointer-events-none" />
-            <div className="absolute bottom-0 left-0 w-24 h-24 bg-[#EC4899]/10 rounded-full blur-2xl pointer-events-none" />
-            
-            <div className="relative z-10 space-y-4">
-              <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-[10px] font-black uppercase tracking-widest text-[#3B82F6] font-mono">
-                  Weekly Insights Feed
-                </span>
-              </div>
-
-              <div className="space-y-1">
-                <h4 className="text-sm font-black text-neutral-950 dark:text-white">
-                  Join WebzoneBD Tech Circle
-                </h4>
-                <p className="text-neutral-500 dark:text-slate-400 text-[11px] leading-relaxed">
-                  Get high-velocity hosting guides, WHMCS security checks, and modern core developer secrets directly in your inbox.
-                </p>
-              </div>
-
-              <form 
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  alert("Successfully added to the premium intelligence feed! Welcome aboard WebzoneBD Circle.");
-                }}
-                className="space-y-2.5"
-                id="newsletter-form-sidebar"
-              >
-                <div className="space-y-1.5">
-                  <input 
-                    type="email" 
-                    required 
-                    placeholder="Enter professional email..." 
-                    className="w-full bg-white dark:bg-slate-950/80 border border-neutral-200 dark:border-slate-800 px-3 py-2 text-xs rounded-xl text-neutral-905 dark:text-white placeholder:text-neutral-400 focus:outline-none focus:ring-1 focus:ring-[#00E5FF]"
-                  />
-                </div>
-                <button 
-                  type="submit" 
-                  className="w-full py-2 bg-gradient-to-r from-[#00E5FF] via-[#3B82F6] to-[#7C3AED] hover:opacity-95 text-white font-bold text-xs rounded-xl shadow-md cursor-pointer select-none"
-                >
-                  Join Feed Now
-                </button>
-              </form>
             </div>
           </div>
 
@@ -721,7 +1234,7 @@ export default function BlogDetails({
         <div className="lg:col-span-3 space-y-8">
           
           {/* Main Reading Canvas */}
-          <article className="p-6 md:p-8 bg-white dark:bg-slate-900 rounded-3xl border border-neutral-200 dark:border-slate-800 shadow-[0_4px_30px_rgba(0,0,0,0.01)] relative overflow-hidden">
+          <article ref={articleRef} className="p-6 md:p-8 bg-white dark:bg-slate-900 rounded-3xl border border-neutral-200 dark:border-slate-800 shadow-[0_4px_30px_rgba(0,0,0,0.01)] relative overflow-hidden">
             
             {/* Omitted smaller cover image banner since the massive fullscreen cinematic header is active! */}
 
@@ -738,34 +1251,33 @@ export default function BlogDetails({
             </div>
 
             {/* Title */}
-            <h1 className="text-2xl md:text-4xl font-black text-neutral-900 dark:text-white leading-tight tracking-tight mb-4">
+            <h1 className="text-2xl md:text-4xl font-black text-neutral-900 dark:text-white leading-tight tracking-tight mb-4 font-sans">
               {titleText}
             </h1>
 
-            {/* Author details banner */}
-            <div className="p-4 rounded-2xl bg-neutral-50 dark:bg-slate-950 border border-neutral-200/60 dark:border-slate-800/60 flex flex-wrap items-center justify-between gap-4 mb-6">
+            <div className="p-4 rounded-2xl bg-[#F8F9FA] dark:bg-slate-950/70 border border-neutral-200/50 dark:border-slate-850/60 flex flex-wrap items-center justify-between gap-4 mb-8">
               
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-violet-100 dark:bg-violet-950 flex items-center justify-center text-violet-600 dark:text-violet-400 font-bold text-sm">
+                <div className="w-10 h-10 rounded-full bg-[#7C3AED]/10 dark:bg-purple-900/20 flex items-center justify-center text-[#7C3AED] dark:text-[#00E5FF] font-black text-sm">
                   {post.author ? post.author[0] : 'W'}
                 </div>
                 <div>
-                  <h4 className="text-sm font-bold text-neutral-800 dark:text-white leading-none">
+                  <h4 className="text-sm font-black text-neutral-800 dark:text-white leading-none">
                     {post.author || 'Senior Enterprise Architect'}
                   </h4>
-                  <span className="text-[10px] text-neutral-500 dark:text-slate-400 font-mono">
-                    Published: {post.date} • Revision: June 2026
+                  <span className="text-[10px] text-neutral-500 dark:text-slate-400 font-mono font-semibold">
+                    Revision: June 2026
                   </span>
                 </div>
               </div>
 
-              <div className="flex items-center gap-4 text-xs font-mono text-neutral-500 dark:text-slate-450">
+              <div className="flex items-center gap-4 text-xs font-mono text-neutral-500 dark:text-slate-450 font-semibold">
                 <span className="flex items-center gap-1">
-                  <Clock className="w-3.5 h-3.5 text-violet-500" />
+                  <Clock className="w-3.5 h-3.5 text-[#7C3AED]" />
                   {post.readTime}
                 </span>
                 <span className="flex items-center gap-1">
-                  <Eye className="w-3.5 h-3.5" />
+                  <Eye className="w-3.5 h-3.5 text-blue-500" />
                   {post.views} Views
                 </span>
                 <button
@@ -773,7 +1285,7 @@ export default function BlogDetails({
                   id="header-action-bookmark-toggle"
                   className="flex items-center gap-1 hover:text-amber-500 cursor-pointer text-xs"
                 >
-                  <Bookmark className={`w-3.5 h-3.5 ${isBookmarked ? 'fill-amber-500 text-amber-500' : ''}`} />
+                  <Bookmark className={`w-3.5 h-3.5 text-amber-500 ${isBookmarked ? 'fill-amber-500' : ''}`} />
                   <span>{isBookmarked ? 'Saved' : 'Save'}</span>
                 </button>
               </div>
@@ -787,84 +1299,9 @@ export default function BlogDetails({
                 const showOfferCard = post.id === 'whmcs-automation' && idx === 5;
                 const showDomainOfferCard = post.id === 'domain-registration-services' && idx === 3;
 
-                // Render headings nicely
-                if (seg.startsWith('### ')) {
-                  let headingId = post.outline && post.outline[idx] ? post.outline[idx].id : `heading-${idx}`;
-                  if (post.id === 'whmcs-automation') {
-                    if (seg.includes('Step 1')) headingId = 'step-1';
-                    else if (seg.includes('Step 2')) headingId = 'step-2';
-                    else if (seg.includes('Step 3')) headingId = 'step-3';
-                    else if (seg.includes('Step 4')) headingId = 'step-4';
-                    else if (seg.includes('Step 5')) headingId = 'step-5';
-                    else if (seg.includes('Step 6')) headingId = 'step-6';
-                    else if (seg.includes('Step 7')) headingId = 'step-7';
-                    else if (seg.includes('Why Choose')) headingId = 'why-whmcs';
-                  } else if (post.id === 'domain-registration-services') {
-                    if (seg.includes('What Is a Domain')) headingId = 'domain-definition';
-                    else if (seg.includes('Why Is Domain Registration')) headingId = 'domain-importance';
-                    else if (seg.includes('How Domain Registration Works')) headingId = 'domain-workflow';
-                    else if (seg.includes('Why Choose WebzoneBD')) headingId = 'domain-advantages';
-                  }
-
-                  return (
-                    <motion.h3 
-                       initial={{ opacity: 0, x: -5 }}
-                       whileInView={{ opacity: 1, x: 0 }}
-                       viewport={{ once: true }}
-                       key={idx} 
-                       id={headingId}
-                       className="text-lg md:text-xl font-black tracking-tight text-neutral-900 dark:text-white border-b border-neutral-100 dark:border-slate-800 pb-2 pt-6 flex items-center gap-1.5 group transition-colors"
-                    >
-                      <span className="text-[#3B82F6] opacity-60 group-hover:opacity-100 group-hover:translate-x-1 transition-all font-mono">#</span>
-                      <span className="bg-gradient-to-r from-neutral-900 to-neutral-700 dark:from-white dark:to-slate-350 bg-clip-text hover:text-[#00E5FF] transition-colors">
-                        {seg.replace('### ', '')}
-                      </span>
-                    </motion.h3>
-                  );
-                }
-
-                // Render code block custom helper - suppress for Custom structured articles
-                if (post.id !== 'whmcs-automation' && post.id !== 'domain-registration-services' && (seg.includes('```') || idx === 2)) {
-                  return (
-                    <div key={idx} className="my-4 rounded-xl overflow-hidden border border-slate-800 shadow-md">
-                      <div className="bg-slate-950 px-4 py-2 flex items-center justify-between text-[11px] font-mono text-slate-400">
-                        <span>Terminal/PHP Code block</span>
-                        <span className="flex items-center gap-1 cursor-pointer hover:text-white">
-                          <Code className="w-3 h-3" />
-                          <span>Syntax Active</span>
-                        </span>
-                      </div>
-                      <pre className="bg-slate-900 p-4 text-xs font-mono text-emerald-400 overflow-x-auto leading-relaxed">
-                        {`// Optimized routing middleware schema\nRoute::middleware(['sslcommerz.webhook'])->group(function () {\n    Route::post('/payment/verification', [PaymentController::class, 'verifyTransaction']);\n    Route::get('/payment/logs', [PaymentController::class, 'readCloudLogs']);\n});`}
-                      </pre>
-                    </div>
-                  );
-                }
-
-                // Render custom callout block mock - suppress for custom structured articles
-                if (post.id !== 'whmcs-automation' && post.id !== 'domain-registration-services' && idx === 1) {
-                  return (
-                    <div key={idx} className="p-4 my-2 rounded-2xl bg-amber-500/10 border-l-4 border-amber-500 flex gap-3 text-sm text-neutral-700 dark:text-slate-300">
-                      <AlertTriangle className="w-5 h-5 text-amber-500 flex-none" />
-                      <div>
-                        <strong className="block text-amber-500 font-bold mb-0.5">Critical Precaution:</strong>
-                        <span>Never concatenate user inputs into a dynamic raw query. Bruteforcers can manipulate variables to dump system coordinates. Always filter inputs and compile with strict parameters.</span>
-                      </div>
-                    </div>
-                  );
-                }
-
-                // Standard paragraph with micro scroll reveal feel
                 return (
                   <React.Fragment key={idx}>
-                    <motion.p 
-                      initial={{ opacity: 0, y: 10 }}
-                      whileInView={{ opacity: 1, y: 0 }}
-                      viewport={{ once: true, margin: "-40px" }}
-                      className="leading-relaxed text-sm md:text-base text-neutral-700 dark:text-slate-300 transition-colors hover:text-black dark:hover:text-white"
-                    >
-                      {seg}
-                    </motion.p>
+                    {renderFormattedContent(seg, idx, showOfferCard, showDomainOfferCard)}
                     {showOfferCard && renderHostingOfferCard()}
                     {showDomainOfferCard && renderDomainOfferCard()}
                   </React.Fragment>
@@ -923,21 +1360,33 @@ export default function BlogDetails({
 
               {/* Simulated Embedded Video Mockup - Suppress for WHMCS & Domain posts */}
               {post.id !== 'whmcs-automation' && post.id !== 'domain-registration-services' && (
-                <div className="p-4 rounded-2xl bg-neutral-100 dark:bg-slate-950 border border-neutral-200 dark:border-slate-800 my-6 flex flex-col items-center justify-center text-center space-y-3 aspect-video relative overflow-hidden group">
-                  <div className="absolute inset-0 bg-slate-950/45 group-hover:bg-slate-950/30 transition-colors z-0" />
-                  <img src="https://images.unsplash.com/photo-1531297484001-80022131f5a1?auto=format&fit=crop&w=600&q=80" alt="" className="absolute inset-0 w-full h-full object-cover z-[-1]" />
-                  
-                  <button 
-                    onClick={() => alert("Simulated playback: Booting micro server setup visualization video tutorial.")}
-                    id="media-play-btn"
-                    className="w-14 h-14 bg-violet-600 hover:bg-violet-750 text-white rounded-full flex items-center justify-center shadow-lg transform group-hover:scale-110 transition-all cursor-pointer relative z-10 select-none"
-                  >
-                    <Play className="w-6 h-6 fill-current" />
-                  </button>
-                  <div className="relative z-10 text-white space-y-0.5">
-                    <h5 className="font-bold text-sm">System Optimization Guide Layout</h5>
-                    <p className="text-[10px] text-gray-300 font-mono">Duration: 14:20 mins • Cloud WebzoneBD Tutorial</p>
-                  </div>
+                <div className="my-6 aspect-video rounded-2xl overflow-hidden border border-neutral-200 dark:border-slate-800 shadow-[0_4px_25px_rgba(0,0,0,0.02)] bg-black relative group">
+                  {isPlayingVideo ? (
+                    <iframe
+                      className="absolute inset-0 w-full h-full border-0"
+                      src={`${getYouTubeEmbedUrl(post.videoUrl || 'https://www.youtube.com/watch?v=dQw4w9WgXcQ')}?autoplay=1`}
+                      title="YouTube video player"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                      allowFullScreen
+                    />
+                  ) : (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-4 space-y-3">
+                      <div className="absolute inset-0 bg-slate-950/45 group-hover:bg-slate-950/30 transition-colors z-0" />
+                      <img src="https://images.unsplash.com/photo-1531297484001-80022131f5a1?auto=format&fit=crop&w=600&q=80" alt="" className="absolute inset-0 w-full h-full object-cover z-[-1]" />
+                      
+                      <button 
+                        onClick={() => setIsPlayingVideo(true)}
+                        id="media-play-btn"
+                        className="w-14 h-14 bg-violet-600 hover:bg-violet-750 text-white rounded-full flex items-center justify-center shadow-lg transform group-hover:scale-110 transition-all cursor-pointer relative z-10 select-none"
+                      >
+                        <Play className="w-6 h-6 fill-current ml-1" />
+                      </button>
+                      <div className="relative z-10 text-white space-y-0.5">
+                        <h5 className="font-bold text-sm">System Optimization Guide Layout</h5>
+                        <p className="text-[10px] text-gray-300 font-mono">Duration: 14:20 mins • Cloud WebzoneBD Tutorial</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1006,70 +1455,94 @@ export default function BlogDetails({
 
             </div>
 
-            {/* Share Insights (Small Icons Only under the post) */}
-            <div className="mt-6 pt-5 border-t border-dashed border-neutral-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4">
+            {/* Share Insights (Modern Premium Brand Buttons) */}
+            <div className="mt-8 pt-6 border-t border-dashed border-neutral-200 dark:border-slate-800 space-y-4">
               <div className="flex items-center gap-2">
-                <Share2 className="w-4 h-4 text-violet-500" />
-                <span className="text-xs font-bold uppercase tracking-wider text-neutral-500 dark:text-slate-400 font-mono">
-                  {language === 'bn' ? 'শেয়ার করুন' : language === 'ar' ? 'مشاركة المقال' : 'Share Insights'}
+                <Share2 className="w-5 h-5 text-violet-500 animate-pulse" />
+                <span className="text-xs font-black uppercase tracking-wider text-neutral-800 dark:text-slate-300 font-mono">
+                  {language === 'bn' ? 'আর্টিকেলটি বন্ধুদের সাথে শেয়ার করুন' : 'Spread the Knowledge'}
                 </span>
               </div>
-              <div className="flex items-center gap-2">
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold leading-relaxed">
+                {language === 'bn' 
+                  ? 'আপনার সামাজিক যোগাযোগ মাধ্যমে এই গুরুত্বপূর্ণ তথ্যটি শেয়ার করে অন্যদের জানতে সাহায্য করুন।'
+                  : 'Help colleagues and friends level up by sharing this technical insight on your social platforms.'
+                }
+              </p>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 pt-2">
+                {/* Twitter / X */}
+                <a 
+                  href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(window.location.origin + '/blog/' + post.id)}&text=${encodeURIComponent(titleText)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  title="Twitter/X"
+                  className="flex items-center justify-center gap-2.5 px-4 py-3 bg-[#111] hover:bg-black text-white font-bold text-xs rounded-xl shadow-xs transition-all hover:scale-[1.02] active:scale-95 cursor-pointer"
+                >
+                  <Twitter className="w-4 h-4 fill-white shrink-0" />
+                  <span>X / Twitter</span>
+                </a>
+
+                {/* LinkedIn */}
+                <a 
+                  href={`https://linkedin.com/shareArticle?url=${encodeURIComponent(window.location.origin + '/blog/' + post.id)}&title=${encodeURIComponent(titleText)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  title="LinkedIn"
+                  className="flex items-center justify-center gap-2.5 px-4 py-3 bg-[#0077B5] hover:bg-[#00669c] text-white font-bold text-xs rounded-xl shadow-xs transition-all hover:scale-[1.02] active:scale-95 cursor-pointer"
+                >
+                  <Linkedin className="w-4 h-4 fill-white shrink-0" />
+                  <span>LinkedIn</span>
+                </a>
+
+                {/* WhatsApp */}
+                <a 
+                  href={`https://api.whatsapp.com/send?text=${encodeURIComponent(titleText + ' - ' + window.location.origin + '/blog/' + post.id)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  title="WhatsApp"
+                  className="flex items-center justify-center gap-2.5 px-4 py-3 bg-[#25D366] hover:bg-[#20ba59] text-white font-bold text-xs rounded-xl shadow-xs transition-all hover:scale-[1.02] active:scale-95 cursor-pointer"
+                >
+                  <MessageCircle className="w-4 h-4 text-white shrink-0" />
+                  <span>WhatsApp</span>
+                </a>
+
+                {/* Facebook */}
                 <a 
                   href={`https://facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.origin + '/blog/' + post.id)}`}
                   target="_blank"
                   rel="noreferrer"
                   title="Facebook"
-                  className="w-8 h-8 rounded-full bg-neutral-100 dark:bg-slate-800 hover:bg-blue-500 hover:text-white dark:hover:bg-blue-600 dark:hover:text-white text-neutral-600 dark:text-slate-350 flex items-center justify-center transition-all hover:scale-110 cursor-pointer"
+                  className="flex items-center justify-center gap-2.5 px-4 py-3 bg-[#1877F2] hover:bg-[#166fe5] text-white font-bold text-xs rounded-xl shadow-xs transition-all hover:scale-[1.02] active:scale-95 cursor-pointer"
                 >
-                  <Facebook className="w-4 h-4" />
+                  <Facebook className="w-4 h-4 fill-white shrink-0" />
+                  <span>Facebook</span>
                 </a>
-                <a 
-                  href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(window.location.origin + '/blog/' + post.id)}`} 
-                  target="_blank"
-                  rel="noreferrer"
-                  title="Twitter/X"
-                  className="w-8 h-8 rounded-full bg-neutral-100 dark:bg-slate-800 hover:bg-neutral-900 hover:text-white dark:hover:bg-slate-950 dark:hover:text-white text-neutral-600 dark:text-slate-350 flex items-center justify-center transition-all hover:scale-110 cursor-pointer"
-                >
-                  <span className="text-xs font-black font-mono">X</span>
-                </a>
-                <a 
-                  href={`https://linkedin.com/shareArticle?url=${encodeURIComponent(window.location.origin + '/blog/' + post.id)}`} 
-                  target="_blank"
-                  rel="noreferrer"
-                  title="LinkedIn"
-                  className="w-8 h-8 rounded-full bg-neutral-100 dark:bg-slate-800 hover:bg-blue-700 hover:text-white dark:hover:bg-blue-800 dark:hover:text-white text-neutral-600 dark:text-slate-350 flex items-center justify-center transition-all hover:scale-110 cursor-pointer"
-                >
-                  <Linkedin className="w-4 h-4" />
-                </a>
-                <a 
-                  href={`https://api.whatsapp.com/send?text=${encodeURIComponent(window.location.origin + '/blog/' + post.id)}`} 
-                  target="_blank"
-                  rel="noreferrer"
-                  title="WhatsApp"
-                  className="w-8 h-8 rounded-full bg-neutral-100 dark:bg-slate-800 hover:bg-emerald-500 hover:text-white dark:hover:bg-emerald-600 dark:hover:text-white text-neutral-600 dark:text-slate-350 flex items-center justify-center transition-all hover:scale-110 cursor-pointer"
-                >
-                  <PhoneCall className="w-4 h-4" />
-                </a>
-                <a 
-                  href={`https://t.me/share/url?url=${encodeURIComponent(window.location.origin + '/blog/' + post.id)}`} 
-                  target="_blank"
-                  rel="noreferrer"
-                  title="Telegram"
-                  className="w-8 h-8 rounded-full bg-neutral-100 dark:bg-slate-800 hover:bg-cyan-500 hover:text-white dark:hover:bg-cyan-600 dark:hover:text-white text-neutral-600 dark:text-slate-350 flex items-center justify-center transition-all hover:scale-110 cursor-pointer"
-                >
-                  <TelegramIcon className="w-4 h-4" />
-                </a>
+              </div>
+
+              {/* Extras and copy link footer */}
+              <div className="pt-3 flex flex-wrap items-center justify-between gap-3 text-xs border-t border-neutral-100 dark:border-slate-850/50">
+                <div className="flex gap-2">
+                  <a 
+                    href={`https://t.me/share/url?url=${encodeURIComponent(window.location.origin + '/blog/' + post.id)}`} 
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-slate-400 hover:text-[#0088cc] dark:hover:text-[#0088cc] transition-colors flex items-center gap-1 font-mono text-[10.5px]"
+                  >
+                    <TelegramIcon className="w-3.5 h-3.5" />
+                    <span>Telegram</span>
+                  </a>
+                </div>
                 <button 
                   onClick={handleCopyLink}
-                  title="Copy Link"
-                  className={`w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg font-bold font-mono text-[11px] flex items-center gap-1.5 transition-all cursor-pointer ${
                     copiedLink 
-                      ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20' 
-                      : 'bg-neutral-100 dark:bg-slate-800 hover:bg-neutral-200 text-neutral-600 dark:text-slate-350'
+                      ? 'bg-emerald-500/15 text-emerald-500 border border-emerald-500/25 animate-pulse' 
+                      : 'bg-neutral-150 dark:bg-slate-800 text-neutral-600 dark:text-slate-300 hover:bg-neutral-200 dark:hover:bg-slate-750'
                   }`}
                 >
-                  {copiedLink ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copiedLink ? 'Copied Link!' : 'Copy Permanent URL'}</span>
                 </button>
               </div>
             </div>
@@ -1523,27 +1996,51 @@ export default function BlogDetails({
 
           {/* Related Articles Slider */}
           {relatedPosts && relatedPosts.length > 0 && (
-            <div className="space-y-4">
-              <h3 className="text-sm font-extrabold uppercase tracking-widest text-neutral-950 dark:text-white flex items-center gap-1">
-                <span>Recommended Reading (Same Category)</span>
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {relatedPosts.map((rp) => {
+            <div className="space-y-6 pt-10 border-t border-neutral-200 dark:border-slate-800">
+              <div>
+                <span className="text-[10px] uppercase font-bold tracking-widest text-[#7C3AED] dark:text-[#00E5FF] font-mono block mb-1">
+                  {language === 'bn' ? 'আরও পড়ুন' : language === 'ar' ? 'اقرأ المزيد' : 'Keep Reading'}
+                </span>
+                <h3 className="text-xl font-black text-neutral-950 dark:text-white tracking-tight">
+                  {language === 'bn' ? 'সম্পর্কিত অন্যান্য আর্টিকেল' : language === 'ar' ? 'مقالات ذات صلة' : 'Related Insights & Articles'}
+                </h3>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                {relatedPosts.slice(0, 4).map((rp) => {
                   const rTitle = language === 'bn' ? rp.titleBn || rp.title : language === 'ar' ? rp.titleAr || rp.title : rp.title;
+                  const rCategory = language === 'bn' ? rp.categoryBn || rp.category : language === 'ar' ? rp.categoryAr || rp.category : rp.category;
                   return (
                     <div 
                       key={rp.id}
                       onClick={() => onSelectRelated(rp)}
-                      className="p-4 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 rounded-2xl cursor-pointer hover:border-violet-500/30 transition-all flex gap-3 group"
+                      className="p-4 bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800/80 rounded-2xl cursor-pointer hover:border-[#7C3AED] dark:hover:border-purple-500 hover:shadow-lg transition-all duration-300 flex gap-4 group"
                     >
-                      <img src={rp.image} alt="" className="w-20 h-14 object-cover rounded-lg flex-none group-hover:opacity-90" referrerPolicy="no-referrer" />
+                      <div className="w-24 h-20 sm:w-28 sm:h-22 bg-neutral-100 dark:bg-slate-950 rounded-xl overflow-hidden flex-none relative">
+                        <img 
+                          src={rp.image} 
+                          alt="" 
+                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" 
+                          referrerPolicy="no-referrer" 
+                        />
+                        <span className="absolute bottom-1 right-1 px-1.5 py-0.5 bg-[#7C3AED]/90 text-white text-[8px] uppercase font-bold tracking-wider rounded font-mono">
+                          {rCategory}
+                        </span>
+                      </div>
                       <div className="min-w-0 flex-1 flex flex-col justify-between">
-                        <h4 className="text-xs font-bold text-neutral-850 dark:text-white group-hover:text-violet-500 line-clamp-2 leading-snug">
+                        <h4 className="text-xs sm:text-sm font-bold text-neutral-850 dark:text-white group-hover:text-[#7C3AED] dark:group-hover:text-purple-400 line-clamp-2 leading-snug transition-colors">
                           {rTitle}
                         </h4>
-                        <span className="text-[9px] text-neutral-400 font-mono uppercase block mt-1">
-                          {rp.date} • {rp.readTime}
-                        </span>
+                        <div className="flex items-center gap-3 text-[10px] text-neutral-400 dark:text-slate-450 font-mono mt-1 pt-1 border-t border-neutral-100 dark:border-slate-800/40">
+                          <span className="flex items-center gap-1">
+                            <Clock className="w-3.5 h-3.5 text-[#7C3AED]" />
+                            {rp.readTime}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Eye className="w-3.5 h-3.5" />
+                            {rp.views.toLocaleString()}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   );
@@ -1552,38 +2049,7 @@ export default function BlogDetails({
             </div>
           )}
 
-          {/* Interactive SEO Crawling visualizer card */}
-          <div className="p-6 bg-slate-900/50 dark:bg-slate-950/60 border border-neutral-200/50 dark:border-slate-800 rounded-3xl text-xs space-y-4">
-            <h4 className="text-sm font-extrabold text-white uppercase tracking-widest flex items-center gap-1.5 font-mono">
-              <Code className="w-4 h-4 text-violet-400" />
-              <span>CRAWLER METADATA SIMULATOR & SCHEMAS (SEO FRAMEWORK ON)</span>
-            </h4>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-slate-350 select-text">
-              <div className="space-y-1 font-mono text-[10.5px]">
-                <span className="text-violet-400 font-bold block">// LD-JSON Schema Markup</span>
-                <p className="bg-slate-900 p-2.5 rounded-lg border border-slate-800 text-slate-400 overflow-x-auto leading-relaxed">
-                  {`{
-  "@context": "https://schema.org",
-  "@type": "TechArticle",
-  "headline": "${titleText.substring(0,60)}...",
-  "image": "${post.image}",
-  "author": "${post.author || 'Senior DevOps'}"
-}`}
-                </p>
-              </div>
 
-              <div className="space-y-1 font-sans text-xs">
-                <span className="text-pink-400 font-bold block font-mono">// Live Open Graph Metadata Crawled Preview</span>
-                <div className="bg-slate-900 p-2.5 rounded-lg border border-slate-800 text-[11px] font-mono space-y-1 text-slate-400">
-                  <p><span className="text-cyan-400">og:title:</span> "{titleText.substring(0,40)}..."</p>
-                  <p><span className="text-cyan-400">og:description:</span> "{post.seoMetaDesc || 'Optimizing code deployment...'}"</p>
-                  <p><span className="text-cyan-400">og:url:</span> "https://webzonebd.com/blog/{post.id}"</p>
-                  <p><span className="text-cyan-400">og:image:</span> "{post.image.substring(0,35)}..."</p>
-                </div>
-              </div>
-            </div>
-          </div>
 
         </div>
 

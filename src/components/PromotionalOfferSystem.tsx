@@ -7,12 +7,14 @@ interface PromotionalOfferSystemProps {
   language: Language;
   triggerToast: (msg: string) => void;
   setCurrentPage: (page: string) => void;
+  isAdmin?: boolean;
 }
 
 export default function PromotionalOfferSystem({
   language,
   triggerToast,
   setCurrentPage,
+  isAdmin = false,
 }: PromotionalOfferSystemProps) {
   // Modal visibility states
   const [showNewsletter, setShowNewsletter] = useState<boolean>(false);
@@ -31,6 +33,7 @@ export default function PromotionalOfferSystem({
 
   // Helper check: Is pop-up allowed to show (once per visitor / 7 days cooldown)
   const isPopupAllowed = (): boolean => {
+    if (isAdmin) return false;
     const isSubscribed = localStorage.getItem('webzone_newsletter_subscribed');
     if (isSubscribed === 'true') return false;
 
@@ -46,6 +49,12 @@ export default function PromotionalOfferSystem({
   };
 
   useEffect(() => {
+    if (isAdmin) {
+      setShowNewsletter(false);
+      setShowNotification(false);
+      return;
+    }
+
     // ----------------------------------------------------
     // POPUP TRIGGER 1: 10 Seconds Inactivity Detection
     // ----------------------------------------------------
@@ -127,7 +136,7 @@ export default function PromotionalOfferSystem({
       clearTimeout(hideNotificationTimer);
       clearInterval(rotateInterval);
     };
-  }, [showNewsletter, subscribed]);
+  }, [showNewsletter, subscribed, isAdmin]);
 
   // Handle closing popup
   const handleCloseNewsletter = () => {

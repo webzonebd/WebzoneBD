@@ -6,12 +6,13 @@ import {
   HelpCircle, ChevronDown, ChevronUp, FileText, ShoppingBag, Info, 
   User, Database, Terminal, CheckCircle, ChevronRight, Play, Paperclip, AlertCircle
 } from 'lucide-react';
-import { Service, Language, Theme, Order } from '../types';
+import { Service, Language, Theme, Order, Currency } from '../types';
 
 interface ServiceDetailsProps {
   service: any; // CatalogService type
   language: Language;
   theme: Theme;
+  currency: Currency;
   onBack: () => void;
   onNavigateToService: (srvId: string) => void;
   allServices: any[];
@@ -19,22 +20,28 @@ interface ServiceDetailsProps {
   triggerToast: (msg: string) => void;
   addToCart?: (product: any) => void;
   setCartOpen?: (open: boolean) => void;
+  onOrderWhatsApp?: (serviceName: string, packageName?: string) => void;
+  onRequestQuotation?: (serviceName: string, packageName?: string) => void;
 }
 
 export default function ServiceDetails({
   service,
   language,
   theme,
+  currency,
   onBack,
   onNavigateToService,
   allServices,
   addSimulatedServiceOrder,
   triggerToast,
   addToCart,
-  setCartOpen
+  setCartOpen,
+  onOrderWhatsApp,
+  onRequestQuotation
 }: ServiceDetailsProps) {
   const isDark = theme === 'dark';
   const [activePackageTab, setActivePackageTab] = useState<'starter' | 'professional' | 'business'>('professional');
+  const [advancePercent, setAdvancePercent] = useState<30 | 50 | 100>(100);
   const [openFaqIdx, setOpenFaqIdx] = useState<number | null>(0);
   const [currentTimelineStep, setCurrentTimelineStep] = useState<number>(0);
   const [expandedPhase, setExpandedPhase] = useState<number | null>(0);
@@ -92,7 +99,7 @@ export default function ServiceDetails({
   const pricingTiers = {
     starter: {
       name: language === 'bn' ? 'স্টার্টার প্যাক' : 'Starter MVP',
-      price: Math.round(service.startingPrice * 0.8),
+      price: service.starterPrice || Math.round(service.startingPrice * 0.8),
       delivery: '3-5 Days',
       support: '30 Days Priority Support',
       revisions: '5 Rounds Revisions',
@@ -106,7 +113,7 @@ export default function ServiceDetails({
     },
     professional: {
       name: language === 'bn' ? 'প্রফেশনাল প্যাক' : 'Professional Growth',
-      price: Math.round(service.startingPrice * 1.2),
+      price: service.businessPrice || service.professionalPrice || Math.round(service.startingPrice * 1.2),
       delivery: '7-10 Days',
       support: '180 Days VIP Support',
       revisions: 'Unlimited Revisions',
@@ -121,7 +128,7 @@ export default function ServiceDetails({
     },
     business: {
       name: language === 'bn' ? 'বিজনেস প্যাক' : 'Enterprise Scale SaaS',
-      price: Math.round(service.startingPrice * 2.1),
+      price: service.enterprisePrice || Math.round(service.startingPrice * 2.1),
       delivery: '14-20 Days',
       support: '365 Days Dev SLA Line Support',
       revisions: 'Lifetime Custom Revisions',
@@ -137,14 +144,9 @@ export default function ServiceDetails({
   };
 
   const getFormatPrice = (val: number) => {
-    switch (language) {
-      case 'bn':
-        return `${val * 115} BDT`;
-      case 'ar':
-        return `${val * 3.75} SAR`;
-      default:
-        return `$${val}`;
-    }
+    const rate = currency === 'BDT' ? 115 : currency === 'SAR' ? 3.75 : 1;
+    const symbol = currency === 'BDT' ? '৳' : currency === 'SAR' ? 'SAR ' : '$';
+    return `${symbol}${Math.round(val * rate).toLocaleString()}`;
   };
 
   const overviewFeatures = [
@@ -237,6 +239,8 @@ export default function ServiceDetails({
 
   const handleOrderSubmit = () => {
     const selectedTier = pricingTiers[activePackageTab];
+    const calculatedAdvance = Math.round(selectedTier.price * (advancePercent / 100));
+    const calculatedDue = selectedTier.price - calculatedAdvance;
     
     // 1. Log simulated database order for audit registry
     const orderDetails: Order = {
@@ -246,7 +250,10 @@ export default function ServiceDetails({
       price: selectedTier.price,
       date: new Date().toISOString().split('T')[0],
       paymentMethod: 'Instant Secure Check',
-      paymentStatus: 'pending'
+      paymentStatus: 'pending',
+      advancePercent: advancePercent,
+      advanceAmount: calculatedAdvance,
+      dueAmount: calculatedDue
     };
     addSimulatedServiceOrder(orderDetails);
 
@@ -272,7 +279,10 @@ export default function ServiceDetails({
         demoUrl: 'https://demo.webzonebd.com',
         downloadUrl: 'https://webzonebd.com',
         tags: [service.category || 'Service'],
-        views: 100
+        views: 100,
+        advancePercent: advancePercent,
+        advanceAmount: calculatedAdvance,
+        dueAmount: calculatedDue
       };
 
       addToCart(packageProductRepresentation);
@@ -373,6 +383,44 @@ export default function ServiceDetails({
                   {language === 'bn' ? service.shortDescriptionBn : service.shortDescription}
                 </p>
 
+                {service.fullDescription && (
+                  <p className={`text-xs sm:text-sm leading-relaxed max-w-2xl border-l-2 pl-3 transition-colors ${isDark ? 'text-slate-400 border-slate-700/60' : 'text-slate-500 border-slate-300'}`}>
+                    {language === 'bn' ? service.fullDescriptionBn : service.fullDescription}
+                  </p>
+                )}
+
+                {/* Verified Techbari Source Info Board */}
+                {service.id === 'srv-freelance-marketplace' && (
+                  <div className={`p-5 rounded-2xl border text-left space-y-3 transition-all ${isDark ? 'bg-indigo-950/20 border-indigo-500/30 shadow-[0_0_15px_rgba(99,102,241,0.1)]' : 'bg-indigo-50/50 border-indigo-200 shadow-xs'}`}>
+                    <div className="flex items-center gap-2">
+                      <span className="p-1.5 bg-indigo-500/10 rounded-lg text-indigo-500">
+                        <Globe className="w-5 h-5 animate-pulse" />
+                      </span>
+                      <div>
+                        <h4 className="text-xs font-bold uppercase tracking-widest text-indigo-500 font-mono">Verified Techbari® Script Asset</h4>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400">Licensed under 100% GPL for Unlimited Domains usage</p>
+                      </div>
+                    </div>
+                    <p className="text-xs leading-relaxed text-slate-600 dark:text-slate-350">
+                      {language === 'bn'
+                        ? "এই প্রিমিয়াম পিএইচপি স্ক্রিপ্টটি বিখ্যাত টেকবাড়ি (Techbari) থেকে সোর্সকৃত এবং সম্পূর্ণ ভেরিফাইড ব্র্যান্ড লাইসেন্স সম্বলিত। চমৎকার এই সিস্টেমটি দিয়ে আপনি নিজের বা বায়ারের জন্য একটি পরিপূর্ণ ফ্রিল্যান্সিং সার্ভিসেস ডেক্স দাঁড় করাতে পারবেন।"
+                        : "This premium multi-vendor freelancer platform script aligns exactly with the master-class Techbari product structures. Features include live project bidding milestones, local wallet integrations, instant microjob gig sales, and full admin dashboard oversight."
+                      }
+                    </p>
+                    <div className="flex flex-wrap gap-2.5 pt-1">
+                      <a
+                        href="https://techbari.com/product/freelance-marketplace-php-script-download"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-black rounded-lg transition-all hover:scale-[1.02] flex items-center gap-1 cursor-pointer"
+                      >
+                        <span>Download Original Script Source (Techbari)</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </a>
+                    </div>
+                  </div>
+                )}
+
                 {/* Performance stats row inside Hero */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2">
                   <div className={`p-3 rounded-2xl border space-y-0.5 transition-colors ${isDark ? 'bg-white/5 border-white/5' : 'bg-slate-50 border-neutral-150'}`}>
@@ -408,6 +456,50 @@ export default function ServiceDetails({
                     📞 Free Consultation Call
                   </button>
                 </div>
+              </div>
+            </div>
+
+
+
+            {/* ========================================= TECHBARI STYLED SYSTEM DATA SHEET (DETAILED SPECS TABLE) ========================================= */}
+            <div className={`p-5 md:p-6 rounded-3xl border text-left space-y-4 transition-colors ${isDark ? 'bg-slate-950/40 border-slate-800/80 shadow-xs' : 'bg-white border-neutral-200'}`}>
+              <div>
+                <h4 className={`text-[10px] font-mono font-bold uppercase tracking-widest ${isDark ? 'text-[#00E5FF]' : 'text-blue-600'}`}>{language === 'bn' ? 'সিস্টেম স্পেসিফিকেশন ও সামঞ্জস্যতা' : 'TECHNICAL SPECS & COMPATIBILITY SHEET'}</h4>
+                <h3 className={`text-base font-black mt-0.5 transition-colors ${isDark ? 'text-white' : 'text-slate-900'}`}>{language === 'bn' ? 'স্ক্রিপ্ট ও সার্ভিস ফাইলের বিবরণ' : 'Detailed Codebase Core Characteristics'}</h3>
+                <p className={`text-[11px] mt-1 transition-colors ${isDark ? 'text-slate-450' : 'text-slate-405'}`}>
+                  {language === 'bn' ? 'ওয়েব জোন বিডি এর মাধ্যমে আপনার সার্ভিসটি অত্যন্ত হালকা ও অত্যন্ত দ্রুতগতির করার প্রযুক্তিগত সমাধান এখানে দেখুন।' : 'Review the modular architecture benchmark parameters designed for enterprise performance.'}
+                </p>
+              </div>
+
+              <div className={`border rounded-2xl overflow-hidden text-xs mt-3 transition-colors ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+                {[
+                  { 
+                    k: language === 'bn' ? 'ব্যাকএন্ড ফ্রেমওয়ার্ক' : 'Server Engine', 
+                    v: service.id === 'srv-freelance-marketplace' ? 'PHP 8.2+ Object Oriented Engine' : 'NodeJS Express compiled with Bun' 
+                  },
+                  { 
+                    k: language === 'bn' ? 'ফ্রন্টএন্ড লাইব্রেরি' : 'UI Stack', 
+                    v: service.id === 'srv-freelance-marketplace' ? 'Bootstrap 5, jQuery, Tailwind CSS utility layers' : 'React 19 & Tailwind CSS v4' 
+                  },
+                  { 
+                    k: language === 'bn' ? 'ডেটাবেজ ও ওআরএম' : 'Database Client', 
+                    v: service.id === 'srv-freelance-marketplace' ? 'MySQL 8 / relational query builder indexes' : 'PostgreSQL or SQLite configured with Drizzle Kit' 
+                  },
+                  { k: language === 'bn' ? 'লাইসেন্স ক্যাটাগরি' : 'License Status', v: 'GPL 100% Open Source (Self-Owned Unlimited Resell)' },
+                  { 
+                    k: language === 'bn' ? 'ইন্সটলেশন সিস্টেম' : 'Setup Script', 
+                    v: service.id === 'srv-freelance-marketplace' ? 'cPanel server auto-install file setup configuration' : 'cPanel Git Integration Auto-Deploy script included' 
+                  },
+                  { k: language === 'bn' ? 'নিরাপত্তা ও এসইও' : 'Core Audits', v: 'SQL Injection Proof, CSRF guards, Schema.org pre-indexed' }
+                ].map((item, idx) => (
+                  <div 
+                    key={idx} 
+                    className={`grid grid-cols-5 p-3 px-4 transition-colors border-b last:border-0 ${idx % 2 === 0 ? (isDark ? 'bg-slate-900/20' : 'bg-slate-50/50') : ''} ${isDark ? 'border-slate-800/40' : 'border-slate-200'}`}
+                  >
+                    <span className="col-span-2 font-bold text-[10.5px] text-slate-400 tracking-wide font-mono uppercase">{item.k}</span>
+                    <span className={`col-span-3 font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{item.v}</span>
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -531,12 +623,86 @@ export default function ServiceDetails({
                   </div>
                 </div>
 
+                {/* 💳 Advance Payment Options */}
+                <div className={`p-4 rounded-xl border space-y-3 transition-all ${isDark ? 'bg-slate-950/60 border-slate-800' : 'bg-slate-50 border-neutral-200'}`}>
+                  <div className="flex items-center justify-between">
+                    <span className={`text-xs font-bold font-sans transition-colors ${isDark ? 'text-slate-200' : 'text-neutral-700'}`}>
+                      {language === 'bn' ? 'অ্যাডভান্স পেমেন্ট অপশন' : 'Advance Payment Option'}
+                    </span>
+                    <span className="text-[10px] text-pink-500 font-mono font-bold">
+                      {language === 'bn' ? 'অগ্রিম পেমেন্ট নির্বাচন করুন' : 'Select escrow advance'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    {[30, 50, 100].map((percent) => {
+                      const isActive = advancePercent === percent;
+                      return (
+                        <button
+                          key={percent}
+                          type="button"
+                          onClick={() => setAdvancePercent(percent as any)}
+                          className={`p-2.5 rounded-xl border text-center transition-all duration-300 flex flex-col items-center gap-1 cursor-pointer hover:scale-[1.02] ${
+                            isActive
+                              ? 'border-transparent bg-gradient-to-r from-[#7C3AED]/10 via-[#A855F7]/10 to-[#EC4899]/10 text-[#7C3AED] shadow-[0_0_12px_rgba(124,58,237,0.15)] ring-1 ring-[#7C3AED]/40'
+                              : isDark
+                              ? 'border-slate-800 bg-slate-900/30 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                              : 'border-slate-200 bg-white text-slate-600 hover:text-slate-900 hover:border-slate-305'
+                          }`}
+                        >
+                          <div className="flex items-center gap-1">
+                            <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center transition-all ${
+                              isActive 
+                                ? 'border-[#7C3AED] bg-gradient-to-r from-[#7C3AED] to-[#EC4899]' 
+                                : isDark ? 'border-slate-750' : 'border-slate-300'
+                            }`}>
+                              {isActive && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                            </div>
+                            <span className="text-xs font-black font-mono">{percent}%</span>
+                          </div>
+                          <span className="text-[10px] font-bold">
+                            {percent === 100 
+                              ? (language === 'bn' ? 'ফুল পেমেন্ট' : 'Full Pay') 
+                              : (language === 'bn' ? 'অ্যাডভান্স' : 'Advance')
+                            }
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className={`pt-2.5 border-t flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-xs font-medium ${isDark ? 'border-slate-800 text-slate-400' : 'border-slate-200 text-neutral-600'}`}>
+                    <div>
+                      {language === 'bn' ? (
+                        <span>
+                          অগ্রিম প্রদেয় ({advancePercent}%): <strong className="text-emerald-500 font-mono font-black">{getFormatPrice(Math.round(pricingTiers[activePackageTab].price * (advancePercent / 100)))}</strong>
+                        </span>
+                      ) : (
+                        <span>
+                          Advance Payable ({advancePercent}%): <strong className="text-emerald-500 font-mono font-black">{getFormatPrice(Math.round(pricingTiers[activePackageTab].price * (advancePercent / 100)))}</strong>
+                        </span>
+                      )}
+                    </div>
+                    {advancePercent < 100 && (
+                      <div className="font-mono text-[10px]">
+                        {language === 'bn' ? (
+                          <span>বকেয়া (Due): <span className="text-amber-500 font-extrabold">{getFormatPrice(pricingTiers[activePackageTab].price - Math.round(pricingTiers[activePackageTab].price * (advancePercent / 100)))}</span></span>
+                        ) : (
+                          <span>Due Remaining: <span className="text-amber-500 font-extrabold">{getFormatPrice(pricingTiers[activePackageTab].price - Math.round(pricingTiers[activePackageTab].price * (advancePercent / 100)))}</span></span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 <div className="pt-4 flex flex-col sm:flex-row gap-3">
                   <button 
                     onClick={handleOrderSubmit}
                     className="flex-1 py-3 bg-gradient-to-r from-[#00E5FF] to-[#3B82F6] hover:opacity-95 text-xs text-white md:text-slate-950 font-black rounded-xl text-center active:scale-95 transition cursor-pointer"
                   >
-                    🚀 Order Now ({getFormatPrice(pricingTiers[activePackageTab].price)})
+                    🚀 {advancePercent < 100 
+                      ? (language === 'bn' ? `অর্ডার করুন • অগ্রিম ${advancePercent}% (${getFormatPrice(Math.round(pricingTiers[activePackageTab].price * (advancePercent / 100)))})` : `Order Now • Advance ${advancePercent}% (${getFormatPrice(Math.round(pricingTiers[activePackageTab].price * (advancePercent / 100)))})`)
+                      : (language === 'bn' ? `অর্ডার করুন (${getFormatPrice(pricingTiers[activePackageTab].price)})` : `Order Now (${getFormatPrice(pricingTiers[activePackageTab].price)})`)}
                   </button>
 
                   <a 
@@ -596,34 +762,6 @@ export default function ServiceDetails({
                 <div className="flex gap-2 items-center text-[10px] text-emerald-500 font-mono mt-3 uppercase font-bold tracking-wider">
                   <CheckCircle className="w-3.5 h-3.5 shrink-0 animate-bounce" />
                   <span>SLA Audit verification active for current stage</span>
-                </div>
-              </div>
-            </div>
-
-            {/* ========================================= FREE BONUS BANNER (GRADIENT BORDER ANIMATION) ========================================= */}
-            <div className={`relative p-6 rounded-2xl border overflow-hidden text-left shadow-xl transition-all ${isDark ? 'bg-gradient-to-tr from-[#020617] via-slate-900/30 to-slate-950 border-[#00E5FF]/20 shadow-[#00E5FF]/5' : 'bg-white border-neutral-200 shadow-sm'}`}>
-              <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-tr from-transparent to-[#EC4899]/10 rounded-tr-2xl pointer-events-none" />
-              <div className="absolute bottom-[-10%] left-[-10%] w-48 h-48 bg-[#00E5FF]/5 rounded-full blur-2xl pointer-events-none animate-pulse" />
-              
-              <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div className="space-y-1.5">
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded bg-[#EC4899]/10 text-[#EC4899] text-[9px] font-mono font-black border border-[#EC4899]/20 uppercase tracking-widest animate-pulse">
-                    🚀 FREE EXTRAS FOR IMMING ORDERS
-                  </span>
-                  <h3 className={`text-base sm:text-lg font-black tracking-tight flex items-center gap-2 transition-colors ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                    <Sparkles className="w-5 h-5 text-amber-400" />
-                    <span>Exclusive Digital Bonus Value Bundle</span>
-                  </h3>
-                  <p className={`text-[10.5px] leading-relaxed max-w-xl transition-colors ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-                    Every checkout placement includes our premium support packages completely free. Zero setups, zero billing surprises.
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 text-[10px] w-full md:w-auto font-mono text-[#00E5FF]">
-                  <div className={`p-2 rounded-xl border transition-colors ${isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-slate-50 border-neutral-150'}`}>🎁 Free 1-Year Domain (.com)</div>
-                  <div className={`p-2 rounded-xl border transition-colors ${isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-slate-50 border-neutral-150'}`}>🎁 Free NVMe Hosting Setup</div>
-                  <div className={`p-2 rounded-xl border transition-colors ${isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-slate-50 border-neutral-150'}`}>🎁 Free Lifetime SSL Secure</div>
-                  <div className={`p-2 rounded-xl border transition-colors ${isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-slate-50 border-neutral-150'}`}>🎁 30 Days Free Maintenance</div>
                 </div>
               </div>
             </div>
@@ -786,6 +924,128 @@ export default function ServiceDetails({
 
           {/* ========================================= STICKY ORDER DESKTOP SIDEBAR (4 Columns width) ========================================= */}
           <div className="lg:col-span-4 lg:sticky lg:top-6 space-y-6">
+
+            {/* PRICING CONTROL CARD */}
+            <div className={`p-5 md:p-6 rounded-3xl border relative overflow-hidden backdrop-blur-md shadow-2xl transition-all text-left ${isDark ? 'bg-slate-950/60 border-slate-800/90 shadow-[#00E5FF]/5' : 'bg-white border-neutral-200'}`}>
+              <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-tr from-transparent to-cyan-500/10 rounded-tr-3xl pointer-events-none" />
+              
+              {/* Product Badge */}
+              <div className="flex justify-between items-center pb-3 border-b border-dashed border-slate-800/80">
+                <span className="px-2 py-0.5 bg-cyan-400/10 text-cyan-400 border border-cyan-400/20 text-[9px] font-black uppercase font-mono tracking-widest rounded">
+                  🎁 SCRIPT LICENSING
+                </span>
+                <span className="text-[10px] text-amber-500 font-bold flex items-center gap-0.5">
+                  ⭐ 5.0 (98 reviews)
+                </span>
+              </div>
+
+              {/* Package selector tabs inside sidebar */}
+              <div className={`grid grid-cols-3 p-1 border rounded-2xl text-[10px] font-black uppercase tracking-wider mt-4 transition-all ${isDark ? 'bg-slate-900/60 border-slate-800/80' : 'bg-slate-100 border-neutral-200 shadow-inner'}`}>
+                {(['starter', 'professional', 'business'] as const).map((tierKey) => (
+                  <button
+                    key={tierKey}
+                    onClick={() => setActivePackageTab(tierKey)}
+                    className={`py-2 px-1 rounded-xl transition-all cursor-pointer text-center ${activePackageTab === tierKey ? 'bg-gradient-to-r from-blue-600 to-indigo-650 text-white shadow-md font-extrabold' : `${isDark ? 'text-slate-400 hover:text-white' : 'text-neutral-500 hover:text-slate-800'}`}`}
+                  >
+                    {tierKey === 'starter' ? 'Starter' : tierKey === 'professional' ? 'Pro' : 'SaaS v4'}
+                  </button>
+                ))}
+              </div>
+
+              {/* Price section */}
+              <div className="py-5 space-y-1 text-left">
+                <span className="text-[9.5px] uppercase font-mono text-slate-500 block tracking-widest">{language === 'bn' ? 'অর্ডার এস্টিমেটেড প্রাইস' : 'Estimated Pricing Cost'}</span>
+                
+                <div className="flex items-baseline gap-2">
+                  <span className={`text-3xl font-black font-mono tracking-tight transition-colors ${isDark ? 'text-[#00E5FF]' : 'text-blue-650'}`}>
+                    {getFormatPrice(pricingTiers[activePackageTab].price)}
+                  </span>
+                  {activePackageTab === 'professional' && (
+                    <span className="text-slate-500 line-through text-xs font-mono">
+                      {getFormatPrice(Math.round(pricingTiers[activePackageTab].price * 1.4))}
+                    </span>
+                  )}
+                </div>
+
+                <p className="text-[10px] text-emerald-500 font-mono font-semibold flex items-center gap-1">
+                  ❇️ {language === 'bn' ? '৮৫% সাশ্রয়ী মূল্যে লাইভ সোর্স কোড' : '85% cheaper than dev agencies'}
+                </p>
+              </div>
+
+              {/* Delivery specifications in Sidebar */}
+              <div className={`p-4 rounded-2xl border text-xs font-mono space-y-2.5 mb-4 transition-colors ${isDark ? 'bg-slate-900/40 border-slate-800/80' : 'bg-slate-50 border-neutral-150'}`}>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400 text-[10.5px]">SLA DELIVERY:</span>
+                  <span className={`font-black ${isDark ? 'text-[#00E5FF]' : 'text-blue-600'}`}>{pricingTiers[activePackageTab].delivery}</span>
+                </div>
+                <div className="flex justify-between items-center border-t border-slate-800/20 pt-2">
+                  <span className="text-slate-400 text-[10.5px]">REVISIONS:</span>
+                  <span className="text-slate-300 font-black">{pricingTiers[activePackageTab].revisions}</span>
+                </div>
+                <div className="flex justify-between items-center border-t border-slate-800/25 pt-2 border-dashed">
+                  <span className="text-slate-400 text-[10.5px]">SUPPORT TERM:</span>
+                  <span className="text-[#EC4899] font-black">{pricingTiers[activePackageTab].support}</span>
+                </div>
+              </div>
+
+              {/* Packaging features checklist */}
+              <div className="space-y-3 pb-5 border-b border-slate-800/15">
+                <span className="text-[9.5px] font-black font-mono text-slate-500 block uppercase tracking-wider">{language === 'bn' ? 'প্যাকেজে অন্তর্ভুক্ত ফিচার সমূহ:' : 'Core Bundle Checklist:'}</span>
+                <div className="space-y-2 text-xs">
+                  {pricingTiers[activePackageTab].features.slice(0, 4).map((feat, idx) => (
+                    <div key={idx} className="flex items-start gap-2.5">
+                      <Check className="w-4 h-4 text-[#00E5FF] shrink-0 mt-0.5" />
+                      <span className={`leading-snug transition-colors ${isDark ? 'text-slate-300' : 'text-slate-650'}`}>{feat}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Direct order checkouts */}
+              <div className="pt-5 space-y-2.5">
+                <button 
+                  onClick={() => {
+                    if (onOrderWhatsApp) {
+                      onOrderWhatsApp(service.title, pricingTiers[activePackageTab].name);
+                    } else {
+                      handleOrderSubmit();
+                    }
+                  }}
+                  className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-wide rounded-xl flex items-center justify-center gap-1.5 transition-all text-center border border-emerald-500/20 active:scale-95 cursor-pointer"
+                >
+                  <MessageSquare className="w-4 h-4 text-white" />
+                  <span>🟢 {language === 'bn' ? 'হোয়াটসঅ্যাপে অর্ডার করুন' : 'Order via WhatsApp'}</span>
+                </button>
+
+                <button 
+                  onClick={() => {
+                    if (onRequestQuotation) {
+                      onRequestQuotation(service.title, pricingTiers[activePackageTab].name);
+                    } else {
+                      setIsConsultationModalOpen(true);
+                    }
+                  }}
+                  className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-indigo-650 text-white font-black text-xs uppercase tracking-wide rounded-xl active:scale-95 transition hover:shadow-lg shadow-blue-500/10 cursor-pointer text-center flex items-center justify-center gap-1.5"
+                >
+                  <FileText className="w-4 h-4" />
+                  <span>📋 {language === 'bn' ? 'কোটেশন রিকোয়েস্ট' : 'Request Quotation'}</span>
+                </button>
+
+                <button 
+                  onClick={() => setIsConsultationModalOpen(true)}
+                  className={`w-full py-2.5 px-4 rounded-xl border border-dashed text-[11px] font-bold tracking-wide transition-all cursor-pointer text-center ${isDark ? 'border-sky-500/40 bg-sky-500/5 hover:bg-sky-500/10 text-sky-400' : 'border-blue-300 bg-blue-50 hover:bg-blue-100 text-blue-700'}`}
+                >
+                  📞 Request Free 15-Min Callback Call
+                </button>
+              </div>
+
+              {/* Trust labels inside purchase box */}
+              <div className="pt-4 flex justify-center items-center gap-4 text-[9px] font-mono text-slate-500 uppercase border-t border-slate-800/40 mt-4">
+                <span className="flex items-center gap-1">🛡️ SSL SECURE</span>
+                <span className="text-slate-805">|</span>
+                <span className="flex items-center gap-1">❇️ GPL CODE</span>
+              </div>
+            </div>
 
             {/* SECURED CLIENT CERTIFICATION STATS */}
             <div className={`p-4 rounded-xl border text-left space-y-2.5 transition-all ${isDark ? 'bg-slate-900/20 shadow-xl border-slate-800/80' : 'bg-emerald-50/70 border-emerald-150'}`}>

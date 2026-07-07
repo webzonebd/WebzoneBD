@@ -3,11 +3,19 @@ import {
   X, Mail, Lock, Eye, EyeOff, User, Phone, CheckCircle2, 
   Smartphone, ShieldCheck, Sparkles, RefreshCw, Key, ArrowRight,
   ShieldAlert, Activity, AlertCircle, Sparkles as SparklesIcon,
-  Check, Info, ChevronRight, CornerDownRight
+  Check, Info, ChevronRight, CornerDownRight, ExternalLink
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Language, Theme, UserSession, UserRole, Currency } from '../types';
 import { PRESEEDED_USERS } from './AuthSystem';
+import { auth as firebaseAuth, db as firebaseDb, handleFirestoreError, OperationType } from '../firebase';
+import { 
+  signInWithPopup, 
+  GoogleAuthProvider,
+  setPersistence,
+  browserLocalPersistence
+} from 'firebase/auth';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 interface AuthPopupProps {
   isOpen: boolean;
@@ -19,6 +27,7 @@ interface AuthPopupProps {
   defaultRole?: 'customer' | 'affiliate';
   onLoginSuccess: (user: UserSession) => void;
   triggerToast: (msg: string) => void;
+  onNavigate?: (page: string) => void;
 }
 
 export default function AuthPopup({
@@ -30,11 +39,19 @@ export default function AuthPopup({
   defaultView = 'login',
   defaultRole = 'customer',
   onLoginSuccess,
-  triggerToast
+  triggerToast,
+  onNavigate
 }: AuthPopupProps) {
   const [view, setView] = useState<'login' | 'register' | 'forgot' | 'success'>('login');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [isIframe, setIsIframe] = useState(false);
+  const [showPartitionError, setShowPartitionError] = useState(false);
+
+  useEffect(() => {
+    setIsIframe(typeof window !== 'undefined' && window.self !== window.top);
+  }, []);
 
   // Form Fields - Login
   const [loginEmail, setLoginEmail] = useState('');
@@ -50,6 +67,77 @@ export default function AuthPopup({
   const [regPassword, setRegPassword] = useState('');
   const [regConfirmPassword, setRegConfirmPassword] = useState('');
   const [regTerms, setRegTerms] = useState(false);
+
+  // Validation Errors - Registration
+  const [regFullNameError, setRegFullNameError] = useState('');
+  const [regEmailError, setRegEmailError] = useState('');
+  const [regPhoneError, setRegPhoneError] = useState('');
+  const [regPasswordError, setRegPasswordError] = useState('');
+  const [regConfirmPasswordError, setRegConfirmPasswordError] = useState('');
+
+  // Password Strength Helper
+  const getPasswordStrengthLabel = (pass: string) => {
+    if (!pass) return '';
+    let score = 0;
+    if (pass.length >= 8) score++;
+    if (/[A-Z]/.test(pass)) score++;
+    if (/[a-z]/.test(pass)) score++;
+    if (/[0-9]/.test(pass)) score++;
+    if (/[^A-Za-z0-9]/.test(pass)) score++;
+
+    if (score <= 2) return 'Weak';
+    if (score <= 4) return 'Medium';
+    return 'Strong';
+  };
+
+  // Sanitization and Validation Logic
+  const sanitizeNameInput = (val: string) => {
+    let clean = val.replace(/<[^>]*>?/gm, ''); // HTML tags removal
+    return clean;
+  };
+
+  const validateFullNameField = (name: string) => {
+    if (!name) return 'Full Name is required.';
+    if (name.trim().length === 0) return 'Do not allow only spaces.';
+    if (name.length < 2) return 'Please enter a valid Full Name. Minimum 2 characters required.';
+    if (name.length > 100) return 'Maximum 100 characters allowed.';
+    const nameRegex = /^[a-zA-Z\s]+$/;
+    if (!nameRegex.test(name)) return 'Please enter a valid Full Name. Allow letters and spaces only.';
+    return '';
+  };
+
+  const validateEmailField = (email: string) => {
+    if (!email) return 'Email is required.';
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) return 'Please enter a valid email address.';
+    return '';
+  };
+
+  const validatePhoneField = (phone: string, code: string) => {
+    if (!phone) return 'Phone number is required.';
+    // Strip out non-numbers to get actual digits
+    const digitsOnly = phone.replace(/\D/g, '');
+    if (digitsOnly.length < 8 || digitsOnly.length > 15) {
+      return 'Please enter a valid phone number. Must be between 8 and 15 digits.';
+    }
+    return '';
+  };
+
+  const validatePasswordField = (pass: string) => {
+    if (!pass) return 'Password is required.';
+    if (pass.length < 8) return 'Password must be at least 8 characters.';
+    if (!/[A-Z]/.test(pass)) return 'Password must contain at least 1 uppercase letter.';
+    if (!/[a-z]/.test(pass)) return 'Password must contain at least 1 lowercase letter.';
+    if (!/[0-9]/.test(pass)) return 'Password must contain at least 1 number.';
+    if (!/[^A-Za-z0-9]/.test(pass)) return 'Password must contain at least 1 special character.';
+    return '';
+  };
+
+  const validateConfirmPasswordField = (confirm: string, pass: string) => {
+    if (!confirm) return 'Confirm password is required.';
+    if (confirm !== pass) return 'Confirm Password must match Password field.';
+    return '';
+  };
 
   // Forgot Password
   const [forgotEmail, setForgotEmail] = useState('');
@@ -174,9 +262,40 @@ export default function AuthPopup({
 
     simulateHashing(loginPassword, () => {
       // Find matching user from PRESEEDED_USERS
-      const matched = PRESEEDED_USERS.find(
+      let matched = PRESEEDED_USERS.find(
         u => u.email.toLowerCase() === loginEmail.toLowerCase().trim() && u.password === loginPassword
       );
+
+      if (!matched) {
+        try {
+          const savedStaff = localStorage.getItem('webzone_admin_staff');
+          if (savedStaff) {
+            const staffList = JSON.parse(savedStaff);
+            const stf = staffList.find(
+              (s: any) => s.email && s.email.toLowerCase() === loginEmail.toLowerCase().trim() && s.password === loginPassword
+            );
+            if (stf) {
+              matched = {
+                id: stf.userId,
+                name: stf.name,
+                username: stf.name.toLowerCase().replace(/\s+/g, '_'),
+                email: stf.email,
+                phone: '+8801864000123',
+                role: (stf.role?.toLowerCase() === 'admin' ? 'admin' : 'staff') as any,
+                avatar: stf.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+                isVerified: true,
+                isSocial: false,
+                createdAt: '2026-06-22',
+                status: (stf.status || 'active') as any,
+                password: stf.password || '',
+                wishlistedProductIds: [] as string[]
+              } as any;
+            }
+          }
+        } catch (e) {
+          console.warn("Error reading webzone_admin_staff in AuthPopup:", e);
+        }
+      }
 
       if (matched) {
         if ((matched.status as string) === 'suspended') {
@@ -199,18 +318,20 @@ export default function AuthPopup({
   const handleRegisterSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!regFullName || !regUsername || !regEmail || !regPhone || !regPassword || !regConfirmPassword) {
-      triggerToast('All input fields are security mandatory.');
-      return;
-    }
+    const nameErr = validateFullNameField(regFullName);
+    const emailErr = validateEmailField(regEmail);
+    const phoneErr = validatePhoneField(regPhone, regPhoneCode);
+    const passErr = validatePasswordField(regPassword);
+    const confirmErr = validateConfirmPasswordField(regConfirmPassword, regPassword);
 
-    if (regPassword !== regConfirmPassword) {
-      triggerToast(language === 'bn' ? 'পাসওয়ার্ড ম্যাচ করেনি!' : 'Passwords do not match.');
-      return;
-    }
+    setRegFullNameError(nameErr);
+    setRegEmailError(emailErr);
+    setRegPhoneError(phoneErr);
+    setRegPasswordError(passErr);
+    setRegConfirmPasswordError(confirmErr);
 
-    if (regPassword.length < 6) {
-      triggerToast('Select a password of at least 6 characters.');
+    if (nameErr || emailErr || phoneErr || passErr || confirmErr) {
+      triggerToast(language === 'bn' ? 'অনুগ্রহ করে ফর্মের ত্রুটিগুলো সংশোধন করুন।' : 'Please fix the errors in the registration form.');
       return;
     }
 
@@ -293,58 +414,149 @@ export default function AuthPopup({
   };
 
   // Google / Facebook dynamic authentication simulator
-  const handleSocialAuth = (provider: 'google' | 'facebook') => {
-    const isGoogle = provider === 'google';
-    
-    // Auto profiles data
-    const socialName = isGoogle ? "Google User" : "Facebook User";
-    const socialEmail = isGoogle ? "google@webzonebd.com" : "facebook@webzonebd.com";
-    const socialUsername = isGoogle ? "google_user" : "facebook_user";
-    const socialAvatar = isGoogle 
-      ? "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80"
-      : "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=150&q=80";
+  const handleSocialAuth = async (provider: 'google' | 'facebook') => {
+    if (provider === 'google') {
+      setIsGoogleLoading(true);
+      try {
+        // Fix Firebase Authentication Persistence
+        await setPersistence(firebaseAuth, browserLocalPersistence);
 
-    triggerToast(`🔗 Authenticating via ${isGoogle ? 'Google Cloud Secure API' : 'Facebook App Token'}...`);
-
-    setTimeout(() => {
-      // Find or create in memory
-      let matched = PRESEEDED_USERS.find(u => u.email === socialEmail);
-      if (!matched) {
-        matched = {
-          id: 'usr-social-' + Date.now(),
-          name: socialName,
-          username: socialUsername,
-          email: socialEmail,
-          phone: '+966570511931',
-          role: 'customer' as UserRole,
-          password: 'socialpassword',
-          avatar: socialAvatar,
-          isVerified: true,
-          isSocial: true,
-          createdAt: new Date().toISOString().split('T')[0],
-          status: 'active' as const,
-          wishlistedProductIds: []
-        };
-        PRESEEDED_USERS.push(matched);
+        const googleProvider = new GoogleAuthProvider();
+        googleProvider.setCustomParameters({
+          prompt: 'select_account'
+        });
+        
+        const credentials = await signInWithPopup(firebaseAuth, googleProvider);
+        const fbUser = credentials.user;
+        
+        if (fbUser) {
+          const userDocRef = doc(firebaseDb, 'users', fbUser.uid);
+          let userSessionData: UserSession;
+          const nowIso = new Date().toISOString();
+          
+          try {
+            const userDocSnap = await getDoc(userDocRef);
+            if (userDocSnap.exists()) {
+              // Existing user auto log in
+              const existingData = userDocSnap.data();
+              userSessionData = {
+                ...existingData,
+                id: fbUser.uid,
+                name: existingData.name || fbUser.displayName || 'Google User',
+                email: existingData.email || fbUser.email || '',
+                avatar: existingData.avatar || fbUser.photoURL || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
+                isVerified: fbUser.emailVerified || existingData.isVerified || false,
+                lastLogin: nowIso,
+                provider: 'Google',
+                isSocial: true,
+                socialProvider: 'google'
+              } as UserSession;
+              await setDoc(userDocRef, userSessionData);
+            } else {
+              // Brand new user auto create account
+              userSessionData = {
+                id: fbUser.uid,
+                name: fbUser.displayName || 'Google User',
+                username: (fbUser.email?.split('@')[0] || 'google_user') + '_' + Math.floor(1000 + Math.random() * 9000),
+                email: fbUser.email || `${fbUser.uid}@google.com`,
+                phone: fbUser.phoneNumber || '',
+                role: 'customer',
+                isVerified: fbUser.emailVerified,
+                createdAt: nowIso,
+                lastLogin: nowIso,
+                status: 'active',
+                wishlistedProductIds: [],
+                avatar: fbUser.photoURL || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
+                socialProvider: 'google',
+                isSocial: true,
+                provider: 'Google'
+              };
+              await setDoc(userDocRef, userSessionData);
+            }
+            
+            onLoginSuccess(userSessionData);
+            triggerToast(language === 'bn' ? `সাফল্যের সাথে গুগল দিয়ে সাইন-ইন সম্পন্ন হয়েছে! স্বাগতম, ${userSessionData.name}` : `🔒 Authenticated securely via Firebase Google Auth as: ${userSessionData.name}`);
+            onClose();
+            return;
+          } catch (fireErr) {
+            handleFirestoreError(fireErr, OperationType.WRITE, `users/${fbUser.uid}`);
+          }
+        }
+      } catch (err: any) {
+        const errMsg = err?.message || '';
+        const isPartitionErr = err?.code === 'auth/web-storage-unsupported' || 
+                              err?.code === 'auth/popup-blocked' ||
+                              errMsg.includes('missing initial state') || 
+                              errMsg.includes('sessionStorage') || 
+                              errMsg.includes('storage-partitioned') ||
+                              errMsg.includes('popup-blocked') ||
+                              errMsg.includes('popup_blocked');
+        
+        if (isPartitionErr) {
+          console.warn("Firebase Google Auth Popup/Storage blocked (expected in iframe or restricted settings):", err);
+          setShowPartitionError(true);
+        } else if (err?.code === 'auth/popup-closed-by-user' || errMsg.includes('closed by user')) {
+          console.info("Google Sign-In cancelled by user.");
+          triggerToast(language === 'bn' ? 'গুগল লগইন বাতিল করা হয়েছে।' : 'Google Sign-In was cancelled.');
+        } else {
+          console.warn("Firebase Google Auth Unexpected Error Details in Popup (falling back): ", err);
+          if (typeof window !== 'undefined' && window.self !== window.top) {
+            setShowPartitionError(true);
+          } else {
+            triggerToast(language === 'bn' ? `গুগল লগইন ত্রুটি: ${err.message}` : `Google Sign-In Error: ${err.message || 'Authentication failed'}`);
+          }
+        }
+        return;
+      } finally {
+        setIsGoogleLoading(false);
       }
+    } else {
+      const socialName = "Facebook User";
+      const socialEmail = "facebook@webzonebd.com";
+      const socialUsername = "facebook_user";
+      const socialAvatar = "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=150&q=80";
 
-      onLoginSuccess({
-        id: matched.id,
-        name: matched.name,
-        username: matched.username,
-        email: matched.email,
-        phone: matched.phone,
-        role: matched.role,
-        isVerified: true,
-        createdAt: matched.createdAt,
-        status: matched.status,
-        wishlistedProductIds: [],
-        avatar: matched.avatar
-      });
+      triggerToast(`🔗 Authenticating via Facebook App Token...`);
 
-      triggerToast(`✅ Welcome back, ${matched.name}! Session established via social federation.`);
-      onClose();
-    }, 1000);
+      setTimeout(() => {
+        let matched = PRESEEDED_USERS.find(u => u.email === socialEmail);
+        if (!matched) {
+          matched = {
+            id: 'usr-social-' + Date.now(),
+            name: socialName,
+            username: socialUsername,
+            email: socialEmail,
+            phone: '+966570511931',
+            role: 'customer' as UserRole,
+            password: 'socialpassword',
+            avatar: socialAvatar,
+            isVerified: true,
+            isSocial: true,
+            createdAt: new Date().toISOString().split('T')[0],
+            status: 'active' as const,
+            wishlistedProductIds: []
+          };
+          PRESEEDED_USERS.push(matched);
+        }
+
+        onLoginSuccess({
+          id: matched.id,
+          name: matched.name,
+          username: matched.username,
+          email: matched.email,
+          phone: matched.phone,
+          role: matched.role,
+          isVerified: true,
+          createdAt: matched.createdAt,
+          status: matched.status,
+          wishlistedProductIds: [],
+          avatar: matched.avatar
+        });
+
+        triggerToast(`✅ Welcome back, ${matched.name}! Session established via social federation.`);
+        onClose();
+      }, 1000);
+    }
   };
 
   // Password reset submit handler
@@ -567,29 +779,63 @@ export default function AuthPopup({
               </div>
 
               {/* Social Login Grid */}
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="space-y-2">
+                {isIframe && (
+                  <div className="p-3.5 rounded-xl bg-purple-500/10 border border-purple-500/25 text-purple-700 dark:text-purple-300 text-xs flex items-start gap-2 leading-relaxed mb-3">
+                    <Info className="w-4 h-4 shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <span className="font-semibold block mb-0.5 text-slate-800 dark:text-purple-200">
+                        {language === 'bn' ? '💡 প্রিভিউ ফ্রেম নোটিশ' : '💡 Live Preview Frame Detected'}
+                      </span>
+                      <p className="text-[11px] text-slate-600 dark:text-slate-300">
+                        {language === 'bn' 
+                          ? 'ব্রাউজারের নিরাপত্তা সীমাবদ্ধতা এড়াতে এবং গুগল লগইন নিশ্চিত করতে দয়া করে এই সাইটটি নতুন ট্যাবে ব্যবহার করুন।' 
+                          : 'To bypass browser security limits and sign in with Google seamlessly, please use this site in a new browser tab.'}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => window.open(window.location.href, '_blank')}
+                        className="mt-1.5 inline-flex items-center gap-1 font-semibold text-purple-600 dark:text-purple-400 hover:underline cursor-pointer"
+                      >
+                        <span>{language === 'bn' ? 'নতুন ট্যাবে ওপেন করুন' : 'Open in New Tab'}</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                )}
                 <button
+                  type="button"
                   onClick={() => handleSocialAuth('google')}
-                  className="py-2.5 px-4 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900 transition-all text-xs font-black flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 duration-200"
+                  disabled={isGoogleLoading}
+                  className="w-full h-[54px] flex items-center justify-center gap-2.5 px-4 bg-white hover:bg-slate-50 dark:bg-[#111827] dark:hover:bg-[#1f2937] border border-slate-200 dark:border-[#374151] rounded-2xl shadow-sm hover:shadow-[0_12px_30px_rgba(124,58,237,0.15)] transition-all duration-300 hover:scale-[1.02] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-xs font-semibold text-slate-700 dark:text-white"
                 >
-                  {/* Custom built SVG for absolute dependency safety */}
-                  <svg className="w-4.5 h-4.5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l3.66-2.85z" fill="#FBBC05"/>
-                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.85c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-                  </svg>
-                  <span>Google</span>
+                  {isGoogleLoading ? (
+                    <RefreshCw className="w-5 h-5 animate-spin text-purple-600" />
+                  ) : (
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l3.66-2.85z" fill="#FBBC05"/>
+                      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.85c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                    </svg>
+                  )}
+                  <span className="font-semibold text-sm">
+                    {isGoogleLoading 
+                      ? (language === 'bn' ? 'গুগল সংযোগ করা হচ্ছে...' : 'Connecting to Google...') 
+                      : (language === 'bn' ? 'গুগল দিয়ে চালিয়ে যান' : 'Continue with Google')}
+                  </span>
                 </button>
 
                 <button
+                  type="button"
                   onClick={() => handleSocialAuth('facebook')}
-                  className="py-2.5 px-4 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900 transition-all text-xs font-black flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 duration-200"
+                  disabled={isGoogleLoading}
+                  className="w-full py-2.5 px-4 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900 transition-all text-xs font-black flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 duration-200"
                 >
                   <svg className="w-4.5 h-4.5 fill-blue-600 dark:fill-blue-500" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
                   </svg>
-                  <span>Facebook</span>
+                  <span>{language === 'bn' ? 'ফেসবুক দিয়ে চালিয়ে যান' : 'Continue with Facebook'}</span>
                 </button>
               </div>
 
@@ -641,11 +887,21 @@ export default function AuthPopup({
                       type="text"
                       required
                       value={regFullName}
-                      onChange={(e) => setRegFullName(e.target.value)}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        const sanitized = sanitizeNameInput(raw);
+                        // Block any non-letters and non-spaces
+                        const filtered = sanitized.replace(/[^a-zA-Z\s]/g, '');
+                        setRegFullName(filtered);
+                        setRegFullNameError(validateFullNameField(filtered));
+                      }}
                       placeholder="e.g. Al-Amin Chowdhury"
                       className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-250 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#8B5CF6]/20 focus:border-[#8B5CF6]"
                     />
                   </div>
+                  {regFullNameError && (
+                    <p className="text-[10px] text-red-500 font-medium font-mono pl-1 mt-0.5">{regFullNameError}</p>
+                  )}
                 </div>
 
                 {/* Grid row for UserName and WhatsApp mobile */}
@@ -668,7 +924,7 @@ export default function AuthPopup({
                   {/* WhatsApp Mobile Number */}
                   <div className="space-y-1">
                     <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 font-mono">
-                      WhatsApp Number & Country Code
+                      WhatsApp Number
                     </label>
                     <div className="flex gap-2 relative">
                       {/* Country Code Selection Dropdown */}
@@ -679,6 +935,7 @@ export default function AuthPopup({
                             setRegPhoneCode(e.target.value);
                             const label = e.target.value === '+880' ? 'BD (BDT Taka)' : e.target.value === '+966' ? 'SA (SAR Riyal)' : 'Global (USD Dollar)';
                             triggerToast(`Phone Code: ${e.target.value} (${label})`);
+                            setRegPhoneError(validatePhoneField(regPhone, e.target.value));
                           }}
                           className="w-full pl-2 pr-7 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-250 dark:border-slate-800 rounded-xl text-neutral border-neutral-300 dark:border-neutral-850 text-xs font-bold font-mono text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 appearance-none cursor-pointer"
                         >
@@ -705,12 +962,19 @@ export default function AuthPopup({
                           type="tel"
                           required
                           value={regPhone}
-                          onChange={(e) => setRegPhone(e.target.value.replace(/[^0-9]/g, ''))}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/[^0-9]/g, ''); // Block letters and special characters
+                            setRegPhone(val);
+                            setRegPhoneError(validatePhoneField(val, regPhoneCode));
+                          }}
                           placeholder="e.g. 1700112233"
                           className="w-full pl-8 pr-3 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-250 dark:border-slate-800 rounded-xl text-xs font-mono text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/25 focus:border-emerald-500"
                         />
                       </div>
                     </div>
+                    {regPhoneError && (
+                      <p className="text-[10px] text-red-500 font-medium font-mono mt-1 pl-1">{regPhoneError}</p>
+                    )}
                   </div>
                 </div>
 
@@ -727,11 +991,18 @@ export default function AuthPopup({
                       type="email"
                       required
                       value={regEmail}
-                      onChange={(e) => setRegEmail(e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setRegEmail(val);
+                        setRegEmailError(validateEmailField(val));
+                      }}
                       placeholder="e.g. info@webzonebd.com"
-                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-250 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none"
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-250 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#8B5CF6]/20 focus:border-[#8B5CF6]"
                     />
                   </div>
+                  {regEmailError && (
+                    <p className="text-[10px] text-red-500 font-medium font-mono pl-1 mt-0.5">{regEmailError}</p>
+                  )}
                 </div>
 
                 {/* Passwords double security */}
@@ -740,28 +1011,81 @@ export default function AuthPopup({
                     <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 font-mono">
                       Password
                     </label>
-                    <input
-                      type="password"
-                      required
-                      value={regPassword}
-                      onChange={(e) => setRegPassword(e.target.value)}
-                      placeholder="••••••••"
-                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-250 dark:border-slate-800 rounded-xl text-xs font-mono text-slate-900 dark:text-white focus:outline-none"
-                    />
+                    <div className="relative">
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        required
+                        value={regPassword}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setRegPassword(val);
+                          setRegPasswordError(validatePasswordField(val));
+                        }}
+                        placeholder="••••••••"
+                        className="w-full pl-3.5 pr-10 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-250 dark:border-slate-800 rounded-xl text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#8B5CF6]/20 focus:border-[#8B5CF6]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-white"
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    {regPasswordError && (
+                      <p className="text-[10px] text-red-500 font-medium font-mono pl-1 mt-0.5">{regPasswordError}</p>
+                    )}
+                    {regPassword && (
+                      <div className="mt-1 space-y-1 pl-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[9px] font-mono uppercase text-slate-400">Strength:</span>
+                          <span className={`text-[9px] font-black uppercase ${
+                            getPasswordStrengthLabel(regPassword) === 'Weak' ? 'text-red-500' :
+                            getPasswordStrengthLabel(regPassword) === 'Medium' ? 'text-amber-500' : 'text-emerald-500'
+                          }`}>
+                            {getPasswordStrengthLabel(regPassword)}
+                          </span>
+                        </div>
+                        <div className="flex h-1 w-full bg-slate-100 dark:bg-slate-900 rounded-full overflow-hidden">
+                          <div 
+                            className={`h-full transition-all duration-300 ${
+                              getPasswordStrengthLabel(regPassword) === 'Weak' ? 'w-1/3 bg-red-500' :
+                              getPasswordStrengthLabel(regPassword) === 'Medium' ? 'w-2/3 bg-amber-500' : 'w-full bg-emerald-500'
+                            }`}
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-1">
                     <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 font-mono">
                       Confirm Password
                     </label>
-                    <input
-                      type="password"
-                      required
-                      value={regConfirmPassword}
-                      onChange={(e) => setRegConfirmPassword(e.target.value)}
-                      placeholder="••••••••"
-                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-250 dark:border-slate-800 rounded-xl text-xs font-mono text-slate-900 dark:text-white focus:outline-none"
-                    />
+                    <div className="relative">
+                      <input
+                        type={showConfirmPassword ? 'text' : 'password'}
+                        required
+                        value={regConfirmPassword}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setRegConfirmPassword(val);
+                          setRegConfirmPasswordError(validateConfirmPasswordField(val, regPassword));
+                        }}
+                        placeholder="••••••••"
+                        className="w-full pl-3.5 pr-10 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-250 dark:border-slate-800 rounded-xl text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#8B5CF6]/20 focus:border-[#8B5CF6]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-white"
+                      >
+                        {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    {regConfirmPasswordError && (
+                      <p className="text-[10px] text-red-500 font-medium font-mono pl-1 mt-0.5">{regConfirmPasswordError}</p>
+                    )}
                   </div>
                 </div>
 
@@ -775,7 +1099,103 @@ export default function AuthPopup({
                     className="w-4 h-4 rounded mt-0.5 text-[#8B5CF6] border-slate-300 dark:border-slate-700 accent-[#8B5CF6] cursor-pointer"
                   />
                   <span className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
-                    I agree to the <b className="text-slate-700 dark:text-white">Terms & Privacy Policy</b> guidelines.
+                    {language === 'bn' ? (
+                      <>
+                        আমি{' '}
+                        <span
+                          id="register-terms-link"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            onClose();
+                            onNavigate?.('privacy');
+                            triggerToast('শর্তাবলী ও শর্তসমূহ পেজে নিয়ে যাওয়া হচ্ছে...');
+                          }}
+                          className="underline text-slate-700 hover:text-[#8B5CF6] dark:text-slate-200 dark:hover:text-[#EC4899] font-bold cursor-pointer transition-colors"
+                        >
+                          Terms & Conditions
+                        </span>{' '}
+                        এবং{' '}
+                        <span
+                          id="register-privacy-link"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            onClose();
+                            onNavigate?.('privacy');
+                            triggerToast('প্রাইভেসি পলিসি পেজে নিয়ে যাওয়া হচ্ছে...');
+                          }}
+                          className="underline text-slate-700 hover:text-[#8B5CF6] dark:text-slate-200 dark:hover:text-[#EC4899] font-bold cursor-pointer transition-colors"
+                        >
+                          Privacy Policy
+                        </span>{' '}
+                        নির্দেশিকাগুলির সাথে একমত।
+                      </>
+                    ) : language === 'ar' ? (
+                      <>
+                        أنا أوافق على{' '}
+                        <span
+                          id="register-terms-link"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            onClose();
+                            onNavigate?.('privacy');
+                            triggerToast('جاري الانتقال إلى الشروط والأحكام...');
+                          }}
+                          className="underline text-slate-700 hover:text-[#8B5CF6] dark:text-slate-200 dark:hover:text-[#EC4899] font-bold cursor-pointer transition-colors"
+                        >
+                          الشروط والأحكام
+                        </span>{' '}
+                        و{' '}
+                        <span
+                          id="register-privacy-link"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            onClose();
+                            onNavigate?.('privacy');
+                            triggerToast('جاري الانتقال إلى سياسة الخصوصية...');
+                          }}
+                          className="underline text-slate-700 hover:text-[#8B5CF6] dark:text-slate-200 dark:hover:text-[#EC4899] font-bold cursor-pointer transition-colors"
+                        >
+                          سياسة الخصوصية
+                        </span>{' '}
+                        الخاصة بنا.
+                      </>
+                    ) : (
+                      <>
+                        I agree to the{' '}
+                        <span
+                          id="register-terms-link"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            onClose();
+                            onNavigate?.('privacy');
+                            triggerToast('Navigating to Terms & Conditions...');
+                          }}
+                          className="underline text-slate-700 hover:text-[#8B5CF6] dark:text-slate-200 dark:hover:text-[#EC4899] font-bold cursor-pointer transition-colors"
+                        >
+                          Terms & Conditions
+                        </span>{' '}
+                        and{' '}
+                        <span
+                          id="register-privacy-link"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            onClose();
+                            onNavigate?.('privacy');
+                            triggerToast('Navigating to Privacy Policy...');
+                          }}
+                          className="underline text-slate-700 hover:text-[#8B5CF6] dark:text-slate-200 dark:hover:text-[#EC4899] font-bold cursor-pointer transition-colors"
+                        >
+                          Privacy Policy
+                        </span>{' '}
+                        guidelines.
+                      </>
+                    )}
                   </span>
                 </label>
 
@@ -800,28 +1220,63 @@ export default function AuthPopup({
               </div>
 
               {/* Social Login Grid */}
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="space-y-2">
+                {isIframe && (
+                  <div className="p-3.5 rounded-xl bg-purple-500/10 border border-purple-500/25 text-purple-700 dark:text-purple-300 text-xs flex items-start gap-2 leading-relaxed mb-3">
+                    <Info className="w-4 h-4 shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <span className="font-semibold block mb-0.5 text-slate-800 dark:text-purple-200">
+                        {language === 'bn' ? '💡 প্রিভিউ ফ্রেম নোটিশ' : '💡 Live Preview Frame Detected'}
+                      </span>
+                      <p className="text-[11px] text-slate-600 dark:text-slate-300">
+                        {language === 'bn' 
+                          ? 'ব্রাউজারের নিরাপত্তা সীমাবদ্ধতা এড়াতে এবং গুগল লগইন নিশ্চিত করতে দয়া করে এই সাইটটি নতুন ট্যাবে ব্যবহার করুন।' 
+                          : 'To bypass browser security limits and sign in with Google seamlessly, please use this site in a new browser tab.'}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => window.open(window.location.href, '_blank')}
+                        className="mt-1.5 inline-flex items-center gap-1 font-semibold text-purple-600 dark:text-purple-400 hover:underline cursor-pointer"
+                      >
+                        <span>{language === 'bn' ? 'নতুন ট্যাবে ওপেন করুন' : 'Open in New Tab'}</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                )}
                 <button
+                  type="button"
                   onClick={() => handleSocialAuth('google')}
-                  className="py-2.5 px-4 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900 transition-all text-xs font-black flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 duration-200"
+                  disabled={isGoogleLoading}
+                  className="w-full h-[54px] flex items-center justify-center gap-2.5 px-4 bg-white hover:bg-slate-50 dark:bg-[#111827] dark:hover:bg-[#1f2937] border border-slate-200 dark:border-[#374151] rounded-2xl shadow-sm hover:shadow-[0_12px_30px_rgba(124,58,237,0.15)] transition-all duration-300 hover:scale-[1.02] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-xs font-semibold text-slate-700 dark:text-white"
                 >
-                  <svg className="w-4.5 h-4.5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l3.66-2.85z" fill="#FBBC05"/>
-                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.85c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-                  </svg>
-                  <span>Google</span>
+                  {isGoogleLoading ? (
+                    <RefreshCw className="w-5 h-5 animate-spin text-purple-600" />
+                  ) : (
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l3.66-2.85z" fill="#FBBC05"/>
+                      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.85c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                    </svg>
+                  )}
+                  <span className="font-semibold text-sm">
+                    {isGoogleLoading 
+                      ? (language === 'bn' ? 'গুগল সংযোগ করা হচ্ছে...' : 'Connecting to Google...') 
+                      : (language === 'bn' ? 'গুগল দিয়ে চালিয়ে যান' : 'Continue with Google')}
+                  </span>
                 </button>
 
                 <button
+                  type="button"
                   onClick={() => handleSocialAuth('facebook')}
-                  className="py-2.5 px-4 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900 transition-all text-xs font-black flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 duration-200"
+                  disabled={isGoogleLoading}
+                  className="w-full py-2.5 px-4 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900 transition-all text-xs font-black flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 duration-200"
                 >
                   <svg className="w-4.5 h-4.5 fill-blue-600 dark:fill-blue-500" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
                   </svg>
-                  <span>Facebook</span>
+                  <span>{language === 'bn' ? 'ফেসবুক দিয়ে চালিয়ে যান' : 'Continue with Facebook'}</span>
                 </button>
               </div>
 
@@ -1013,6 +1468,47 @@ export default function AuthPopup({
           )}
 
         </div>
+
+        {showPartitionError && (
+          <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
+            <div className="w-full max-w-md p-6 bg-white dark:bg-[#0F172A] rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl">
+              <div className="flex items-center gap-3 mb-4 text-amber-500">
+                <ShieldAlert className="w-8 h-8 shrink-0 text-purple-500" />
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                  {language === 'bn' ? 'গুগল সাইন-ইন সমাধান' : 'Google Sign-In Help Required'}
+                </h3>
+              </div>
+              
+              <p className="text-sm text-slate-600 dark:text-slate-300 mb-6 leading-relaxed">
+                {language === 'bn' 
+                  ? 'ব্রাউজারের সিকিউরিটি পলিসি (Storage Partitioning) এর কারণে এই প্রিভিউ ফ্রেমের ভেতর সরাসরি গুগল লগইন সম্পন্ন করা যাচ্ছে না। এটি সমাধানের জন্য অনুগ্রহ করে অ্যাপটি একটি নতুন ট্যাবে ওপেন করে গুগল সাইন-ইন সম্পন্ন করুন।' 
+                  : 'Due to browser iframe security restrictions (Storage Partitioning), Google Sign-In is blocked inside this preview frame. To resolve this instantly, please open WebzoneBD in a new tab to complete your secure sign-in.'}
+              </p>
+
+              <div className="space-y-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.open(window.location.href, '_blank');
+                  }}
+                  className="w-full h-12 flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white font-semibold shadow-[0_4px_15px_rgba(124,58,237,0.3)] hover:scale-[1.01] active:scale-[0.99] transition duration-200 cursor-pointer"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  <span>{language === 'bn' ? 'নতুন ট্যাবে খুলুন' : 'Open in New Tab'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowPartitionError(false)}
+                  className="w-full py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-900 transition text-xs font-semibold cursor-pointer"
+                >
+                  {language === 'bn' ? 'বন্ধ করুন' : 'Close / Go Back'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
       </motion.div>
     </div>
   );

@@ -4,7 +4,7 @@
 
 export type Language = 'en' | 'bn' | 'ar';
 export type Theme = 'light' | 'dark';
-export type UserRole = 'admin' | 'customer' | 'vendor' | 'staff' | 'affiliate';
+export type UserRole = 'super_admin' | 'admin' | 'editor' | 'customer' | 'user' | 'vendor' | 'staff' | 'affiliate';
 export type Currency = 'USD' | 'BDT' | 'SAR';
 
 export interface UserSession {
@@ -55,6 +55,8 @@ export interface UserSession {
   emailOtpEnabled?: boolean;
   googleAuthEnabled?: boolean;
   whatsappOtpEnabled?: boolean;
+  lastLogin?: string;
+  provider?: string;
 }
 
 export interface ActivityLog {
@@ -65,16 +67,28 @@ export interface ActivityLog {
   userAgent: string;
 }
 
+export interface ProductReview {
+  id: string;
+  userId: string;
+  userName: string;
+  userAvatar?: string;
+  rating: number;
+  comment: string;
+  createdAt: string;
+}
+
 export interface Product {
   id: string;
   name: string;
   nameBn: string;
   nameAr: string;
-  category: 'php' | 'wordpress' | 'blogger' | 'laravel' | 'mobile' | 'source';
+  category: string;
+  subCategory?: string;
   price: number;
   discountPrice?: number;
   rating: number;
   reviewsCount: number;
+  reviews?: ProductReview[];
   description: string;
   descriptionBn: string;
   descriptionAr: string;
@@ -86,6 +100,16 @@ export interface Product {
   downloadUrl: string;
   tags: string[];
   views: number;
+  badge?: 'Best Seller' | 'Trending' | 'New' | 'Hot Deal' | 'Featured' | 'Verified' | string;
+  isFeatured?: boolean;
+  isTrending?: boolean;
+  isBestSeller?: boolean;
+  licenseType?: 'regular' | 'extended' | string;
+  relatedIds?: string[];
+  downloadsCount?: number;
+  advancePercent?: number;
+  advanceAmount?: number;
+  dueAmount?: number;
 }
 
 export interface Service {
@@ -111,10 +135,12 @@ export interface Coupon {
   code: string;
   discountPercent: number;
   expiryDate: string;
+  usageCount?: number;
 }
 
 export interface SupportTicket {
   id: string;
+  userId?: string;
   subject: string;
   category: string;
   priority: 'low' | 'medium' | 'high';
@@ -146,6 +172,7 @@ export interface BlogPost {
   date: string;
   author: string;
   readTime: string;
+  videoUrl?: string;
 }
 
 export interface PortfolioItem {
@@ -157,6 +184,9 @@ export interface PortfolioItem {
   categoryLabel: string;
   categoryLabelBn: string;
   categoryLabelAr: string;
+  subCategory?: string;
+  subCategoryBn?: string;
+  subCategoryAr?: string;
   image: string;
   client: string;
   duration: string;
@@ -174,6 +204,7 @@ export interface PortfolioItem {
   longCaseStudy?: string;
   longCaseStudyBn?: string;
   longCaseStudyAr?: string;
+  videoUrl?: string;
 }
 
 export interface Order {
@@ -184,13 +215,32 @@ export interface Order {
   price: number;
   date: string;
   paymentMethod: string;
-  paymentStatus: 'pending' | 'completed' | 'failed';
+  paymentStatus: 'pending' | 'completed' | 'failed' | 'refunded';
   downloadUrl?: string;
+  trackingId?: string;
+  status?: 'pending' | 'processing' | 'shipped' | 'delivered';
+  isGuest?: boolean;
+  guestName?: string;
+  guestPhone?: string;
+  guestEmail?: string;
+  transactionId?: string;
+  transactionReceipt?: string;
+  customerName?: string;
+  customerEmail?: string;
+  customerPhone?: string;
+  assignedStaff?: string;
+  orderNotes?: string;
+  advancePercent?: number;
+  advanceAmount?: number;
+  dueAmount?: number;
 }
 
 export interface CartItem {
   product: Product;
   appliedCoupon?: Coupon;
+  advancePercent?: number;
+  advanceAmount?: number;
+  dueAmount?: number;
 }
 
 export interface SystemConfig {

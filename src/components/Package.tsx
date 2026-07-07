@@ -264,12 +264,13 @@ export default function Package({ language, theme }: PackageProps) {
           return (
             <div 
               key={pkg.id}
-              className={`relative rounded-[24px] bg-white dark:bg-[#0f172a] border transition-all duration-300 hover:shadow-[0_30px_60px_rgba(37,99,235,0.12)] dark:hover:shadow-[0_30px_60px_rgba(6,182,212,0.06)] hover:-translate-y-2 overflow-hidden flex flex-col justify-between ${
+              className={`relative rounded-[24px] p-[1.5px] bg-gradient-to-br transition-all duration-300 hover:shadow-[0_30px_60px_rgba(37,99,235,0.15)] dark:hover:shadow-[0_30px_60px_rgba(6,182,212,0.08)] hover:-translate-y-2 overflow-hidden flex flex-col justify-between ${
                 pkg.isPopular 
-                  ? 'border-blue-500/60 dark:border-cyan-500/65 shadow-xl shadow-blue-500/10' 
-                  : 'border-slate-200/80 dark:border-slate-800'
+                  ? 'from-blue-650 via-indigo-600 to-cyan-450 shadow-xl shadow-blue-500/15' 
+                  : 'from-neutral-200 to-neutral-300/40 dark:from-slate-805 dark:to-slate-900/40 hover:from-blue-500 hover:via-indigo-500 hover:to-cyan-450 dark:hover:from-blue-500 dark:hover:via-indigo-500 dark:hover:to-cyan-450'
               }`}
             >
+              <div className="bg-white dark:bg-[#0f172a] rounded-[22px] overflow-hidden flex flex-col justify-between h-full w-full">
               {/* Popular Package Ribbon overlay */}
               {pkg.isPopular && (
                 <div className="absolute top-0 right-0 overflow-hidden w-32 h-32 pointer-events-none z-10">
@@ -414,6 +415,7 @@ export default function Package({ language, theme }: PackageProps) {
                   <span>{t.waBtn}</span>
                 </button>
               </div>
+             </div>
             </div>
           );
         })}

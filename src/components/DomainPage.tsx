@@ -519,7 +519,7 @@ export default function DomainPage({
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10 space-y-6">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-xs text-blue-650 dark:text-cyan-400 font-mono tracking-wider uppercase animate-pulse">
             <Sparkle className="w-4 h-4 text-emerald-500 fill-emerald-500 animate-spin" style={{ animationDuration: "12s" }} />
-            <span>{language === "bn" ? "অ্যাডভান্সড এআই ইঞ্জিন চালিত" : "Premium Hostinger-Style AI Generator"}</span>
+            <span>{language === "bn" ? "অ্যাডভান্সড এআই ইঞ্জিন চালিত" : language === "ar" ? "يعمل بمحرك يعتمد على الذكاء الاصطناعي الممتاز" : "Premium Hostinger-Style AI Generator"}</span>
           </div>
 
           <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-none max-w-4xl mx-auto font-display">
@@ -543,7 +543,7 @@ export default function DomainPage({
                 }`}
               >
                 <Search className="w-3.5 h-3.5" />
-                <span>{language === "bn" ? "ইনস্ট্যান্ট সার্চ" : "Hostinger Search"}</span>
+                <span>{language === "bn" ? "ইনস্ট্যান্ট সার্চ" : language === "ar" ? "البحث الفوري" : "Hostinger Search"}</span>
               </button>
               <button
                 type="button"
@@ -555,7 +555,7 @@ export default function DomainPage({
                 }`}
               >
                 <Cpu className="w-3.5 h-3.5" />
-                <span>{language === "bn" ? "এআই জেনারেটর" : "AI Generator"}</span>
+                <span>{language === "bn" ? "এআই জেনারেটর" : language === "ar" ? "توليد بالذكاء الاصطناعي" : "AI Generator"}</span>
               </button>
             </div>
 
@@ -568,7 +568,7 @@ export default function DomainPage({
                     <Globe className="absolute left-4 text-blue-500 w-5 h-5 animate-pulse" />
                     <input
                       type="text"
-                      placeholder={language === "bn" ? "আপনার পছন্দের ডোমেন নামটি খুঁজুন (যেমন: mybrand.com)..." : "Search your perfect domain with extensions (e.g. mybrand.com)..."}
+                      placeholder={language === "bn" ? "আপনার পছন্দের ডোমেন নামটি খুঁজুন (যেমন: mybrand.com)..." : language === "ar" ? "ابحث عن نطاقك الفريد واستعلم عن توفره (مثل: mybrand.com)..." : "Search your perfect domain with extensions (e.g. mybrand.com)..."}
                       value={instantSearchQuery}
                       onChange={(e) => setInstantSearchQuery(e.target.value)}
                       className="w-full bg-transparent pl-12 pr-4 py-4 text-sm sm:text-base font-semibold text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none border-none"
@@ -577,7 +577,7 @@ export default function DomainPage({
 
                   {/* Preloaded suggestion examples row for Instant Mode */}
                   <div className="flex flex-wrap items-center gap-2 px-4 py-2 bg-slate-50 dark:bg-slate-900/40 rounded-2xl border border-slate-100 dark:border-slate-800/40">
-                    <span className="text-[10px] font-bold font-mono text-slate-400 uppercase tracking-widest">{language === "bn" ? "ইউনিক আইডিয়া:" : "Try Examples:"}</span>
+                    <span className="text-[10px] font-bold font-mono text-slate-400 uppercase tracking-widest">{language === "bn" ? "ইউনিক আইডিয়া:" : language === "ar" ? "أمثلة شائعة:" : "Try Examples:"}</span>
                     {[
                       "hostingerpro.com",
                       "dhakaitlabs.net",
@@ -605,12 +605,12 @@ export default function DomainPage({
                       {isInstantSearching ? (
                         <>
                           <RefreshCw className="w-5 h-5 animate-spin" />
-                          <span>{language === "bn" ? "সার্চ হচ্ছে..." : "Searching WHOIS Registry..."}</span>
+                          <span>{language === "bn" ? "সার্চ হচ্ছে..." : language === "ar" ? "جاري البحث..." : "Searching WHOIS Registry..."}</span>
                         </>
                       ) : (
                         <>
                           <Search className="w-5 h-5" />
-                          <span>{language === "bn" ? "ডোমেন চেক করুন" : "Search Domain"}</span>
+                          <span>{language === "bn" ? "ডোমেন চেক করুন" : language === "ar" ? "البحث عن النطاق" : "Search Domain"}</span>
                         </>
                       )}
                     </button>
@@ -632,13 +632,13 @@ export default function DomainPage({
 
                   {/* Preconfigured Examples Buttons Row */}
                   <div className="flex flex-wrap items-center gap-2 px-4 py-2 bg-slate-50 dark:bg-slate-900/40 rounded-2xl border border-slate-100 dark:border-slate-800/40">
-                    <span className="text-[10px] font-bold font-mono text-slate-400 uppercase tracking-widest">{language === "bn" ? "প্রম্পট উদাহরণ:" : "Try Examples:"}</span>
+                    <span className="text-[10px] font-bold font-mono text-slate-400 uppercase tracking-widest">{language === "bn" ? "প্রম্পট উদাহরণ:" : language === "ar" ? "أمثلة شائعة:" : "Try Examples:"}</span>
                     {[
-                      { label: language === "bn" ? "ওয়েব হোস্টিং কোম্পানি" : "Web Hosting Company", desc: "Premium cloud web hosting company offering global servers and domains support", style: "Tech" },
-                      { label: language === "bn" ? "ডিজিটাল এজেন্সি" : "Digital Marketing Agency", desc: "Digital design, social SEO optimization, and premium media marketing group", style: "Startup" },
-                      { label: language === "bn" ? "রিয়াদ রেস্টুরেন্ট" : "Restaurant in Riyadh", desc: "Elegant authentic Arabic hospitality and luxury dining outlet in Riyadh center", style: "Local Business" },
-                      { label: language === "bn" ? "ই-কমার্স স্টোর" : "E-commerce Store", desc: "Handcrafted boutique fashion products and sustainable accessories eShop", style: "E-commerce" },
-                      { label: language === "bn" ? "আইটি সলিউশন" : "IT Solution Company", desc: "Enterprise cloud engineering, high performance database administration and software", style: "Professional" }
+                      { label: language === "bn" ? "ওয়েব হোস্টিং কোম্পানি" : language === "ar" ? "شركة استضافة مواقع" : "Web Hosting Company", desc: "Premium cloud web hosting company offering global servers and domains support", style: "Tech" },
+                      { label: language === "bn" ? "ডিজিটাল এজেন্সি" : language === "ar" ? "وكالة تسويق رقمي" : "Digital Marketing Agency", desc: "Digital design, social SEO optimization, and premium media marketing group", style: "Startup" },
+                      { label: language === "bn" ? "রিয়াদ রেস্টুরेंट" : language === "ar" ? "مطعم في الرياض" : "Restaurant in Riyadh", desc: "Elegant authentic Arabic hospitality and luxury dining outlet in Riyadh center", style: "Local Business" },
+                      { label: language === "bn" ? "ই-কমার্স স্টোর" : language === "ar" ? "متجر للتجارة الإلكترونية" : "E-commerce Store", desc: "Handcrafted boutique fashion products and sustainable accessories eShop", style: "E-commerce" },
+                      { label: language === "bn" ? "আইটি সলিউশন" : language === "ar" ? "شركة حلول تقنية معلومات" : "IT Solution Company", desc: "Enterprise cloud engineering, high performance database administration and software", style: "Professional" }
                     ].map((ex, index) => (
                       <button
                         key={index}
@@ -719,7 +719,7 @@ export default function DomainPage({
                       {isGenerating ? (
                         <>
                           <RefreshCw className="w-5 h-5 animate-spin" />
-                          <span>{language === "bn" ? "আপনার জন্য ডোমেন ওহী জেনারেট হচ্ছে..." : "AI Engine Analyzing & Creating suggestions..."}</span>
+                          <span>{language === "bn" ? "আপনার জন্য ডোমেন ওহী জেনারেট হচ্ছে..." : language === "ar" ? "جاري توليد اقتراحات النطاقات المناسبة لك..." : "AI Engine Analyzing & Creating suggestions..."}</span>
                         </>
                       ) : (
                         <>
@@ -754,20 +754,20 @@ export default function DomainPage({
                           ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400"
                           : "bg-rose-500/10 border border-rose-500/20 text-rose-500 dark:text-rose-455"
                       }`}>
-                        {instantSearchResult.isAvailable ? (language === "bn" ? "✅ বুকিংয়ের জন্য খালি আছে" : "✅ Available") : (language === "bn" ? "❌ অলরেডি রেজিস্টার্ড" : "❌ Taken")}
+                        {instantSearchResult.isAvailable ? (language === "bn" ? "✅ বুকিংয়ের জন্য খালি আছে" : language === "ar" ? "✅ متاح للتسجيل" : "✅ Available") : (language === "bn" ? "❌ অলরেডি রেজিস্টার্ড" : language === "ar" ? "❌ محجوز مسبقاً" : "❌ Taken")}
                       </span>
                     </div>
                     <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-xl leading-relaxed">
                       {instantSearchResult.isAvailable
-                        ? (language === "bn" ? "অভিনন্দন! আপনার পছন্দের ডোমেনটি খালি আছে। এখনই সর্বোচ্চ গতিসম্পন্ন এন্টারপ্রাইজ সার্ভারে রেজিস্টার করুন।" : "Perfect! This domain name is fully available for registry and standard deployment. Secure it immediately.")
-                        : (language === "bn" ? "দুঃখিত! এই ডোমেনটি অলরেডি রেজিস্টার্ড হয়ে গেছে। আমরা আপনার জন্য কিছু চমৎকার বিকল্প খুঁজে পেয়েছি নিচে দেখুন।" : "Apologies! This domain represents an active registry or is unavailable. Consider taking our suggested alternatives below.")}
+                        ? (language === "bn" ? "অভিনন্দন! আপনার পছন্দের ডোমেনটি খালি আছে। এখনই সর্বোচ্চ গতিসম্পন্ন এন্টারপ্রাইজ সার্ভারে রেজিস্টার করুন।" : language === "ar" ? "تهانينا! النطاق الذي اخترته متاح تماماً للتسجيل الفوري. احجزه الآن واكتسب مكاناً على شبكتنا السحابية فائقة السرعة." : "Perfect! This domain name is fully available for registry and standard deployment. Secure it immediately.")
+                        : (language === "bn" ? "দুঃখিত! এই ডোমেনটি অলরেডি রেজিস্টার্ড হয়ে গেছে। আমরা আপনার জন্য কিছু চমৎকার বিকল্প খুঁজে পেয়েছি নিচে দেখুন।" : language === "ar" ? "عذراً! هذا النطاق محجوز ومسجل بالفعل لجهة أخرى، نقترح عليك بعض البدائل والامتدادات المتميزة بالأسفل." : "Apologies! This domain represents an active registry or is unavailable. Consider taking our suggested alternatives below.")}
                     </p>
                   </div>
 
                   <div className="flex items-center justify-between md:justify-end gap-4 border-t md:border-t-0 border-slate-100 dark:border-slate-800/80 pt-4 md:pt-0 shrink-0">
                     {instantSearchResult.isAvailable && (
                       <div className="text-right">
-                        <span className="text-[10px] font-bold font-mono text-slate-400 uppercase leading-none block">{language === "bn" ? "অফারে মূল্য" : "Promo Price"}</span>
+                        <span className="text-[10px] font-bold font-mono text-slate-400 uppercase leading-none block">{language === "bn" ? "অফারে মূল্য" : language === "ar" ? "سعر العرض المميز" : "Promo Price"}</span>
                         <span className="text-xl sm:text-2xl font-black text-emerald-500 leading-none">{convertAndFormatVal(instantSearchResult.priceBDT)}</span>
                       </div>
                     )}
@@ -777,7 +777,7 @@ export default function DomainPage({
                         onClick={() => handleRegisterDomainRedirect(instantSearchResult.name)}
                         className="px-6 py-3 bg-gradient-to-r from-blue-600 to-emerald-500 text-white font-mono text-xs font-bold rounded-xl text-center hover:opacity-90 active:scale-[0.98] transition border-none cursor-pointer shadow-lg shadow-blue-500/10"
                       >
-                        {language === "bn" ? "কিনুন 🛒" : "Buy It Now 🛒"}
+                        {language === "bn" ? "কিনুন 🛒" : language === "ar" ? "احجز الآن 🛒" : "Buy It Now 🛒"}
                       </button>
                     ) : (
                       <a
@@ -786,7 +786,7 @@ export default function DomainPage({
                         rel="noreferrer"
                         className="px-5 py-3 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white font-bold text-xs rounded-xl transition flex items-center gap-1.5"
                       >
-                        {language === "bn" ? "ডোমেন মালিকের তথ্য" : "Inquire WHOIS"}
+                        {language === "bn" ? "ডোমেন মালিকের তথ্য" : language === "ar" ? "استعلام WHOIS للمالك" : "Inquire WHOIS"}
                       </a>
                     )}
                   </div>
@@ -797,7 +797,7 @@ export default function DomainPage({
                   <div className="space-y-4">
                     <h3 className="text-lg font-black tracking-tight text-slate-800 dark:text-white flex items-center gap-2">
                       <Sparkles className="w-5 h-5 text-blue-500" />
-                      <span>{language === "bn" ? "অন্যান্য জনপ্রিয় ডোমেন সলিউশন:" : "Popular recommended alternate TLDs:"}</span>
+                      <span>{language === "bn" ? "অন্যান্য জনপ্রিয় ডোমেন সলিউশন:" : language === "ar" ? "امتدادات وبدائل أخرى مقترحة ومتاحة:" : "Popular recommended alternate TLDs:"}</span>
                     </h3>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -812,7 +812,7 @@ export default function DomainPage({
                               <span className={`text-[10px] font-extrabold uppercase ${
                                 altItem.isAvailable ? "text-emerald-500" : "text-rose-500"
                               }`}>
-                                {altItem.isAvailable ? (language === "bn" ? "অবশিষ্ট" : "Available") : (language === "bn" ? "গৃহীত" : "Taken")}
+                                {altItem.isAvailable ? (language === "bn" ? "অবশিষ্ট" : language === "ar" ? "متاح" : "Available") : (language === "bn" ? "গৃহীত" : language === "ar" ? "غير متاح" : "Taken")}
                               </span>
                               {altItem.isAvailable && (
                                 <span className="text-[10.5px] font-black text-emerald-500 font-mono">
@@ -827,7 +827,7 @@ export default function DomainPage({
                               onClick={() => handleRegisterDomainRedirect(altItem.name)}
                               className="px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-blue-600 dark:text-cyan-400 hover:bg-blue-600 hover:text-white hover:border-blue-600 font-mono text-xs font-bold rounded-lg transition active:scale-95 flex items-center gap-1 cursor-pointer"
                             >
-                              <span>{language === "bn" ? "বুক করুন" : "Register"}</span>
+                              <span>{language === "bn" ? "বুক করুন" : language === "ar" ? "احجز النطاق" : "Register"}</span>
                               <ShoppingCart className="w-3.5 h-3.5" />
                             </button>
                           ) : (
@@ -851,7 +851,7 @@ export default function DomainPage({
             <div className="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto animate-bounce">
               <Cpu className="w-8 h-8 text-blue-500 animate-spin" style={{ animationDuration: "3s" }} />
             </div>
-            <h3 className="text-lg font-bold font-display">{language === "bn" ? "এআই পরামর্শ তৈরি করছে..." : "AI Brand Manager is working..."}</h3>
+            <h3 className="text-lg font-bold font-display">{language === "bn" ? "এআই পরামর্শ তৈরি করছে..." : language === "ar" ? "مدير العلامة التجارية بالذكاء الاصطناعي يعمل حالياً..." : "AI Brand Manager is working..."}</h3>
             <div className="w-full max-w-sm bg-slate-200 dark:bg-slate-800 h-1.5 rounded-full mx-auto overflow-hidden">
               <div className="bg-gradient-to-r from-blue-500 to-emerald-500 h-full animate-pulse-slow w-4/5 rounded-full" />
             </div>
@@ -1134,6 +1134,8 @@ export default function DomainPage({
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-2xl mx-auto">
             {language === "bn"
               ? "ডোমেন বুকিং এর সময় হোস্টিং যুক্ত করে প্রথম বছরে সেভ করুন অতিরিক্ত ৩০% পর্যন্ত ডাইরেক্ট ডিসকাউন্ট!"
+              : language === "ar"
+              ? "احصل على حزم الاستضافة لوحة cPanel مع خصم كود 30% فوري عند حجز النطاق مع استضافة فائقة السرعة للمرة الأولى!"
               : "Claim first-year promo server and cPanel package models. Consolidate your server and name together."}
           </p>
         </div>
@@ -1277,20 +1279,20 @@ export default function DomainPage({
             <div className="text-left">
               <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-display tracking-tight flex items-center gap-2">
                 <Database className="w-5 h-5 text-blue-500" />
-                <span>{language === "bn" ? "ডোমেন ড্যাশবোর্ড ও ক্লায়েন্ট পোর্টাল" : "Domain Dashboard Integration"}</span>
+                <span>{language === "bn" ? "ডোমেন ড্যাশবোর্ড ও ক্লায়েন্ট পোর্টাল" : language === "ar" ? "لوحة تحكم النطاقات وبوابة العملاء" : "Domain Dashboard Integration"}</span>
               </h2>
               <p className="text-xs text-slate-455 dark:text-slate-400 mt-1">
-                {language === "bn" ? "আপনার সংরক্ষিত ডোমেন আইডিয়া, DNS রেকর্ড এবং লাইভ WHOIS তথ্য এক প্যানেলে কন্ট্রোল করুন।" : "Manage your favorited ideas, active DNS mappings, and direct WHOIS lookups."}
+                {language === "bn" ? "আপনার সংরক্ষিত ডোমেন আইডিয়া, DNS রেকর্ড এবং লাইভ WHOIS তথ্য এক প্যানেলে কন্ট্রোল করুন।" : language === "ar" ? "قم بإدارة النطاقات المفضلة لديك وسجلات العناوين DNS المباشرة واستعلامات المالك في لوحة موحدة." : "Manage your favorited ideas, active DNS mappings, and direct WHOIS lookups."}
               </p>
             </div>
 
             {/* Dashboard tabs switcher buttons */}
             <div className="flex flex-wrap items-center gap-1.5">
               {[
-                { tab: "saved", label: language === "bn" ? "সংরক্ষিত আইডিয়া" : "Saved Ideas", icon: Bookmark },
-                { tab: "purchased", label: language === "bn" ? "নিবন্ধিত ডোমেন" : "Active Domains", icon: Globe },
-                { tab: "dns", label: "DNS Console", icon: Terminal },
-                { tab: "whois", label: "WHOIS Lookup", icon: Search },
+                { tab: "saved", label: language === "bn" ? "সংরক্ষিত আইডিয়া" : language === "ar" ? "الأفكار المحفوظة" : "Saved Ideas", icon: Bookmark },
+                { tab: "purchased", label: language === "bn" ? "নিবন্ধিত ডোমেন" : language === "ar" ? "النطاقات النشطة" : "Active Domains", icon: Globe },
+                { tab: "dns", label: language === "bn" ? "ডিএনএস কনসোল" : language === "ar" ? "لوحة التحكم DNS" : "DNS Console", icon: Terminal },
+                { tab: "whois", label: language === "bn" ? "হু-ইজ কুয়েরি" : language === "ar" ? "البحث في WHOIS" : "WHOIS Lookup", icon: Search },
               ].map((t) => {
                 const Icon = t.icon;
                 const isActive = dashboardTab === t.tab;
@@ -1318,8 +1320,8 @@ export default function DomainPage({
               {savedDomains.length === 0 ? (
                 <div className="p-12 text-center text-slate-400 space-y-2 border-2 border-dashed border-slate-150 dark:border-slate-800 rounded-3xl bg-slate-50/40 dark:bg-slate-900/10">
                   <Bookmark className="w-8 h-8 mx-auto text-slate-350" />
-                  <p className="text-xs font-semibold">{language === "bn" ? "কোন সংরক্ষিত ডোমেন আইডিয়া নেই।" : "No domain name ideas favorited yet."}</p>
-                  <p className="text-[10px] text-slate-400">Describe your project above and save items directly using the bookmark icon.</p>
+                  <p className="text-xs font-semibold">{language === "bn" ? "কোন সংরক্ষিত ডোমেন আইডিয়া নেই।" : language === "ar" ? "لا توجد أي أفكار نطاقات محفوظة حالياً." : "No domain name ideas favorited yet."}</p>
+                  <p className="text-[10px] text-slate-400">{language === "bn" ? "উপরে বর্ণনা লিখে সার্চ করুন এবং স্টার বা বুকমার্ক আইকন দিয়ে ডোমেনগুলো সংরক্ষণ করুন।" : language === "ar" ? "صف مشروعك في الأعلى واحفظ النطاقات هنا مباشرة باستخدام رمز المفضلة." : "Describe your project above and save items directly using the bookmark icon."}</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-left">

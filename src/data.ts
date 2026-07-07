@@ -12,9 +12,9 @@ export const systemConfigDefault: SystemConfig = {
 };
 
 export const sampleCoupons: Coupon[] = [
-  { code: "WEBZONE20", discountPercent: 20, expiryDate: "2026-12-31" },
-  { code: "EID2026", discountPercent: 15, expiryDate: "2026-06-30" },
-  { code: "WELCOME", discountPercent: 10, expiryDate: "2026-12-31" }
+  { code: "WEBZONE20", discountPercent: 20, expiryDate: "2026-12-31", usageCount: 12 },
+  { code: "EID2026", discountPercent: 15, expiryDate: "2026-06-30", usageCount: 8 },
+  { code: "WELCOME", discountPercent: 10, expiryDate: "2026-12-31", usageCount: 4 }
 ];
 
 export const sampleProducts: Product[] = [
@@ -52,7 +52,7 @@ export const sampleProducts: Product[] = [
       "روابط صديقة لمحركات البحث (SEO) ومخطط هيكلي",
       "واجهة برمجة تطبيقات سريعة لدعم تطبيقات الأجهزة المحمولة"
     ],
-    image: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=800&q=80",
+    image: "https://images.unsplash.com/photo-1557821552-17105176677c?auto=format&fit=crop&w=800&q=80",
     demoUrl: "https://demo.webzonebd.com/zonecart",
     downloadUrl: "https://webzonebd.com/downloads/zonecart-v2.zip",
     tags: ["Laravel", "E-commerce", "Multi-vendor", "Php Script"],
@@ -89,7 +89,7 @@ export const sampleProducts: Product[] = [
       "سرعة تحميل فائقة في أقل من ثانية واحدة",
       "إمكانية تثبيت الديمو بضغطة زر واحدة تلقائياً"
     ],
-    image: "https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=800&q=80",
+    image: "https://images.unsplash.com/photo-1585829365295-ab7cd400c167?auto=format&fit=crop&w=800&q=80",
     demoUrl: "https://demo.webzonebd.com/webnews",
     downloadUrl: "https://webzonebd.com/downloads/webnews-wp-theme.zip",
     tags: ["WordPress", "News", "Magazine", "Elementor Theme"],
@@ -129,7 +129,7 @@ export const sampleProducts: Product[] = [
       "زر تبديل سريع للوضع الداكن والسلس",
       "مبني فيه نظام الأسئلة الشائعة وعناصر التنقل"
     ],
-    image: "https://images.unsplash.com/photo-1499750310107-5fef28a66643?auto=format&fit=crop&w=800&q=80",
+    image: "https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?auto=format&fit=crop&w=800&q=80",
     demoUrl: "https://demo.webzonebd.com/bloggerspot",
     downloadUrl: "https://webzonebd.com/downloads/bloggerspot-blogger.xml",
     tags: ["Blogger", "Blogspot", "Responsive Theme", "Blogging"],
@@ -169,7 +169,7 @@ export const sampleProducts: Product[] = [
       "إشعارات تلقائية عبر الرسائل القصيرة لجميع الهواتف",
       "حماية قصوى ضد تزوير الطلبات وثغرات SQL Injection"
     ],
-    image: "https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80",
+    image: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=800&q=80",
     demoUrl: "https://demo.webzonebd.com/schoolzone",
     downloadUrl: "https://webzonebd.com/downloads/schoolzone-v1.zip",
     tags: ["PHP Script", "School Management", "Education System", "Portal"],
@@ -293,7 +293,8 @@ export const samplePortfolio: PortfolioItem[] = [
     featuresAr: ["تصميم متجاوب بالكامل وتفاعلي", "مزامنة تفاعلية للوضع المظلم والمضيء", "محرك حساب تكلفة الخدمة الفورية"],
     results: [{ label: "Page Load Speed", value: "0.8s" }, { label: "Client Inquiries", value: "+150%" }],
     resultsBn: [{ label: "পেজ লোড স্পীড", value: "০.৮ সেকেন্ড" }, { label: "ক্লায়েন্ট ইনকোয়ারি", value: "+১৫০%" }],
-    resultsAr: [{ label: "سرعة تحميل الصفحة", value: "0.8 ثانية" }, { label: "استفسارات العملاء", value: "+150%" }]
+    resultsAr: [{ label: "سرعة تحميل الصفحة", value: "0.8 ثانية" }, { label: "استفسارات العملاء", value: "+150%" }],
+    videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ"
   },
   {
     id: "port-news-1",
@@ -317,7 +318,8 @@ export const samplePortfolio: PortfolioItem[] = [
     featuresAr: ["نظام فوري لإشعارات الأخبار العاجلة", "منصة لوحة تحكم مخصصة للكتاب والمحررين", "إطار مدمج لتوزيع الإعلانات الذاتية"],
     results: [{ label: "Monthly Sessions", value: "2.4M" }, { label: "Ad Visibility Match", value: "98.5%" }],
     resultsBn: [{ label: "মাসিক ভিজিটর সেশন", value: "২৪ লাখ+" }, { label: "বিজ্ঞাপন দৃশ্যমানতা", value: "৯৮.৫%" }],
-    resultsAr: [{ label: "الجلسات الشهرية للموقع", value: "2.4 مليون" }, { label: "توافق رؤية الإعلان", value: "98.5%" }]
+    resultsAr: [{ label: "الجلسات الشهرية للموقع", value: "2.4 مليون" }, { label: "توافق رؤية الإعلان", value: "98.5%" }],
+    videoUrl: "https://www.youtube.com/embed/Y7PlVlUInb0"
   },
   {
     id: "port-blog-1",
@@ -365,7 +367,8 @@ export const samplePortfolio: PortfolioItem[] = [
     featuresAr: ["لوحات تحكم ذكية متعددة البائعين والمشرفين", "عربة تسوق ديناميكية وخيارات طلب مرنة", "بوابات دفع مدمجة وفواتير إلكترونية فورية"],
     results: [{ label: "Daily Volume Tracking", value: "৳2.5M+" }, { label: "Registered Merchants", value: "450+" }],
     resultsBn: [{ label: "দৈনিক লেনদেন", value: "৳২৫ লাখ+" }, { label: "নিবন্ধিত বিক্রেতা", value: "৪৫০+" }],
-    resultsAr: [{ label: "حجم المعاملات اليومي", value: "+2.5M ৳" }, { label: "التجار المسجلين بالمنصة", value: "450+" }]
+    resultsAr: [{ label: "حجم المعاملات اليومي", value: "+2.5M ৳" }, { label: "التجار المسجلين بالمنصة", value: "450+" }],
+    videoUrl: "https://www.youtube.com/embed/fA3-r_3f0vA"
   },
   {
     id: "port-cust-1",
@@ -438,6 +441,54 @@ export const samplePortfolio: PortfolioItem[] = [
     results: [{ label: "Billing Processing Speed", value: "1.2s" }, { label: "Offline Outages Safe", value: "100%" }],
     resultsBn: [{ label: "বিল প্রসেসিং স্পীড", value: "১.২ সেকেন্ড" }, { label: "অফলাইন নিরবচ্ছিন্ন সংযোগ নিশ্চিত", value: "১০০%" }],
     resultsAr: [{ label: "سرعة تجهيز وإصدار الفاتورة", value: "1.2 ثانية" }, { label: "تأمين معالجة انقطاع الشبكة", value: "100%" }]
+  },
+  {
+    id: "port-mkt-1",
+    title: "Apex Logistics - Integrated Social Media & Google Lead Generation Drive",
+    titleBn: "এপেক্স লজিস্টিকস - ইন্টিগ্রেটেড সোশ্যাল মিডিয়া ও গুগল লিড জেনারেশন ড্রাইভ",
+    titleAr: "Apex Logistics - حملة متكاملة لتوليد العملاء المحتملين عبر شبكات التواصل وإعلانات جوجل",
+    category: "marketing",
+    categoryLabel: "Digital Marketing",
+    categoryLabelBn: "ডিজিটাল মার্কেটিং",
+    categoryLabelAr: "التسويق الرقمي",
+    image: "https://images.unsplash.com/photo-1551836022-d5d88e9218df?auto=format&fit=crop&w=800&q=80",
+    client: "Apex Logistics Ltd.",
+    duration: "2 Months",
+    demoUrl: "https://apex-logistics.example",
+    description: "Multi-channel targeting campaign designed to capture qualified business-to-business logistics leads using social SEO, precise demographic audiences, and automated email nurturing.",
+    descriptionBn: "সোশ্যাল এসইও, টার্গেটেড ডেমোগ্রাফিক অডিয়েন্স এবং অটোমেটেড কন্টেন্ট ফানেল ব্যবহার করে হাই-কোয়ালিটি বিটুবি লিড সংগ্রহের জন্য বহুমুখী ডিজিটাল ক্যাম্পেইন।",
+    descriptionAr: "حملة تسويقية متكاملة متعددة القنوات مصممة لجذب العملاء في قطاع الأعمال واللوجستيات باستخدام السيو الاجتماعي، وتحديد الجمهور بدقة، والمتابعة البريدية المؤتمتة.",
+    techStack: ["Meta Ads Manager", "Google Ads", "LinkedIn Sales Navigator", "ActiveCampaign"],
+    features: ["Highly targeted audience segments", "Interactive sales onboarding funnel", "Complete dynamic KPI dashboard tracking"],
+    featuresBn: ["অডিয়েন্স সেগমেন্টেশন", "ইন্টারেক্টিভ সেলস ফানেল", "ডাইনামিক কেপিআই ড্যাশবোর্ড ট্র্যাকিং"],
+    featuresAr: ["استهداف دقيق لشرائح الجمهور الفعالة", "مسارات تفاعلية متكاملة لإتمام وتثبيت البيع", "لوحة تحكم ديناميكية لقياس الأداء ومؤشرات النجاح"],
+    results: [{ label: "Qualified Leads Generated", value: "3,400+" }, { label: "Cost Per Acquisition", value: "Decreased 35%" }],
+    resultsBn: [{ label: "কোয়ালিফাইড লিড জেনারেশন", value: "৩,৪০০+" }, { label: "লিড সংগ্রহ খরচ হ্রাস", value: "৩৫% কমেছে" }],
+    resultsAr: [{ label: "العملاء المحتملين الجدد", value: "+3,400" }, { label: "تخفيض تكلفة العميل الجديد", value: "بنسبة 35%" }]
+  },
+  {
+    id: "port-graph-1",
+    title: "Apex Logistics - Premium Corporate Rebranding & Visual Identity Guidelines",
+    titleBn: "এপেক্স লজিস্টিকস - প্রিমিয়াম কর্পোরেট রিব্র্যান্ডিং ও ভিজ্যুয়াল আইডেন্টিটি ডিজাইন",
+    titleAr: "Apex Logistics - إعادة تصميم الهوية البصرية وشعار الشركة مع دليل العلامة التجارية المتكامل",
+    category: "graphic",
+    categoryLabel: "Graphic Design",
+    categoryLabelBn: "গ্রাফিক ডিজাইন",
+    categoryLabelAr: "تصميم الجرافيك",
+    image: "https://images.unsplash.com/photo-1626785774573-4b799315345d?auto=format&fit=crop&w=800&q=80",
+    client: "Apex Logistics Ltd.",
+    duration: "1 Month",
+    demoUrl: "https://apex-branding.example",
+    description: "A complete overhaul of corporate design assets, including high-contrast premium vector logos, dynamic UI/UX design schemes, typography alignments, and high-performance branding presentation kits.",
+    descriptionBn: "হাই-কন্ট্রাস্ট প্রিমিয়াম ভেক্টর লোগো, আকর্ষনীয় ইউআই/ইউএক্স কালার স্কিম, টাইপোগ্রাফি বিন্যাস এবং পেশাদার ব্রোশিয়ার ডিজাইন সহ একটি সম্পূর্ণ ভিজ্যুয়াল রিব্র্যান্ডিং সলিউশন।",
+    descriptionAr: "تطوير شامل وممتاز للأصول التصميمية للشركة، بما في ذلك الشعارات المتجهية (Vector) عالية التباين، ومخططات واجهات الاستخدام UI/UX، وتوافق الخطوط، وحزم عروض العلامة التجارية الفائقة.",
+    techStack: ["Adobe Illustrator", "Figma", "Photoshop", "Brand Books Guidelines"],
+    features: ["Vector assets with infinite scaling", "Responsive screen layout blueprints", "Complete multi-variant color palette"],
+    featuresBn: ["ইনফিনিট স্কেলিং ভেক্টর লোগো সম্পদ", "রেস্পন্সিভ স্ক্রিন লেআউট ব্লুপ্রিন্ট", "মাল্টি-ভেরিয়েন্ট কালার প্যালেট গাইডলাইন"],
+    featuresAr: ["أصول رسومية متجهية قابلة للتكبير اللانهائي", "تخطيطات هندسية لواجهات الشاشات المتجاوبة", "دليل شامل لمنظومة وحزم الألوان المتعددة"],
+    results: [{ label: "Brand Equity Increase", value: "+85%" }, { label: "Digital UI Satisfaction Score", value: "99.2%" }],
+    resultsBn: [{ label: "ব্র্যান্ড ভ্যালু বৃদ্ধি", value: "+৮৫%" }, { label: "ব্যবহারকারীদের ইউআই সন্তুষ্টি", value: "৯৯.২%" }],
+    resultsAr: [{ label: "ارتفاع القيمة السوقية للهوية", value: "+85%" }, { label: "معدل الرضا عن واجهة الاستخدام", value: "99.2%" }]
   }
 ];
 

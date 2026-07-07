@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Search, Globe, Shield, Terminal, MessageSquare, ArrowRight, Sparkles, Award, Star, CheckCircle } from 'lucide-react';
+import { Search, Globe, Shield, Terminal, MessageSquare, ArrowRight, Sparkles, Award, Star, CheckCircle, Mic, MicOff } from 'lucide-react';
 import { Language } from '../types';
 
 interface HeroProps {
@@ -8,9 +8,10 @@ interface HeroProps {
   searchTerm: string;
   setSearchTerm: (term: string) => void;
   setCurrentPage: (page: string) => void;
+  triggerToast?: (msg: string) => void;
 }
 
-export default function Hero({ language, searchTerm, setSearchTerm, setCurrentPage }: HeroProps) {
+export default function Hero({ language, searchTerm, setSearchTerm, setCurrentPage, triggerToast }: HeroProps) {
   const [activeClientsCount, setActiveClientsCount] = useState(880);
   
   // Real-time micro statistics simulation for active sessions
@@ -73,6 +74,78 @@ export default function Hero({ language, searchTerm, setSearchTerm, setCurrentPa
     statDelivered: "Enterprise Deployments",
     statSupport: "Support Rating",
     uptime: "Uptime SLA"
+  };
+
+  // Voice Search Web Speech API state
+  const [isListening, setIsListening] = useState<boolean>(false);
+
+  const startVoiceSearch = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      const msg = language === 'bn' ? "আপনার ব্রাউজার ভয়েস সার্চ সমর্থন করে না।" : language === 'ar' ? "متصفحك لا يدعم البحث الصوتي." : "Your browser does not support Web Speech voice search.";
+      if (triggerToast) triggerToast(`⚠️ ${msg}`);
+      else alert(msg);
+      return;
+    }
+
+    try {
+      if (isListening) {
+        setIsListening(false);
+        return;
+      }
+
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.lang = language === 'bn' ? 'bn-BD' : language === 'ar' ? 'ar-SA' : 'en-US';
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+
+      recognition.onstart = () => {
+        setIsListening(true);
+      };
+
+      recognition.onerror = (event: any) => {
+        console.warn("Speech session dynamic feedback:", event?.error || event);
+        setIsListening(false);
+        const errType = event.error || '';
+        if (errType === 'not-allowed') {
+          const msg = language === 'bn'
+            ? "মাইক্রোফোন ব্যবহারের অনুমতি দেওয়া হয়নি অথবা আইফ্রেম সিকিউরিটি পলিসি দ্বারা এটি অবরুদ্ধ করা হয়েছে। অনুগ্রহ করে অ্যাপটি নতুন ট্যাবে (New Tab) ওপেন করুন।"
+            : "Microphone permission is denied or restricted by iframe security. Please open the application in a new tab to use voice search.";
+          if (triggerToast) triggerToast(`🛑 ${msg}`);
+          else console.warn(msg);
+        } else if (errType === 'no-speech') {
+          // Speech recognition timed out or heard nothing
+        } else if (errType) {
+          const msg = language === 'bn'
+            ? `ভয়েস রিকগনিশন ত্রুটি: ${errType}`
+            : `Speech recognition error encountered: ${errType}`;
+          if (triggerToast) triggerToast(`⚠️ ${msg}`);
+          else console.warn(msg);
+        }
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognition.onresult = (event: any) => {
+        const textResult = event.results[0][0].transcript;
+        if (textResult) {
+          const cleanedText = textResult.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g,"");
+          setSearchTerm(cleanedText);
+          // Redirect to digital store search with slight delay to show transcribed text
+          setTimeout(() => {
+            setCurrentPage('marketplace');
+          }, 800);
+        }
+      };
+
+      recognition.start();
+    } catch (e) {
+      console.error(e);
+      setIsListening(false);
+    }
   };
 
   const handleSearchKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -206,29 +279,74 @@ export default function Hero({ language, searchTerm, setSearchTerm, setCurrentPa
           </motion.p>
 
           {/* Search bar - Premium glassy SaaS input component */}
-          <motion.div 
-            variants={elementVariants}
-            className="max-w-xl mx-auto mt-4 bg-white/80 dark:bg-slate-900/60 backdrop-blur-xl rounded-2xl p-1.5 shadow-xl hover:shadow-2xl hover:border-blue-500/40 transition-all duration-300 border border-slate-200/80 dark:border-slate-800 flex items-center gap-2"
-          >
-            <div className="flex-1 flex items-center pl-3">
-              <Search className="w-5 h-5 text-slate-400 dark:text-slate-500 flex-shrink-0" />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                onKeyDown={handleSearchKeyPress}
-                placeholder={t.searchPlaceholder}
-                className="w-full bg-transparent border-0 outline-none text-xs sm:text-sm font-medium px-2 py-2 text-[#0f172a] dark:text-slate-50 placeholder-slate-400 dark:placeholder-slate-550 focus:ring-0"
-              />
-            </div>
-            <button
-              onClick={() => setCurrentPage('marketplace')}
-              className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 text-white text-xs font-extrabold rounded-xl transition-all duration-300 flex items-center gap-1.5 cursor-pointer shadow-md hover:shadow-[0_0_20px_rgba(37,99,235,0.4)] hover:scale-[1.02]"
+          <div className="relative max-w-xl mx-auto w-full z-20">
+            <motion.div 
+              variants={elementVariants}
+              className="mt-4 bg-white/80 dark:bg-slate-900/60 backdrop-blur-xl rounded-2xl p-1.5 shadow-xl hover:shadow-2xl hover:border-blue-500/40 transition-all duration-300 border border-slate-200/80 dark:border-slate-800 flex items-center gap-2"
             >
-              <span>{language === 'bn' ? "খুঁজুন" : language === 'ar' ? "بحث بالمتجر" : "Search"}</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </motion.div>
+              <div className="flex-1 flex items-center pl-3">
+                <Search className="w-5 h-5 text-slate-400 dark:text-slate-500 flex-shrink-0" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onKeyDown={handleSearchKeyPress}
+                  placeholder={t.searchPlaceholder}
+                  className="w-full bg-transparent border-0 outline-none text-xs sm:text-sm font-medium px-2 py-2 pr-12 text-[#0f172a] dark:text-slate-50 placeholder-slate-400 dark:placeholder-slate-550 focus:ring-0"
+                />
+                
+                {/* Voice search microphone trigger */}
+                <button
+                  type="button"
+                  onClick={startVoiceSearch}
+                  className={`p-2 rounded-xl transition-all mr-1 duration-205 cursor-pointer flex items-center justify-center relative ${
+                    isListening
+                      ? 'bg-red-500 text-white animate-pulse shadow-md shadow-red-500/30'
+                      : 'text-slate-400 hover:text-blue-500 dark:hover:text-cyan-400 hover:bg-slate-100 dark:hover:bg-slate-800/40'
+                  }`}
+                  title="Voice Search"
+                >
+                  {isListening ? (
+                    <span className="relative flex h-4 w-4">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                      <Mic className="w-4 h-4 relative text-white" />
+                    </span>
+                  ) : (
+                    <Mic className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
+              <button
+                onClick={() => setCurrentPage('marketplace')}
+                className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 text-white text-xs font-extrabold rounded-xl transition-all duration-305 flex items-center gap-1.5 cursor-pointer shadow-md hover:shadow-[0_0_20px_rgba(37,99,235,0.4)] hover:scale-[1.02]"
+              >
+                <span>{language === 'bn' ? "খুঁজুন" : language === 'ar' ? "بحث بالمتجر" : "Search"}</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </motion.div>
+
+            {/* Listening floating HUD under input */}
+            {isListening && (
+              <div className="absolute left-0 right-0 top-full mt-2 p-3 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs font-bold rounded-2xl flex items-center justify-between shadow-lg animate-in slide-in-from-top-1 fade-in duration-200 z-30">
+                <div className="flex items-center gap-2">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
+                  </span>
+                  <span>
+                    {language === 'bn' ? "আমি শুনছি... বলুন।" : language === 'ar' ? "أنا أستمع... تحدث الآن." : "Listening... speak now."}
+                  </span>
+                </div>
+                {/* Visual Audio waves */}
+                <div className="flex items-center justify-end gap-1 flex-1">
+                  <span className="w-[3px] h-3 bg-white/80 rounded-full animate-bounce" style={{ animationDelay: '0ms', animationDuration: '0.6s' }}></span>
+                  <span className="w-[3px] h-5 bg-white rounded-full animate-bounce" style={{ animationDelay: '150ms', animationDuration: '0.6s' }}></span>
+                  <span className="w-[3px] h-4 bg-white/90 rounded-full animate-bounce" style={{ animationDelay: '300ms', animationDuration: '0.6s' }}></span>
+                  <span className="w-[3px] h-2 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '450ms', animationDuration: '0.6s' }}></span>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Action calls (Redesigned buttons with gradients, full-rounded, glow, and micro-interactions) */}
           <motion.div 

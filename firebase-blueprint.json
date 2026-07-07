@@ -1,0 +1,302 @@
+{
+  "entities": {
+    "UserSession": {
+      "title": "UserSession",
+      "description": "User profile settings, credentials metadata, and feature preferences.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier matching the Firebase Auth UID"
+        },
+        "name": {
+          "type": "string",
+          "description": "Full name of the user"
+        },
+        "username": {
+          "type": "string",
+          "description": "Unique handling name of the user"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Primary communication email address"
+        },
+        "phone": {
+          "type": "string",
+          "description": "Primary verification phone number"
+        },
+        "role": {
+          "type": "string",
+          "enum": ["admin", "customer", "vendor", "staff", "affiliate"],
+          "description": "System privilege role assigned to user"
+        },
+        "avatar": {
+          "type": "string",
+          "description": "Optional asset URL of user's display avatar image"
+        },
+        "isVerified": {
+          "type": "boolean",
+          "description": "Determines if user email verification state is satisfied"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Record creation timestamp"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "suspended"],
+          "description": "Activity state of the user account"
+        },
+        "wishlistedProductIds": {
+          "type": "array",
+          "description": "List of product IDs added to wishlist"
+        },
+        "preferredCurrency": {
+          "type": "string",
+          "enum": ["USD", "BDT", "SAR"],
+          "description": "Default currency selected for checkout display"
+        }
+      },
+      "required": ["id", "name", "email", "role", "isVerified", "createdAt", "status"]
+    },
+    "Project": {
+      "title": "Project",
+      "description": "A client software development project with budget, milestones, progression, and staff leader.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "clientName": { "type": "string" },
+        "clientId": { "type": "string" },
+        "progress": { "type": "number" },
+        "status": { "type": "string", "enum": ["in_progress", "revision", "pending_brief", "completed"] },
+        "budget": { "type": "number" },
+        "dueDate": { "type": "string" },
+        "assignedStaff": { "type": "string" },
+        "milestones": { "type": "number" },
+        "completedMilestones": { "type": "number" }
+      },
+      "required": ["id", "title", "clientId", "assignedStaff"]
+    },
+    "Task": {
+      "title": "Task",
+      "description": "An individual work item associated with a project in the Kanban system.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "projectId": { "type": "string" },
+        "title": { "type": "string" },
+        "column": { "type": "string", "enum": ["todo", "in_progress", "testing", "done"] },
+        "priority": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+        "assignee": { "type": "string" },
+        "dueDate": { "type": "string" },
+        "completedDate": { "type": "string" },
+        "description": { "type": "string" },
+        "attachments": { "type": "array" },
+        "comments": { "type": "array" }
+      },
+      "required": ["id", "projectId", "title", "column", "priority", "assignee"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Receipt transactions log of digital assets and bespoke service inquiries.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique transaction ID reference"
+        },
+        "productId": {
+          "type": "string",
+          "description": "Referenced script or product ID if template license purchase"
+        },
+        "serviceId": {
+          "type": "string",
+          "description": "Referenced custom IT solution package ID if bespoke service contract"
+        },
+        "itemTitle": {
+          "type": "string",
+          "description": "Display name of purchased item or service"
+        },
+        "price": {
+          "type": "number",
+          "description": "Aggregate price paid"
+        },
+        "date": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Order placement timestamp"
+        },
+        "paymentMethod": {
+          "type": "string",
+          "description": "Selected processor gateway"
+        },
+        "paymentStatus": {
+          "type": "string",
+          "enum": ["pending", "completed", "failed"],
+          "description": "Settlement state of transacted funds"
+        },
+        "downloadUrl": {
+          "type": "string",
+          "description": "Target direct address for secure digital script file retrievals"
+        },
+        "userId": {
+          "type": "string",
+          "description": "UID of user who initiated order"
+        }
+      },
+      "required": ["id", "itemTitle", "price", "date", "paymentMethod", "paymentStatus", "userId"]
+    },
+    "SupportTicket": {
+      "title": "SupportTicket",
+      "description": "Support query ticket logged by customer with correspondence timelines.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique case reference ID"
+        },
+        "subject": {
+          "type": "string",
+          "description": "High level description headers"
+        },
+        "category": {
+          "type": "string",
+          "description": "Case department classifier"
+        },
+        "priority": {
+          "type": "string",
+          "enum": ["low", "medium", "high"],
+          "description": "Urgency weighting of the request"
+        },
+        "message": {
+          "type": "string",
+          "description": "Initial text description of the problem"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["open", "answered", "closed"],
+          "description": "Resolution track state"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Log creation timestamp"
+        },
+        "userId": {
+          "type": "string",
+          "description": "UID of owner who created the ticket"
+        },
+        "replies": {
+          "type": "array",
+          "description": "Historical array conversation timeline logs of replies"
+        }
+      },
+      "required": ["id", "subject", "category", "priority", "message", "status", "createdAt", "userId"]
+    },
+    "ServiceInquiry": {
+      "title": "ServiceInquiry",
+      "description": "Client custom project specification inquiry submitted before WhatsApp redirection.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "serviceName": { "type": "string" },
+        "packageName": { "type": "string" },
+        "customerName": { "type": "string" },
+        "mobileNumber": { "type": "string" },
+        "whatsappNumber": { "type": "string" },
+        "emailAddress": { "type": "string" },
+        "companyName": { "type": "string" },
+        "budget": { "type": "string" },
+        "projectDetails": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "status": { "type": "string", "enum": ["New Lead", "Contacted", "Quotation Sent", "Negotiation", "Converted", "Completed", "Cancelled"] }
+      },
+      "required": ["id", "serviceName", "customerName", "mobileNumber"]
+    },
+    "ServiceOrder": {
+      "title": "ServiceOrder",
+      "description": "Logged reference of active WhatsApp service bookings.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "serviceName": { "type": "string" },
+        "packageName": { "type": "string" },
+        "customerName": { "type": "string" },
+        "mobileNumber": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "serviceName", "customerName", "mobileNumber"]
+    },
+    "ServiceLead": {
+      "title": "ServiceLead",
+      "description": "Client profile leads captured during inquiry submission.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "name", "phone"]
+    },
+    "WhatsAppLead": {
+      "title": "WhatsAppLead",
+      "description": "Dedicated redirect tracking leads for CRM logging.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "whatsapp": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "name", "phone"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserSession",
+      "description": "Contains system user account identities, role parameters and configuration settings."
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Tracks bespoke custom solution order transactions and script downloads references."
+    },
+    "/tickets/{ticketId}": {
+      "schema": "SupportTicket",
+      "description": "Maintains user customer support communication cases and admin resolutions logs."
+    },
+    "/projects/{projectId}": {
+      "schema": "Project",
+      "description": "Maintains client and office IT solution projects details and milestone status trackers."
+    },
+    "/tasks/{taskId}": {
+      "schema": "Task",
+      "description": "Tracks specific technical tasks assigned to developers for any given active project."
+    },
+    "/cms_sync/{collectionPath}": {
+      "schema": "object",
+      "description": "Enterprise cloud-synced storage for WordPress, WooCommerce and Shopify layout variables, pages and catalog products."
+    },
+    "/service_inquiries/{inquiryId}": {
+      "schema": "ServiceInquiry",
+      "description": "Client custom project specifications submitted from the service order form."
+    },
+    "/service_orders/{orderId}": {
+      "schema": "ServiceOrder",
+      "description": "Tracks WhatsApp booked client orders."
+    },
+    "/service_leads/{leadId}": {
+      "schema": "ServiceLead",
+      "description": "Contains detailed client capture leads."
+    },
+    "/whatsapp_leads/{whatsappLeadId}": {
+      "schema": "WhatsAppLead",
+      "description": "Contains direct WhatsApp redirection track references."
+    }
+  }
+}

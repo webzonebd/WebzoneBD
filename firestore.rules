@@ -1,0 +1,178 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global helper primitives
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isAdmin() {
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // 1. Users collection
+    match /users/{userId} {
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin();
+      
+      allow create: if isOwner(userId) && isValidUser(request.resource.data);
+      allow update: if isOwner(userId) && isValidUser(request.resource.data) && (
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'username', 'phone', 'avatar', 'wishlistedProductIds', 'preferredCurrency'])
+      ) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // 2. Orders collection
+    match /orders/{orderId} {
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid && isValidOrder(request.resource.data);
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // 3. Support tickets collection
+    match /tickets/{ticketId} {
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid && isValidTicket(request.resource.data);
+      allow update: if isSignedIn() && (
+        (resource.data.userId == request.auth.uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['replies', 'status']) && isValidTicket(request.resource.data)) || isAdmin()
+      );
+      allow delete: if isAdmin();
+    }
+
+    // 4. Projects collection
+    match /projects/{projectId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn() && isValidProject(request.resource.data);
+    }
+
+    // 5. Tasks collection
+    match /tasks/{taskId} {
+      allow get, list: if isSignedIn();
+      allow create, delete: if isSignedIn() && isValidTask(request.resource.data);
+      allow update: if isSignedIn() && isValidTask(request.resource.data) && (
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['column']) || isAdmin() || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'column', 'priority', 'assignee', 'dueDate', 'completedDate', 'description', 'attachments', 'comments'])
+      );
+    }
+
+    // Entity validator logic helpers
+    function isValidProject(data) {
+      return data.keys().hasAll(['id', 'title', 'clientId', 'assignedStaff'])
+        && data.id is string && data.id.size() <= 128
+        && data.title is string && data.title.size() <= 200
+        && data.clientId is string && data.clientId.size() <= 128
+        && data.assignedStaff is string && data.assignedStaff.size() <= 100;
+    }
+
+    function isValidTask(data) {
+      return data.keys().hasAll(['id', 'projectId', 'title', 'column', 'priority', 'assignee'])
+        && data.id is string && data.id.size() <= 128
+        && data.projectId is string && data.projectId.size() <= 128
+        && data.title is string && data.title.size() <= 500
+        && data.column in ['todo', 'in_progress', 'testing', 'done']
+        && data.priority in ['low', 'medium', 'high', 'critical']
+        && data.assignee is string && data.assignee.size() <= 100;
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['id', 'name', 'email', 'role', 'isVerified', 'createdAt', 'status'])
+        && data.id == request.auth.uid
+        && data.name is string && data.name.size() <= 100
+        && data.email is string && data.email.size() <= 128
+        && data.role in ['admin', 'customer', 'vendor', 'staff', 'affiliate']
+        && data.isVerified is bool
+        && data.status in ['active', 'suspended'];
+    }
+
+    function isValidOrder(data) {
+      return data.keys().hasAll(['id', 'itemTitle', 'price', 'date', 'paymentMethod', 'paymentStatus', 'userId'])
+        && data.id is string && data.id.size() <= 128
+        && data.itemTitle is string && data.itemTitle.size() <= 200
+        && data.price is number
+        && data.paymentMethod is string
+        && data.paymentStatus in ['pending', 'completed', 'failed']
+        && data.userId == request.auth.uid;
+    }
+
+    function isValidTicket(data) {
+      return data.keys().hasAll(['id', 'subject', 'category', 'priority', 'message', 'status', 'createdAt', 'userId'])
+        && data.id is string && data.id.size() <= 128
+        && data.subject is string && data.subject.size() <= 200
+        && data.category is string && data.category.size() <= 100
+        && data.priority in ['low', 'medium', 'high']
+        && data.message is string && data.message.size() <= 5000
+        && data.status in ['open', 'answered', 'closed']
+        && data.userId == request.auth.uid;
+    }
+
+    // 6. CMS Sync configuration collection
+    match /cms_sync/{collectionPath} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // 7. Service Inquiries collection
+    match /service_inquiries/{inquiryId} {
+      allow create, get, list, update, delete: if true;
+    }
+
+    // 8. Service Orders collection
+    match /service_orders/{orderId} {
+      allow create, get, list, update, delete: if true;
+    }
+
+    // 9. Service Leads collection
+    match /service_leads/{leadId} {
+      allow create, get, list, update, delete: if true;
+    }
+
+    // 10. WhatsApp Leads collection
+    match /whatsapp_leads/{whatsappLeadId} {
+      allow create, get, list, update, delete: if true;
+    }
+
+    // New validation helpers
+    function isValidInquiry(data) {
+      return data.keys().hasAll(['id', 'serviceName', 'customerName', 'mobileNumber'])
+        && data.id is string && data.id.size() <= 128
+        && data.serviceName is string && data.serviceName.size() <= 200
+        && data.customerName is string && data.customerName.size() <= 100
+        && data.mobileNumber is string && data.mobileNumber.size() <= 30;
+    }
+
+    function isValidServiceOrder(data) {
+      return data.keys().hasAll(['id', 'serviceName', 'customerName', 'mobileNumber'])
+        && data.id is string && data.id.size() <= 128
+        && data.serviceName is string && data.serviceName.size() <= 200
+        && data.customerName is string && data.customerName.size() <= 100
+        && data.mobileNumber is string && data.mobileNumber.size() <= 30;
+    }
+
+    function isValidServiceLead(data) {
+      return data.keys().hasAll(['id', 'name', 'phone'])
+        && data.id is string && data.id.size() <= 128
+        && data.name is string && data.name.size() <= 100
+        && data.phone is string && data.phone.size() <= 30;
+    }
+
+    function isValidWhatsAppLead(data) {
+      return data.keys().hasAll(['id', 'name', 'phone'])
+        && data.id is string && data.id.size() <= 128
+        && data.name is string && data.name.size() <= 100
+        && data.phone is string && data.phone.size() <= 30;
+    }
+  }
+}

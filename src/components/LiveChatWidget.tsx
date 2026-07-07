@@ -89,7 +89,7 @@ export default function LiveChatWidget({ language }: LiveChatWidgetProps) {
   };
 
   return (
-    <div className="fixed bottom-4 left-4 sm:bottom-6 sm:left-6 z-50 flex flex-col items-center gap-2 font-sans" id="live-chat-floating-root">
+    <div className="fixed bottom-16 md:bottom-6 left-4 md:left-6 z-50 flex flex-col items-start md:items-center gap-2 font-sans" id="live-chat-floating-root">
       {/* Floating Toggle Button with Glowing Effect - Mobile compact layout */}
       <motion.button
         onClick={() => setIsOpen(!isOpen)}

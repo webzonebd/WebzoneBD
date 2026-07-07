@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { 
-  ShieldCheck, LogOut, ChevronRight, ChevronLeft, Menu, X, HelpCircle, Bell
+  ShieldCheck, LogOut, ChevronRight, ChevronLeft, Menu, X, HelpCircle, Bell, Sun, Moon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Language, Currency, UserSession } from '../types';
+import { Language, Currency, UserSession, Theme } from '../types';
 
 export interface SubMenuItem {
   id: string;
@@ -37,6 +37,8 @@ interface SidebarProps {
   canAccessStaff: boolean;
   isCollapsed: boolean;
   setIsCollapsed: (collapsed: boolean) => void;
+  theme?: Theme;
+  setTheme?: (theme: Theme) => void;
 }
 
 export default function Sidebar({
@@ -57,14 +59,43 @@ export default function Sidebar({
   canAccessVendor,
   canAccessStaff,
   isCollapsed,
-  setIsCollapsed
+  setIsCollapsed,
+  theme = 'light',
+  setTheme
 }: SidebarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   // Sync profile details
   const profileName = user?.name || 'Guest User';
   const profileEmail = user?.email || 'guest@webzonebd.com';
   const profileAvatar = user?.avatar || '';
+
+  const getLocalizedText = (english: string, bengali: string): string => {
+    if (language === 'bn') return bengali || english;
+    if (language === 'ar') {
+      const arMap: Record<string, string> = {
+        '🏠 Dashboard': '🏠 لوحة التحكم',
+        '📦 My Orders': '📦 طلباتي المفتوحة',
+        '⬇️ Download Center': '⬇️ مركز التحميل',
+        '❤️ Saved Wishlist': '❤️ قائمة المفضلة',
+        '🧾 Billing & Invoices': '🧾 الفواتير والدفع',
+        '🤝 Affiliate Program': '🤝 نظام التسويق بالعمولة',
+        '⚙️ Account Settings': '⚙️ إعدادات الحساب',
+        'Click to expand submenus': 'انقر لتوسيع القوائم الفرعية',
+        'Profile Settings': 'إعدادات الحساب',
+        'Loading Profile Settings...': 'جاري تحميل إعدادات الملف الشخصي...',
+        'Loading Wallet Balance...': 'جاري تحميل رصيد المحفظة...',
+        'Balance 💰': 'الرصيد 💰',
+        'Overall VIP': 'كبار الشخصيات VIP',
+        'Portal Home': 'الرئيسية',
+        'Log Out': 'تسجيل الخروج',
+        'Are you sure you want to log out?': 'هل أنت متأكد من تسجيل الخروج؟'
+      };
+      return arMap[english] || arMap[bengali] || english;
+    }
+    return english;
+  };
 
   // Parse emojis and clean labels
   const getMenuVisuals = (label: string) => {
@@ -178,61 +209,69 @@ export default function Sidebar({
                 </div>
               )}
             </div>
-
-            {/* Bottom Row Buttons Grid when expanded */}
-            {!isCollapsed && (
+            {!isRealCollapsed && (
               <div className="grid grid-cols-2 gap-2 pt-2.5 border-t border-white/10">
                 <button
+                  type="button"
                   onClick={() => {
                     setActiveTab('profile');
-                    triggerToast(language === 'bn' ? 'প্রোফাইল সেটিংস লোড করা হচ্ছে...' : 'Loading Profile Settings...');
+                    triggerToast(language === 'bn' ? 'প্রোফাইল সেটিংস লোড করা হচ্ছে...' : language === 'ar' ? 'جاري تحميل إعدادات الملف الشخصي...' : 'Loading Profile Settings...');
                     onAddActivityLog('Navigated to Profile Settings via shortcuts');
                     if (isOnMobile) setMobileMenuOpen(false);
                   }}
                   className="py-2 px-1 bg-white/10 hover:bg-white/20 text-white text-[9.5px] font-black rounded-xl cursor-pointer text-center transition duration-200 truncate border border-white/10 shadow-inner"
                   title="Profile Settings"
                 >
-                  {language === 'bn' ? 'প্রোফাইল সেটিংস' : 'Profile Settings'}
+                  {getLocalizedText('Profile Settings', 'প্রোফাইল সেটিংস')}
                 </button>
                 <button
+                  type="button"
                   onClick={() => {
                     setActiveTab('wallet-funds');
-                    triggerToast(language === 'bn' ? 'ওয়ালেট ব্যালেন্স পৃষ্ঠা...' : 'Loading Wallet Balance...');
+                    triggerToast(language === 'bn' ? 'ওয়ালেট ব্যালেন্স পৃষ্ঠা...' : language === 'ar' ? 'جاري تحميل رصيد المحفظة...' : 'Loading Wallet Balance...');
                     onAddActivityLog('Navigated to Wallet via shortcut Balance link');
                     if (isOnMobile) setMobileMenuOpen(false);
                   }}
                   className="py-2 px-1 bg-white hover:bg-neutral-50 text-[#2563EB] text-[9.5px] font-black rounded-xl cursor-pointer text-center shadow-md hover:shadow-lg transition duration-200 truncate"
                   title={`Balance: ${formatPrice(walletBalance)}`}
                 >
-                  {language === 'bn' ? 'ব্যালেন্স: ' : 'Balance: '} {formatPrice(walletBalance)}
+                  {getLocalizedText('Balance 💰', 'ব্যালেন্স 💰')}
                 </button>
               </div>
             )}
           </div>
         </div>
 
-        {/* Main Navigation Sidebar Menu lists Items */}
-        <div className="space-y-2 font-sans">
+        {/* Main Navigation Sidebar Menu list Fields */}
+        <div className="space-y-2.5 font-sans">
           {clientMenus.map((menu) => {
             const hasSub = !!menu.subMenus && menu.subMenus.length > 0;
             const isExpanded = expandedMenu === menu.id;
             const isParentActive = evaluateParentActive(menu);
-            const { emoji, cleanLabel } = getMenuVisuals(language === 'bn' ? menu.labelBn : menu.label);
+            const { emoji, cleanLabel } = getMenuVisuals(getLocalizedText(menu.label, menu.labelBn));
 
             return (
-              <div key={menu.id} className="relative group/menu">
+              <div key={menu.id} className="relative group/menu mb-1.5">
                 <button
+                  type="button"
                   onClick={() => handleParentMenuClick(menu, isOnMobile)}
                   style={{ minHeight: '48px' }}
-                  className={`w-full flex items-center justify-between px-4 py-2.5 text-xs font-bold transition-all duration-300 rounded-xl relative overflow-hidden active:scale-98 cursor-pointer ${
+                  className={`w-full flex items-center justify-between px-4 py-2.5 text-xs font-bold transition-all duration-300 rounded-2xl relative overflow-hidden active:scale-95 cursor-pointer border ${
                     isParentActive
                       ? isOnMobile
-                        ? 'bg-[#EEF2F6] dark:bg-gradient-to-r dark:from-indigo-600 dark:to-violet-600 text-indigo-700 dark:text-white font-extrabold border border-indigo-150/40 dark:border-none shadow-sm shadow-indigo-500/5'
-                        : 'text-indigo-650 dark:text-cyan-400 font-extrabold shadow-[0_4px_12px_rgba(99,102,241,0.06)] active-menu-glow'
-                      : 'text-slate-600 dark:text-slate-350 hover:text-indigo-500 dark:hover:text-cyan-400'
+                        ? 'text-indigo-700 dark:text-cyan-400 font-extrabold bg-gradient-to-r from-indigo-500/12 via-indigo-500/5 to-transparent dark:from-cyan-500/12 dark:to-transparent border-l-4 border-l-indigo-600 dark:border-l-cyan-400 border-y-indigo-200/55 border-r-indigo-100/40 dark:border-y-cyan-500/15 dark:border-r-slate-800/20 shadow-[0_4px_16px_rgba(99,102,241,0.06)]'
+                        : 'text-indigo-650 dark:text-cyan-400 font-extrabold border-transparent shadow-[0_4px_12px_rgba(99,102,241,0.06)] active-menu-glow'
+                      : isOnMobile
+                        ? 'text-slate-700 dark:text-slate-300 bg-slate-50/50 dark:bg-slate-900/15 border-slate-200/50 dark:border-slate-800/40 hover:bg-slate-100/55 dark:hover:bg-slate-800/30 hover:border-indigo-100 dark:hover:border-slate-700 shadow-xs'
+                        : 'text-slate-600 dark:text-slate-350 hover:text-indigo-500 dark:hover:text-cyan-400 border-transparent'
                   }`}
                 >
-                  {/* Active Glow/Border on Main Menu */}
+                  {/* Left vibrant indicator bar on active parent menu */}
+                  {isParentActive && !isOnMobile && (
+                    <div className="absolute left-0 top-1/4 bottom-1/4 w-[3.5px] rounded-r-md bg-gradient-to-b from-indigo-650 to-indigo-500 dark:from-cyan-400 dark:to-teal-400 z-20" />
+                  )}
+
+                  {/* Active Glow/Border on Main Menu (Desktop-only to avoid duplicate layered borders on mobile) */}
                   {isParentActive && !isOnMobile && (
                     <div className="absolute inset-x-0 bottom-0 top-0 rounded-xl p-[1px] bg-gradient-to-r from-[#2563EB]/45 to-[#7C3AED]/45 dark:from-[#6366F1]/55 dark:to-[#8B5CF6]/55 -z-10 animate-pulse">
                       <div className="w-full h-full bg-[#FFFFFF] dark:bg-[#1E293B] rounded-[11px]" />
@@ -242,19 +281,28 @@ export default function Sidebar({
                   {/* Gradient Fill Animation on Hover */}
                   <div className="absolute inset-0 bg-gradient-to-r from-[#2563EB]/5 to-[#7C3AED]/5 opacity-0 group-hover/menu:opacity-100 transition-opacity duration-300 -z-10" />
 
-                  <span className={`flex items-center gap-2.5 z-10 transition-transform duration-300 ${
-                    isCollapsed ? 'justify-center w-full' : 'group-hover/menu:translate-x-0.5'
+                  <span className={`flex items-center gap-3.5 z-10 transition-transform duration-300 ${
+                    isRealCollapsed ? 'justify-center w-full' : 'group-hover/menu:translate-x-0.5'
                   }`}>
-                    <span className="scale-110 inline-block font-sans select-none" title={isCollapsed ? cleanLabel : ''}>
-                      {emoji}
-                    </span>
-                    {!isCollapsed && (
-                      <span className={`scale-105 inline-block select-none font-sans ml-0.5 text-left truncate transition-all duration-300 ${
+                    {isOnMobile ? (
+                      <span className={`w-8.5 h-8.5 rounded-xl flex items-center justify-center transition-all duration-300 font-sans select-none shrink-0 ${
+                        isParentActive 
+                          ? 'bg-indigo-600/10 dark:bg-cyan-400/10 text-indigo-700 dark:text-cyan-400 ring-4 ring-indigo-50 dark:ring-cyan-500/5 border border-indigo-200 dark:border-cyan-500/25' 
+                          : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-205 dark:border-slate-700 shadow-xs group-hover/menu:bg-white dark:group-hover/menu:bg-slate-700'
+                      }`}>
+                        {emoji}
+                      </span>
+                    ) : (
+                      <span className="scale-110 inline-block font-sans select-none animate-none" title={isRealCollapsed ? cleanLabel : ''}>
+                        {emoji}
+                      </span>
+                    )}
+                    
+                    {!isRealCollapsed && (
+                      <span className={`scale-100 inline-block select-none font-sans ml-0.5 text-left truncate transition-all duration-300 ${
                         isParentActive
-                          ? isOnMobile
-                            ? 'text-indigo-750 dark:text-white font-black'
-                            : 'bg-gradient-to-r from-indigo-750 via-indigo-650 to-indigo-850 dark:from-cyan-400 dark:via-teal-300 dark:to-cyan-200 bg-clip-text text-transparent font-black shadow-none'
-                          : ''
+                          ? 'text-indigo-650 dark:text-cyan-400 font-extrabold shadow-none'
+                          : 'font-semibold text-slate-700 dark:text-slate-250'
                       }`}>
                         {cleanLabel}
                       </span>
@@ -262,19 +310,19 @@ export default function Sidebar({
                   </span>
 
                   {/* Arrow turning down smoothly if expanded inside expanded mode */}
-                  {!isCollapsed && hasSub && (
+                  {!isRealCollapsed && hasSub && (
                     <ChevronRight className={`w-3.5 h-3.5 transition-all duration-300 z-10 text-slate-400 ${
-                      isExpanded ? 'rotate-90 text-indigo-600 dark:text-cyan-400 scale-110 font-bold' : ''
+                      isExpanded ? 'rotate-90 text-indigo-650 dark:text-cyan-400 scale-110 font-bold' : ''
                     }`} />
                   )}
 
                   {/* Floating tooltip inline on collapsed mode */}
-                  {isCollapsed && (
+                  {isRealCollapsed && (
                     <div className="absolute left-full ml-3 px-3.5 py-1.5 bg-slate-950 text-white text-xs font-bold font-sans rounded-xl opacity-0 scale-90 group-hover/menu:opacity-100 group-hover/menu:scale-100 transition-all duration-200 shadow-xl pointer-events-none whitespace-nowrap z-50 border border-slate-800">
-                      {language === 'bn' ? menu.labelBn : menu.label}
+                      {getLocalizedText(menu.label, menu.labelBn)}
                       {hasSub && (
                         <span className="block text-[9.5px] text-[#818CF8] font-mono font-medium mt-0.5 uppercase tracking-wider">
-                          {language === 'bn' ? 'সাবমেনু উপলব্ধ' : 'Click to expand submenus'}
+                          {getLocalizedText('Click to expand submenus', 'সাবমেনু উপলব্ধ')}
                         </span>
                       )}
                     </div>
@@ -282,7 +330,7 @@ export default function Sidebar({
                 </button>
 
                 {/* Sub-menu block (hardware-accelerated, 250ms-350ms duration) */}
-                {!isCollapsed && hasSub && menu.subMenus && (
+                {!isRealCollapsed && hasSub && menu.subMenus && (
                   <div
                     style={{
                       maxHeight: isExpanded ? `${menu.subMenus.length * 44}px` : '0px',
@@ -291,7 +339,11 @@ export default function Sidebar({
                       transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)'
                     }}
                     className={`overflow-hidden opacity-0 ${
-                      isExpanded ? 'opacity-100 mt-1 mb-2 pl-3 ml-2 border-l border-neutral-200 dark:border-slate-800 space-y-1' : ''
+                      isExpanded 
+                        ? isOnMobile
+                          ? 'opacity-100 mt-2 mb-3.5 pl-4 ml-5.5 border-l-2 border-dashed border-slate-250 dark:border-slate-700 space-y-2'
+                          : 'opacity-100 mt-1 mb-2 pl-3 ml-2 border-l border-neutral-200 dark:border-slate-800 space-y-1'
+                        : ''
                     }`}
                   >
                     {menu.subMenus.map((sub) => {
@@ -299,6 +351,7 @@ export default function Sidebar({
                       return (
                         <button
                           key={sub.id}
+                          type="button"
                           style={{ minHeight: '36px' }}
                           onClick={() => {
                             setActiveTab(sub.id);
@@ -307,16 +360,20 @@ export default function Sidebar({
                               setMobileMenuOpen(false);
                             }
                           }}
-                          className={`w-full flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-[11px] font-bold transition-all duration-200 cursor-pointer text-left ${
+                          className={`w-full flex items-center gap-2.5 px-3.5 py-2 rounded-xl text-[11px] font-bold transition-all duration-200 cursor-pointer text-left ${
                             isSubActive
-                              ? 'text-indigo-650 dark:text-cyan-400 active-child-menu-glow font-extrabold shadow-sm bg-indigo-50/50 dark:bg-slate-800/40'
-                              : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-[#F8FAFC]/50 dark:hover:bg-slate-900/30'
+                              ? isOnMobile
+                                ? 'text-indigo-705 dark:text-cyan-400 font-black bg-gradient-to-r from-indigo-50/70 to-indigo-50/15 dark:from-cyan-950/20 dark:to-transparent border-l-2 border-l-indigo-600 dark:border-l-cyan-400 pl-4 shadow-xs'
+                                : 'text-indigo-650 dark:text-cyan-400 active-child-menu-glow font-extrabold shadow-sm bg-indigo-50/50 dark:bg-slate-800/40'
+                              : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-900/40 rounded-lg'
                           }`}
                         >
-                          <span className={`w-1.5 h-1.5 rounded-full transition-transform duration-200 ${
-                            isSubActive ? 'bg-indigo-600 dark:bg-cyan-400 scale-125' : 'bg-[#D1D5DB] dark:bg-slate-600'
+                          <span className={`w-1.5 h-1.5 rounded-full transition-transform duration-205 ${
+                            isSubActive 
+                              ? 'bg-indigo-600 dark:bg-cyan-400 scale-125 ring-4 ring-indigo-100 dark:ring-cyan-500/15' 
+                              : 'bg-slate-300 dark:bg-slate-600'
                           }`} />
-                          <span className="truncate">{language === 'bn' ? sub.labelBn : sub.label}</span>
+                          <span className="truncate">{getLocalizedText(sub.label, sub.labelBn)}</span>
                         </button>
                       );
                     })}
@@ -326,117 +383,27 @@ export default function Sidebar({
             );
           })}
 
-          {/* Conditionally Append Special Access Panels for system maintainers */}
-          {canAccessVendor && (
+          {/* Modern Premium Gradient Log Out Button */}
+          <div className="pt-2.5 border-t border-neutral-200 dark:border-slate-800/60 relative group/logout w-full">
             <button
               onClick={() => {
-                setActiveTab('vendor');
-                onAddActivityLog('Routed to Vendor Workspace');
-                if (isOnMobile) {
-                  setMobileMenuOpen(false);
-                }
+                setShowLogoutConfirm(true);
               }}
-              style={{ minHeight: '48px' }}
-              className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} px-4 py-2.5 text-xs font-black transition-all duration-300 cursor-pointer rounded-xl relative overflow-hidden group active:scale-98 ${
-                activeTab === 'vendor'
-                  ? isOnMobile
-                    ? 'bg-[#EEF2F6] dark:bg-gradient-to-r dark:from-cyan-600 dark:to-teal-600 text-cyan-750 dark:text-white border border-cyan-150/40 dark:border-none shadow-sm shadow-cyan-500/5'
-                    : 'text-cyan-655 dark:text-cyan-400 shadow-[0_4px_12px_rgba(6,182,212,0.1)] active-menu-glow'
-                  : 'text-cyan-600 dark:text-cyan-400 hover:text-cyan-500'
-              }`}
+              style={{ minHeight: '40px' }}
+              className={`w-full flex items-center ${isRealCollapsed ? 'justify-center p-1.5' : 'justify-center gap-2 px-4 py-2.5'} text-xs font-bold uppercase tracking-wider text-white bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 hover:from-purple-700 hover:via-indigo-700 hover:to-blue-700 active:scale-95 rounded-xl transition-all duration-300 cursor-pointer shadow-md shadow-indigo-500/20 text-center relative`}
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-[#06B6D4]/10 to-[#3B82F6]/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10" />
-              <span className={`flex items-center gap-2 transition-transform duration-300 ${!isCollapsed && 'group-hover:translate-x-1'}`}>
-                <span className="text-sm">🛠️</span>
-                {!isCollapsed && (
-                  <span className={`transition-all duration-300 ${
-                    activeTab === 'vendor'
-                      ? isOnMobile
-                        ? 'text-cyan-750 dark:text-white font-black'
-                        : 'bg-gradient-to-r from-cyan-700 to-teal-700 dark:from-cyan-400 dark:via-cyan-300 dark:to-teal-300 bg-clip-text text-transparent font-black shadow-none'
-                      : ''
-                  }`}>
-                    {language === 'bn' ? 'ভেন্ডর স্টুডিও' : 'Vendor Studio'}
-                  </span>
-                )}
-              </span>
-
-              {isCollapsed && (
-                <div className="absolute left-full ml-3 px-3.5 py-1.5 bg-slate-950 text-white text-xs font-bold font-sans rounded-xl opacity-0 scale-90 group-hover:opacity-100 group-hover:scale-100 transition-all duration-200 shadow-xl pointer-events-none whitespace-nowrap z-50 border border-slate-800">
-                  {language === 'bn' ? '🛠️ ভেন্ডর স্টুডিও' : '🛠️ Vendor Studio Workspace'}
-                </div>
+              <LogOut className="w-4 h-4 text-white shrink-0 animate-pulse" />
+              {!isRealCollapsed && (
+                <span>{language === 'bn' ? 'লগআউট করুন 🚪' : 'Logout Portal 🚪'}</span>
               )}
             </button>
-          )}
 
-          {canAccessStaff && (
-            <button
-              onClick={() => {
-                setActiveTab('staff');
-                onAddActivityLog('Routed to Staff Admin Dashboard');
-                if (isOnMobile) {
-                  setMobileMenuOpen(false);
-                }
-              }}
-              style={{ minHeight: '48px' }}
-              className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} px-4 py-2.5 text-xs font-black transition-all duration-300 cursor-pointer rounded-xl relative overflow-hidden group active:scale-98 ${
-                activeTab === 'staff'
-                  ? isOnMobile
-                    ? 'bg-[#EEF2F6] dark:bg-gradient-to-r dark:from-purple-650 dark:to-pink-650 text-purple-750 dark:text-white border border-purple-150/40 dark:border-none shadow-sm shadow-purple-500/5'
-                    : 'text-purple-655 dark:text-purple-400 shadow-[0_4px_12px_rgba(168,85,247,0.1)] active-menu-glow'
-                  : 'text-purple-600 dark:text-purple-400 hover:text-[#EC4899]'
-              }`}
-            >
-              <div className="absolute inset-0 bg-gradient-to-r from-[#8B5CF6]/10 to-[#EC4899]/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10" />
-              <span className={`flex items-center gap-2 transition-transform duration-300 ${!isCollapsed && 'group-hover:translate-x-1'}`}>
-                <span className="text-sm">🛡️</span>
-                {!isCollapsed && (
-                  <span className={`transition-all duration-300 ${
-                    activeTab === 'staff'
-                      ? isOnMobile
-                        ? 'text-purple-750 dark:text-white font-black'
-                        : 'bg-gradient-to-r from-purple-700 to-pink-700 dark:from-purple-400 dark:via-pink-400 dark:to-purple-305 bg-clip-text text-transparent font-black shadow-none'
-                      : ''
-                  }`}>
-                    {language === 'bn' ? 'স্টাফ ড্যাশবোর্ড' : 'Staff Dashboard'}
-                  </span>
-                )}
-              </span>
-
-              {isCollapsed && (
-                <div className="absolute left-full ml-3 px-3.5 py-1.5 bg-slate-950 text-white text-xs font-bold font-sans rounded-xl opacity-0 scale-90 group-hover:opacity-100 group-hover:scale-100 transition-all duration-200 shadow-xl pointer-events-none whitespace-nowrap z-50 border border-slate-800">
-                  {language === 'bn' ? '🛡️ স্টাফ ড্যাশবোর্ড' : '🛡️ Staff Admin Dashboard'}
-                </div>
-              )}
-            </button>
-          )}
-
-
-
-          {/* Log Out Option Button */}
-          <button
-            onClick={() => {
-              if (confirm(language === 'bn' ? "আপনি কি মেম্বার প্যানেল থেকে বের হতে চান?" : "Are you sure you wish to log out from WebzoneBD Customer Area?")) {
-                onLogout();
-                if (isOnMobile) {
-                  setMobileMenuOpen(false);
-                }
-              }
-            }}
-            style={{ minHeight: '48px' }}
-            className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} px-4 py-2.5 rounded-xl text-xs font-black text-[#EF4444] hover:bg-red-500/10 transition-all duration-300 cursor-pointer text-left active:scale-95`}
-          >
-            <div className="flex items-center gap-2.5">
-              <LogOut className="w-4 h-4 text-[#EF4444] animate-pulse" />
-              {!isCollapsed && <span>{language === 'bn' ? 'লগআউট' : 'Logout Portal'}</span>}
-            </div>
-
-            {isCollapsed && (
-              <div className="absolute left-full ml-3 px-3.5 py-1.5 bg-slate-950 text-[#EF4444] text-xs font-black font-sans rounded-xl opacity-0 scale-90 group-hover:opacity-100 group-hover:scale-100 transition-all duration-200 shadow-xl pointer-events-none whitespace-nowrap z-50 border border-slate-800">
+            {isRealCollapsed && (
+              <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 px-3.5 py-1.5 bg-neutral-950 text-white text-xs font-black font-sans rounded-xl opacity-0 scale-90 group-hover/logout:opacity-100 group-hover/logout:scale-100 transition-all duration-200 shadow-xl pointer-events-none whitespace-nowrap z-50 border border-slate-800">
                 {language === 'bn' ? '🚪 লগআউট (Logout)' : '🚪 Logout Customer Portal'}
               </div>
             )}
-          </button>
+          </div>
         </div>
 
         {/* Currency Switcher & Footer Utilities */}
@@ -520,7 +487,7 @@ export default function Sidebar({
       {/* 2. MOBILE QUICK SELECT BAR & STICKY OVERLAY DRAWER COMPONENT */}
       <div className="block lg:hidden w-full space-y-4">
         {/* Compact Responsive Mobile Top Menu Strip */}
-        <div className="w-full flex items-center justify-between bg-white dark:bg-[#1E293B] p-4 border border-[#E2E8F0] dark:border-slate-800 rounded-2xl shadow-md">
+        <div className="w-full flex items-center justify-between bg-white dark:bg-[#1E293B] py-2.5 px-4 border border-[#E2E8F0] dark:border-slate-800 rounded-2xl shadow-md">
           <div className="flex items-center gap-3">
             {/* Sync trigger button */}
             <button
@@ -581,39 +548,140 @@ export default function Sidebar({
                 initial={{ x: '-100%' }}
                 animate={{ x: 0 }}
                 exit={{ x: '-100%' }}
-                transition={{ type: 'spring', damping: 25, stiffness: 220 }}
-                className="fixed top-0 bottom-0 left-0 w-[290px] sm:w-[325px] bg-white dark:bg-[#1E293B] shadow-2xl p-5 overflow-y-auto z-50 flex flex-col justify-between"
+                transition={{ type: 'spring', damping: 26, stiffness: 210 }}
+                className="fixed top-0 bottom-0 left-0 w-[300px] sm:w-[335px] bg-white/95 dark:bg-[#0F172A]/98 backdrop-blur-xl border-r border-slate-200 dark:border-slate-800 text-neutral-850 dark:text-neutral-100 shadow-2xl p-5 overflow-y-auto z-50 flex flex-col justify-between"
               >
                 <div>
                   {/* Top Header Drawer Banner */}
-                  <div className="flex items-center justify-between pb-4 mb-4 border-b border-neutral-100 dark:border-slate-800">
+                  <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-200 dark:border-slate-800">
                     <div className="flex items-center gap-2">
-                      <span className="text-lg">⚡</span>
-                      <span className="font-extrabold text-[#2563EB] dark:text-cyan-400 text-sm">WebzoneBD Member Panel</span>
+                      <div className="p-1.5 bg-gradient-to-tr from-indigo-600 to-[#06B6D4] rounded-lg text-white">
+                        <ShieldCheck className="w-4 h-4 stroke-[2.5]" />
+                      </div>
+                      <span className="font-extrabold text-slate-900 dark:text-white text-xs md:text-sm tracking-tight uppercase">
+                        WebzoneBD Member
+                      </span>
                     </div>
 
                     <button
                       onClick={() => setMobileMenuOpen(false)}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-neutral-150 dark:hover:bg-slate-800 transition cursor-pointer"
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
                     >
-                      <X className="w-4 h-4" />
+                      <X className="w-4.5 h-4.5" />
                     </button>
                   </div>
 
                   {/* Render list content with active state mapping closures */}
-                  <div>
+                  <div className="space-y-4">
                     {renderDashboardMenuContents(true)}
                   </div>
                 </div>
 
-                <div className="mt-8 pt-4 border-t border-slate-100 dark:border-slate-800 text-center">
-                  <p className="text-[10px] text-slate-400 font-mono tracking-tight uppercase">WebzoneBD Client Consolidation v3.1</p>
+                {/* Secure Theme Switcher and Signature Block */}
+                <div className="mt-8 space-y-4">
+                  {/* Premium Theme Switching section within member drawer */}
+                  <div className="pt-4 border-t border-slate-200 dark:border-slate-800/80">
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-2 font-mono font-black px-1 flex items-center gap-2">
+                      <Sun className="w-3.5 h-3.5 text-blue-500 dark:text-cyan-400 animate-pulse" />
+                      <span>Theme Settings</span>
+                    </p>
+                    <div className="grid grid-cols-2 gap-2 font-sans text-[10.5px] font-black">
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          if (setTheme) {
+                            setTheme('light');
+                            triggerToast('🔆 Light Theme Mode Active');
+                          }
+                        }}
+                        className={`py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer duration-300 border ${
+                          theme === 'light' 
+                            ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white border-transparent shadow-lg shadow-blue-500/10' 
+                            : 'bg-slate-50 hover:bg-slate-100 dark:bg-slate-900/50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-850'
+                        }`}
+                      >
+                        <span className="text-xs">☀</span>
+                        <span>Light Mode</span>
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          if (setTheme) {
+                            setTheme('dark');
+                            triggerToast('🌙 Dark Theme Mode Active');
+                          }
+                        }}
+                        className={`py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer duration-300 border ${
+                          theme === 'dark' 
+                            ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white border-transparent shadow-lg shadow-blue-500/15' 
+                            : 'bg-slate-50 hover:bg-slate-100 dark:bg-slate-900/50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-850'
+                        }`}
+                      >
+                        <span className="text-xs">🌙</span>
+                        <span>Dark Mode</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="pt-3 border-t border-slate-100 dark:border-slate-800/60 text-center">
+                    <p className="text-[9px] text-slate-400 dark:text-neutral-500 font-mono tracking-tight uppercase">WebzoneBD Client Consolidation v3.1</p>
+                  </div>
                 </div>
               </motion.div>
             </>
           )}
         </AnimatePresence>
       </div>
+
+      {/* Custom Logout Confirmation Dialog */}
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 z-55 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-300 pointer-events-auto font-sans">
+          <div className="w-full max-w-sm rounded-2xl border border-neutral-200 dark:border-slate-800 bg-white dark:bg-[#1E293B] text-neutral-900 dark:text-white shadow-2xl p-6 relative overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Red accent strip */}
+            <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-red-650 via-rose-500 to-orange-500" />
+            
+            <div className="flex gap-4">
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-red-500/10 text-red-500 border border-red-500/20 flex items-center justify-center">
+                <LogOut className="w-5 h-5 text-red-500" />
+              </div>
+              <div className="space-y-1.5 flex-1 w-full text-left">
+                <h4 className="text-sm font-black tracking-tight uppercase font-sans text-red-600 dark:text-red-400">
+                  {language === 'bn' ? 'লগআউট নিশ্চিত করুন?' : 'Confirm Logout?'}
+                </h4>
+                <p className="text-xs opacity-75 leading-relaxed font-sans mt-1">
+                  {language === 'bn' 
+                    ? 'আপনি কি নিশ্চিত যে আপনি মেম্বার প্যানেল থেকে লগআউট করতে চান?' 
+                    : 'Are you sure you want to log out from WebzoneBD Customer Area?'
+                  }
+                </p>
+                <span className="text-[10px] text-red-500 font-semibold block bg-red-500/5 px-2 py-1 rounded border border-red-500/10 mt-2 font-mono">
+                  🚨 {language === 'bn' ? 'এটি আপনার সুরক্ষিত সেশন বন্ধ করে দেবে।' : 'This will terminate your secure portal session.'}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4 mt-2">
+              <button
+                type="button"
+                onClick={() => setShowLogoutConfirm(false)}
+                className="px-3 py-1.5 text-xs font-bold rounded-lg border border-neutral-200 dark:border-slate-800 text-neutral-700 dark:text-slate-300 hover:bg-neutral-100 dark:hover:bg-slate-800 transition cursor-pointer"
+              >
+                {language === 'bn' ? 'না, প্যানেলে থাকুন' : 'No, Stay'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowLogoutConfirm(false);
+                  onLogout();
+                }}
+                className="px-4 py-1.5 text-xs font-black bg-red-600 hover:bg-red-700 text-white rounded-lg transition shadow-lg shadow-red-500/20 hover:scale-[1.01] active:scale-95 cursor-pointer"
+              >
+                {language === 'bn' ? 'হ্যাঁ, লগআউট' : 'Yes, Logout'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

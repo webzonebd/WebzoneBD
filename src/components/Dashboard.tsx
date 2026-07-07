@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { jsPDF } from 'jspdf';
 import { 
   User, Clipboard, Download, MessageSquare, ShieldCheck, 
   Send, Plus, Trash2, Key, Ticket, UserCheck, HelpCircle,
@@ -7,12 +8,15 @@ import {
   Home, Package, Rocket, Wallet, Heart, Users, Settings, LogOut,
   ChevronRight, Lock, Shield, CreditCard, ExternalLink, Cpu, Check, AlertCircle,
   Search, Calendar, ArrowUpDown, Filter, Clock, Loader2, Tag, Bell,
-  ChevronUp, ChevronDown, Folder, Globe, Languages
+  ChevronUp, ChevronDown, Folder, Globe, Languages, Truck, Inbox,
+  Printer, MoreHorizontal, ShoppingCart
 } from 'lucide-react';
 import { Order, SupportTicket, Language, Theme, UserSession, Currency, ActivityLog, Product } from '../types';
 import ProfileSettingsCenter from './ProfileSettingsCenter';
 import Sidebar from './Sidebar';
 import { DashboardWidgets } from './DashboardWidgets';
+import UserOrderHistory from './UserOrderHistory';
+import CompanyRevenueDashboard from './CompanyRevenueDashboard';
 
 interface DashboardProps {
   language: Language;
@@ -32,10 +36,25 @@ interface DashboardProps {
   onAddActivityLog: (log: string) => void;
   products: Product[];
   onAddProduct: (prod: Product) => void;
+  onUpdateProductRating?: (idOrName: string, rating: number, comment: string) => void;
   currencySettings?: any;
   setLanguage?: (lang: Language) => void;
   setTheme?: (theme: Theme) => void;
+  onUpdateOrders?: (orders: Order[]) => void;
+  deleteOrder?: (id: string) => void;
 }
+
+const getDaysRemaining = (expiryDateStr: string): number => {
+  if (!expiryDateStr) return 999;
+  const expiryDate = new Date(expiryDateStr);
+  if (isNaN(expiryDate.getTime())) return 999;
+  const today = new Date();
+  expiryDate.setHours(0, 0, 0, 0);
+  today.setHours(0, 0, 0, 0);
+  const diffTime = expiryDate.getTime() - today.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  return diffDays;
+};
 
 export default function Dashboard({
   language,
@@ -55,9 +74,12 @@ export default function Dashboard({
   onAddActivityLog,
   products,
   onAddProduct,
+  onUpdateProductRating,
   currencySettings,
   setLanguage,
-  setTheme
+  setTheme,
+  onUpdateOrders,
+  deleteOrder
 }: DashboardProps) {
   // Sync page state through tab tracking
   const [activeTab, setActiveTab] = useState<string>(() => {
@@ -69,6 +91,14 @@ export default function Dashboard({
     return 'dashboard';
   });
 
+  // Helper to standardise Order IDs sequentially to match AdminPanel
+  const getOrderSerial = (orderId: string) => {
+    if (!orderId) return 'Order-101';
+    if (orderId.startsWith('Order-')) return orderId;
+    const idx = orders.findIndex(o => o.id === orderId);
+    return idx !== -1 ? `Order-${101 + idx}` : orderId;
+  };
+
   // Collapsible Sidebar state persistence
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
     return localStorage.getItem('webzone_dashboard_sidebar_collapsed') === 'true';
@@ -78,6 +108,76 @@ export default function Dashboard({
     setIsSidebarCollapsed(collapsed);
     localStorage.setItem('webzone_dashboard_sidebar_collapsed', String(collapsed));
   };
+
+  // Interactive order tracking state
+  const [selectedTrackingOrderId, setSelectedTrackingOrderId] = useState<string>(() => {
+    const trackable = orders.filter(o => o.paymentStatus !== 'pending');
+    return trackable.length > 0 ? trackable[0].id : 'demo';
+  });
+  const [orderTrackingSteps, setOrderTrackingSteps] = useState<Record<string, number>>(() => {
+    const initial: Record<string, number> = { 'demo': 4 }; // Default demo order to step 4 (delivered)
+    orders.forEach(o => {
+      if (o.status === 'delivered' || o.paymentStatus === 'completed') {
+        initial[o.id] = 4;
+      } else if (o.status === 'shipped') {
+        initial[o.id] = 3;
+      } else if (o.status === 'processing') {
+        initial[o.id] = 2;
+      } else if (o.paymentStatus === 'failed') {
+        initial[o.id] = 1;
+      } else {
+        initial[o.id] = 0;
+      }
+    });
+    return initial;
+  });
+  const [cancellationRequests, setCancellationRequests] = useState<Record<string, boolean>>({});
+  const [deleteConfirmOrder, setDeleteConfirmOrder] = useState<{ isOpen: boolean; orderId: string | null; itemTitle: string }>({ isOpen: false, orderId: null, itemTitle: '' });
+  const [ratingOrderModalId, setRatingOrderModalId] = useState<string | null>(null);
+  const [ratingStars, setRatingStars] = useState<number>(5);
+  const [ratingComment, setRatingComment] = useState<string>('');
+  const [submittedFeedback, setSubmittedFeedback] = useState<Record<string, { rating: number; comment: string }>>(() => {
+    try {
+      const saved = localStorage.getItem('webzone_submitted_feedback');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const saveFeedback = (orderId: string, rating: number, comment: string) => {
+    setSubmittedFeedback(prev => {
+      const next = { ...prev, [orderId]: { rating, comment } };
+      localStorage.setItem('webzone_submitted_feedback', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    setOrderTrackingSteps(prev => {
+      const updated = { ...prev };
+      orders.forEach(o => {
+        if (updated[o.id] === undefined) {
+          if (o.status === 'delivered' || o.paymentStatus === 'completed') {
+            updated[o.id] = 4;
+          } else if (o.status === 'shipped') {
+            updated[o.id] = 3;
+          } else if (o.status === 'processing') {
+            updated[o.id] = 2;
+          } else if (o.paymentStatus === 'failed') {
+            updated[o.id] = 1;
+          } else {
+            updated[o.id] = 0;
+          }
+        }
+      });
+      return updated;
+    });
+    const trackable = orders.filter(o => o.paymentStatus !== 'pending');
+    if (trackable.length > 0 && selectedTrackingOrderId === 'demo') {
+      setSelectedTrackingOrderId(trackable[trackable.length - 1].id);
+    }
+  }, [orders]);
 
   // Listen for storage changes to instantly update dashboard tab if redirected from Header quick links
   useEffect(() => {
@@ -167,6 +267,9 @@ export default function Dashboard({
   const [orderSearchQuery, setOrderSearchQuery] = useState('');
   const [orderDateRangeFilter, setOrderDateRangeFilter] = useState<'all' | '30days' | '90days' | 'thisyear'>('all');
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+  const [openActionDropdownId, setOpenActionDropdownId] = useState<string | null>(null);
+  const [editingNotesOrder, setEditingNotesOrder] = useState<Order | null>(null);
+  const [tempNotesText, setTempNotesText] = useState('');
 
   // Login Sessions List with simulated removal state
   const [loginSessions, setLoginSessions] = useState([
@@ -180,22 +283,46 @@ export default function Dashboard({
   const [vendorProdPrice, setVendorProdPrice] = useState(49);
   const [vendorProdCategory, setVendorProdCategory] = useState<'php' | 'wordpress' | 'laravel' | 'mobile'>('php');
   const [vendorProdDesc, setVendorProdDesc] = useState('');
+  const [vendorProdImage, setVendorProdImage] = useState<string>('');
+  const [vendorProdImageFile, setVendorProdImageFile] = useState<File | null>(null);
 
   // Hostinger, WHMCS, and premium SaaS platform state additions
   // Hostinger, WHMCS, and premium SaaS platform state additions loaded persistently or empty for new visitors
   const [domains, setDomains] = useState<any[]>(() => {
     const saved = localStorage.getItem(`webzone_domains_${user?.id || 'guest'}`);
-    return saved ? JSON.parse(saved) : [];
+    if (saved) return JSON.parse(saved);
+    // Return preseeded domains with dynamic expiry dates (within 30 days)
+    const today = new Date();
+    const datePlus12 = new Date(today.getTime() + 12 * 24 * 60 * 60 * 1000).toLocaleDateString();
+    const datePlus45 = new Date(today.getTime() + 45 * 24 * 60 * 60 * 1000).toLocaleDateString();
+    const datePlus5 = new Date(today.getTime() + 5 * 24 * 60 * 60 * 1000).toLocaleDateString();
+    return [
+      { id: 'dom-101', domainName: 'my-corporate-site.com', status: 'Active', registeredAt: '2025-07-15', expiresAt: datePlus12, whoisLocked: true },
+      { id: 'dom-102', domainName: 'webzone-dev-sandbox.net', status: 'Active', registeredAt: '2025-08-01', expiresAt: datePlus45, whoisLocked: true },
+      { id: 'dom-103', domainName: 'custom-app-demo.xyz', status: 'Active', registeredAt: '2025-06-12', expiresAt: datePlus5, whoisLocked: false }
+    ];
   });
 
   const [hostingPackages, setHostingPackages] = useState<any[]>(() => {
     const saved = localStorage.getItem(`webzone_hosting_packages_${user?.id || 'guest'}`);
-    return saved ? JSON.parse(saved) : [];
+    if (saved) return JSON.parse(saved);
+    // Return preseeded hosting packages with dynamic expiry dates
+    const today = new Date();
+    const datePlus12 = new Date(today.getTime() + 12 * 24 * 60 * 60 * 1000).toLocaleDateString();
+    const datePlus5 = new Date(today.getTime() + 5 * 24 * 60 * 60 * 1000).toLocaleDateString();
+    return [
+      { id: 'hst-101', tierName: 'Managed VPS Hosting - SSD Pro', primaryDomain: 'my-corporate-site.com', ssdSpaceUsed: 12, ssdSpaceLimit: 50, cpuUsage: 28, status: 'Active', expiresAt: datePlus12 },
+      { id: 'hst-102', tierName: 'Shared BDIX Hosting - Light', primaryDomain: 'custom-app-demo.xyz', ssdSpaceUsed: 2.4, ssdSpaceLimit: 10, cpuUsage: 14, status: 'Active', expiresAt: datePlus5 }
+    ];
   });
 
   const [services, setServices] = useState<any[]>(() => {
     const saved = localStorage.getItem(`webzone_services_${user?.id || 'guest'}`);
     if (saved) return JSON.parse(saved);
+    
+    const isPreseededUser = ['usr-101', 'usr-102', 'usr-103', 'usr-104', 'usr-105', 'usr-vendor', 'usr-admin', 'usr-webzonebd-admin'].includes(user?.id || '');
+    if (!isPreseededUser) return [];
+
     return [
       {
         id: 'srv-pos',
@@ -211,10 +338,7 @@ export default function Dashboard({
     ];
   });
 
-  const [wishlistItems, setWishlistItems] = useState<any[]>(() => {
-    const saved = localStorage.getItem(`webzone_wishlist_items_${user?.id || 'guest'}`);
-    return saved ? JSON.parse(saved) : [];
-  });
+
 
   const [rewardPoints, setRewardPoints] = useState<number>(() => {
     const saved = localStorage.getItem(`webzone_reward_points_${user?.id || 'guest'}`);
@@ -238,6 +362,74 @@ export default function Dashboard({
       { id: 'not-welcome', title: '👋 Welcome to WebzoneBD!', message: 'Explore ready-made IT services, customize parameters, and build a digital footprint.', type: 'system', date: 'Just now', read: false }
     ];
   });
+
+  // Real-time tracking of order updates to alert the customer
+  const prevOrdersRef = useRef<Order[]>([]);
+
+  useEffect(() => {
+    if (prevOrdersRef.current && prevOrdersRef.current.length > 0) {
+      orders.forEach(currentOrder => {
+        const prevOrder = prevOrdersRef.current.find(o => o.id === currentOrder.id);
+        if (prevOrder && prevOrder.paymentStatus === 'pending' && currentOrder.paymentStatus === 'completed') {
+          const congratsMessage = language === 'bn' 
+            ? `🎉 অভিনন্দন! আপনার অর্ডার #${currentOrder.id} ("${currentOrder.itemTitle}") সফলভাবে পরিশোধিত এবং সম্পূর্ণ হয়েছে। ডাউনলোড লিঙ্ক এখন প্রস্তুত!`
+            : `🎉 Congratulations! Your Order #${currentOrder.id} ("${currentOrder.itemTitle}") has been verified & completed. Digital Code files are now unlocked and ready for download!`;
+            
+          triggerToast(congratsMessage);
+          
+          const newNotification = {
+            id: `not-${currentOrder.id}-${Date.now()}`,
+            title: language === 'bn' ? '✅ পেমেন্ট নিশ্চিত করা হয়েছে!' : '✅ Payment Confirmed & Completed!',
+            message: language === 'bn'
+              ? `আপনার অর্ডার #${currentOrder.id} ("${currentOrder.itemTitle}") পেমেন্ট সফলভাবে নিশ্চিত করা হয়েছে। আপনার ডিজিটাল ফাইল ড্যাশবোর্ড থেকে ডাউনলোড করুন।`
+              : `Your payment for Order #${currentOrder.id} ("${currentOrder.itemTitle}") is confirmed. Your digital assets are now ready for download in the main dashboard or download center.`,
+            type: 'billing',
+            date: language === 'bn' ? 'সরাসরি আপডেট' : 'Just Now',
+            read: false,
+            meta: { orderId: currentOrder.id }
+          };
+          
+          setNotifications(prevNotifs => {
+            const updated = [newNotification, ...prevNotifs];
+            localStorage.setItem(`webzone_notifications_${user?.id || 'guest'}`, JSON.stringify(updated));
+            return updated;
+          });
+
+          onAddActivityLog(`System generated Order Confirmed notification for Order #${currentOrder.id}`);
+        }
+      });
+    }
+    prevOrdersRef.current = orders;
+  }, [orders, language, user?.id, triggerToast, onAddActivityLog]);
+
+  // Sync live broadcast offer into notifications roster automatically
+  useEffect(() => {
+    const liveMsg = localStorage.getItem('site_wide_broadcast_notification');
+    if (!liveMsg) return;
+
+    const liveLink = localStorage.getItem('site_wide_broadcast_link') || '';
+    const liveLinkText = localStorage.getItem('site_wide_broadcast_link_text') || 'Claim Offer';
+    const bId = localStorage.getItem('site_wide_broadcast_id') || 'site-wide-offer-promo';
+
+    const alreadyExists = notifications.some(n => n.id === bId || (n.type === 'offer' && n.message === liveMsg));
+    if (!alreadyExists) {
+      const bNotif = {
+        id: bId,
+        title: language === 'bn' ? '🎁 বিশেষ অফার ঘোষণা করা হয়েছে!' : '🎁 Special Site-wide Offer Announced!',
+        message: liveMsg,
+        type: 'offer',
+        link: liveLink || undefined,
+        linkText: liveLinkText,
+        date: 'Just now',
+        read: false
+      };
+      setNotifications(prev => {
+        const updated = [bNotif, ...prev];
+        localStorage.setItem(`webzone_notifications_${user?.id || 'guest'}`, JSON.stringify(updated));
+        return updated;
+      });
+    }
+  }, [language, user?.id, notifications]);
 
   const [businessStats, setBusinessStats] = useState({
     seoScore: 88,
@@ -293,10 +485,230 @@ export default function Dashboard({
   const [selectedInvoice, setSelectedInvoice] = useState<Order | null>(null);
 
   // Affiliate Dashboard states
-  const [withdrawAmt, setWithdrawAmt] = useState('150');
+  const [withdrawAmt, setWithdrawAmt] = useState('25');
   const [withdrawGateway, setWithdrawGateway] = useState('bKash');
   const [customAffSuffix, setCustomAffSuffix] = useState('campaign_bd');
   const [copiedAffLink, setCopiedAffLink] = useState(false);
+
+  // Dynamic affiliate program registration states
+  const [affiliateStatus, setAffiliateStatus] = useState<'unregistered' | 'pending' | 'approved' | 'suspended'>('unregistered');
+  const [affiliateProfile, setAffiliateProfile] = useState<any>(null);
+  const [affiliateReferralsList, setAffiliateReferralsList] = useState<any[]>([]);
+  const [promoChannel, setPromoChannel] = useState('Personal Blog & Tech Portal');
+  const [promoCountry, setPromoCountry] = useState('Bangladesh');
+  const [payoutDetails, setPayoutDetails] = useState('');
+
+  useEffect(() => {
+    if (!user) return;
+    const savedList = localStorage.getItem('webzone_affiliate_list');
+    const list = savedList ? JSON.parse(savedList) : [
+      { userId: 'usr-101', name: 'Imran Hasan', code: 'PARTNER-IMRAN', referrals: 24, commissionEarned: 1240, status: 'approved', channel: 'Personal Tech Blog', commissionRate: 20, registeredAt: '2025-10-15', balance: 140, clicks: 1482, paymentDetails: 'bKash: 01711223344' },
+      { userId: 'usr-102', name: 'Al-Shehri Majid', code: 'PARTNER-MAJID', referrals: 58, commissionEarned: 3500, status: 'approved', channel: 'Riyadh Hosting Network', commissionRate: 25, registeredAt: '2025-11-20', balance: 840, clicks: 3120, paymentDetails: 'PayPal: majid@saudiweb.com' },
+      { userId: 'usr-103', name: 'Zeeshan Rahman', code: 'PARTNER-ZEESHAN', referrals: 8, commissionEarned: 320, status: 'approved', channel: 'YouTube Channel', commissionRate: 15, registeredAt: '2026-01-11', balance: 0, clicks: 540, paymentDetails: 'Nagad: 01864051151' },
+      { userId: 'usr-105', name: 'Enamul Haque', code: 'AFF-ENAMUL', referrals: 15, commissionEarned: 560, status: 'approved', channel: 'Dhaka Host Group LLC', commissionRate: 15, registeredAt: '2025-11-10', balance: 120, clicks: 420, paymentDetails: 'bKash: 01912345678' },
+    ];
+    
+    const match = list.find((a: any) => a.userId === user.id);
+    if (match) {
+      setAffiliateProfile(match);
+      setAffiliateStatus(match.status);
+    } else {
+      setAffiliateStatus('unregistered');
+      setAffiliateProfile(null);
+    }
+
+    const savedRefs = localStorage.getItem('webzone_affiliate_referrals');
+    const refs = savedRefs ? JSON.parse(savedRefs) : [
+      { id: 'ref-1', affiliateId: 'usr-101', affiliateCode: 'PARTNER-IMRAN', referredUserName: 'Anwar Hossain', productName: 'Corporate Portal Dynamic Development', saleAmount: 450, commissionEarned: 90, campaignSuffix: 'tech_post', date: '2026-06-12', status: 'approved' },
+      { id: 'ref-2', affiliateId: 'usr-102', affiliateCode: 'PARTNER-MAJID', referredUserName: 'Bander Al-Harbi', productName: 'Premium VPS Dedicated Node', saleAmount: 1200, commissionEarned: 300, campaignSuffix: 'hosting_campaign', date: '2026-06-11', status: 'approved' }
+    ];
+    const filteredRefs = refs.filter((r: any) => r.affiliateId === user.id);
+    setAffiliateReferralsList(filteredRefs);
+  }, [user, activeTab]);
+
+  const handleAffiliateRegisterSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    const generatedCode = `AFF-${user.name.split(' ')[0].toUpperCase()}-${Math.floor(100 + Math.random() * 900)}`;
+
+    const newPartner = {
+      userId: user.id,
+      name: user.name,
+      email: user.email,
+      code: generatedCode,
+      status: 'pending',
+      channel: promoChannel,
+      paymentDetails: `${withdrawGateway}: ${payoutDetails}`,
+      commissionRate: 15,
+      clicks: 0,
+      referrals: 0,
+      totalEarned: 0,
+      balance: 0,
+      registeredAt: new Date().toISOString().split('T')[0],
+      country: promoCountry
+    };
+
+    const savedList = localStorage.getItem('webzone_affiliate_list');
+    const currentList = savedList ? JSON.parse(savedList) : [
+      { userId: 'usr-101', name: 'Imran Hasan', code: 'PARTNER-IMRAN', referrals: 24, commissionEarned: 1240, status: 'approved', channel: 'Personal Tech Blog', commissionRate: 20, registeredAt: '2025-10-15', balance: 140, clicks: 1482, paymentDetails: 'bKash: 01711223344' },
+      { userId: 'usr-102', name: 'Al-Shehri Majid', code: 'PARTNER-MAJID', referrals: 58, commissionEarned: 3500, status: 'approved', channel: 'Riyadh Hosting Network', commissionRate: 25, registeredAt: '2025-11-20', balance: 840, clicks: 3120, paymentDetails: 'PayPal: majid@saudiweb.com' },
+      { userId: 'usr-103', name: 'Zeeshan Rahman', code: 'PARTNER-ZEESHAN', referrals: 8, commissionEarned: 320, status: 'approved', channel: 'YouTube Channel', commissionRate: 15, registeredAt: '2026-01-11', balance: 0, clicks: 540, paymentDetails: 'Nagad: 01864051151' },
+      { userId: 'usr-105', name: 'Enamul Haque', code: 'AFF-ENAMUL', referrals: 15, commissionEarned: 560, status: 'approved', channel: 'Dhaka Host Group LLC', commissionRate: 15, registeredAt: '2025-11-10', balance: 120, clicks: 420, paymentDetails: 'bKash: 01912345678' },
+    ];
+    currentList.push(newPartner);
+    localStorage.setItem('webzone_affiliate_list', JSON.stringify(currentList));
+
+    setAffiliateProfile(newPartner);
+    setAffiliateStatus('pending');
+    triggerToast('🎉 Growth Partner application successfully logged! Review in progress...');
+  };
+
+  const handleSimulateAffiliateClick = () => {
+    if (!affiliateProfile || !user) return;
+    const savedList = localStorage.getItem('webzone_affiliate_list');
+    const currentList = savedList ? JSON.parse(savedList) : [];
+    const updated = currentList.map((a: any) => {
+      if (a.userId === user.id) {
+        return { ...a, clicks: (a.clicks || 0) + 1 };
+      }
+      return a;
+    });
+    localStorage.setItem('webzone_affiliate_list', JSON.stringify(updated));
+    const matched = updated.find((a: any) => a.userId === user.id);
+    setAffiliateProfile(matched);
+    triggerToast('🔗 Simulated Referral Click logged! Affiliate Clicks incremented (+1 click)');
+  };
+
+  const handleSimulatePromotionSale = () => {
+    if (!affiliateProfile || !user) return;
+    const productPrice = 250; // Dynamic Web solution
+    const rate = affiliateProfile.commissionRate || 15;
+    const comm = parseFloat((productPrice * (rate / 100)).toFixed(2));
+
+    // Update partner profile
+    const savedList = localStorage.getItem('webzone_affiliate_list');
+    const currentList = savedList ? JSON.parse(savedList) : [];
+    const updatedList = currentList.map((a: any) => {
+      if (a.userId === user.id) {
+        return { 
+          ...a, 
+          referrals: (a.referrals || 0) + 1, 
+          commissionEarned: (a.commissionEarned || 0) + comm, 
+          balance: parseFloat(((a.balance || 0) + comm).toFixed(2))
+        };
+      }
+      return a;
+    });
+    localStorage.setItem('webzone_affiliate_list', JSON.stringify(updatedList));
+    const matched = updatedList.find((a: any) => a.userId === user.id);
+    setAffiliateProfile(matched);
+
+    // Add referral record
+    const savedRefs = localStorage.getItem('webzone_affiliate_referrals');
+    const refs = savedRefs ? JSON.parse(savedRefs) : [];
+    const newRef = {
+      id: "ref-sim-" + Math.floor(10000 + Math.random() * 90000),
+      affiliateId: user.id,
+      affiliateCode: affiliateProfile.code,
+      referredUserName: "Mock Referred Client (" + ['Rahim Uddin', 'Karim Al-Hasan', 'Saeed Chowdhury', 'Yousuf Ali'][Math.floor(Math.random() * 4)] + ")",
+      productName: 'E-Commerce Enterprise Starter Stack',
+      saleAmount: productPrice,
+      commissionEarned: comm,
+      campaignSuffix: customAffSuffix || 'dashboard_sandbox',
+      date: new Date().toISOString().split('T')[0],
+      status: 'approved'
+    };
+    refs.push(newRef);
+    localStorage.setItem('webzone_affiliate_referrals', JSON.stringify(refs));
+    setAffiliateReferralsList(refs.filter((r: any) => r.affiliateId === user.id));
+
+    triggerToast(`💸 Simulated Referral Order completed! Commission of $${comm} credited to your available balance!`);
+  };
+
+  const handleAffiliateWithdrawalSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !affiliateProfile) return;
+    const amountFloat = parseFloat(withdrawAmt);
+
+    if (isNaN(amountFloat) || amountFloat <= 0) {
+      triggerToast('Error: Invalid payout request amount.');
+      return;
+    }
+
+    if (amountFloat < 20) {
+      triggerToast('⚠️ Minimum withdrawal limit threshold is $20.00 USD.');
+      return;
+    }
+
+    if (amountFloat > affiliateProfile.balance) {
+      triggerToast('⚠️ Insufficient available partner funds! Withdrawable balance is $' + affiliateProfile.balance + ' USD.');
+      return;
+    }
+
+    // Deduct partner balance immediately
+    const savedList = localStorage.getItem('webzone_affiliate_list');
+    const currentList = savedList ? JSON.parse(savedList) : [];
+    const updatedList = currentList.map((a: any) => {
+      if (a.userId === user.id) {
+        return { ...a, balance: parseFloat((a.balance - amountFloat).toFixed(2)) };
+      }
+      return a;
+    });
+    localStorage.setItem('webzone_affiliate_list', JSON.stringify(updatedList));
+    const matched = updatedList.find((a: any) => a.userId === user.id);
+    setAffiliateProfile(matched);
+
+    // Create withdrawal request
+    const savedWithdrawals = localStorage.getItem('webzone_admin_withdrawals');
+    const withdrawals = savedWithdrawals ? JSON.parse(savedWithdrawals) : [];
+    const newRequest = {
+      id: "tx-" + Math.floor(1000 + Math.random() * 9000),
+      partnerId: user.id,
+      partnerName: user.name,
+      partnerCode: affiliateProfile.code,
+      amout: amountFloat,
+      method: withdrawGateway,
+      details: payoutDetails || `Registered mobile payload address`,
+      status: 'pending',
+      date: new Date().toISOString().split('T')[0]
+    };
+    withdrawals.push(newRequest);
+    localStorage.setItem('webzone_admin_withdrawals', JSON.stringify(withdrawals));
+
+    triggerToast(`💸 Withdraw ticket for $${amountFloat} via ${withdrawGateway} submitted! Authorized in under 24 hours.`);
+  };
+
+  const handleAutoApproveSelfDev = () => {
+    if (!user) return;
+    const savedList = localStorage.getItem('webzone_affiliate_list');
+    const currentList = savedList ? JSON.parse(savedList) : [];
+    let matched = currentList.find((a: any) => a.userId === user.id);
+    if (!matched) {
+      matched = {
+        userId: user.id,
+        name: user.name,
+        email: user.email,
+        code: `AFF-${user.name.split(' ')[0].toUpperCase()}-${Math.floor(100 + Math.random() * 900)}`,
+        status: 'approved',
+        channel: 'Personal Blog',
+        paymentDetails: 'bKash: 01700000000',
+        commissionRate: 15,
+        clicks: 12,
+        referrals: 1,
+        totalEarned: 15,
+        balance: 15,
+        registeredAt: new Date().toISOString().split('T')[0],
+        country: 'Bangladesh'
+      };
+      currentList.push(matched);
+    } else {
+      matched.status = 'approved';
+    }
+    localStorage.setItem('webzone_affiliate_list', JSON.stringify(currentList));
+    setAffiliateProfile(matched);
+    setAffiliateStatus('approved');
+    triggerToast('⚡ Developer Sandbox Override: Grow partner approved!');
+  };
 
   // Wallet deposit simulated state
   const [depositAmount, setDepositAmount] = useState('50');
@@ -310,11 +722,15 @@ export default function Dashboard({
   const userWalletBalance = walletBalance;
   const setUserWalletBalance = setWalletBalance;
 
-  const [dnsRecords, setDnsRecords] = useState([
-    { id: 'dns-1', type: 'A', host: '@', value: '103.84.148.29', ttl: '3600' },
-    { id: 'dns-2', type: 'CNAME', host: 'www', value: 'webzonebd-ecommerce.com', ttl: '14400' },
-    { id: 'dns-3', type: 'MX', host: '@', value: 'mail.webzonebd.com (Priority: 10)', ttl: '3600' }
-  ]);
+  const [dnsRecords, setDnsRecords] = useState(() => {
+    const isPreseededUser = ['usr-101', 'usr-102', 'usr-103', 'usr-104', 'usr-105', 'usr-vendor', 'usr-admin', 'usr-webzonebd-admin'].includes(user?.id || '');
+    if (!isPreseededUser) return [];
+    return [
+      { id: 'dns-1', type: 'A', host: '@', value: '103.84.148.29', ttl: '3600' },
+      { id: 'dns-2', type: 'CNAME', host: 'www', value: 'webzonebd-ecommerce.com', ttl: '14400' },
+      { id: 'dns-3', type: 'MX', host: '@', value: 'mail.webzonebd.com (Priority: 10)', ttl: '3600' }
+    ];
+  });
 
   const activeHosting = hostingPackages;
   const setActiveHosting = setHostingPackages;
@@ -336,11 +752,15 @@ export default function Dashboard({
 
   // Project Portal Simulated State
   const [activeProjectTab, setActiveProjectTab] = useState<'details' | 'milestones' | 'chat'>('details');
-  const [projectComments, setProjectComments] = useState<{sender: string, text: string, time: string}[]>([
-    { sender: 'developer', text: 'আসসালামু আলাইকুম, we have successfully drafted the UI mockup screens based on your parameters. Let us know your feedback.', time: '10:15 AM' },
-    { sender: 'user', text: 'Looks magnificent. Please configure bKash checkout APIs in the production container next.', time: '11:42 AM' },
-    { sender: 'developer', text: 'Understood. We are wrapping the webhook configurations. Deployment is slated for Friday.', time: '11:50 AM' }
-  ]);
+  const [projectComments, setProjectComments] = useState<{sender: string, text: string, time: string}[]>(() => {
+    const isPreseededUser = ['usr-101', 'usr-102', 'usr-103', 'usr-104', 'usr-105', 'usr-vendor', 'usr-admin', 'usr-webzonebd-admin'].includes(user?.id || '');
+    if (!isPreseededUser) return [];
+    return [
+      { sender: 'developer', text: 'আসসালামু আলাইকুম, we have successfully drafted the UI mockup screens based on your parameters. Let us know your feedback.', time: '10:15 AM' },
+      { sender: 'user', text: 'Looks magnificent. Please configure bKash checkout APIs in the production container next.', time: '11:42 AM' },
+      { sender: 'developer', text: 'Understood. We are wrapping the webhook configurations. Deployment is slated for Friday.', time: '11:50 AM' }
+    ];
+  });
   const [commentInput, setCommentInput] = useState('');
 
   // Licensing Verification Engine Simulated States
@@ -392,9 +812,7 @@ export default function Dashboard({
     localStorage.setItem(`webzone_services_${user?.id || 'guest'}`, JSON.stringify(services));
   }, [services, user]);
 
-  useEffect(() => {
-    localStorage.setItem(`webzone_wishlist_items_${user?.id || 'guest'}`, JSON.stringify(wishlistItems));
-  }, [wishlistItems, user]);
+
 
   useEffect(() => {
     localStorage.setItem(`webzone_reward_points_${user?.id || 'guest'}`, rewardPoints.toString());
@@ -530,6 +948,246 @@ export default function Dashboard({
     }
   };
 
+  // Generate a premium visual PDF summary of invoice transaction details
+  const generateVisualPDFInvoice = (ord: Order) => {
+    try {
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      // Colors styling definition
+      const primaryColor = [37, 99, 235]; // #2563EB
+      const secondaryColor = [71, 85, 105]; // #475569
+      const darkColor = [15, 23, 42]; // #0F172A
+      const lightBg = [248, 250, 252]; // #F8FAFC
+      const borderColor = [226, 232, 240]; // #E2E8F0
+
+      // Accent top ribbon band
+      doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+      doc.rect(0, 0, 210, 8, 'F');
+
+      // Corporate Brand Header title
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(22);
+      doc.setTextColor(darkColor[0], darkColor[1], darkColor[2]);
+      doc.text('WEBZONEBD', 15, 22);
+
+      doc.setFont('Helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+      doc.text('Premium Software, Scripts, Domain & SSD Cloud hosting', 15, 27);
+
+      // INVOICE Header Section (Top Right Alignment)
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(24);
+      doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+      doc.text('INVOICE', 195, 22, { align: 'right' });
+
+      // Invoice metadata fields
+      doc.setFont('Helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+      doc.text(`Invoice ID: #${getOrderSerial(ord.id)}`, 195, 28, { align: 'right' });
+      doc.text(`Place Date: ${ord.date}`, 195, 33, { align: 'right' });
+      doc.text(`Payment: ${ord.paymentMethod.toUpperCase()}`, 195, 38, { align: 'right' });
+
+      // Clean horizontal separating divider rule
+      doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
+      doc.setLineWidth(0.4);
+      doc.line(15, 45, 195, 45);
+
+      // Left Column: Business details
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(darkColor[0], darkColor[1], darkColor[2]);
+      doc.text('FROM:', 15, 53);
+
+      doc.setFont('Helvetica', 'bold');
+      doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+      doc.text('WebzoneBD IT Solutions Ltd.', 15, 58);
+
+      doc.setFont('Helvetica', 'normal');
+      doc.setFontSize(8.5);
+      doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+      doc.text('Dhaka Office: House 4, Block F, Banani Road, Dhaka 1213', 15, 63);
+      doc.text('Saudi Arabia Online Node Support Hub', 15, 67);
+      doc.text('Contact WhatsApp: +966-570511931', 15, 71);
+      doc.text('Email: support@webzonebd.com', 15, 75);
+
+      // Right Column: Client / Customer billing details
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(darkColor[0], darkColor[1], darkColor[2]);
+      doc.text('BILLED TO:', 110, 53);
+
+      doc.setFont('Helvetica', 'bold');
+      doc.setTextColor(darkColor[0], darkColor[1], darkColor[2]);
+      doc.text(profileName, 110, 58);
+
+      doc.setFont('Helvetica', 'normal');
+      doc.setFontSize(8.5);
+      doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+      const orgStr = companyName ? `${companyName} (${taxId ? 'VAT: ' + taxId : 'Individual'})` : 'Individual Consumer';
+      doc.text(orgStr, 110, 63);
+      doc.text(`Email: ${profileEmail}`, 110, 67);
+      doc.text(`Phone: ${phoneCode} ${profileWhatsApp}`, 110, 71);
+      
+      const addrLine1 = billingStreet;
+      const addrLine2 = `${billingCity}, ${billingState}, ${billingPostal}`;
+      const addrLine3 = billingCountry;
+      doc.text(addrLine1, 110, 75);
+      doc.text(addrLine2, 110, 79);
+      doc.text(addrLine3, 110, 83);
+
+      // Separator rule
+      doc.line(15, 90, 195, 90);
+
+      // Calculations table values
+      const taxRate = 0.15; // 15% VAT
+      const discountRate = 0.20; // 20% Discount
+      const basePriceUsd = ord.price / ((1 - discountRate) * (1 + taxRate));
+      const discountAmountUsd = basePriceUsd * discountRate;
+      const subtotalValueUsd = basePriceUsd - discountAmountUsd;
+      const taxAmountUsd = subtotalValueUsd * taxRate;
+
+      // Header gray background rect
+      doc.setFillColor(lightBg[0], lightBg[1], lightBg[2]);
+      doc.rect(15, 97, 180, 8, 'F');
+      
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(darkColor[0], darkColor[1], darkColor[2]);
+      doc.text('Product Description / License Item', 18, 102);
+      doc.text('Qty', 130, 102, { align: 'center' });
+      doc.text('Unit Rate', 155, 102, { align: 'right' });
+      doc.text('Total', 192, 102, { align: 'right' });
+
+      // Table Header separation line
+      doc.line(15, 105, 195, 105);
+
+      // Table Row
+      doc.setFont('Helvetica', 'normal');
+      doc.setFontSize(8.5);
+      
+      let displayTitle = ord.itemTitle;
+      if (displayTitle.length > 55) {
+        displayTitle = displayTitle.substring(0, 52) + '...';
+      }
+
+      doc.text(displayTitle, 18, 111);
+      doc.text('1', 130, 111, { align: 'center' });
+      doc.text(formatPrice(basePriceUsd), 155, 111, { align: 'right' });
+      doc.text(formatPrice(basePriceUsd), 192, 111, { align: 'right' });
+
+      // Table Bottom separator line
+      doc.line(15, 115, 195, 115);
+
+      // Financial columns alignments
+      const finXLabel = 145;
+      const finXVal = 192;
+      let curY = 122;
+
+      doc.setFont('Helvetica', 'normal');
+      doc.setFontSize(8.5);
+      doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+      
+      doc.text('Base Retail Price:', finXLabel, curY);
+      doc.text(formatPrice(basePriceUsd), finXVal, curY, { align: 'right' });
+      
+      curY += 6;
+      doc.text('Promo Coupon (20%):', finXLabel, curY);
+      doc.setTextColor(16, 185, 129); // emerald green
+      doc.text(`-${formatPrice(discountAmountUsd)}`, finXVal, curY, { align: 'right' });
+      doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+
+      curY += 6;
+      doc.text('Discounted Subtotal:', finXLabel, curY);
+      doc.text(formatPrice(subtotalValueUsd), finXVal, curY, { align: 'right' });
+
+      curY += 6;
+      doc.text('VAT & IT Service Tax (15%):', finXLabel, curY);
+      doc.text(`+${formatPrice(taxAmountUsd)}`, finXVal, curY, { align: 'right' });
+
+      // Solid line for net total header
+      curY += 4;
+      doc.line(135, curY, 195, curY);
+
+      curY += 6;
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(10.5);
+      doc.setTextColor(darkColor[0], darkColor[1], darkColor[2]);
+      doc.text('Grand Total Paid:', finXLabel, curY);
+      doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+      doc.text(formatPrice(ord.price), finXVal, curY, { align: 'right' });
+
+      // Visual Status badge Stamp (Left side of financials)
+      let stampColor = [16, 185, 129]; // Emerald (completed)
+      let stampText = 'PAID / SECURED';
+      if (ord.paymentStatus === 'failed') {
+        stampColor = [239, 68, 68]; // Crimson
+        stampText = 'PAYMENT FAILED';
+      } else if (ord.paymentStatus === 'pending') {
+        stampColor = [245, 158, 11]; // Amber
+        stampText = 'PENDING CLEAR';
+      }
+
+      doc.setDrawColor(stampColor[0], stampColor[1], stampColor[2]);
+      doc.setLineWidth(0.8);
+      // Stamp rectangle box outline
+      doc.rect(15, 125, 60, 16);
+      
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(stampColor[0], stampColor[1], stampColor[2]);
+      doc.text(stampText, 45, 135, { align: 'center' });
+      doc.setFontSize(6.5);
+      doc.text('CRYPTOGRAPHIC LICENSING VALID', 45, 139, { align: 'center' });
+
+      // Sync sub-labels 
+      doc.setFont('Helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+      doc.text(`Payment Gateway: ${ord.paymentMethod.toUpperCase()}`, 15, 147);
+      doc.text(`Licensing Node Code: ${ord.id.toUpperCase().replace('ORD-', 'WZB-NODE-')}`, 15, 151);
+
+      // Terms list & bottom declarations
+      const footerY = 250;
+      doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
+      doc.line(15, footerY - 5, 195, footerY - 5);
+
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(8.5);
+      doc.setTextColor(darkColor[0], darkColor[1], darkColor[2]);
+      doc.text('Declaration & Terms of Digital Delivery', 15, footerY);
+
+      doc.setFont('Helvetica', 'normal');
+      doc.setFontSize(7.5);
+      doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+      doc.text('1. This is a system-generated electronic invoice securing full digital licenses under GPL regulations.', 15, footerY + 4);
+      doc.text('2. Downloaded software/scripts are instantly registered on our node database for support ticket authentication.', 15, footerY + 8);
+      doc.text('3. Cloud hosting purchases operate with dedicated automatic cPanel allocation setups.', 15, footerY + 12);
+      doc.text('Contact Hotline: +966-570511931 | Website: https://webzonebd.com | support@webzonebd.com', 15, footerY + 16);
+
+      // Dark elegant footer accent ribbon bar
+      doc.setFillColor(30, 41, 59); // Slate 800
+      doc.rect(0, 285, 210, 12, 'F');
+      
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(7.5);
+      doc.setTextColor(255, 255, 255);
+      doc.text('SECURE CRYPTOGRAPHIC TRANSACTION GATE • POWERED BY WEBZONEBD SYSTEMS', 105, 292, { align: 'center' });
+
+      // Save PDF output
+      doc.save(`invoice_WEBZONEBD_${getOrderSerial(ord.id)}.pdf`);
+      triggerToast('📥 Visual PDF summary downloaded successfully!');
+    } catch (err) {
+      console.error(err);
+      triggerToast('🚨 Failed to compile custom dynamic PDF invoice. Please use the Print Memo fallback.');
+    }
+  };
+
   // Image Upload Parser
   const handleAvatarFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -645,7 +1303,7 @@ export default function Dashboard({
       features: ["Verified Vendor Asset", "Certified compliance source code"],
       featuresBn: ["ভেন্ডর অনুমোদিত সোর্স কোড"],
       featuresAr: ["كود أمان معتمد للبيع"],
-      image: "https://images.unsplash.com/photo-1542831371-29b0f74f9713?auto=format&fit=crop&w=400&q=80",
+      image: vendorProdImage || "https://images.unsplash.com/photo-1542831371-29b0f74f9713?auto=format&fit=crop&w=400&q=80",
       demoUrl: "https://demo.webzonebd.com",
       downloadUrl: "https://webzonebd.com/downloads/vendor-code.zip",
       tags: [vendorProdCategory, "Vendor Studio Release"],
@@ -656,6 +1314,8 @@ export default function Dashboard({
     triggerToast(`🎉 Success! "${vendorProdName}" successfully cataloged in the Marketplace.`);
     setVendorProdName('');
     setVendorProdDesc('');
+    setVendorProdImage('');
+    setVendorProdImageFile(null);
   };
 
   const handleScriptDownload = (order: Order) => {
@@ -761,6 +1421,8 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
   // Extract wishlisted products from the master list using IDs synced dynamically inside the User object
   const wishlistedItems = products.filter(prod => user?.wishlistedProductIds?.includes(prod.id));
 
+
+
   // Auto-derived licenses from client purchases mapping
   const activeLicensesLists = orders.map((ord, idx) => ({
     id: `LIC-${ord.id}`,
@@ -793,16 +1455,6 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
       labelBn: '📦 আমার অর্ডার'
     },
     {
-      id: 'my-services',
-      label: '🚀 My Services',
-      labelBn: '🚀 আমার সার্ভিস'
-    },
-    {
-      id: 'digital-store',
-      label: '🛒 Digital Store',
-      labelBn: '🛒 ডিজিটাল স্টোর'
-    },
-    {
       id: 'downloads',
       label: '⬇️ Download Center',
       labelBn: '⬇️ ডাউনলোডস সেন্টার'
@@ -812,11 +1464,7 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
       label: '❤️ Saved Wishlist',
       labelBn: '❤️ আমার উইশলিস্ট'
     },
-    {
-      id: 'tickets',
-      label: '🎫 Support Tickets',
-      labelBn: '🎫 সাপোর্ট টিকেট'
-    },
+
     {
       id: 'billing',
       label: '🧾 Billing & Invoices',
@@ -826,11 +1474,6 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
       id: 'affiliate-program',
       label: '🤝 Affiliate Program',
       labelBn: '🤝 এফিলিয়েট প্রোগ্রাম'
-    },
-    {
-      id: 'notifications',
-      label: '🔔 Notification Center',
-      labelBn: '🔔 নোটিফিকেশন সেন্টার'
     },
     {
       id: 'profile',
@@ -946,6 +1589,8 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
             canAccessStaff={canAccessStaff}
             isCollapsed={isSidebarCollapsed}
             setIsCollapsed={handleSetSidebarCollapsed}
+            theme={theme}
+            setTheme={setTheme}
           />
 
           {/* RIGHT CONTENT PANEL: Interactive SaaS Pages Switch Board */}
@@ -1130,6 +1775,354 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
                   </div>
                 )}
 
+                {/* 🚚 REAL-TIME ORDER LOGISTICS & STEPPER TRACKING SUMMARY SECTION */}
+                <div className="bg-white dark:bg-[#0F172A] border border-neutral-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 text-left shadow-xl space-y-6">
+                  {/* Header metadata */}
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-neutral-100 dark:border-slate-800 pb-5">
+                    <div className="space-y-1">
+                      <h3 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2 font-sans tracking-tight">
+                        <Package className="w-5.5 h-5.5 text-indigo-500 animate-pulse" />
+                        <span>
+                          {language === 'bn' ? 'অর্ডার ট্র্যাকিং ও লজিস্টিকস গেটওয়ে' : 'Order Tracking & Dispatch Pipeline'}
+                        </span>
+                      </h3>
+                      <p className="text-xs text-neutral-400 dark:text-slate-400 leading-normal max-w-2xl">
+                        {language === 'bn'
+                          ? 'আপনার ক্রয়কৃত পিএইচপি স্ক্রিপ্ট, থিম এবং কাস্টম ডাটাবেস অটোমেশনের চলমান অবস্থা এবং প্রসেসিং টাইমলাইন দেখুন।'
+                          : 'Monitor real-time server compilation, license keys activation, and source code handover timelines.'}
+                      </p>
+                    </div>
+                    <span className="inline-flex self-start md:self-center items-center gap-1.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-mono text-[9px] font-black px-2.5 py-1 rounded-full border border-emerald-500/20 shrink-0 uppercase tracking-wide">
+                      <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping" />
+                      {language === 'bn' ? 'সরাসরি ডিসপ্যাচ রুট সচল' : 'Live Logistics Dispatch Link'}
+                    </span>
+                  </div>
+
+                  {(() => {
+                    const trackableOrdersList = orders.filter(o => o.paymentStatus !== 'pending').map(o => ({
+                      id: o.id,
+                      itemTitle: o.itemTitle,
+                      price: o.price,
+                      date: o.date,
+                      paymentMethod: o.paymentMethod,
+                      paymentStatus: o.paymentStatus as any,
+                      trackingId: o.trackingId || (o.paymentStatus === 'completed' ? `WZD-${o.id.toUpperCase()}-TRK-GLOBAL` : undefined),
+                      status: o.status || (o.paymentStatus === 'completed' ? 'delivered' : 'processing')
+                    }));
+
+                    if (trackableOrdersList.length === 0) {
+                      return (
+                        <div className="text-center py-12 px-4 rounded-3xl bg-neutral-50/50 dark:bg-slate-900/10 border border-dashed border-neutral-200 dark:border-slate-800 space-y-4">
+                          <Inbox className="w-12 h-12 mx-auto text-neutral-400 dark:text-slate-500 stroke-[1.5]" />
+                          <h4 className="text-sm font-extrabold text-slate-800 dark:text-slate-200">
+                            {language === 'bn' ? 'কোনো সক্রিয় ট্র্যাকযোগ্য অর্ডার নেই' : 'No Active Trackable Orders'}
+                          </h4>
+                          <p className="text-xs text-neutral-450 dark:text-slate-400 max-w-md mx-auto leading-relaxed">
+                            {language === 'bn'
+                              ? 'আপনার প্রোফাইলে কোনো সক্রিয় অর্ডার ট্র্যাক করার মতো নেই। একটি নতুন অর্ডার করার পর তার রিয়েল-টাইম ডিসপ্যাচ অগ্রগতি এখানে দেখতে পাবেন।'
+                              : 'You have no active orders to track. Once you log in and purchase from our digital store, your real-time script development and delivery tracker will show up here.'}
+                          </p>
+                        </div>
+                      );
+                    }
+
+                    const activeTrackedOrder = trackableOrdersList.find(o => o.id === selectedTrackingOrderId) || trackableOrdersList[0];
+                    const activeStep = orderTrackingSteps[activeTrackedOrder.id] !== undefined ? orderTrackingSteps[activeTrackedOrder.id] : 3;
+
+                    // Standard Pipeline steps structures
+                    const trackingSteps = [
+                      {
+                        titleEn: "Order Registered",
+                        titleBn: "অর্ডার নথিবদ্ধকরণ",
+                        descEn: "Customer checkout successfully initiated, processing authorization token.",
+                        descBn: "ক্রয় রিকোয়েস্টটি সিস্টেমে যুক্ত করা হয়েছে এবং ভেরিফিকেশনের জন্য পাঠানো হয়েছে।"
+                      },
+                      {
+                        titleEn: "Payment Verified",
+                        titleBn: "পেমেন্ট নিশ্চিতকরণ",
+                        descEn: "Secure funds cleared via gateway API ledger. Billing record upgraded.",
+                        descBn: "অটোমেটেড গেটওয়ের মাধ্যমে পরিশোধ সফলভাবে সম্পন্ন হয়েছে ও ইনভয়েস লেজার সচল করা হয়েছে।"
+                      },
+                      {
+                        titleEn: "Software Compilation",
+                        titleBn: "ফাইল ও লাইসেন্স প্রস্তুতকরণ",
+                        descEn: "Decrypting software packages, importing core schemas, registering API shields.",
+                        descBn: "প্রিমিয়াম ফাইলসমূহ রিডিউল করে আপনার ইউনিক অ্যাকাউন্ট লাইসেন্স কি ডিক্রিপ্ট করা হচ্ছে।"
+                      },
+                      {
+                        titleEn: "Dispatched to Portal",
+                        titleBn: "ফাইল ডাউনলোড সেন্টারে প্রেরণ",
+                        descEn: "Secure archive compiled, files and cryptographic key updated in customer center.",
+                        descBn: "সিস্টেম জিপ প্যাকেজ এবং সোর্স কোড কাস্টমারের ব্যক্তিগত ডাউনলোড প্যানেলে পাঠানো হয়েছে।"
+                      },
+                      {
+                        titleEn: "Active & Secure",
+                        titleBn: "সম্পূর্ণ সচল ও নিরাপদ",
+                        descEn: "Automation engine running. License signed as active, live checks fully online.",
+                        descBn: "অটোমেশন লাইসেন্স ভেরিফাইড। গ্রাহক ফাইল নামিয়ে ডেপ্লয়মেন্ট করতে সম্পূর্ণ প্রস্তুত।"
+                      }
+                    ];
+
+                    return (
+                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {/* Column 1: Order Selector Panel */}
+                        <div className="space-y-3 lg:border-r lg:border-neutral-100 lg:dark:border-slate-800 lg:pr-5">
+                          <p className="text-[11px] font-black uppercase text-slate-400 tracking-wider pl-1 font-mono text-left">
+                            {language === 'bn' ? 'অর্ডার তালিকা নির্বাচন করুন' : 'Select Order to Track'} ({trackableOrdersList.length})
+                          </p>
+
+                          <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
+                            {trackableOrdersList.map(ord => {
+                              const isSelected = ord.id === activeTrackedOrder.id;
+                              const ordStep = orderTrackingSteps[ord.id] !== undefined ? orderTrackingSteps[ord.id] : 4;
+                              return (
+                                <div
+                                  key={ord.id}
+                                  onClick={() => setSelectedTrackingOrderId(ord.id)}
+                                  className={`p-3.5 rounded-2xl border text-left cursor-pointer transition-all duration-200 ${
+                                    isSelected
+                                      ? 'bg-blue-50/70 dark:bg-slate-900 border-indigo-500 shadow-md ring-1 ring-indigo-500/20'
+                                      : 'bg-slate-50/50 dark:bg-slate-950/45 border-neutral-150 dark:border-slate-850 hover:bg-slate-50 dark:hover:bg-slate-900'
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="font-mono text-[10px] font-black text-indigo-500 dark:text-cyan-400">
+                                      #{getOrderSerial(ord.id)}
+                                    </span>
+                                    <span className={`text-[9px] font-mono font-black px-2 py-0.5 rounded-md ${
+                                      cancellationRequests[ord.id]
+                                        ? 'bg-rose-500/15 text-rose-500'
+                                        : ordStep === 4 
+                                        ? 'bg-emerald-500/15 text-emerald-500' 
+                                        : 'bg-amber-500/15 text-amber-500 animate-pulse'
+                                    }`}>
+                                      {cancellationRequests[ord.id]
+                                        ? (language === 'bn' ? '⏳ বাতিল পেন্ডিং' : '⏳ Cancel Pending')
+                                        : ordStep === 4 
+                                        ? (language === 'bn' ? '✓ সমাপ্ত' : '✓ Completed') 
+                                        : `${language === 'bn' ? 'ধাপ' : 'Stage'} ${ordStep + 1}/5`}
+                                    </span>
+                                  </div>
+                                  <h4 className="text-[11px] font-extrabold text-slate-800 dark:text-slate-200 mt-1.5 line-clamp-1">
+                                    {ord.itemTitle}
+                                  </h4>
+                                  <div className="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-dashed border-neutral-200 dark:border-slate-800/80 text-[10px] text-slate-400 font-mono">
+                                    <span>{ord.date}</span>
+                                    <span className="font-black text-slate-700 dark:text-slate-350">
+                                      {formatPrice(ord.price)}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Columns 2-3: Stepper Pipeline Visual */}
+                        <div className="lg:col-span-2 space-y-4">
+                          {/* Tracking Details Banner */}
+                          <div className="p-4 rounded-2xl bg-slate-50/80 dark:bg-slate-950/60 border border-neutral-150 dark:border-slate-850 text-left space-y-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <h4 className="text-xs font-black text-slate-800 dark:text-white font-mono flex items-center gap-1">
+                                <span>TRACKING:</span>
+                                <span className="text-indigo-500 font-black">#{getOrderSerial(activeTrackedOrder.id)}</span>
+                              </h4>
+                              <span className="text-[10px] font-mono text-slate-400">
+                                {language === 'bn' ? 'পেমেন্ট গেটওয়ে:' : 'Via:'} <strong className="font-bold text-slate-600 dark:text-slate-300">{activeTrackedOrder.paymentMethod}</strong>
+                              </span>
+                            </div>
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                              <p className="text-xs font-black text-slate-900 dark:text-slate-200 line-clamp-2 max-w-lg">
+                                {activeTrackedOrder.itemTitle}
+                              </p>
+                              
+                              {/* Request Cancellation Button */}
+                              {activeStep < 4 ? (
+                                <button
+                                  onClick={() => {
+                                    if (cancellationRequests[activeTrackedOrder.id]) return;
+                                    setCancellationRequests(prev => ({
+                                      ...prev,
+                                      [activeTrackedOrder.id]: true
+                                    }));
+                                    const logMessage = `Request Cancellation - Order #${activeTrackedOrder.id} (${activeTrackedOrder.itemTitle.substring(0, 40)}...) at Processing Stage ${activeStep + 1}`;
+                                    onAddActivityLog(logMessage);
+                                    triggerToast(language === 'bn' ? "অর্ডার বাতিলের অনুরোধ জমা দেওয়া হয়েছে ⚙️" : "Cancellation request successfully submitted ⚙️");
+                                  }}
+                                  disabled={cancellationRequests[activeTrackedOrder.id]}
+                                  className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-205 shrink-0 ${
+                                    cancellationRequests[activeTrackedOrder.id]
+                                      ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20 cursor-not-allowed'
+                                      : 'bg-red-500/10 hover:bg-red-500 hover:text-white text-red-500 border border-red-500/20 cursor-pointer active:scale-95'
+                                  }`}
+                                >
+                                  {cancellationRequests[activeTrackedOrder.id] ? (
+                                    <span>⏳ {language === 'bn' ? 'বাতিলকরণ প্রক্রিয়াধীন' : 'Cancellation Pending'}</span>
+                                  ) : (
+                                    <span>🚫 {language === 'bn' ? 'বাতিল অনুরোধ করুন' : 'Request Cancellation'}</span>
+                                  )}
+                                </button>
+                              ) : (
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  {submittedFeedback[activeTrackedOrder.id] ? (
+                                    <div className="flex flex-col items-end text-right">
+                                      <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[9px] font-black uppercase rounded-lg border border-emerald-500/20 select-none">
+                                        ✓ {language === 'bn' ? 'মতারত দেওয়া হয়েছে' : 'Feedback Submitted'}
+                                      </span>
+                                      <span className="text-[10px] text-amber-500 font-bold mt-1">
+                                        {"★".repeat(submittedFeedback[activeTrackedOrder.id].rating)}{"☆".repeat(5 - submittedFeedback[activeTrackedOrder.id].rating)}
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <button
+                                      onClick={() => {
+                                        setRatingOrderModalId(activeTrackedOrder.id);
+                                        setRatingStars(5);
+                                        setRatingComment('');
+                                      }}
+                                      className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 dark:text-white font-black text-[10px] uppercase rounded-xl tracking-wider shadow-md hover:scale-[1.02] active:scale-95 cursor-pointer transition flex items-center gap-1 shrink-0"
+                                    >
+                                      <span>⭐ {language === 'bn' ? 'মতামত ও রেটিং দিন' : 'Rate Product'}</span>
+                                    </button>
+                                  )}
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[9px] font-black uppercase rounded-lg border border-emerald-500/20 shrink-0 select-none">
+                                    ✓ {language === 'bn' ? 'সম্পূর্ণ ডেলিভারড' : 'Fully Active-Secure'}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Display Tracking ID when status is shipped (3) or delivered (4) */}
+                            {(activeStep === 3 || activeStep === 4) && activeTrackedOrder.trackingId && (
+                              <div className="mt-2.5 p-3 rounded-xl bg-indigo-500/5 dark:bg-cyan-500/5 border border-indigo-500/15 dark:border-cyan-500/15 text-[11px] text-indigo-700 dark:text-cyan-400 font-mono tracking-wide flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <Truck className="w-3.5 h-3.5 text-indigo-505 dark:text-cyan-400 animate-pulse" />
+                                  <span className="font-sans font-bold text-slate-700 dark:text-slate-300">
+                                    {language === 'bn' ? 'ডেলিভারি ট্র্যাকিং আইডি:' : 'SHIPPED/DELIVERED TRACKING ID:'}
+                                  </span>
+                                  <span className="font-extrabold select-all bg-indigo-500/10 dark:bg-cyan-500/10 px-2 py-0.5 rounded text-indigo-600 dark:text-cyan-300 border border-indigo-500/10">
+                                    {activeTrackedOrder.trackingId}
+                                  </span>
+                                </div>
+                                <span className={`text-[9px] font-sans font-black px-2 py-0.5 rounded uppercase self-start sm:self-auto ${
+                                  activeStep === 4
+                                    ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                                    : 'bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20'
+                                }`}>
+                                  {activeStep === 4 
+                                    ? (language === 'bn' ? 'ডেলিভারড' : 'Delivered Status') 
+                                    : (language === 'bn' ? 'পাঠানো হয়েছে (Shipped)' : 'Shipped Status')
+                                  }
+                                </span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Stepper Steps Trail */}
+                          <div className="relative pl-6 space-y-6 text-left border-l-2 border-neutral-200 dark:border-slate-800/90 ml-3">
+                            {trackingSteps.map((step, index) => {
+                              const isCompleted = index < activeStep;
+                              const isCurrent = index === activeStep;
+                              const isUpcoming = index > activeStep;
+
+                              return (
+                                <div key={index} className="relative group transition-all">
+                                  {/* Bullet Marker */}
+                                  <span className={`absolute -left-[35px] top-0.5 flex items-center justify-center w-6 h-6 rounded-full font-mono text-[10px] font-black border transition-all duration-300 ${
+                                    isCompleted
+                                      ? 'bg-emerald-500 border-emerald-400 text-slate-950 shadow-md shadow-emerald-500/20'
+                                      : isCurrent
+                                      ? 'bg-indigo-600 border-indigo-400 text-white shadow-lg shadow-indigo-600/30 animate-pulse'
+                                      : 'bg-white dark:bg-slate-900 border-neutral-300 dark:border-slate-800 text-slate-400'
+                                  }`}>
+                                    {isCompleted ? '✓' : index + 1}
+                                  </span>
+
+                                  {/* Step main block */}
+                                  <div className="space-y-1">
+                                    <div className="flex items-center gap-2">
+                                      <h4 className={`text-xs font-black tracking-tight ${
+                                        isCompleted
+                                          ? 'text-emerald-500'
+                                          : isCurrent
+                                          ? 'text-indigo-500 dark:text-cyan-400'
+                                          : 'text-slate-450 dark:text-slate-500'
+                                      }`}>
+                                        {language === 'bn' ? step.titleBn : step.titleEn}
+                                      </h4>
+
+                                      {/* Interactive status pill */}
+                                      {isCurrent && (
+                                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-indigo-500/10 text-indigo-500 dark:text-cyan-400 text-[8px] font-black font-sans uppercase rounded animate-pulse">
+                                          <span className="w-1 h-1 bg-indigo-500 rounded-full" />
+                                          {language === 'bn' ? 'চলমান প্রসেস' : 'Active Stage'}
+                                        </span>
+                                      )}
+                                      {isCompleted && (
+                                        <span className="text-[8px] font-mono font-black text-emerald-500/70 uppercase">
+                                          {language === 'bn' ? 'সম্পন্ন' : 'Completed'}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className={`text-[11px] leading-relaxed ${
+                                      isCurrent 
+                                        ? 'text-slate-705 dark:text-slate-300 font-medium' 
+                                        : 'text-neutral-450 dark:text-slate-400'
+                                    }`}>
+                                      {language === 'bn' ? step.descBn : step.descEn}
+                                    </p>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          {/* Dynamic Dispatch simulator tools */}
+                          <div className="bg-slate-50/50 dark:bg-slate-950/20 border border-neutral-150 dark:border-slate-850 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+                            <span className="font-mono text-slate-450 dark:text-slate-400 flex items-center gap-1.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-ping" />
+                              <span className="text-[10px] font-black uppercase tracking-wider">
+                                {language === 'bn' ? 'লাইভ ডিসপ্যাচ সিমুলেটর ⚙️' : 'Live Stage Simulator ⚙️'}
+                              </span>
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => {
+                                  setOrderTrackingSteps(prev => ({
+                                    ...prev,
+                                    [activeTrackedOrder.id]: Math.max(0, activeStep - 1)
+                                  }));
+                                  triggerToast(language === 'bn' ? "পূর্ববর্তী ধাপে স্থানান্তর করা হয়েছে" : "Moved logistics stage backward");
+                                }}
+                                disabled={activeStep === 0}
+                                className="px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-40 text-slate-700 dark:text-slate-200 border border-slate-250 dark:border-slate-700 font-extrabold rounded-xl transition cursor-pointer active:scale-95 flex items-center gap-1"
+                              >
+                                {language === 'bn' ? '← পূর্ববর্তী ধাপ' : '← Prev Stage'}
+                              </button>
+                              <span className="font-mono font-black text-slate-800 dark:text-white px-2.5 py-1 bg-slate-100 dark:bg-slate-800 rounded-lg">
+                                {activeStep + 1} / 5
+                              </span>
+                              <button
+                                onClick={() => {
+                                  setOrderTrackingSteps(prev => ({
+                                    ...prev,
+                                    [activeTrackedOrder.id]: Math.min(4, activeStep + 1)
+                                  }));
+                                  triggerToast(language === 'bn' ? "পরবর্তী ধাপে স্থানান্তর করা হয়েছে" : "Moved logistics stage forward");
+                                }}
+                                disabled={activeStep === 4}
+                                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-45 text-white font-extrabold rounded-xl transition cursor-pointer active:scale-95 flex items-center gap-1 shadow-md shadow-indigo-600/10"
+                              >
+                                {language === 'bn' ? 'পরবর্তী ধাপ →' : 'Next Stage →'}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+
                 {/* DYNAMIC DASHBOARD WIDGET MODULES */}
                 <DashboardWidgets
                   language={language}
@@ -1153,6 +2146,7 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
                   onAddActivityLog={onAddActivityLog}
                   formatPrice={formatPrice}
                   isNewClient={isNewClient}
+                  onUpdateOrders={onUpdateOrders}
                 />
 
                 {/* PREVIOUS STATIC DASHBOARD PORTLETS (SAFETY DEACTIVATED) */}
@@ -1362,7 +2356,7 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
                           <span className="text-[10px] uppercase font-bold tracking-wider">Saved Wishlist Items</span>
                           <div className="p-2.5 bg-rose-50 dark:bg-slate-900 text-rose-500 rounded-xl group-hover:scale-105 transition-transform"><Heart className="w-5 h-5 fill-rose-500/10" /></div>
                         </div>
-                        <p className="text-3xl font-black font-mono text-slate-900 dark:text-white mt-1">{wishlistItems.length}</p>
+                        <p className="text-3xl font-black font-mono text-slate-900 dark:text-white mt-1">{wishlistedItems.length}</p>
                         <div className="text-[10px] text-[#2563EB] dark:text-[#6366F1] font-bold mt-2 font-sans hover:underline">
                           View Saved Products & Services &rarr;
                         </div>
@@ -1510,7 +2504,7 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
                                     <span className="p-1 px-2 border border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-405 rounded text-[9px] font-mono uppercase font-bold">
                                       🛍️ Digital Store Licensed script
                                     </span>
-                                    <span className="font-mono text-[10px] text-slate-400 font-bold">{ord.id}</span>
+                                    <span className="font-mono text-[10px] text-slate-400 font-bold">{getOrderSerial(ord.id)}</span>
                                   </div>
                                   <h4 className="font-extrabold text-xs text-slate-900 dark:text-white leading-snug">{ord.itemTitle}</h4>
                                   <div className="flex items-center gap-3 text-[10px] text-slate-450 dark:text-slate-400 font-mono">
@@ -1526,8 +2520,8 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
                                   </div>
                                   <button 
                                     onClick={() => {
-                                      triggerToast(`Initializing Secure Script Download Protocol for solution reference: #${ord.id}`);
-                                      onAddActivityLog(`SaaS Digital Store download asset fetched: ID #${ord.id}`);
+                                      triggerToast(`Initializing Secure Script Download Protocol for solution reference: #${getOrderSerial(ord.id)}`);
+                                      onAddActivityLog(`SaaS Digital Store download asset fetched: ID #${getOrderSerial(ord.id)}`);
                                     }}
                                     className="px-2.5 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-[9px] uppercase rounded-xl transition cursor-pointer"
                                   >
@@ -1726,14 +2720,34 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
               </div>
             )}
 
+            {/* 🚚 ACTIVE VIEW: অর্ডার ট্র্যাকিং (Order Tracking Status) */}
+            {activeTab === 'order-tracker' && (
+              <UserOrderHistory
+                orders={orders}
+                language={language}
+                currency={currency}
+                formatPrice={formatPrice}
+                user={user}
+                triggerToast={triggerToast}
+                onUpdateOrders={onUpdateOrders}
+              />
+            )}
+
+            {/* 📈 ACTIVE VIEW: রেভিনিউ প্রবৃদ্ধি ও লেখচিত্র (Company Revenue & Growth Analytics) */}
+            {activeTab === 'revenue-analytics' && (
+              <CompanyRevenueDashboard
+                language={language}
+                theme={theme}
+                orders={orders}
+                currency={currency}
+                triggerToast={triggerToast}
+                isAdmin={user?.role === 'admin'}
+              />
+            )}
+
             {/* 2.📦 ACTIVE VIEW: আমার অর্ডার (My Orders) */}
             {activeTab === 'my-orders' && (() => {
               const filteredOrders = orders.filter((ord) => {
-                // Remove pending status orders completely from Customer Dashboard
-                if (ord.paymentStatus === 'pending') {
-                  return false;
-                }
-
                 // status filter
                 if (orderStatusFilter !== 'all' && ord.paymentStatus !== orderStatusFilter) {
                   return false;
@@ -1743,7 +2757,7 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
                 if (orderSearchQuery.trim()) {
                   const q = orderSearchQuery.toLowerCase();
                   const matchesTitle = ord.itemTitle.toLowerCase().includes(q);
-                  const matchesId = ord.id.toLowerCase().includes(q);
+                  const matchesId = ord.id.toLowerCase().includes(q) || getOrderSerial(ord.id).toLowerCase().includes(q);
                   const matchesMethod = ord.paymentMethod.toLowerCase().includes(q);
                   if (!matchesTitle && !matchesId && !matchesMethod) {
                     return false;
@@ -1792,10 +2806,11 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
                     const successfulOrders = orders.filter((o) => o.paymentStatus === 'completed');
                     const totalSuccessfulOrders = successfulOrders.length;
                     const totalSpentVal = successfulOrders.reduce((sum, o) => sum + o.price, 0);
+                    const pendingOrdersCount = orders.filter((o) => o.paymentStatus === 'pending').length;
                     const activeTicketsCount = tickets.filter((t) => t.status !== 'closed').length;
 
                     return (
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                         {/* Successful Orders */}
                         <div className="bg-gradient-to-br from-emerald-500/5 to-teal-500/5 dark:from-emerald-500/10 dark:to-teal-500/10 border border-emerald-500/10 dark:border-emerald-500/20 rounded-2xl p-4 flex items-center gap-4 shadow-sm">
                           <div className="p-3 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl shrink-0">
@@ -1836,6 +2851,26 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
                           </div>
                         </div>
 
+                        {/* Pending Orders Count - Requested placement */}
+                        <div className="bg-gradient-to-br from-amber-500/5 to-orange-500/5 dark:from-amber-500/10 dark:to-orange-500/10 border border-amber-500/10 dark:border-amber-500/20 rounded-2xl p-4 flex items-center gap-4 shadow-sm">
+                          <div className="p-3 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-xl shrink-0">
+                            <Clock className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-extrabold block">
+                              {language === 'bn' ? 'অপেক্ষমাণ অর্ডার' : 'Pending Order'}
+                            </span>
+                            <div className="flex items-baseline gap-1.5 mt-0.5">
+                              <span className="text-xl font-black text-slate-900 dark:text-white font-mono">
+                                {pendingOrdersCount}
+                              </span>
+                              <span className={`text-[10px] font-bold whitespace-nowrap ${pendingOrdersCount > 0 ? 'text-amber-600 dark:text-amber-400 animate-pulse' : 'text-slate-400 dark:text-slate-500'}`}>
+                                {pendingOrdersCount > 0 ? (language === 'bn' ? 'যাচাই করা হচ্ছে' : 'Verifying') : (language === 'bn' ? 'কোনোটি নেই' : 'None')}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
                         {/* Active Tickets */}
                         <div className="bg-gradient-to-br from-purple-500/5 to-indigo-500/5 dark:from-purple-500/10 dark:to-indigo-500/10 border border-purple-500/10 dark:border-purple-500/20 rounded-2xl p-4 flex items-center gap-4 shadow-sm">
                           <div className="p-3 bg-purple-500/10 text-[#7C3AED] dark:text-purple-400 rounded-xl shrink-0">
@@ -1849,7 +2884,7 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
                               <span className="text-xl font-black text-slate-900 dark:text-white font-mono">
                                 {activeTicketsCount}
                               </span>
-                              <span className={`text-[10px] font-bold whitespace-nowrap ${activeTicketsCount > 0 ? 'text-amber-500 animate-pulse' : 'text-slate-400 dark:text-slate-500'}`}>
+                              <span className={`text-[10px] font-bold whitespace-nowrap ${activeTicketsCount > 0 ? 'text-purple-550 animate-pulse' : 'text-slate-400 dark:text-slate-500'}`}>
                                 {activeTicketsCount > 0 ? (language === 'bn' ? 'অপেক্ষমান টিকিট' : 'Awaiting Support') : (language === 'bn' ? 'কোনো সমস্যা নেই' : 'Resolved')}
                               </span>
                             </div>
@@ -1920,7 +2955,8 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
                        {language === 'bn' ? 'স্ট্যাটাস ফিল্টার:' : 'Filter Status:'}
                     </span>
                     {[
-                      { key: 'all', label: 'All', labelBn: 'সকল', count: orders.filter(o => o.paymentStatus !== 'pending').length, color: 'indigo' },
+                      { key: 'all', label: 'All', labelBn: 'সকল', count: orders.length, color: 'indigo' },
+                      { key: 'pending', label: 'Pending', labelBn: 'অপেক্ষমাণ', count: orders.filter(o => o.paymentStatus === 'pending').length, color: 'amber' },
                       { key: 'completed', label: 'Paid / Completed', labelBn: 'পরিশোধিত', count: orders.filter(o => o.paymentStatus === 'completed').length, color: 'emerald' },
                       { key: 'failed', label: 'Failed', labelBn: 'ব্যর্থ', count: orders.filter(o => o.paymentStatus === 'failed').length, color: 'rose' }
                     ].map((pill) => {
@@ -1936,7 +2972,9 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
                                 ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/15 scale-[1.01]'
                                 : pill.color === 'rose'
                                   ? 'bg-rose-500 text-white shadow-sm shadow-rose-500/15 scale-[1.01]'
-                                  : 'bg-[#2563EB] text-white shadow-sm shadow-indigo-600/15 scale-[1.01]'
+                                  : pill.color === 'amber'
+                                    ? 'bg-amber-500 text-white shadow-sm shadow-amber-500/15 scale-[1.01]'
+                                    : 'bg-[#2563EB] text-white shadow-sm shadow-indigo-600/15 scale-[1.01]'
                               : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/60 dark:hover:bg-slate-700/80 text-slate-600 dark:text-slate-300'
                           }`}
                         >
@@ -1973,92 +3011,192 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
                       </button>
                     </div>
                   ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left text-xs whitespace-nowrap">
-                        <thead>
-                          <tr className="border-b border-neutral-200 dark:border-slate-800 text-neutral-400 uppercase tracking-widest text-[10px] font-mono">
-                            <th className="py-3 px-4">Invoice Code</th>
-                            <th className="py-3 px-4">Script Solution</th>
-                            <th className="py-3 px-4">Date</th>
-                            <th className="py-3 px-4">Paid Value</th>
-                            <th className="py-3 px-4">Method</th>
-                            <th className="py-3 px-4">Status</th>
-                            <th className="py-3 px-4">Actions</th>
+                    <div className="overflow-x-auto rounded-2xl border border-slate-100 dark:border-white/[0.06] relative">
+                      <table className="w-full text-left border-collapse min-w-[1000px] text-xs">
+                        <thead className="sticky top-0 z-20 bg-slate-50 dark:bg-neutral-900 border-b border-slate-100 dark:border-white/[0.08]">
+                          <tr className="text-purple-400 font-bold uppercase font-mono text-[10px] tracking-wider">
+                            <th className="py-3.5 px-4">Invoice ID</th>
+                            <th className="py-3.5 px-3">Products / Services</th>
+                            <th className="py-3.5 px-3">Order Date</th>
+                            <th className="py-3.5 px-3 text-right">Amount</th>
+                            <th className="py-3.5 px-3">Payment Method</th>
+                            <th className="py-3.5 px-3">Payment Status</th>
+                            <th className="py-3.5 px-4 text-right">Actions</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-neutral-100 dark:divide-slate-800/60 font-semibold text-xs text-neutral-800 dark:text-neutral-200">
+                        <tbody className="divide-y divide-slate-100 dark:divide-white/[0.06] font-semibold text-xs text-neutral-800 dark:text-neutral-200">
                           {filteredOrders.map((ord) => (
                             <React.Fragment key={ord.id}>
                               <tr 
                                 onClick={() => setSelectedInvoice(ord)}
                                 title={language === 'bn' ? 'অর্ডার মেমো ও বিবরণী দেখতে ক্লিক করুন' : 'Click anywhere on this row to open comprehensive order details & invoice'}
-                                className={`hover:bg-[#2563EB]/5 dark:hover:bg-slate-900/30 transition-colors cursor-pointer select-none ${expandedOrderId === ord.id ? 'bg-slate-100/30 dark:bg-slate-900/20' : ''}`}
+                                className={`hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors cursor-pointer select-none ${expandedOrderId === ord.id ? 'bg-purple-600/[0.02] dark:bg-purple-500/[0.02]' : ''}`}
                               >
-                                <td className="py-4 px-4 font-mono font-black text-neutral-500 dark:text-neutral-400">{ord.id}</td>
-                                <td className="py-4 px-4 font-black text-neutral-900 dark:text-white max-w-[260px] truncate">{ord.itemTitle}</td>
-                                <td className="py-4 px-4 font-mono text-neutral-500 dark:text-neutral-400">{ord.date}</td>
-                                <td className="py-4 px-4 font-mono text-emerald-500 dark:text-emerald-400 font-black">{formatPrice(ord.price)}</td>
-                                <td className="py-4 px-4">
-                                  <span className="uppercase font-mono bg-[#2563EB]/5 dark:bg-[#2563EB]/14 text-[#2563EB] dark:text-cyan-405 px-2 py-0.5 rounded text-[10px] font-extrabold">
-                                    {ord.paymentMethod}
+                                <td className="py-3.5 px-4 font-mono font-bold">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedInvoice(ord);
+                                    }}
+                                    className="text-purple-500 hover:text-purple-400 hover:underline flex items-center gap-1 focus:outline-none font-bold"
+                                  >
+                                    <span>{getOrderSerial(ord.id)}</span>
+                                    <ExternalLink className="w-2.5 h-2.5 opacity-65" />
+                                  </button>
+                                </td>
+                                <td className="py-3.5 px-3">
+                                  <div className="font-semibold truncate max-w-[240px] dark:text-white" title={ord.itemTitle}>{ord.itemTitle}</div>
+                                  <span className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-white/[0.06] text-[8px] font-bold uppercase tracking-wide inline-block mt-1">
+                                    {ord.itemTitle.toLowerCase().includes('hosting') ? 'Hosting' : ord.itemTitle.toLowerCase().includes('domain') ? 'Domain' : 'Script Solution'}
                                   </span>
                                 </td>
-                                <td className="py-4 px-4">
-                                  {ord.paymentStatus === 'completed' && (
-                                    <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full font-bold">
-                                      <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                                      {language === 'bn' ? 'পরিশোধিত' : 'PAID'}
-                                    </span>
-                                  )}
-                                  {ord.paymentStatus === 'pending' && (
-                                    <span className="inline-flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-full font-bold">
-                                      <span className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse" />
-                                      {language === 'bn' ? 'অপেক্ষমান' : 'PENDING'}
-                                    </span>
-                                  )}
-                                  {ord.paymentStatus === 'failed' && (
-                                    <span className="inline-flex items-center gap-1 text-[10px] text-rose-600 dark:text-rose-450 bg-rose-500/10 px-2.5 py-1 rounded-full font-bold">
-                                      <span className="w-1.5 h-1.5 bg-rose-500 rounded-full" />
-                                      {language === 'bn' ? 'ব্যর্থ' : 'FAILED'}
-                                    </span>
-                                  )}
+                                <td className="py-3.5 px-3 font-mono opacity-80 whitespace-nowrap">
+                                  {ord.date ? ord.date.slice(0, 16).replace('T', ' ') : 'N/A'}
                                 </td>
-                                <td className="py-4 px-4">
-                                  <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                                <td className="py-3.5 px-3 text-right font-black font-mono text-purple-400 text-sm whitespace-nowrap">
+                                  {formatPrice(ord.price)}
+                                </td>
+                                <td className="py-3.5 px-3">
+                                  <span className="font-mono font-bold uppercase tracking-wide opacity-80 flex items-center gap-1">
+                                    <CreditCard className="w-3 h-3 text-slate-400" />
+                                    {ord.paymentMethod || 'SSLCommerz'}
+                                  </span>
+                                </td>
+                                <td className="py-3.5 px-3">
+                                  {(() => {
+                                    let style = 'bg-amber-500/10 text-amber-500 border border-amber-500/20';
+                                    if (ord.paymentStatus === 'completed') {
+                                      style = 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+                                    } else if (ord.paymentStatus === 'failed') {
+                                      style = 'bg-rose-500/10 text-rose-400 border border-rose-500/20';
+                                    }
+                                    return (
+                                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold font-sans ${style}`}>
+                                        {ord.paymentStatus === 'completed' ? 'Paid' : ord.paymentStatus.toUpperCase()}
+                                      </span>
+                                    );
+                                  })()}
+                                </td>
+                                <td className="py-3.5 px-4 text-right">
+                                  <div className="relative inline-block text-left" onClick={(e) => e.stopPropagation()}>
                                     <button
+                                      type="button"
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        setExpandedOrderId(expandedOrderId === ord.id ? null : ord.id);
+                                        setOpenActionDropdownId(openActionDropdownId === ord.id ? null : ord.id);
                                       }}
-                                      className={`px-3 py-1 border rounded-lg text-[11px] transition-all flex items-center gap-1 cursor-pointer font-bold ${
-                                        expandedOrderId === ord.id
-                                          ? 'bg-[#2563EB] text-white border-[#2563EB] shadow-md shadow-[#2563EB]/15 scale-[1.01]'
-                                          : 'bg-neutral-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-neutral-210 dark:border-slate-750 hover:bg-neutral-100 dark:hover:bg-slate-700/60'
-                                      }`}
+                                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-neutral-55 hover:bg-neutral-100 dark:bg-slate-800 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-300 border border-neutral-210 dark:border-slate-700 rounded-lg text-xs font-bold transition-all duration-150 cursor-pointer shadow-sm"
                                     >
-                                      <span>{expandedOrderId === ord.id ? (language === 'bn' ? 'বন্ধ করুন ✕' : 'Close ✕') : (language === 'bn' ? 'স্ট্যাটাস 🚚' : 'Track 🚚')}</span>
+                                      <span>{language === 'bn' ? 'অ্যাকশন' : 'Actions'}</span>
+                                      <ChevronDown className="w-3 h-3 transition-transform duration-200" style={{ transform: openActionDropdownId === ord.id ? 'rotate(180deg)' : 'none' }} />
                                     </button>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleScriptDownload(ord);
-                                      }}
-                                      className="px-3 py-1 bg-gradient-to-r from-emerald-500 to-green-500 hover:scale-[1.02] text-slate-950 font-black rounded-lg transition-transform text-[11px] cursor-pointer"
-                                      disabled={ord.paymentStatus !== 'completed'}
-                                      title={ord.paymentStatus !== 'completed' ? 'Awaiting Payment' : 'Download ZIP'}
-                                      style={{ opacity: ord.paymentStatus !== 'completed' ? 0.4 : 1 }}
-                                    >
-                                      📥 ZIP Code file
-                                    </button>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setSelectedInvoice(ord);
-                                      }}
-                                      className="px-3 py-1 bg-neutral-100 dark:bg-slate-800 border border-neutral-210 dark:border-slate-700 hover:bg-neutral-200 dark:hover:bg-slate-750 rounded-lg text-[11px] transition text-neutral-700 dark:text-neutral-300 cursor-pointer"
-                                    >
-                                      Invoice 🧾
-                                    </button>
+
+                                    {openActionDropdownId === ord.id && (
+                                      <>
+                                        {/* Invisible overlay for click-outside closure */}
+                                        <div 
+                                          className="fixed inset-0 z-30 bg-transparent cursor-default" 
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setOpenActionDropdownId(null);
+                                          }}
+                                        />
+                                        <div className="absolute right-0 mt-1.5 w-44 bg-white dark:bg-[#1E293B] border border-neutral-200 dark:border-slate-800 rounded-xl shadow-xl z-40 py-1 px-1.5 animate-in fade-in slide-in-from-top-1 duration-150 text-left">
+                                          {/* Track */}
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setExpandedOrderId(expandedOrderId === ord.id ? null : ord.id);
+                                              setOpenActionDropdownId(null);
+                                            }}
+                                            className={`w-full flex items-center px-2.5 py-2 text-[11px] font-extrabold transition duration-150 rounded-lg cursor-pointer ${
+                                              expandedOrderId === ord.id 
+                                                ? 'bg-purple-600 text-white' 
+                                                : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60'
+                                            }`}
+                                          >
+                                            <Truck className={`w-3.5 h-3.5 mr-2 shrink-0 ${expandedOrderId === ord.id ? 'text-white' : 'text-purple-500'}`} />
+                                            <span>{language === 'bn' ? 'ট্র্যাক করুন 🚚' : 'Track 🚚'}</span>
+                                          </button>
+
+                                          {/* Download File Link */}
+                                          {ord.paymentStatus === 'completed' ? (
+                                            <button
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleScriptDownload(ord);
+                                                setOpenActionDropdownId(null);
+                                              }}
+                                              className="w-full flex items-center px-2.5 py-2 text-[11px] font-extrabold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition duration-150 rounded-lg cursor-pointer"
+                                            >
+                                              <Download className="w-3.5 h-3.5 mr-2 text-emerald-500 shrink-0" />
+                                              <span>{language === 'bn' ? 'ডাউনলোড ফাইল লিংক 📥' : 'Download File Link 📥'}</span>
+                                            </button>
+                                          ) : (
+                                            <div
+                                              className="w-full flex items-center px-2.5 py-2 text-[11px] font-extrabold text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-60 rounded-lg"
+                                              title={language === 'bn' ? 'ডাউনলোড করতে পেমেন্ট করুন' : 'Pay to download'}
+                                            >
+                                              <Download className="w-3.5 h-3.5 mr-2 text-slate-400 shrink-0" />
+                                              <span>{language === 'bn' ? 'ডাউনলোড ফাইল লিংক 🔒' : 'Download File Link 🔒'}</span>
+                                            </div>
+                                          )}
+
+                                          {/* Invoice */}
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setSelectedInvoice(ord);
+                                              setOpenActionDropdownId(null);
+                                            }}
+                                            className="w-full flex items-center px-2.5 py-2 text-[11px] font-extrabold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition duration-150 rounded-lg cursor-pointer"
+                                          >
+                                            <CreditCard className="w-3.5 h-3.5 mr-2 text-blue-500 shrink-0" />
+                                            <span>{language === 'bn' ? 'রসিদ 🧾' : 'Invoice 🧾'}</span>
+                                          </button>
+
+                                          {/* Notes */}
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setEditingNotesOrder(ord);
+                                              setTempNotesText(ord.orderNotes || '');
+                                              setOpenActionDropdownId(null);
+                                            }}
+                                            className="w-full flex items-center px-2.5 py-2 text-[11px] font-extrabold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition duration-150 rounded-lg cursor-pointer"
+                                          >
+                                            <ShoppingCart className="w-3.5 h-3.5 mr-2 text-amber-500 shrink-0" />
+                                            <span>{language === 'bn' ? 'নোট 📝' : 'Notes 📝'}</span>
+                                          </button>
+
+                                          {/* Divider */}
+                                          <div className="my-1 border-t border-neutral-100 dark:border-slate-800" />
+
+                                          {/* Delete */}
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setDeleteConfirmOrder({
+                                                isOpen: true,
+                                                orderId: ord.id,
+                                                itemTitle: ord.itemTitle
+                                              });
+                                              setOpenActionDropdownId(null);
+                                            }}
+                                            className="w-full flex items-center px-2.5 py-2 text-[11px] font-extrabold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition duration-150 rounded-lg cursor-pointer"
+                                          >
+                                            <Trash2 className="w-3.5 h-3.5 mr-2 text-rose-550 shrink-0" />
+                                            <span>{language === 'bn' ? 'মুছুন 🗑️' : 'Delete 🗑️'}</span>
+                                          </button>
+                                        </div>
+                                      </>
+                                    )}
                                   </div>
                                 </td>
                               </tr>
@@ -2075,7 +3213,7 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
                                             {language === 'bn' ? 'অর্ডার ট্র্যাকিং সিস্টেম' : 'ORDER STATUS TRACKING'}
                                           </h4>
                                           <div className="flex flex-wrap items-center gap-2 mt-1">
-                                            <span className="text-xs font-black text-slate-900 dark:text-white font-mono bg-slate-100 dark:bg-slate-900 px-2 py-0.5 rounded">#{ord.id}</span>
+                                            <span className="text-xs font-black text-slate-900 dark:text-white font-mono bg-slate-100 dark:bg-slate-900 px-2 py-0.5 rounded">#{getOrderSerial(ord.id)}</span>
                                             <span className="text-xs text-neutral-500 dark:text-neutral-400 font-extrabold truncate max-w-[200px] sm:max-w-sm">{ord.itemTitle}</span>
                                           </div>
                                         </div>
@@ -2236,6 +3374,155 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
                  </div>
                );
              })()}
+            {/* DEDICATED PENDING ORDERS SUMMARY & ACTIVE SUPPORT TICKETS SECTION */}
+            {activeTab === 'my-orders' && (() => {
+              const pendingOrders = orders.filter(o => o.paymentStatus === 'pending');
+              const activeTickets = tickets.filter(t => t.status !== 'closed');
+
+              return (
+                <div className="bg-white/85 dark:bg-[#0F172A]/90 backdrop-blur-[20px] border border-neutral-200/60 dark:border-slate-800/80 rounded-3xl p-6 shadow-xl space-y-6 text-left mt-6 animate-in duration-300">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    
+                    {/* PENDING ORDERS SUMMARY */}
+                    <div className="bg-gradient-to-br from-amber-500/5 to-orange-500/5 dark:from-amber-500/10 dark:to-orange-500/10 border border-amber-500/10 dark:border-amber-500/20 rounded-2xl p-5 shadow-sm space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="p-2 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-xl">
+                            <Clock className="w-5 h-5 animate-pulse" />
+                          </div>
+                          <div className="text-left">
+                            <h4 className="text-xs font-black text-amber-800 dark:text-amber-400 uppercase tracking-tight">
+                              {language === 'bn' ? '⏰ অপেক্ষমান অর্ডার তালিকা (Pending Orders)' : '⏰ Pending Orders Summary'}
+                            </h4>
+                            <p className="text-[10px] text-slate-400 dark:text-slate-500">
+                              {language === 'bn' ? 'ভেরিফিকেশনের জন্য অপেক্ষায় থাকা ডিজিটাল পারচেজ' : 'Digital purchases currently in payment verification'}
+                            </p>
+                          </div>
+                        </div>
+                        <span className="text-[10px] bg-amber-500 text-slate-950 px-2.5 py-0.5 rounded-full font-mono font-black animate-pulse">
+                          {pendingOrders.length}
+                        </span>
+                      </div>
+
+                      {pendingOrders.length === 0 ? (
+                        <div className="bg-white/40 dark:bg-slate-900/40 rounded-xl p-5 text-center border border-dashed border-amber-500/10 dark:border-amber-500/20">
+                          <span className="text-lg">💡</span>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 font-bold mt-1">
+                            {language === 'bn' ? 'বর্তমানে কোনো অপেক্ষমাণ অর্ডার নেই।' : 'No pending orders require payment verification.'}
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-2.5 max-h-[220px] overflow-y-auto pr-1">
+                          {pendingOrders.map(ord => (
+                            <div 
+                              key={ord.id}
+                              className="group bg-white dark:bg-[#1E293B] border border-amber-500/20 rounded-xl p-3 hover:border-amber-500/40 hover:shadow-sm transition-all text-left flex items-center justify-between gap-3 animate-in fade-in"
+                            >
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-mono text-[10px] font-black text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2.5 py-0.5 rounded-md">
+                                    #{getOrderSerial(ord.id)}
+                                  </span>
+                                  <span className="text-[11px] text-slate-700 dark:text-slate-300 font-extrabold truncate max-w-[150px] sm:max-w-[200px]">
+                                    {ord.itemTitle}
+                                  </span>
+                                </div>
+                                <p className="text-[9px] text-slate-400 font-semibold mt-1">
+                                  {language === 'bn' ? 'টাকা:' : 'Price:'} <strong className="text-slate-700 dark:text-slate-300 font-mono">${ord.price}</strong> • {ord.paymentMethod}
+                                </p>
+                              </div>
+                              <div className="text-right shrink-0 flex flex-col items-end gap-1">
+                                <span className="inline-flex items-center gap-1 text-[9px] font-mono font-black text-amber-500 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20 animate-pulse">
+                                  <Loader2 className="w-2.5 h-2.5 animate-spin text-amber-500" />
+                                  {language === 'bn' ? 'যাচাই হচ্ছে' : 'VERIFYING'}
+                                </span>
+                                <span className="text-[9px] text-slate-400 font-medium">
+                                  {ord.date}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* ACTIVE SUPPORT TICKETS */}
+                    <div className="bg-gradient-to-br from-purple-500/5 to-indigo-500/5 dark:from-purple-500/10 dark:to-indigo-500/10 border border-purple-500/10 dark:border-purple-500/20 rounded-2xl p-5 shadow-sm space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="p-2 bg-purple-500/10 text-purple-600 dark:text-purple-400 rounded-xl">
+                            <Ticket className="w-5 h-5" />
+                          </div>
+                          <div className="text-left">
+                            <h4 className="text-xs font-black text-[#7C3AED] dark:text-purple-400 uppercase tracking-tight">
+                              {language === 'bn' ? '🎫 সক্রিয় সাপোর্ট টিকেট তালিকা (Support Tickets)' : '🎫 Active Support Tickets'}
+                            </h4>
+                            <p className="text-[10px] text-slate-400 dark:text-slate-500">
+                              {language === 'bn' ? 'আপনার ওপেন বা এনসার্ড সেশন হেল্পডেস্ক সমুহ' : 'Your unresolved technical & billing helpdesk queries'}
+                            </p>
+                          </div>
+                        </div>
+                        <span className="text-[10px] bg-[#7C3AED] text-white px-2.5 py-0.5 rounded-full font-mono font-black">
+                          {activeTickets.length}
+                        </span>
+                      </div>
+
+                      {activeTickets.length === 0 ? (
+                        <div className="bg-white/40 dark:bg-slate-900/40 rounded-xl p-5 text-center border border-dashed border-purple-500/10 dark:border-purple-500/20">
+                          <span className="text-lg">✨</span>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 font-bold mt-1">
+                            {language === 'bn' ? 'কোনো সক্রিয় সাপোর্ট মেমোরেন্ডাম নেই।' : 'No active support tickets found.'}
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-2.5 max-h-[220px] overflow-y-auto pr-1">
+                          {activeTickets.map(tkt => (
+                            <div 
+                              key={tkt.id}
+                              onClick={() => {
+                                setActiveTab('tickets');
+                                setActiveTicketForChat(tkt);
+                                onAddActivityLog(`Navigated to active ticket ${tkt.id} from Purchase Catalog`);
+                              }}
+                              className="group cursor-pointer bg-white dark:bg-[#1E293B] border border-purple-500/20 rounded-xl p-3 hover:border-[#7C3AED] hover:shadow-sm transition-all text-left flex items-center justify-between gap-3 animate-in fade-in"
+                            >
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-mono text-[10px] font-black text-purple-600 dark:text-purple-400 bg-purple-500/10 px-2.5 py-0.5 rounded-md">
+                                    #{tkt.id}
+                                  </span>
+                                  <span className="text-[11px] text-slate-700 dark:text-slate-300 font-extrabold truncate max-w-[150px] sm:max-w-[200px]">
+                                    {tkt.subject}
+                                  </span>
+                                </div>
+                                <p className="text-[9px] text-slate-400 font-semibold mt-1">
+                                  {language === 'bn' ? 'বিভাগ:' : 'Category:'} <strong className="text-slate-700 dark:text-slate-300 font-semibold">{tkt.category}</strong> • {language === 'bn' ? 'অগ্রাধিকার:' : 'Priority:'} <span className={tkt.priority === 'high' ? 'text-rose-500 font-bold' : 'text-slate-500'}>{tkt.priority.toUpperCase()}</span>
+                                </p>
+                              </div>
+                              <div className="text-right shrink-0 flex flex-col items-end gap-1">
+                                <span className={`inline-flex items-center gap-1 text-[9px] font-mono font-black px-2 py-0.5 rounded-full border ${
+                                  tkt.status === 'answered'
+                                    ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                                    : 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20 animate-pulse'
+                                }`}>
+                                  <span className={`w-1.5 h-1.5 rounded-full ${tkt.status === 'answered' ? 'bg-emerald-500' : 'bg-indigo-500 animate-ping'}`} />
+                                  {tkt.status.toUpperCase()}
+                                </span>
+                                <span className="text-[9px] text-[#7C3AED] dark:text-purple-400 font-black group-hover:underline">
+                                  {language === 'bn' ? 'চ্যাটে যান →' : 'Chat →'}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                  </div>
+                </div>
+              );
+            })()}
+
             {(activeTab === 'my-services' || activeTab.includes('service') || ['active-services', 'project-phases', 'timeline-map'].includes(activeTab)) && (
               <div className="bg-white/80 dark:bg-[#0F172A]/90 backdrop-blur-[20px] border border-neutral-200/60 dark:border-slate-800/80 rounded-3xl p-6 shadow-xl space-y-6 text-left animate-in fade-in duration-300">
                 
@@ -2951,16 +4238,33 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
                           </button>
                         </div>
                       ) : (
-                        displayedDomains.map(dom => (
-                        <div key={dom.id} className="p-5 rounded-2xl bg-[#F8FAFC] dark:bg-slate-900 border border-slate-150 dark:border-slate-850 space-y-4">
-                          <div className="flex items-center justify-between">
-                            <span className="font-mono text-xs text-slate-400 font-bold">Domain ID: {dom.id}</span>
-                            <span className={`p-1 px-2 border rounded-md text-[9px] font-mono tracking-wider font-extrabold uppercase ${
-                              dom.status === 'Active' ? 'bg-emerald-500/15 text-emerald-500 border-emerald-500/30' : 'bg-amber-500/15 text-amber-500 border-amber-500/30'
-                            }`}>
-                              {dom.status}
-                            </span>
-                          </div>
+                        displayedDomains.map(dom => {
+                          const daysRemaining = getDaysRemaining(dom.expiresAt);
+                          return (
+                          <div key={dom.id} className={`p-5 rounded-2xl bg-[#F8FAFC] dark:bg-slate-900 border space-y-4 transition-all duration-300 ${
+                            daysRemaining <= 30
+                              ? 'border-rose-400/40 dark:border-rose-900/60 shadow-[0_0_15px_rgba(239,68,68,0.05)] bg-rose-50/10 dark:bg-rose-950/5'
+                              : 'border-slate-150 dark:border-slate-850'
+                          }`}>
+                            <div className="flex items-center justify-between">
+                              <span className="font-mono text-xs text-slate-400 font-bold">Domain ID: {dom.id}</span>
+                              <div className="flex items-center gap-1.5">
+                                {daysRemaining <= 30 && (
+                                  <span className={`p-1 px-2 border rounded-md text-[9px] font-mono tracking-wider font-extrabold uppercase animate-pulse flex items-center gap-1 ${
+                                    daysRemaining <= 0
+                                      ? 'bg-rose-500/15 text-rose-500 border-rose-500/30 shadow-[0_0_8px_rgba(239,68,68,0.15)]'
+                                      : 'bg-amber-500/15 text-amber-500 border-amber-500/30 shadow-[0_0_8px_rgba(245,158,11,0.15)]'
+                                  }`}>
+                                    ⚠️ {daysRemaining <= 0 ? 'Expired' : `Expires in ${daysRemaining}d`}
+                                  </span>
+                                )}
+                                <span className={`p-1 px-2 border rounded-md text-[9px] font-mono tracking-wider font-extrabold uppercase ${
+                                  dom.status === 'Active' ? 'bg-emerald-500/15 text-emerald-500 border-emerald-500/30' : 'bg-amber-500/15 text-amber-500 border-amber-500/30'
+                                }`}>
+                                  {dom.status}
+                                </span>
+                              </div>
+                            </div>
 
                           <div className="space-y-1">
                             <h4 className="font-extrabold text-[#2563EB] dark:text-[#38BDF8] text-base font-mono">{dom.domainName}</h4>
@@ -3002,7 +4306,9 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
                             </button>
                           </div>
                         </div>
-                      )))}
+                          );
+                        })
+                      )}
                     </div>
                   </div>
                 )}
@@ -3181,9 +4487,14 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
                   {activeHosting.map(host => {
                     const cpuPercent = host.cpuUsage || 28;
                     const ssdPercent = Math.round((host.ssdSpaceUsed / host.ssdSpaceLimit) * 100);
+                    const daysRemaining = host.expiresAt ? getDaysRemaining(host.expiresAt) : 999;
 
                     return (
-                      <div key={host.id} className="p-5 rounded-2xl bg-[#F8FAFC] dark:bg-slate-900 border border-slate-150 dark:border-slate-850 space-y-5">
+                      <div key={host.id} className={`p-5 rounded-2xl bg-[#F8FAFC] dark:bg-slate-900 border space-y-5 transition-all duration-300 ${
+                        daysRemaining <= 30
+                          ? 'border-rose-400/40 dark:border-rose-900/60 shadow-[0_0_15px_rgba(239,68,68,0.05)] bg-rose-50/10 dark:bg-rose-950/5'
+                          : 'border-slate-150 dark:border-slate-850'
+                      }`}>
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                           <div className="space-y-0.5">
                             <span className="text-[10px] font-mono text-slate-400 block">CONTAINER SERIAL ID: {host.id}</span>
@@ -3203,6 +4514,15 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
                             >
                               ⚡ Launch cPanel Dashboard
                             </button>
+                            {host.expiresAt && daysRemaining <= 30 && (
+                              <span className={`p-1 px-2 border rounded-md text-[9px] font-mono tracking-wider font-extrabold uppercase animate-pulse flex items-center gap-1 ${
+                                daysRemaining <= 0
+                                  ? 'bg-rose-500/15 text-rose-500 border-rose-500/30 shadow-[0_0_8px_rgba(239,68,68,0.15)]'
+                                  : 'bg-amber-500/15 text-amber-500 border-amber-500/30 shadow-[0_0_8px_rgba(245,158,11,0.15)]'
+                              }`}>
+                                ⚠️ {daysRemaining <= 0 ? 'Expired' : `Expires in ${daysRemaining}d`}
+                              </span>
+                            )}
                             <span className="p-1 px-2.5 bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 text-[9px] font-mono font-bold rounded uppercase">
                               Active
                             </span>
@@ -3246,7 +4566,12 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
                         </div>
 
                         <div className="pt-3 border-t border-slate-150 dark:border-slate-800 flex items-center justify-between gap-1.5 flex-wrap font-mono text-xs">
-                          <span className="text-[10px] text-slate-400">Primary Server Domain URL: <strong className="text-indigo-400 underline font-semibold">{host.primaryDomain}</strong></span>
+                          <div className="flex flex-col space-y-0.5">
+                            <span className="text-[10px] text-slate-400">Primary Server Domain URL: <strong className="text-indigo-400 underline font-semibold">{host.primaryDomain}</strong></span>
+                            {host.expiresAt && (
+                              <span className="text-[10px] text-slate-400">Renews / Expires: <strong className={`${daysRemaining <= 30 ? 'text-[#EF4444]' : 'text-slate-500'} font-semibold`}>{host.expiresAt}</strong></span>
+                            )}
+                          </div>
                           
                           <div className="flex items-center gap-2">
                             <button
@@ -3323,7 +4648,7 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
 
                   <div className="p-4 rounded-xl bg-blue-500/5 border border-blue-500/10 text-blue-500 text-left space-y-1">
                     <span className="text-[9px] text-slate-400 uppercase font-bold block">Active Billing Profile</span>
-                    <p className="font-extrabold text-[11px] mt-1 text-slate-300">Standard Tier Client ID: #9832</p>
+                    <p className="font-extrabold text-[11px] mt-1 text-slate-300">Active Client ID: {user?.id || '#9832'}</p>
                   </div>
                 </div>
 
@@ -3413,7 +4738,7 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
                         target.value = '';
                         target.reset();
                       }}
-                      className="p-5 rounded-2xl bg-[#F8FAFC] dark:bg-slate-900 border border-slate-150 dark:border-slate-850 space-y-4"
+                      className="p-5 rounded-2xl bg-[#F8FAFC] dark:bg-slate-900 border border-slate-150 dark:border-slate-800 space-y-4"
                     >
                       <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 font-mono text-left">📈 Pre-Fund Account Balance</h4>
                       
@@ -3425,13 +4750,13 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
                           type="number"
                           min="1"
                           placeholder="e.g. 50"
-                          className="w-full p-2.5 rounded-xl border border-neutral-250 dark:border-slate-850 bg-white dark:bg-[#0F172A] font-mono font-black text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          className="w-full p-2.5 rounded-xl border border-neutral-200 dark:border-slate-800 bg-white dark:bg-[#0F172A] font-mono font-black text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
                         />
                       </div>
 
                       <div className="space-y-1.5 text-left">
                         <label className="text-[10px] font-mono text-neutral-400 block uppercase font-bold">Payment Interface Gateway</label>
-                        <select name="gatewayChan" className="w-full p-2.5 rounded-xl border border-neutral-250 dark:border-slate-850 bg-white dark:bg-[#0F172A] text-xs font-bold text-slate-500 focus:outline-none">
+                        <select name="gatewayChan" className="w-full p-2.5 rounded-xl border border-neutral-200 dark:border-slate-800 bg-white dark:bg-[#0F172A] text-xs font-bold text-slate-500 focus:outline-none">
                           <option value="bKash Quick Gateway">bKash Instant Checkout</option>
                           <option value="Nagad Mobile Checkout">Nagad FinTech Link</option>
                           <option value="Rocket Cash Gateway">DBBL Rocket</option>
@@ -3452,6 +4777,414 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
                     </div>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* 8.🤝 ACTIVE VIEW: এফিলিয়েট প্রোগ্রাম (Affiliate Program) */}
+            {activeTab === 'affiliate-program' && (
+              <div className="bg-white dark:bg-[#1E293B] border border-neutral-200 dark:border-slate-800 rounded-3xl p-6 shadow-xl space-y-8 text-left animate-in fade-in duration-300">
+                
+                {/* 1. STATE: UNREGISTERED / NOT REGISTERED YET */}
+                {affiliateStatus === 'unregistered' && (
+                  <div className="space-y-6">
+                    <div className="border-b border-neutral-150 dark:border-slate-800 pb-4">
+                      <h3 className="text-base font-extrabold text-[#F59E0B] flex items-center gap-1.5">
+                        <span>🤝 এফিলিয়েট পার্টনারশিপ রেজিস্ট্রেশন (Partner Program Onboarding)</span>
+                      </h3>
+                      <p className="text-xs text-neutral-500 mt-1">
+                        WebzoneBD-এর আধুনিক এফিলিয়েট সিস্টেমে যুক্ত হয়ে আমাদের হাই-এন্ড আইটি সল্যুশন প্রচার করুন এবং সফল সেলসে সর্বোচ্চ ৫০% পর্যন্ত কমিশন উপার্জন করুন।
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+                      {/* Onboarding form card */}
+                      <form onSubmit={handleAffiliateRegisterSubmit} className="md:col-span-7 p-6 rounded-2xl border border-neutral-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 space-y-4 text-xs">
+                        <h4 className="text-sm font-bold text-neutral-800 dark:text-neutral-100 uppercase tracking-wide">পার্টনারশিপ আবেদন ফর্ম</h4>
+                        
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-mono uppercase text-neutral-400 font-bold block">Promotion Channel / Medium</label>
+                            <input 
+                              type="text" 
+                              required 
+                              value={promoChannel} 
+                              onChange={(e) => setPromoChannel(e.target.value)} 
+                              placeholder="e.g. Technology Blog, YouTube, Facebook Group"
+                              className="w-full p-2.5 bg-white dark:bg-[#0F172A] border border-neutral-300 dark:border-slate-800 rounded text-xs text-neutral-900 dark:text-white"
+                            />
+                          </div>
+                          
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-mono uppercase text-neutral-400 font-bold block">Target Audience Region</label>
+                            <select 
+                              value={promoCountry} 
+                              onChange={(e) => setPromoCountry(e.target.value)}
+                              className="w-full p-2.5 bg-white dark:bg-[#0F172A] border border-neutral-300 dark:border-slate-800 rounded text-xs text-neutral-900 dark:text-white font-bold"
+                            >
+                              <option value="Bangladesh">Bangladesh</option>
+                              <option value="Saudi Arabia">Saudi Arabia</option>
+                              <option value="Middle East">Middle East (Gulf Region)</option>
+                              <option value="Global">Global Reach</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-mono uppercase text-[#F59E0B] font-bold block">Preferred Payout Wallet</label>
+                            <select
+                              value={withdrawGateway}
+                              onChange={(e) => setWithdrawGateway(e.target.value)}
+                              className="w-full p-2.5 bg-white dark:bg-[#0F172A] border border-neutral-300 dark:border-slate-800 rounded text-xs text-neutral-900 dark:text-white font-bold"
+                            >
+                              <option value="bKash">bKash (BD Fintech)</option>
+                              <option value="Nagad">Nagad (BD Post Fintech)</option>
+                              <option value="Rocket">Rocket (DBBL Wallet)</option>
+                              <option value="PayPal">PayPal (Global Payout)</option>
+                              <option value="Bank">Direct Wire bank Transfer</option>
+                            </select>
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-mono uppercase text-neutral-400 font-bold block">Your Payment Address/Details</label>
+                            <input 
+                              type="text" 
+                              required 
+                              value={payoutDetails} 
+                              onChange={(e) => setPayoutDetails(e.target.value)} 
+                              placeholder="e.g. Phone number or Bank IBAN"
+                              className="w-full p-2.5 bg-white dark:bg-[#0F172A] border border-neutral-300 dark:border-slate-800 rounded text-xs text-neutral-900 dark:text-white"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="bg-amber-500/5 p-3 rounded-lg border border-amber-500/10 text-[10px] leading-relaxed text-amber-600 dark:text-amber-400 space-y-1">
+                          <p className="font-bold">📋 Terms Checklist:</p>
+                          <p>• You agree not to perform self-purchases via own referral parameters.</p>
+                          <p>• Commission tracks successfully on cookies matching standard WebzoneBD packages.</p>
+                        </div>
+
+                        <div className="pt-2 flex flex-col sm:flex-row gap-2">
+                          <button
+                            type="submit"
+                            className="bg-purple-650 hover:bg-purple-600 text-white font-extrabold px-6 py-2.5 rounded-lg text-xs uppercase transition tracking-wider flex-1 cursor-pointer"
+                          >
+                            Submit Grow Partner Application ✅
+                          </button>
+                          
+                          <button
+                            type="button"
+                            onClick={handleAutoApproveSelfDev}
+                            className="bg-neutral-900 dark:bg-slate-850 hover:opacity-90 text-yellow-450 font-black px-4 py-2.5 rounded-lg text-xs uppercase tracking-wider cursor-pointer"
+                          >
+                            ⚡ Sandbox Bypass
+                          </button>
+                        </div>
+                      </form>
+
+                      {/* Info side column */}
+                      <div className="md:col-span-5 space-y-4">
+                        <div className="p-5 rounded-2xl bg-[#0F172A] border border-slate-800 text-white space-y-3">
+                          <h4 className="text-xs font-black uppercase tracking-wider text-purple-400 font-mono">Commission Tier Levels</h4>
+                          <div className="space-y-2 text-xs">
+                            <div className="flex justify-between pb-1 border-b border-slate-800 text-[11px]">
+                              <span className="text-neutral-400">Regular Tier</span>
+                              <span className="text-emerald-400 font-bold">15% Commission Rate</span>
+                            </div>
+                            <div className="flex justify-between pb-1 border-b border-slate-800 text-[11px]">
+                              <span className="text-neutral-400">Bronze Power Partner</span>
+                              <span className="text-emerald-400 font-bold">20% Commission Rate</span>
+                            </div>
+                            <div className="flex justify-between pb-1 border-b border-slate-800 text-[11px]">
+                              <span className="text-neutral-400">Gold Elite (VIP Referral)</span>
+                              <span className="text-emerald-400 font-bold">25% - 40% Custom Rate</span>
+                            </div>
+                          </div>
+                          <p className="text-[10px] leading-relaxed text-slate-400">
+                            Our administrators continuously optimize rate ratios per-partner inside the dynamic admin control, guaranteeing higher yields for high converting channels.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 2. STATE: PENDING FOR SCREENING */}
+                {affiliateStatus === 'pending' && (
+                  <div className="p-8 text-center rounded-3xl border border-amber-500/25 bg-amber-500/5 space-y-6 text-xs max-w-2xl mx-auto py-10">
+                    <span className="h-10 w-10 bg-amber-500/10 text-[#F59E0B] rounded-full flex items-center justify-center mx-auto text-xl font-bold animate-pulse">⏳</span>
+                    <div className="space-y-2">
+                      <h4 className="text-sm font-extrabold text-amber-500 text-center uppercase tracking-wider">আবেদন প্রক্রিয়াধীন রয়েছে (Application Review Pending)</h4>
+                      <p className="text-xs text-neutral-550 dark:text-slate-400 leading-relaxed max-w-md mx-auto">
+                        ধন্যবাদ! আপনার পার্টনারশিপ আবেদনটি আমাদের সিস্টেমে সফলভাবে সংরক্ষিত রয়েছে। আমাদের অ্যাডমিন প্যানেল টিম আপনার প্রমোশন চ্যানেল যাচাই করে অ্যাকাউন্ট অ্যাক্টিভেট করে দিবে।
+                      </p>
+                    </div>
+
+                    <div className="p-4 bg-slate-900 border border-slate-800 rounded-xl text-left space-y-1.5 font-mono text-[10px] text-slate-300 max-w-md mx-auto">
+                      <p><span className="text-slate-550">Applicant:</span> {user?.name}</p>
+                      <p><span className="text-slate-550">Channel:</span> {promoChannel}</p>
+                      <p><span className="text-slate-550">Wallet:</span> {withdrawGateway}</p>
+                      <p><span className="text-slate-555">Payout Address:</span> {payoutDetails || 'Simulated payout field'}</p>
+                      <p className="text-purple-400 animate-pulse"><span className="text-slate-550">SLA Status:</span> Validation in progress...</p>
+                    </div>
+
+                    <div className="flex justify-center gap-3">
+                      <button 
+                        onClick={handleAutoApproveSelfDev}
+                        className="px-5 py-2 bg-purple-650 hover:bg-purple-600 text-white font-extrabold rounded-lg uppercase tracking-wider text-[11px] cursor-pointer"
+                      >
+                        🚀 Sandbox Bypass (Instant Self-Approve)
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* 3. STATE: APPROVED (THE FULLY FEATURED AFFILIATE DASHBOARD) */}
+                {affiliateStatus === 'approved' && affiliateProfile && (
+                  <div className="space-y-8 animate-in fade-in duration-300">
+                    
+                    {/* Header bar widget design */}
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-neutral-150 dark:border-slate-800">
+                      <div>
+                        <h3 className="text-base font-extrabold text-purple-600 dark:text-purple-400">🤝 এফিলিয়েট প্রোগ্রাম (Growth Partner Commission Platform)</h3>
+                        <p className="text-xs text-neutral-500">Promote licensed tools with unique referral parameters and earn high yields.</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="p-1 px-2.5 bg-emerald-500/10 text-emerald-500 font-mono text-[10px] font-black uppercase rounded">
+                          Account: APPROVED PARTNER
+                        </span>
+                        <button 
+                          onClick={handleAutoApproveSelfDev}
+                          title="Reset settings/Balance to default seeds"
+                          className="p-1 bg-red-100 text-red-500 rounded text-[9px] hover:bg-red-200 cursor-pointer"
+                        >
+                          Reset
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Stat Cards Row */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-205 dark:border-slate-800">
+                        <span className="text-[9px] font-mono text-slate-400 uppercase tracking-wider block font-black">Referrals Clicks</span>
+                        <p className="text-xl font-black mt-1 font-mono text-neutral-900 dark:text-neutral-100">{(affiliateProfile.clicks || 0).toLocaleString()} Clicks</p>
+                      </div>
+                      <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-205 dark:border-slate-800">
+                        <span className="text-[9px] font-mono text-slate-400 uppercase tracking-wider block font-black">Formed Sales / Signups</span>
+                        <p className="text-xl font-black mt-1 font-mono text-neutral-900 dark:text-neutral-100">{(affiliateProfile.referrals || 0).toLocaleString()} referrals</p>
+                      </div>
+                      <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-205 dark:border-slate-800">
+                        <span className="text-[9px] font-mono text-slate-400 uppercase tracking-wider block font-black">Lifetime Earned Profits</span>
+                        <p className="text-xl font-black mt-1 font-mono text-emerald-500">${(affiliateProfile.commissionEarned || 0).toFixed(2)} USD</p>
+                      </div>
+                      <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-205 dark:border-slate-800">
+                        <span className="text-[9px] font-mono text-slate-400 uppercase tracking-wider block font-black text-purple-500">Withdrawable Balance</span>
+                        <p className="text-xl font-black mt-1 font-mono text-purple-500">${(affiliateProfile.balance || 0).toFixed(2)} USD</p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                      {/* Left Block - Token customization & Sandbox utilities */}
+                      <div className="lg:col-span-10 xl:col-span-7 space-y-6">
+                        
+                        {/* Token deploy panel */}
+                        <div className="p-5 rounded-2xl bg-amber-500/5 border border-amber-500/10 space-y-4">
+                          <div className="flex justify-between items-center">
+                            <h4 className="text-xs font-black uppercase font-mono tracking-wider text-amber-600 dark:text-amber-400">Deploy Referral Token</h4>
+                            <span className="text-[10px] text-pink-400 font-mono font-bold">RATE CAP: {affiliateProfile.commissionRate || 15}%</span>
+                          </div>
+                          
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              readOnly
+                              value={`${window.location.origin}/?ref=${affiliateProfile.code}&camp=${customAffSuffix}`}
+                              className="bg-neutral-150 dark:bg-slate-950 p-2 text-[10px] font-mono rounded-lg flex-1 text-cyan-500 select-all border border-slate-800 text-xs py-2.5"
+                            />
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(`${window.location.origin}/?ref=${affiliateProfile.code}&camp=${customAffSuffix}`);
+                                setCopiedAffLink(true);
+                                triggerToast('📋 Referral link copied to your clipboard!');
+                                setTimeout(() => setCopiedAffLink(false), 2000);
+                              }}
+                              className="p-2 px-4 bg-gradient-to-r from-amber-500 to-red-500 hover:opacity-90 text-slate-900 font-black rounded-lg text-xs tracking-wider uppercase transition-all cursor-pointer"
+                            >
+                              {copiedAffLink ? 'Copied' : 'Copy'}
+                            </button>
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] text-neutral-400 font-mono font-bold uppercase block">Campaign channel tag Suffix</label>
+                            <input
+                              type="text"
+                              value={customAffSuffix}
+                              onChange={(e) => setCustomAffSuffix(e.target.value.replace(/[^a-zA-Z0-9_-]/g, ''))}
+                              placeholder="e.g. facebook_ads_bd"
+                              className="w-full p-2.5 bg-neutral-100 dark:bg-[#0F172A] rounded border border-neutral-300 dark:border-slate-800 text-xs font-mono font-bold text-neutral-900 dark:text-white"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Interactive Sandbox Traffic Emulator */}
+                        <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 text-white space-y-4 text-xs">
+                          <div className="flex justify-between items-center pb-2 border-b border-slate-800">
+                            <h4 className="font-bold text-purple-400 font-mono text-[11px] uppercase tracking-wide">Developer testing sandbox toolkit</h4>
+                            <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500 text-[8px] font-mono animate-pulse uppercase">active emulator</span>
+                          </div>
+                          
+                          <p className="text-[10px] text-slate-400 leading-relaxed">
+                            Use these actions to simulate referral traffic and referred clicks/orders instantly on this sandbox environment. This lets you observe conversions inside your ledger and the administrator panel immediately!
+                          </p>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                            <button
+                              onClick={handleSimulateAffiliateClick}
+                              className="p-3 rounded-xl bg-neutral-950 border border-neutral-805 hover:border-purple-500 text-left transition space-y-1 cursor-pointer"
+                            >
+                              <span className="font-bold text-white block text-xs">🔗 Simulate URL Click</span>
+                              <span className="text-[9px] text-[#00E5FF] block font-mono">Increment Clicks count (+1 Click)</span>
+                            </button>
+
+                            <button
+                              onClick={handleSimulatePromotionSale}
+                              className="p-3 rounded-xl bg-neutral-950 border border-neutral-805 hover:border-emerald-500 text-left transition space-y-1 cursor-pointer"
+                            >
+                              <span className="font-bold text-white block text-xs">💰 Simulate Referred Order</span>
+                              <span className="text-[9px] text-emerald-400 block font-mono">Generate $250.00 purchase commission</span>
+                            </button>
+                          </div>
+                        </div>
+
+                      </div>
+
+                      {/* Right Block - Withdraw Commission forms */}
+                      <div className="lg:col-span-10 xl:col-span-5 space-y-4">
+                        <form
+                          onSubmit={handleAffiliateWithdrawalSubmit}
+                          className="p-5 rounded-2xl border border-neutral-200 dark:border-slate-800 bg-[#F8FAFC] dark:bg-[#111827]/40 text-xs space-y-3"
+                        >
+                          <h4 className="text-xs font-bold uppercase tracking-wider font-mono text-purple-600 dark:text-purple-400">Withdrawal request form</h4>
+                          
+                          <div className="space-y-1.5">
+                            <div className="flex justify-between items-center text-[10px]">
+                              <span className="text-slate-400 font-mono uppercase">Payout Quantity ($ USD)</span>
+                              <span className="text-[#00E5FF] font-black">Min limit: $20.00</span>
+                            </div>
+                            <input
+                              type="number"
+                              min="20"
+                              max="2000"
+                              required
+                              value={withdrawAmt}
+                              onChange={(e) => setWithdrawAmt(e.target.value)}
+                              className="w-full p-2.5 bg-white dark:bg-[#0F172A] border border-neutral-300 dark:border-slate-800 rounded font-mono font-bold text-sm text-neutral-900 dark:text-white"
+                            />
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] text-slate-400 font-mono block">Mobile FinTech Transfer Gateway Channel</label>
+                            <select
+                              value={withdrawGateway}
+                              onChange={(e) => setWithdrawGateway(e.target.value)}
+                              className="w-full p-2.5 bg-white dark:bg-[#0F172A] border border-neutral-300 dark:border-slate-800 rounded font-bold text-xs animate-none"
+                            >
+                              <option value="bKash">bKash Personal Agent</option>
+                              <option value="Rocket">Rocket DBA Smart Wallet</option>
+                              <option value="Nagad">Nagad FinTech</option>
+                              <option value="PayPal">PayPal (Fast release)</option>
+                              <option value="Bank">Direct Wire transfer</option>
+                            </select>
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] text-slate-400 font-mono block">Registered address/Receiver wallet number</label>
+                            <input 
+                              type="text" 
+                              required 
+                              value={payoutDetails} 
+                              onChange={(e) => setPayoutDetails(e.target.value)} 
+                              placeholder="e.g. PayPal mail or bKash phone"
+                              className="w-full p-2.5 bg-white dark:bg-[#0F172A] border border-neutral-300 dark:border-slate-800 rounded font-bold text-xs"
+                            />
+                          </div>
+
+                          <button
+                            type="submit"
+                            className="w-full py-2.5 bg-purple-650 hover:bg-purple-650 text-white font-black tracking-wide uppercase rounded font-mono text-xs transition cursor-pointer"
+                          >
+                            Transmit Withdrawal Release Request
+                          </button>
+                        </form>
+                      </div>
+                    </div>
+
+                    {/* BOTTOM DYNAMIC MODULE - YOUR CONVERSION HISTORY LEDGER */}
+                    <div className="space-y-4 pt-2 border-t border-neutral-150 dark:border-slate-800">
+                      <div>
+                        <h4 className="font-extrabold text-[#F59E0B] text-xs font-mono uppercase tracking-wider">Your Referral Conversions history ledger</h4>
+                        <p className="text-[10px] text-neutral-500">List of successful orders credited to your partner session code.</p>
+                      </div>
+
+                      <div className="overflow-x-auto rounded-xl border border-neutral-200 dark:border-slate-800 text-xs">
+                        <table className="w-full text-left text-xs font-sans">
+                          <thead className="bg-[#5B21B6]/10 dark:bg-[#5B21B6]/20 text-[9px] uppercase font-mono tracking-wider text-slate-500 border-b border-neutral-200 dark:border-slate-800">
+                            <tr>
+                              <th className="p-3">Conversion ID</th>
+                              <th className="p-3">Referred Client</th>
+                              <th className="p-3">Purchased Product/Service</th>
+                              <th className="p-3">Total Cost</th>
+                              <th className="p-3">Com % Amount</th>
+                              <th className="p-3">Campaign Channel</th>
+                              <th className="p-3">Conversion Date</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-neutral-200 dark:divide-slate-800 bg-white dark:bg-transparent text-neutral-650 dark:text-neutral-350">
+                            {affiliateReferralsList.length === 0 ? (
+                              <tr>
+                                <td colSpan={7} className="p-4 text-center italic text-slate-500">No referral conversions found yet. Spread your link to start earning!</td>
+                              </tr>
+                            ) : (
+                              affiliateReferralsList.map((item) => (
+                                <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/60 transition font-mono text-[10.5px]">
+                                  <td className="p-3 font-semibold text-purple-600">#{item.id}</td>
+                                  <td className="p-3 font-sans font-medium text-neutral-900 dark:text-neutral-200">{item.referredUserName}</td>
+                                  <td className="p-3 font-sans text-neutral-650 dark:text-neutral-400 truncate max-w-[150px]">{item.productName}</td>
+                                  <td className="p-3 text-neutral-500">${item.saleAmount}</td>
+                                  <td className="p-3 text-emerald-500 font-bold">${item.commissionEarned}</td>
+                                  <td className="p-3">
+                                    <span className="px-1.5 py-0.5 bg-neutral-100 dark:bg-slate-800 border border-neutral-200 dark:border-slate-700 text-[8.5px] rounded text-slate-400">
+                                      {item.campaignSuffix}
+                                    </span>
+                                  </td>
+                                  <td className="p-3 text-slate-400">{item.date}</td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                  </div>
+                )}
+
+                {/* 4. STATE: SUSPENDED OR LOCKED APPLICANTS */}
+                {affiliateStatus === 'suspended' && (
+                  <div className="p-8 text-center rounded-3xl border border-red-500/25 bg-red-500/5 space-y-4 max-w-xl mx-auto py-10">
+                    <span className="h-10 w-10 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mx-auto text-xl font-bold font-mono">⚠️</span>
+                    <h4 className="text-sm font-extrabold text-red-500 text-center uppercase tracking-wider">পার্টনার অ্যাকাউন্ট সাময়িকভাবে স্থগিত</h4>
+                    <p className="text-xs text-neutral-500 dark:text-slate-400 leading-relaxed">
+                      দুঃখিত, ট্রাফিক পলিসি লঙ্ঘনের কারণে আপনার এই এফিলিয়েট পার্টনার অ্যাকাউন্টটি অ্যাডমিন টিম সাময়িকভাবে স্থগিত করেছে। বিস্তারিত জানতে দয়া করে সাপোর্ট টিকেটের মাধ্যমে বিলিং বা সিকিউরিটি ডিপার্টমেন্টে যোগাযোগ করুন।
+                    </p>
+                    <button 
+                      onClick={handleAutoApproveSelfDev}
+                      className="mt-3 px-5 py-2 bg-neutral-900 text-yellow-400 border border-yellow-500/20 text-xs font-black uppercase rounded hover:opacity-95 cursor-pointer"
+                    >
+                      Bypass Suspension (Sandbox Dev Reset)
+                    </button>
+                  </div>
+                )}
 
               </div>
             )}
@@ -3533,126 +5266,6 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
               </div>
             )}
 
-            {/* 8.🤝 ACTIVE VIEW: এফিলিয়েট প্রোগ্রাম (Affiliate Program) */}
-            {activeTab === 'affiliate-program' && (
-              <div className="bg-white dark:bg-[#1E293B] border border-neutral-200 dark:border-slate-800 rounded-3xl p-6 shadow-xl space-y-8 text-left animate-in fade-in duration-300">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-neutral-150 dark:border-slate-800">
-                  <div>
-                    <h3 className="text-base font-extrabold text-[#F59E0B]">🤝 এফিলিয়েট প্রোগ্রাম (Partner Commission and Referrals Panel)</h3>
-                    <p className="text-xs text-neutral-500">Promote licensed tools with unique referral parameters and earn 15% recursive cash commission.</p>
-                  </div>
-                  <span className="p-1 px-2.5 bg-amber-500/15 text-[#F59E0B] font-mono text-[9px] font-black uppercase rounded">
-                    Partner Key: AFF-{user?.id?.slice(-5)?.toUpperCase() || 'PARTNER'}
-                  </span>
-                </div>
-
-                {/* Stat Cards Row */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-205 dark:border-slate-800">
-                    <span className="text-[9px] font-mono text-slate-400 uppercase tracking-wider block font-black">Referrals Clicks</span>
-                    <p className="text-xl font-black mt-1 font-mono">1,482 Clicks</p>
-                  </div>
-                  <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-205 dark:border-slate-800">
-                    <span className="text-[9px] font-mono text-slate-400 uppercase tracking-wider block font-black">Formed Registrations</span>
-                    <p className="text-xl font-black mt-1 font-mono">192 Users</p>
-                  </div>
-                  <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-205 dark:border-slate-800">
-                    <span className="text-[9px] font-mono text-slate-400 uppercase tracking-wider block font-black">Earned Profit Commission</span>
-                    <p className="text-xl font-black mt-1 font-mono text-emerald-500">$240.00</p>
-                  </div>
-                  <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-205 dark:border-slate-800">
-                    <span className="text-[9px] font-mono text-slate-400 uppercase tracking-wider block font-black text-amber-500">Current Payout Queue</span>
-                    <p className="text-xl font-black mt-1 font-mono text-amber-500">$50.00</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                  {/* Left Link copy */}
-                  <div className="lg:col-span-7 space-y-4">
-                    <div className="p-4 rounded-2xl bg-amber-500/5 border border-amber-500/10 space-y-3">
-                      <h4 className="text-xs font-black uppercase font-mono tracking-wider text-amber-600 dark:text-amber-400">Deploy Referral Token</h4>
-                      
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          readOnly
-                          value={`${window.location.origin}/?ref=AFF-${user?.id?.slice(-5)?.toUpperCase() || 'PARTNER'}&camp=${customAffSuffix}`}
-                          className="bg-neutral-100 dark:bg-slate-905 bg-slate-900/30 p-2 text-[10px] font-mono rounded-lg flex-1 text-cyan-400 select-all border border-slate-800"
-                        />
-                        <button
-                          onClick={() => {
-                            navigator.clipboard.writeText(`${window.location.origin}/?ref=AFF-${user?.id?.slice(-5)?.toUpperCase() || 'PARTNER'}&camp=${customAffSuffix}`);
-                            setCopiedAffLink(true);
-                            triggerToast('📋 Referral url link copied to clipboard!');
-                            setTimeout(() => setCopiedAffLink(false), 2000);
-                          }}
-                          className="p-2 px-4 bg-gradient-to-r from-amber-500 to-red-500 hover:opacity-90 text-slate-950 font-black rounded-lg text-xs"
-                        >
-                          {copiedAffLink ? 'Copied' : 'Copy'}
-                        </button>
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="text-[10px] text-neutral-400 font-mono font-bold uppercase">Custom Campaign parameter tag Suffix</label>
-                        <input
-                          type="text"
-                          value={customAffSuffix}
-                          onChange={(e) => setCustomAffSuffix(e.target.value.replace(/[^a-zA-Z0-9_-]/g, ''))}
-                          placeholder="e.g. facebook_ads_bd"
-                          className="w-full p-2 bg-neutral-100 dark:bg-[#0F172A] rounded border border-neutral-300 dark:border-slate-800 text-xs font-mono font-bold text-neutral-900 dark:text-white"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Right Withdrawal request form */}
-                  <div className="lg:col-span-5 space-y-4">
-                    <form
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        triggerToast(`💸 Withdrawal ticket for $${withdrawAmt} submitted successfully via ${withdrawGateway}! Queue cleared within 24h.`);
-                      }}
-                      className="p-5 rounded-2xl border border-neutral-150 dark:border-slate-800 bg-[#F8FAFC] dark:bg-[#111827]/40 text-xs space-y-3"
-                    >
-                      <h4 className="text-xs font-bold uppercase tracking-wider font-mono">Withdrawal request form</h4>
-                      
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] text-slate-400 font-mono">Payout Quantity ($ USD)</label>
-                        <input
-                          type="number"
-                          min="50"
-                          required
-                          value={withdrawAmt}
-                          onChange={(e) => setWithdrawAmt(e.target.value)}
-                          className="w-full p-2 bg-white dark:bg-[#0F172A] border border-slate-800 rounded font-mono font-bold text-sm text-neutral-900 dark:text-white"
-                        />
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] text-slate-400 font-mono">Mobile FinTech Transfer Gateway Channel</label>
-                        <select
-                          value={withdrawGateway}
-                          onChange={(e) => setWithdrawGateway(e.target.value)}
-                          className="w-full p-2 bg-white dark:bg-[#0F172A] border border-slate-800 rounded font-bold text-xs"
-                        >
-                          <option value="bKash">bKash Personal Agent</option>
-                          <option value="Rocket">Rocket DBA Smart Wallet</option>
-                          <option value="Nagad">Nagad FinTech</option>
-                        </select>
-                      </div>
-
-                      <button
-                        type="submit"
-                        className="w-full py-2 bg-[#F59E0B] hover:bg-amber-400 text-slate-950 font-black tracking-wide uppercase rounded font-mono text-xs"
-                      >
-                        Transmit Withdrawal Release Request
-                      </button>
-                    </form>
-                  </div>
-                </div>
-              </div>
-            )}
-
             {/* 7.5.🔔 ACTIVE VIEW: নোটিফিকেশন সেন্টার (Notification Center Panel) */}
             {activeTab === 'notifications' && (
               <div className="bg-white dark:bg-[#0F172A] border border-neutral-200 dark:border-slate-800 rounded-3xl p-6 shadow-xl space-y-6 text-left animate-in fade-in duration-300">
@@ -3679,17 +5292,31 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
                     const badgeClass = not.type === 'domain' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' : 
                                       not.type === 'hosting' ? 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20' : 
                                       not.type === 'affiliate' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 
+                                      not.type === 'offer' ? 'bg-pink-500/10 text-pink-550 dark:text-pink-400 border-pink-500/20 font-black animate-pulse' :
                                       'bg-blue-500/10 text-blue-500 border-blue-500/20';
 
                     return (
                       <div key={not.id} className={`p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition duration-150 ${not.read ? 'bg-slate-50/50 dark:bg-slate-900/40 border-slate-100 dark:border-slate-850 opacity-85' : 'bg-blue-500/5 dark:bg-blue-500/5 border-blue-500/15'}`}>
-                        <div className="space-y-1 text-left min-w-0">
+                        <div className="space-y-1 text-left min-w-0 flex-1">
                           <div className="flex items-center gap-2">
                             <span className={`p-0.5 px-2 rounded text-[9px] font-mono font-bold uppercase border ${badgeClass}`}>{not.type}</span>
                             <span className="text-[10px] text-slate-400 font-mono">{not.date}</span>
                           </div>
                           <h5 className={`text-sm font-extrabold truncate ${not.read ? 'text-slate-500' : 'text-slate-900 dark:text-white'}`}>{not.title}</h5>
                           <p className="text-xs text-slate-400 leading-relaxed">{not.message}</p>
+                          
+                          {not.link && (
+                            <div className="pt-2">
+                              <a
+                                href={not.link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-550 hover:to-indigo-550 text-white font-extrabold text-[10px] rounded-lg transition-all shadow-sm active:scale-95 shrink-0"
+                              >
+                                🎁 {not.linkText || 'Claim Offer'}
+                              </a>
+                            </div>
+                          )}
                         </div>
                         <div className="flex gap-2 shrink-0">
                           {!not.read ? (
@@ -4502,7 +6129,7 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
                       </div>
                     </div>
 
-                    <div className="space-y-1.5">
+                    <div className="space-y-1.5 font-semibold">
                       <label className="">Product features details description</label>
                       <textarea
                         required
@@ -4512,6 +6139,65 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
                         placeholder="Explain technical configurations parameters..."
                         className="w-full bg-[#F8FAFC] dark:bg-[#0F172A] border border-slate-800 p-2.5 rounded-xl text-neutral-900 dark:text-white focus:outline-none"
                       />
+                    </div>
+
+                    {/* CUSTOM PRODUCT THUMBNAIL FILE INPUT WITH IMAGE PREVIEW */}
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-neutral-700 dark:text-neutral-300">Custom Product Image Thumbnail (Optional)</label>
+                      
+                      <div className="flex flex-col sm:flex-row gap-4 items-center">
+                        <div className="flex-1 w-full">
+                          <div 
+                            className="border-2 border-dashed border-slate-705 dark:border-slate-800 hover:border-emerald-500 rounded-xl p-4 text-center cursor-pointer transition-colors relative"
+                            onClick={() => document.getElementById('vendor-thumbnail-input')?.click()}
+                          >
+                            <input
+                              type="file"
+                              id="vendor-thumbnail-input"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  setVendorProdImageFile(file);
+                                  const reader = new FileReader();
+                                  reader.onloadend = () => {
+                                    setVendorProdImage(reader.result as string);
+                                    triggerToast("📸 Core thumbnail loaded successfully!");
+                                  };
+                                  reader.readAsDataURL(file);
+                                }
+                              }}
+                            />
+                            <div className="space-y-1">
+                              <span className="block text-[#06B6D4] font-bold text-[11px]">Click to upload product graphic asset</span>
+                              <span className="block text-[9px] text-neutral-400">Supports PNG, JPG, WEBP formats</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {vendorProdImage && (
+                          <div className="w-24 h-24 rounded-xl border border-slate-705 dark:border-slate-800 overflow-hidden relative group shrink-0 shadow bg-slate-900/60 flex items-center justify-center">
+                            <img 
+                              src={vendorProdImage} 
+                              alt="New Product Preview" 
+                              className="w-full h-full object-cover" 
+                            />
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setVendorProdImage('');
+                                setVendorProdImageFile(null);
+                                triggerToast("Reset thumbnail placeholder.");
+                              }}
+                              className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-red-500 text-[10px] font-bold"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     <button
@@ -4558,115 +6244,117 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
 
 
             {/* ⚡ 'Quick Actions' Floating Action Button & Menu */}
-            <div className="fixed bottom-6 right-6 z-45 font-sans">
-              <div className="relative">
-                {/* Backdrop overlay when open to easily dismiss */}
-                {quickActionsOpen && (
-                  <div 
-                    className="fixed inset-0 bg-transparent z-0" 
-                    onClick={() => setQuickActionsOpen(false)}
-                  />
-                )}
-
-                {/* Floating Menu Card */}
-                {quickActionsOpen && (
-                  <div className="absolute bottom-16 right-0 w-64 bg-white dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-slate-800 rounded-2xl shadow-2xl p-4 space-y-2.5 z-10 animate-in fade-in slide-in-from-bottom-5 duration-250 text-left">
-                    <div className="pb-2 border-b border-neutral-100 dark:border-slate-800/80">
-                      <h4 className="text-xs font-black text-slate-800 dark:text-slate-100 tracking-wider uppercase flex items-center gap-1.5">
-                        <span className="text-amber-500">⚡</span> Quick Actions Control
-                      </h4>
-                      <p className="text-[10px] text-neutral-400 dark:text-neutral-500 leading-normal mt-0.5">Instant redirects to hot features</p>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      {/* 1. Create New Support Ticket */}
-                      <button
-                        onClick={() => {
-                          setActiveTab('create-ticket');
-                          setExpandedMenu('tickets');
-                          setQuickActionsOpen(false);
-                          onAddActivityLog('Used Quick Actions floating menu to access Create New Support Ticket');
-                          triggerToast('Redirected to: Create New Support Ticket');
-                        }}
-                        className="w-full text-left p-2.5 rounded-lg border border-transparent hover:border-slate-200 dark:hover:border-slate-800 hover:bg-[#F8FAFC] dark:hover:bg-[#111827] flex items-center gap-3 transition cursor-pointer text-xs font-bold text-slate-705 dark:text-slate-300"
-                      >
-                        <div className="p-1.5 bg-[#7C3AED]/15 text-[#7C3AED] rounded-md">
-                          <Ticket className="w-3.5 h-3.5" />
-                        </div>
-                        <div className="flex-1">
-                          <p className="truncate">Create Ticket 🎫</p>
-                          <span className="text-[9px] text-neutral-450 font-mono block">Technical Helpdesk SLA</span>
-                        </div>
-                      </button>
-
-                      {/* 2. Add Wallet Funds */}
-                      <button
-                        onClick={() => {
-                          setActiveTab('billing');
-                          setExpandedMenu('billing');
-                          setQuickActionsOpen(false);
-                          onAddActivityLog('Used Quick Actions floating menu to access Add Wallet Funds');
-                          triggerToast('Redirected to: Pre-Fund Account Balance 💰');
-                          setTimeout(() => {
-                            const elem = document.getElementById('pre-fund-balance');
-                            if (elem) {
-                              elem.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                            }
-                          }, 150);
-                        }}
-                        className="w-full text-left p-2.5 rounded-lg border border-transparent hover:border-slate-200 dark:hover:border-slate-800 hover:bg-[#F8FAFC] dark:hover:bg-[#111827] flex items-center gap-3 transition cursor-pointer text-xs font-bold text-slate-705 dark:text-slate-300"
-                      >
-                        <div className="p-1.5 bg-[#14B8A6]/15 text-[#14B8A6] rounded-md">
-                          <Wallet className="w-3.5 h-3.5" />
-                        </div>
-                        <div className="flex-1">
-                          <p className="truncate">Add Wallet Funds 💰</p>
-                          <span className="text-[9px] text-neutral-450 font-mono block">Deposit automated WHMCS</span>
-                        </div>
-                      </button>
-
-                      {/* 3. View Latest Downloads */}
-                      <button
-                        onClick={() => {
-                          setActiveTab('downloads');
-                          setExpandedMenu('downloads');
-                          setQuickActionsOpen(false);
-                          onAddActivityLog('Used Quick Actions floating menu to access View Latest Downloads');
-                          triggerToast('Redirected to: Genuine Script Downloads');
-                        }}
-                        className="w-full text-left p-2.5 rounded-lg border border-transparent hover:border-slate-200 dark:hover:border-slate-800 hover:bg-[#F8FAFC] dark:hover:bg-[#111827] flex items-center gap-3 transition cursor-pointer text-xs font-bold text-slate-705 dark:text-slate-300"
-                      >
-                        <div className="p-1.5 bg-[#2563EB]/15 text-[#2563EB] rounded-md">
-                          <Download className="w-3.5 h-3.5" />
-                        </div>
-                        <div className="flex-1">
-                          <p className="truncate">View Downloads ⬇️</p>
-                          <span className="text-[9px] text-neutral-450 font-mono block">Access genuine code ZIPs</span>
-                        </div>
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Floating Action Button (FAB) Trigger */}
-                <button
-                  onClick={() => setQuickActionsOpen(!quickActionsOpen)}
-                  style={{ minWidth: '48px', minHeight: '48px' }}
-                  className="relative group p-3 rounded-full bg-gradient-to-r from-[#2563EB] to-[#7C3AED] hover:from-[#1D4ED8] hover:to-[#6D28D9] text-white flex items-center justify-center shadow-xl hover:shadow-[#2563EB]/20 hover:scale-[1.08] transition-all duration-300 z-10 active:scale-95 cursor-pointer border border-white/10"
-                  title="Quick Actions Menu Launcher"
-                >
-                  <span className="absolute inset-0 rounded-full bg-gradient-to-r from-[#2563EB] to-[#7C3AED] blur-md opacity-50 group-hover:opacity-75 transition-opacity" />
-                  <Plus className={`w-5 h-5 transition-transform duration-300 z-10 ${quickActionsOpen ? 'rotate-45' : ''}`} />
-                  
-                  {/* Small decorative notification glow dot */}
-                  {!quickActionsOpen && (
-                    <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-cyan-400 rounded-full border-2 border-white dark:border-[#1E293B] shadow-sm z-20">
-                      <span className="absolute inset-0 bg-cyan-400 rounded-full animate-ping opacity-75" />
-                    </span>
+            {user?.role !== 'admin' && user?.role !== 'super_admin' && (
+              <div className="fixed bottom-20 md:bottom-6 right-6 z-45 font-sans">
+                <div className="relative">
+                  {/* Backdrop overlay when open to easily dismiss */}
+                  {quickActionsOpen && (
+                    <div 
+                      className="fixed inset-0 bg-transparent z-0" 
+                      onClick={() => setQuickActionsOpen(false)}
+                    />
                   )}
-                </button>
+
+                  {/* Floating Menu Card */}
+                  {quickActionsOpen && (
+                    <div className="absolute bottom-16 right-0 w-64 bg-white dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-slate-800 rounded-2xl shadow-2xl p-4 space-y-2.5 z-10 animate-in fade-in slide-in-from-bottom-5 duration-250 text-left">
+                      <div className="pb-2 border-b border-neutral-100 dark:border-slate-800/80">
+                        <h4 className="text-xs font-black text-slate-800 dark:text-slate-100 tracking-wider uppercase flex items-center gap-1.5">
+                          <span className="text-amber-500">⚡</span> Quick Actions Control
+                        </h4>
+                        <p className="text-[10px] text-neutral-400 dark:text-neutral-500 leading-normal mt-0.5">Instant redirects to hot features</p>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        {/* 1. Create New Support Ticket */}
+                        <button
+                          onClick={() => {
+                            setActiveTab('create-ticket');
+                            setExpandedMenu('tickets');
+                            setQuickActionsOpen(false);
+                            onAddActivityLog('Used Quick Actions floating menu to access Create New Support Ticket');
+                            triggerToast('Redirected to: Create New Support Ticket');
+                          }}
+                          className="w-full text-left p-2.5 rounded-lg border border-transparent hover:border-slate-200 dark:hover:border-slate-800 hover:bg-[#F8FAFC] dark:hover:bg-[#111827] flex items-center gap-3 transition cursor-pointer text-xs font-bold text-slate-705 dark:text-slate-300"
+                        >
+                          <div className="p-1.5 bg-[#7C3AED]/15 text-[#7C3AED] rounded-md">
+                            <Ticket className="w-3.5 h-3.5" />
+                          </div>
+                          <div className="flex-1">
+                            <p className="truncate">Create Ticket 🎫</p>
+                            <span className="text-[9px] text-neutral-450 font-mono block">Technical Helpdesk SLA</span>
+                          </div>
+                        </button>
+
+                        {/* 2. Add Wallet Funds */}
+                        <button
+                          onClick={() => {
+                            setActiveTab('billing');
+                            setExpandedMenu('billing');
+                            setQuickActionsOpen(false);
+                            onAddActivityLog('Used Quick Actions floating menu to access Add Wallet Funds');
+                            triggerToast('Redirected to: Pre-Fund Account Balance 💰');
+                            setTimeout(() => {
+                              const elem = document.getElementById('pre-fund-balance');
+                              if (elem) {
+                                elem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                              }
+                            }, 150);
+                          }}
+                          className="w-full text-left p-2.5 rounded-lg border border-transparent hover:border-slate-200 dark:hover:border-slate-800 hover:bg-[#F8FAFC] dark:hover:bg-[#111827] flex items-center gap-3 transition cursor-pointer text-xs font-bold text-slate-705 dark:text-slate-300"
+                        >
+                          <div className="p-1.5 bg-[#14B8A6]/15 text-[#14B8A6] rounded-md">
+                            <Wallet className="w-3.5 h-3.5" />
+                          </div>
+                          <div className="flex-1">
+                            <p className="truncate">Add Wallet Funds 💰</p>
+                            <span className="text-[9px] text-neutral-450 font-mono block">Deposit automated WHMCS</span>
+                          </div>
+                        </button>
+
+                        {/* 3. View Latest Downloads */}
+                        <button
+                          onClick={() => {
+                            setActiveTab('downloads');
+                            setExpandedMenu('downloads');
+                            setQuickActionsOpen(false);
+                            onAddActivityLog('Used Quick Actions floating menu to access View Latest Downloads');
+                            triggerToast('Redirected to: Genuine Script Downloads');
+                          }}
+                          className="w-full text-left p-2.5 rounded-lg border border-transparent hover:border-slate-200 dark:hover:border-slate-800 hover:bg-[#F8FAFC] dark:hover:bg-[#111827] flex items-center gap-3 transition cursor-pointer text-xs font-bold text-slate-705 dark:text-slate-300"
+                        >
+                          <div className="p-1.5 bg-[#2563EB]/15 text-[#2563EB] rounded-md">
+                            <Download className="w-3.5 h-3.5" />
+                          </div>
+                          <div className="flex-1">
+                            <p className="truncate">View Downloads ⬇️</p>
+                            <span className="text-[9px] text-neutral-450 font-mono block">Access genuine code ZIPs</span>
+                          </div>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Floating Action Button (FAB) Trigger */}
+                  <button
+                    onClick={() => setQuickActionsOpen(!quickActionsOpen)}
+                    style={{ minWidth: '48px', minHeight: '48px' }}
+                    className="relative group p-3 rounded-full bg-gradient-to-r from-[#2563EB] to-[#7C3AED] hover:from-[#1D4ED8] hover:to-[#6D28D9] text-white flex items-center justify-center shadow-xl hover:shadow-[#2563EB]/20 hover:scale-[1.08] transition-all duration-300 z-10 active:scale-95 cursor-pointer border border-white/10"
+                    title="Quick Actions Menu Launcher"
+                  >
+                    <span className="absolute inset-0 rounded-full bg-gradient-to-r from-[#2563EB] to-[#7C3AED] blur-md opacity-50 group-hover:opacity-75 transition-opacity" />
+                    <Plus className={`w-5 h-5 transition-transform duration-300 z-10 ${quickActionsOpen ? 'rotate-45' : ''}`} />
+                    
+                    {/* Small decorative notification glow dot */}
+                    {!quickActionsOpen && (
+                      <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-cyan-400 rounded-full border-2 border-white dark:border-[#1E293B] shadow-sm z-20">
+                        <span className="absolute inset-0 bg-cyan-400 rounded-full animate-ping opacity-75" />
+                      </span>
+                    )}
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
           </div>
 
@@ -4677,7 +6365,7 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
       {/* 🧾 Spectacular Invoice Modal overlay view */}
       {selectedInvoice && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white text-neutral-900 dark:bg-[#111827] dark:text-neutral-100 max-w-2xl w-full rounded-3xl border border-neutral-200 dark:border-slate-850 shadow-2xl p-6 sm:p-8 relative overflow-hidden transition-all max-h-[90vh] overflow-y-auto">
+          <div id="print-area-invoice" className="bg-white text-neutral-900 dark:bg-[#111827] dark:text-neutral-100 max-w-2xl w-full rounded-3xl border border-neutral-200 dark:border-slate-850 shadow-2xl p-6 sm:p-8 relative overflow-hidden transition-all max-h-[90vh] overflow-y-auto">
             
             {/* Ambient accent background glow */}
             <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-[#2563EB]/10 to-teal-500/5 rounded-full blur-3xl pointer-events-none" />
@@ -4696,7 +6384,7 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
                   <span className="px-3 py-1 rounded bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-500 font-mono text-[9px] uppercase font-black">
                     {language === 'bn' ? 'অফিসিয়াল অর্ডার মেমো' : 'OFFICIAL INVOICE'}
                   </span>
-                  <p className="text-xs font-black text-neutral-900 dark:text-white mt-3">Invoice Ref: <b className="font-mono text-blue-600 dark:text-cyan-400">{selectedInvoice.id}</b></p>
+                  <p className="text-xs font-black text-neutral-900 dark:text-white mt-3">Invoice Ref: <b className="font-mono text-blue-600 dark:text-cyan-400">{getOrderSerial(selectedInvoice.id)}</b></p>
                   <p className="text-[10px] text-neutral-400 dark:text-neutral-500 font-mono mt-1">Date: {selectedInvoice.date}</p>
                   <p className={`text-[10px] font-black font-mono mt-0.5 uppercase ${
                     selectedInvoice.paymentStatus === 'completed'
@@ -4801,7 +6489,7 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
                 const discountAmount = basePrice * discountRate;
                 const subtotalValue = basePrice - discountAmount;
                 const taxAmount = subtotalValue * taxRate;
-                const couponCode = selectedInvoice.id.toUpperCase().replace('ORD-', 'WZB-WELCOME-');
+                const couponCode = getOrderSerial(selectedInvoice.id).toUpperCase().replace('ORD-', 'WZB-WELCOME-');
 
                 return (
                   <div className="bg-neutral-50 dark:bg-slate-900/60 p-5 rounded-2xl border border-neutral-150 dark:border-slate-800 space-y-3 text-xs text-left">
@@ -4843,9 +6531,30 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
 
                     {/* Grand Total */}
                     <div className="flex justify-between font-mono font-black border-t border-neutral-250 dark:border-slate-800 pt-3 text-neutral-950 dark:text-white text-sm">
-                      <span className="text-xs uppercase tracking-wider">{language === 'bn' ? 'সর্বমোট পরিশোধিত মূল্য:' : 'Grand Total Paid:'}</span>
-                      <span className="text-emerald-500 dark:text-emerald-400 text-base font-extrabold">{formatPrice(selectedInvoice.price)}</span>
+                      <span className="text-xs uppercase tracking-wider">{language === 'bn' ? 'প্যাকেজের মোট মূল্য:' : 'Total Package Price:'}</span>
+                      <span className="text-neutral-900 dark:text-white text-base font-extrabold">{formatPrice(selectedInvoice.price)}</span>
                     </div>
+
+                    {selectedInvoice.advancePercent !== undefined && selectedInvoice.advancePercent < 100 && (
+                      <div className="pt-2.5 border-t border-dashed border-neutral-250 dark:border-slate-800 space-y-2.5">
+                        <div className="flex justify-between font-mono font-bold text-xs">
+                          <span className="text-emerald-600 dark:text-emerald-400">
+                            {language === 'bn' ? `অগ্রিম পরিশোধিত (${selectedInvoice.advancePercent}%):` : `Paid Advance (${selectedInvoice.advancePercent}%):`}
+                          </span>
+                          <span className="text-emerald-600 dark:text-emerald-400 text-sm font-extrabold">
+                            {formatPrice(selectedInvoice.advanceAmount || 0)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between font-mono font-bold text-xs">
+                          <span className="text-amber-500">
+                            {language === 'bn' ? 'বকেয়া বাকি (Remaining Due):' : 'Remaining Due Amount:'}
+                          </span>
+                          <span className="text-amber-500 text-sm font-extrabold">
+                            {formatPrice(selectedInvoice.dueAmount || 0)}
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })()}
@@ -4859,6 +6568,14 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
                 className="px-4 py-2 border border-neutral-210 dark:border-slate-800 bg-neutral-50 hover:bg-neutral-100 dark:bg-slate-800 dark:hover:bg-slate-700/80 text-neutral-900 dark:text-white text-xs font-bold rounded-lg transition duration-200 flex items-center gap-1.5 cursor-pointer"
               >
                 <span>{language === 'bn' ? 'প্রিন্ট মেমো 🖨️' : 'Print Memo 🖨️'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => generateVisualPDFInvoice(selectedInvoice!)}
+                className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-lg transition duration-200 flex items-center gap-1.5 cursor-pointer shadow-sm"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>{language === 'bn' ? 'ডাউনলোড পিডিএফ 📥' : 'Download PDF Invoice 📥'}</span>
               </button>
               <button
                 type="button"
@@ -4935,6 +6652,248 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
                 Submit support ticket
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ⭐ DIGITAL PRODUCT FEEDBACK & RATING MODAL */}
+      {ratingOrderModalId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm" id="feedback-rating-modal-container">
+          <div className="bg-white dark:bg-[#1E293B] w-full max-w-md rounded-3xl overflow-hidden shadow-2xl border border-neutral-200 dark:border-slate-800 animate-in zoom-in duration-200 text-left">
+            <div className="bg-gradient-to-r from-amber-500 to-indigo-600 text-white p-5 flex items-center justify-between">
+              <div>
+                <span className="text-[10px] uppercase tracking-widest font-mono text-amber-200 font-extrabold">
+                  {language === 'bn' ? 'ডিজিটাল প্রোডাক্ট রিভিউ ও রেটিং' : 'Digital Product Feedback Center'}
+                </span>
+                <h3 className="text-base font-extrabold">
+                  {language === 'bn' ? 'আপনার সোর্স কোড রেটিং দিন' : 'Rate Your Source Code / Script'}
+                </h3>
+              </div>
+              <button
+                onClick={() => setRatingOrderModalId(null)}
+                className="p-1 px-2 text-xs bg-slate-900 rounded-lg hover:bg-slate-800 font-mono text-white cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5 text-xs font-semibold text-slate-800 dark:text-slate-200">
+              <p className="text-xs text-slate-505 dark:text-slate-400 leading-normal font-medium">
+                {language === 'bn' 
+                  ? 'আপনার অর্ডারকৃত ডিজিটাল স্ক্রিপ্ট বা সোর্স কোডের ডেভেলপমেন্ট কোয়ালিটি এবং ফিচার রেটিং দিন। আপনার মতামত আমাদের সার্ভিস উন্নত করতে সাহায্য করবে।'
+                  : 'Let other developers know about your experience. Your feedback will calculate and update the primary product rating schema immediately.'
+                }
+              </p>
+
+              {/* Star Rating Controls */}
+              <div className="space-y-2">
+                <label className="text-neutral-400 dark:text-slate-400 font-bold uppercase tracking-wider block font-mono text-[9px]">
+                  {language === 'bn' ? 'রেটিং (তারকা চিহ্ন নির্বাচন করুন)' : 'Product Rating Level'}
+                </label>
+                <div className="flex items-center gap-2">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setRatingStars(star)}
+                      className="text-2xl cursor-pointer hover:scale-110 active:scale-95 transition-transform"
+                    >
+                      <span className={star <= ratingStars ? "text-amber-500 font-sans" : "text-neutral-300 dark:text-slate-700 font-sans"}>
+                        ★
+                      </span>
+                    </button>
+                  ))}
+                  <span className="ml-2 text-xs font-mono font-black text-amber-600 dark:text-amber-400">
+                    {ratingStars} / 5 {language === 'bn' ? 'তারকা' : 'Stars'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Comments Textarea */}
+              <div className="space-y-1.5">
+                <label className="text-neutral-400 dark:text-slate-400 font-bold uppercase tracking-wider block font-mono text-[9px]">
+                  {language === 'bn' ? 'আপনার মন্তব্য লিখুন' : 'Short Developer Comment / Review'}
+                </label>
+                <textarea
+                  required
+                  rows={3}
+                  value={ratingComment}
+                  onChange={(e) => setRatingComment(e.target.value)}
+                  placeholder={language === 'bn' ? 'যেমন: চমৎকার কোড স্ট্রাকচার, চমৎকার পেমেন্ট ইন্টিগ্রেশন!' : 'e.g. Excellent modular code, very easy setup process with custom db schemas.'}
+                  className="w-full bg-neutral-100 dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 p-3 rounded-xl text-neutral-900 dark:text-white focus:outline-none resize-none focus:ring-1 focus:ring-indigo-500 font-sans"
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setRatingOrderModalId(null)}
+                  className="flex-1 py-2.5 bg-neutral-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-black rounded-xl uppercase text-xs cursor-pointer hover:bg-neutral-200 dark:hover:bg-slate-700 transition"
+                >
+                  {language === 'bn' ? 'বাতিল' : 'Cancel'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const matchedOrder = orders.find(o => o.id === ratingOrderModalId) || { id: ratingOrderModalId, itemTitle: "WHMCS Automated bKash & Rocket Premium Integration Script" };
+                    if (onUpdateProductRating) {
+                      onUpdateProductRating(matchedOrder.itemTitle, ratingStars, ratingComment);
+                    }
+                    saveFeedback(ratingOrderModalId!, ratingStars, ratingComment);
+                    triggerToast(language === 'bn' ? "পণ্য রেটিং সফলভাবে হালনাগাদ করা হয়েছে! ধন্যবাদ!" : "Digital product rating submitted! Average score updated.");
+                    setRatingOrderModalId(null);
+                  }}
+                  className="flex-1 py-2.5 bg-gradient-to-r from-amber-500 to-indigo-600 text-white font-black rounded-xl uppercase text-xs cursor-pointer hover:scale-[1.01] active:scale-95 transition"
+                >
+                  {language === 'bn' ? 'রিভিউ জমা দিন' : 'Submit Review'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Localized Deletion Safety Dialogue for Orders */}
+      {deleteConfirmOrder.isOpen && (
+        <div className="fixed inset-0 z-55 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-300 pointer-events-auto">
+          <div className="w-full max-w-sm rounded-2xl border border-neutral-200 dark:border-slate-800 bg-white dark:bg-[#1E293B] text-neutral-900 dark:text-white shadow-2xl p-6 relative overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Red accent strip */}
+            <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-red-650 via-rose-500 to-orange-500" />
+            
+            <div className="flex gap-4">
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-red-500/10 text-red-500 border border-red-500/20 flex items-center justify-center">
+                <AlertCircle className="w-5 h-5 animate-pulse" />
+              </div>
+              <div className="space-y-1.5 flex-1 w-full text-left">
+                <h4 className="text-sm font-black tracking-tight uppercase font-sans text-red-600 dark:text-red-400">
+                  {language === 'bn' ? 'অর্ডার মুছে ফেলবেন?' : 'Delete Order?'}
+                </h4>
+                <p className="text-xs opacity-75 leading-relaxed font-sans mt-1">
+                  {language === 'bn' 
+                    ? `আপনি কি নিশ্চিত যে আপনি অর্ডার #${deleteConfirmOrder.orderId} ("${deleteConfirmOrder.itemTitle}") মুছে ফেলতে চান?`
+                    : `Are you sure you want to delete Order #${deleteConfirmOrder.orderId} ("${deleteConfirmOrder.itemTitle}")?`
+                  }
+                </p>
+                <p className="text-xs font-semibold text-rose-500 dark:text-rose-450 mt-1">
+                  {language === 'bn' ? 'আপনি কি নিশ্চিত?' : 'you ar sure ?'}
+                </p>
+                <span className="text-[10px] text-red-500 font-semibold block bg-red-500/5 px-2 py-1 rounded border border-red-500/10 mt-2 font-mono">
+                  🚨 {language === 'bn' ? 'এই কাজটি পূর্বাবস্থায় ফেরানো যাবে না।' : 'This action cannot be undone.'}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4 mt-2">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmOrder({ isOpen: false, orderId: null, itemTitle: '' })}
+                className="px-3 py-1.5 text-xs font-bold rounded-lg border border-neutral-200 dark:border-slate-800 text-neutral-700 dark:text-slate-300 hover:bg-neutral-100 dark:hover:bg-slate-800 transition cursor-pointer"
+              >
+                {language === 'bn' ? 'না, রাখুন' : 'No, Keep'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (deleteConfirmOrder.orderId && deleteOrder) {
+                    deleteOrder(deleteConfirmOrder.orderId);
+                    triggerToast(language === 'bn' 
+                      ? `🗑️ অর্ডার #${deleteConfirmOrder.orderId} সফলভাবে মুছে ফেলা হয়েছে।`
+                      : `🗑️ Order #${deleteConfirmOrder.orderId} successfully deleted.`
+                    );
+                    onAddActivityLog(`Deleted purchase receipt for Order #${deleteConfirmOrder.orderId}`);
+                  }
+                  setDeleteConfirmOrder({ isOpen: false, orderId: null, itemTitle: '' });
+                }}
+                className="px-4 py-1.5 text-xs font-black bg-red-600 hover:bg-red-700 text-white rounded-lg transition shadow-lg shadow-red-500/20 hover:scale-[1.01] active:scale-95 cursor-pointer"
+              >
+                {language === 'bn' ? 'হ্যাঁ, মুছে ফেলুন' : 'Yes, Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 📝 Interactive Order Notes Modal */}
+      {editingNotesOrder && (
+        <div className="fixed inset-0 z-55 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200 pointer-events-auto">
+          <div className="w-full max-w-lg rounded-2xl border border-neutral-200 dark:border-slate-800 bg-white dark:bg-[#1E293B] text-neutral-900 dark:text-white shadow-2xl p-6 relative overflow-hidden animate-in zoom-in-95 duration-150">
+            {/* Top decorative gradient strip */}
+            <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-amber-500 via-indigo-500 to-purple-600" />
+            
+            {/* Header */}
+            <div className="flex justify-between items-start pb-4 border-b border-neutral-150 dark:border-slate-800">
+              <div className="space-y-1 text-left">
+                <h4 className="text-sm font-black tracking-tight uppercase flex items-center gap-2 text-indigo-600 dark:text-indigo-400">
+                  <ShoppingCart className="w-4 h-4 text-amber-500" />
+                  <span>{language === 'bn' ? 'অর্ডার নোটস' : 'Order Notes'}</span>
+                </h4>
+                <p className="text-[11px] text-neutral-500 dark:text-slate-400">
+                  {language === 'bn' ? `অর্ডার আইডি: #${getOrderSerial(editingNotesOrder.id)}` : `Order ID: #${getOrderSerial(editingNotesOrder.id)}`}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingNotesOrder(null)}
+                className="p-1 rounded-lg text-neutral-400 hover:text-neutral-600 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-slate-800 transition cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="py-4 space-y-4 text-left">
+              <div className="bg-neutral-50 dark:bg-slate-900/50 p-3 rounded-xl border border-neutral-150 dark:border-slate-800/60">
+                <span className="text-[10px] font-black uppercase text-amber-500 block mb-1">
+                  {language === 'bn' ? 'অর্ডারের বিবরণ' : 'Order Item'}
+                </span>
+                <span className="text-xs font-bold text-neutral-800 dark:text-slate-200 block">
+                  {editingNotesOrder.itemTitle}
+                </span>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-extrabold uppercase text-neutral-500 dark:text-slate-450 tracking-wider flex items-center gap-1">
+                  <span>📝</span>
+                  <span>{language === 'bn' ? 'স্পেশাল নোট / নির্দেশনা' : 'Special Notes / Instructions'}</span>
+                </label>
+                <textarea
+                  rows={5}
+                  value={tempNotesText}
+                  onChange={(e) => setTempNotesText(e.target.value)}
+                  placeholder={language === 'bn' ? 'এখানে আপনার অর্ডারের বিশেষ নির্দেশনা বা তথ্য লিখুন...' : 'Write custom order notes, hosting choices, domain setups or specific details...'}
+                  className="w-full text-xs sm:text-sm font-semibold bg-[#F8FAFC] dark:bg-[#111827] border border-[#E2E8F0] dark:border-[#374151] p-3.5 rounded-xl text-neutral-900 dark:text-white placeholder-neutral-400 dark:placeholder-slate-650 focus:outline-none focus:ring-4 focus:ring-indigo-500/15 focus:border-indigo-500 transition-all duration-200 resize-none"
+                />
+              </div>
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="flex justify-end gap-2.5 pt-4 border-t border-neutral-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setEditingNotesOrder(null)}
+                className="px-4 py-2 text-xs font-bold rounded-lg border border-neutral-200 dark:border-slate-800 text-neutral-700 dark:text-slate-300 hover:bg-neutral-100 dark:hover:bg-slate-800 transition cursor-pointer"
+              >
+                {language === 'bn' ? 'বন্ধ করুন' : 'Cancel'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (editingNotesOrder.id && onUpdateOrders) {
+                    const updated = orders.map(o => o.id === editingNotesOrder.id ? { ...o, orderNotes: tempNotesText } : o);
+                    onUpdateOrders(updated);
+                    triggerToast(language === 'bn' ? 'অর্ডার নোট সফলভাবে সংরক্ষণ করা হয়েছে।' : 'Order notes successfully saved.');
+                    onAddActivityLog(`Updated notes for Order #${editingNotesOrder.id}`);
+                  } else {
+                    triggerToast(language === 'bn' ? 'ত্রুটি: আপডেট করা সম্ভব হয়নি।' : 'Error: Unable to update order notes.');
+                  }
+                  setEditingNotesOrder(null);
+                }}
+                className="px-5 py-2 text-xs font-black bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition shadow-lg shadow-indigo-500/20 hover:scale-[1.01] active:scale-95 cursor-pointer"
+              >
+                {language === 'bn' ? 'সংরক্ষণ করুন' : 'Save Notes'}
+              </button>
+            </div>
           </div>
         </div>
       )}

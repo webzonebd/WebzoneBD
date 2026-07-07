@@ -99,10 +99,16 @@ export default function BlogCard({
         {/* Action Widgets */}
         <div className="absolute top-4 right-4 flex items-center gap-1.5 z-10">
           {/* Bookmark */}
-          <button
+          <motion.button
             onClick={(e) => onBookmarkToggle(post.id, e)}
             id={`bookmark-btn-${post.id}`}
             aria-label="Toggle Bookmark"
+            whileHover={{ scale: 1.15 }}
+            whileTap={{ scale: 0.8 }}
+            animate={{
+              scale: isBookmarked ? [1, 1.3, 0.9, 1.1, 1] : 1
+            }}
+            transition={{ duration: 0.45 }}
             className={`w-9 h-9 rounded-full flex items-center justify-center transition-all cursor-pointer backdrop-blur-md ${
               isBookmarked 
                 ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30' 
@@ -110,7 +116,7 @@ export default function BlogCard({
             }`}
           >
             <Bookmark className={`w-4 h-4 ${isBookmarked ? 'fill-current' : ''}`} />
-          </button>
+          </motion.button>
 
           {/* Quick Share */}
           <button
@@ -182,14 +188,20 @@ export default function BlogCard({
             </span>
 
             {/* Like count active */}
-            <button
+            <motion.button
               onClick={(e) => onLikeToggle(post.id, e)}
               id={`like-btn-${post.id}`}
+              whileHover={{ scale: 1.15 }}
+              whileTap={{ scale: 0.8 }}
+              animate={{
+                scale: post.likes > 248 ? [1, 1.3, 0.9, 1.1, 1] : 1
+              }}
+              transition={{ duration: 0.45 }}
               className="flex items-center gap-1 text-xs font-mono text-neutral-500 dark:text-slate-400 hover:text-rose-500 dark:hover:text-rose-450 cursor-pointer active:scale-95 transition-all group/like"
             >
               <Heart className={`w-3.5 h-3.5 transition-colors group-hover/like:fill-rose-500 ${post.likes > 248 ? 'fill-rose-500 text-rose-500' : ''}`} />
               <span>{post.likes}</span>
-            </button>
+            </motion.button>
           </div>
         </div>
 
