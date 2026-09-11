@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion } from 'motion/react';
 import { 
   DollarSign, 
   List, 
@@ -33,9 +34,18 @@ import {
   Clock,
   CheckCircle2,
   AlertTriangle,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Globe,
+  Server
 } from 'lucide-react';
 import { ResponsiveContainer, ComposedChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Bar, Area, Line } from 'recharts';
+import { 
+  DashboardMetricsSkeleton, 
+  DashboardAnalyticsSkeleton, 
+  DashboardOrdersTableSkeleton, 
+  DashboardServicesSkeleton, 
+  DashboardRecentActivitySkeleton 
+} from './skeletons/DashboardSkeleton';
 
 interface DashboardWidgetsProps {
   language: 'en' | 'bn';
@@ -104,10 +114,33 @@ export const DashboardWidgets: React.FC<DashboardWidgetsProps> = ({
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [currentPageNum, setCurrentPageNum] = useState(1);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isLoadingWidgets, setIsLoadingWidgets] = useState(true);
   const [selectedOrderForView, setSelectedOrderForView] = useState<any | null>(null);
   const [selectedOrderForEdit, setSelectedOrderForEdit] = useState<any | null>(null);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState<string | null>(null);
   const [isInvoicePrintOpen, setIsInvoicePrintOpen] = useState<any | null>(null);
+
+  // Initial mount skeleton effect
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsLoadingWidgets(false);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Timeframe change skeleton transition
+  const isFirstMountRef = React.useRef(true);
+  React.useEffect(() => {
+    if (isFirstMountRef.current) {
+      isFirstMountRef.current = false;
+      return;
+    }
+    setIsLoadingWidgets(true);
+    const timer = setTimeout(() => {
+      setIsLoadingWidgets(false);
+    }, 280);
+    return () => clearTimeout(timer);
+  }, [adminTimeframe]);
 
   const adminTrendData = React.useMemo(() => {
     const days = [];
@@ -336,24 +369,28 @@ export const DashboardWidgets: React.FC<DashboardWidgetsProps> = ({
       <div className="space-y-6">
         
         {/* Statistics Metric cards represent general administrative nodes */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="p-5 rounded-[20px] bg-white dark:bg-[#0F172A] border border-slate-150 dark:border-slate-800/80 text-left shadow-sm">
-            <span className="text-[9px] uppercase font-bold tracking-wider text-slate-400">Total System Revenue</span>
-            <p className="text-2.5xl font-black text-indigo-550 mt-1 text-[#7C3AED] dark:text-cyan-400">{formatPrice(totalRevenue)}</p>
+        {isLoadingWidgets ? (
+          <DashboardMetricsSkeleton count={4} />
+        ) : (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="p-5 rounded-[20px] bg-white dark:bg-[#0F172A] border border-slate-150 dark:border-slate-800/80 text-left shadow-sm">
+              <span className="text-[9px] uppercase font-bold tracking-wider text-slate-400">Total System Revenue</span>
+              <p className="text-2.5xl font-black text-indigo-550 mt-1 text-[#7C3AED] dark:text-cyan-400">{formatPrice(totalRevenue)}</p>
+            </div>
+            <div className="p-5 rounded-[20px] bg-white dark:bg-[#0F172A] border border-slate-150 dark:border-slate-800/80 text-left shadow-sm">
+              <span className="text-[9px] uppercase font-bold tracking-wider text-slate-400">Total System Orders</span>
+              <p className="text-2.5xl font-black text-slate-900 dark:text-white mt-1">{orders.length}</p>
+            </div>
+            <div className="p-5 rounded-[20px] bg-white dark:bg-[#0F172A] border border-slate-150 dark:border-slate-800/80 text-left shadow-sm">
+              <span className="text-[9px] uppercase font-bold tracking-wider text-slate-400">Client Accounts Info</span>
+              <p className="text-2.5xl font-black text-slate-900 dark:text-white mt-1">{activeClientsCount}</p>
+            </div>
+            <div className="p-5 rounded-[20px] bg-white dark:bg-[#0F172A] border border-slate-150 dark:border-slate-800/80 text-left shadow-sm">
+              <span className="text-[9px] uppercase font-bold tracking-wider text-slate-400">Tickets Requiring Attention</span>
+              <p className="text-2.5xl font-black text-amber-500 mt-1">{tickets.filter(t => t.status === 'open').length}</p>
+            </div>
           </div>
-          <div className="p-5 rounded-[20px] bg-white dark:bg-[#0F172A] border border-slate-150 dark:border-slate-800/80 text-left shadow-sm">
-            <span className="text-[9px] uppercase font-bold tracking-wider text-slate-400">Total System Orders</span>
-            <p className="text-2.5xl font-black text-slate-900 dark:text-white mt-1">{orders.length}</p>
-          </div>
-          <div className="p-5 rounded-[20px] bg-white dark:bg-[#0F172A] border border-slate-150 dark:border-slate-800/80 text-left shadow-sm">
-            <span className="text-[9px] uppercase font-bold tracking-wider text-slate-400">Client Accounts Info</span>
-            <p className="text-2.5xl font-black text-slate-900 dark:text-white mt-1">{activeClientsCount}</p>
-          </div>
-          <div className="p-5 rounded-[20px] bg-white dark:bg-[#0F172A] border border-slate-150 dark:border-slate-800/80 text-left shadow-sm">
-            <span className="text-[9px] uppercase font-bold tracking-wider text-slate-400">Tickets Requiring Attention</span>
-            <p className="text-2.5xl font-black text-amber-500 mt-1">{tickets.filter(t => t.status === 'open').length}</p>
-          </div>
-        </div>
+        )}
 
         {/* ==========================================
             📊 SaaS PREMIUM GLASSMORPHIC SUMMARY STATISTICS
@@ -369,7 +406,10 @@ export const DashboardWidgets: React.FC<DashboardWidgetsProps> = ({
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {isLoadingWidgets ? (
+            <DashboardMetricsSkeleton count={4} />
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Card 1: Total Orders Today */}
             <div id="stat-card-orders-today" className="relative group overflow-hidden bg-white/70 dark:bg-[#0F172A]/70 backdrop-blur-[20px] border border-slate-150 dark:border-white/10 rounded-[24px] p-5 text-left shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
               <div className="absolute top-0 left-0 w-2 h-full bg-gradient-to-b from-[#7C3AED] via-[#A855F7] to-[#EC4899]" />
@@ -466,6 +506,7 @@ export const DashboardWidgets: React.FC<DashboardWidgetsProps> = ({
               </div>
             </div>
           </div>
+          )}
         </div>
 
         {/* ==========================================
@@ -1496,178 +1537,427 @@ export const DashboardWidgets: React.FC<DashboardWidgetsProps> = ({
       return acc + (v || 0);
     }, 0);
 
+    const completedOrdersSum = orders
+      .filter(o => o.paymentStatus === 'completed' || o.paymentStatus === 'paid')
+      .reduce((sum, o) => sum + (o.price || 0), 0);
+    const totalOrdersSum = orders.reduce((sum, o) => sum + (o.price || 0), 0);
+    const effectiveTotalSpent = completedOrdersSum > 0 ? completedOrdersSum : (totalOrdersSum > 0 ? totalOrdersSum : chartTotalSpent);
+    const activeTicketsCount = tickets.filter(t => t.status !== 'closed' && t.status !== 'resolved').length;
+
     return (
       <div className="space-y-6">
 
-        {/* Real-time stats header summary */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="p-5 rounded-3xl bg-white dark:bg-[#0F172A] border border-slate-150 dark:border-slate-800 text-left">
-            <span className="text-[9px] uppercase font-bold tracking-wider text-slate-400">Services Active</span>
-            <p className="text-2.5xl font-black text-slate-900 dark:text-white mt-1">{services.length}</p>
-          </div>
-          <div className="p-5 rounded-3xl bg-white dark:bg-[#0F172A] border border-slate-150 dark:border-slate-800 text-left">
-            <span className="text-[9px] uppercase font-bold tracking-wider text-slate-400">Managed Suffixes</span>
-            <p className="text-2.5xl font-black text-slate-900 dark:text-white mt-1">{domains.length}</p>
-          </div>
-          <div className="p-5 rounded-3xl bg-white dark:bg-[#0F172A] border border-slate-150 dark:border-slate-800 text-left">
-            <span className="text-[9px] uppercase font-bold tracking-wider text-slate-400">Cloud Web Hostings</span>
-            <p className="text-2.5xl font-black text-slate-900 dark:text-white mt-1">{hostingPackages.length}</p>
-          </div>
-          <div className="p-5 rounded-3xl bg-white dark:bg-[#0F172A] border border-slate-150 dark:border-slate-800 text-left">
-            <span className="text-[9px] uppercase font-bold tracking-wider text-slate-400">Total Orders</span>
-            <p className="text-2.5xl font-black text-slate-900 dark:text-white mt-1">{orders.length}</p>
+        {/* Customer Account Summary & Quick Assessment Banner */}
+        <div className="bg-gradient-to-r from-indigo-900/90 via-slate-900 to-slate-950 dark:from-indigo-950 dark:via-slate-900 dark:to-slate-950 border border-indigo-500/20 rounded-3xl p-5 sm:p-6 text-white shadow-xl relative overflow-hidden">
+          {/* Ambient glowing highlights */}
+          <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute bottom-0 left-1/3 -mb-16 w-64 h-64 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-500 to-cyan-400 p-0.5 shrink-0 shadow-lg shadow-indigo-500/20">
+                <div className="w-full h-full bg-slate-900 rounded-[14px] flex items-center justify-center font-extrabold text-lg text-white">
+                  {user?.name ? user.name.charAt(0).toUpperCase() : (user?.email ? user.email.charAt(0).toUpperCase() : 'U')}
+                </div>
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-lg sm:text-xl font-black text-white">
+                    {language === 'bn' ? 'অ্যাকাউন্ট সামারি ও স্ট্যাটাস' : 'Customer Account Summary'}
+                  </h2>
+                  <span className="p-1 px-2.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[9px] font-mono font-bold uppercase tracking-wider flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
+                    {language === 'bn' ? 'সক্রিয় ও ভেরিফাইড' : 'Verified & Active'}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300 mt-1">
+                  {user?.email || 'client@webzonebd.com'} • {language === 'bn' ? 'কাস্টমার ড্যাশবোর্ড ওভারভিউ' : 'Client Overview Desk'}
+                </p>
+              </div>
+            </div>
+
+            {/* Quick Summary Metrics Pills */}
+            <div className="flex flex-wrap items-center gap-3">
+              <div 
+                onClick={() => setActiveTab('billing')}
+                className="p-3 px-4 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 transition cursor-pointer flex items-center gap-3 group"
+              >
+                <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400 group-hover:scale-110 transition-transform">
+                  <DollarSign className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 uppercase font-mono font-bold block">
+                    {language === 'bn' ? 'মোট ব্যয়' : 'Total Spent'}
+                  </span>
+                  <span className="text-base font-extrabold text-emerald-300 font-mono">
+                    {formatPrice(effectiveTotalSpent)}
+                  </span>
+                </div>
+              </div>
+
+              <div 
+                onClick={() => setActiveTab('tickets')}
+                className="p-3 px-4 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 transition cursor-pointer flex items-center gap-3 group"
+              >
+                <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 group-hover:scale-110 transition-transform">
+                  <MessageSquare className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 uppercase font-mono font-bold block">
+                    {language === 'bn' ? 'সক্রিয় টিকিট' : 'Active Tickets'}
+                  </span>
+                  <span className="text-base font-extrabold text-amber-300 font-mono flex items-center gap-1.5">
+                    {activeTicketsCount}
+                    {activeTicketsCount > 0 && (
+                      <span className="text-[9px] bg-amber-500 text-slate-950 font-black px-1.5 py-0.2 rounded-full">
+                        Open
+                      </span>
+                    )}
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
+
+        {/* Real-time stats header summary grid */}
+        {isLoadingWidgets ? (
+          <DashboardMetricsSkeleton count={6} />
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+            {/* Total Spent */}
+            <motion.div
+              whileHover={{ y: -6, scale: 1.02 }}
+              transition={{ type: "spring", stiffness: 300, damping: 20 }}
+              onClick={() => setActiveTab('billing')}
+              className="p-5 rounded-[20px] bg-white dark:bg-[#0F172A] border border-slate-150 dark:border-[rgba(255,255,255,0.08)] text-left relative overflow-hidden group shadow-[0_12px_30px_rgba(0,0,0,0.03)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.12)] transition-colors duration-300 flex flex-col justify-between min-h-[125px] cursor-pointer"
+            >
+              <div className="absolute top-0 right-0 -mr-6 -mt-6 w-20 h-20 bg-gradient-to-br from-emerald-500/20 to-teal-500/0 rounded-full blur-xl group-hover:scale-150 transition-transform duration-500 pointer-events-none" />
+              
+              <div className="flex items-center justify-between z-10">
+                <span className="text-[10px] sm:text-[11px] uppercase font-bold tracking-wider text-slate-400 dark:text-slate-500">
+                  {language === 'bn' ? 'মোট ব্যয়' : 'Total Spent'}
+                </span>
+                <div className="p-2.5 rounded-xl bg-gradient-to-br from-emerald-500/10 to-teal-500/10 text-emerald-500 group-hover:from-emerald-500 group-hover:to-teal-500 group-hover:text-white transition-all duration-300">
+                  <DollarSign className="w-4 h-4" />
+                </div>
+              </div>
+              
+              <div className="mt-4 z-10">
+                <p className="text-xl sm:text-2xl font-extrabold text-slate-950 dark:text-white tracking-tight leading-none bg-clip-text text-transparent bg-gradient-to-r from-emerald-500 to-teal-600 dark:from-white dark:to-slate-100 font-mono">
+                  {formatPrice(effectiveTotalSpent)}
+                </p>
+                <span className="text-[9px] sm:text-[10px] font-semibold text-slate-400 dark:text-slate-500 mt-1 block">
+                  {language === 'bn' ? 'পরিশোধিত পেমেন্ট ইতিবৃত্ত' : 'Verified order payments'}
+                </span>
+              </div>
+            </motion.div>
+
+            {/* Active Support Tickets */}
+            <motion.div
+              whileHover={{ y: -6, scale: 1.02 }}
+              transition={{ type: "spring", stiffness: 300, damping: 20 }}
+              onClick={() => setActiveTab('tickets')}
+              className="p-5 rounded-[20px] bg-white dark:bg-[#0F172A] border border-slate-150 dark:border-[rgba(255,255,255,0.08)] text-left relative overflow-hidden group shadow-[0_12px_30px_rgba(0,0,0,0.03)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.12)] transition-colors duration-300 flex flex-col justify-between min-h-[125px] cursor-pointer"
+            >
+              <div className="absolute top-0 right-0 -mr-6 -mt-6 w-20 h-20 bg-gradient-to-br from-amber-500/20 to-orange-500/0 rounded-full blur-xl group-hover:scale-150 transition-transform duration-500 pointer-events-none" />
+              
+              <div className="flex items-center justify-between z-10">
+                <span className="text-[10px] sm:text-[11px] uppercase font-bold tracking-wider text-slate-400 dark:text-slate-500">
+                  {language === 'bn' ? 'সক্রিয় টিকিট' : 'Active Tickets'}
+                </span>
+                <div className="p-2.5 rounded-xl bg-gradient-to-br from-amber-500/10 to-orange-500/10 text-amber-500 group-hover:from-amber-500 group-hover:to-orange-500 group-hover:text-white transition-all duration-300">
+                  <MessageSquare className="w-4 h-4" />
+                </div>
+              </div>
+              
+              <div className="mt-4 z-10">
+                <p className="text-2.5xl sm:text-3xl font-extrabold text-slate-950 dark:text-white tracking-tight leading-none bg-clip-text text-transparent bg-gradient-to-r from-amber-500 to-orange-600 dark:from-white dark:to-slate-100 font-mono">
+                  {activeTicketsCount}
+                </p>
+                <span className="text-[9px] sm:text-[10px] font-semibold text-slate-400 dark:text-slate-500 mt-1 block">
+                  {activeTicketsCount > 0 
+                    ? (language === 'bn' ? 'খোলা সাপোর্ট টিকিট কেস' : 'Open helpdesk tickets')
+                    : (language === 'bn' ? 'সকল টিকিট সমাধান করা হয়েছে' : 'All cases resolved')}
+                </span>
+              </div>
+            </motion.div>
+
+            {/* Active Services */}
+            <motion.div
+              whileHover={{ y: -6, scale: 1.02 }}
+              transition={{ type: "spring", stiffness: 300, damping: 20 }}
+              onClick={() => setActiveTab('my-services')}
+              className="p-5 rounded-[20px] bg-white dark:bg-[#0F172A] border border-slate-150 dark:border-[rgba(255,255,255,0.08)] text-left relative overflow-hidden group shadow-[0_12px_30px_rgba(0,0,0,0.03)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.12)] transition-colors duration-300 flex flex-col justify-between min-h-[125px] cursor-pointer"
+            >
+              {/* Ambient background glow */}
+              <div className="absolute top-0 right-0 -mr-6 -mt-6 w-20 h-20 bg-gradient-to-br from-indigo-500/20 to-purple-500/0 rounded-full blur-xl group-hover:scale-150 transition-transform duration-500 pointer-events-none" />
+              
+              <div className="flex items-center justify-between z-10">
+                <span className="text-[10px] sm:text-[11px] uppercase font-bold tracking-wider text-slate-400 dark:text-slate-500">
+                  {language === 'bn' ? 'সক্রিয় সার্ভিস' : 'Active Services'}
+                </span>
+                <div className="p-2.5 rounded-xl bg-gradient-to-br from-indigo-500/10 to-purple-500/10 text-indigo-500 group-hover:from-[#7C3AED] group-hover:to-[#EC4899] group-hover:text-white transition-all duration-300">
+                  <CloudLightning className="w-4 h-4 animate-pulse" />
+                </div>
+              </div>
+              
+              <div className="mt-4 z-10">
+                <p className="text-2.5xl sm:text-3xl font-extrabold text-slate-950 dark:text-white tracking-tight leading-none bg-clip-text text-transparent bg-gradient-to-r from-indigo-500 to-purple-600 dark:from-white dark:to-slate-100">
+                  {services.length}
+                </p>
+                <span className="text-[9px] sm:text-[10px] font-semibold text-slate-400 dark:text-slate-500 mt-1 block">
+                  {language === 'bn' ? 'চলমান প্রজেক্ট ও সাবস্ক্রিপশন' : 'Running projects & contracts'}
+                </span>
+              </div>
+            </motion.div>
+
+            {/* Managed Suffixes */}
+            <motion.div
+              whileHover={{ y: -6, scale: 1.02 }}
+              transition={{ type: "spring", stiffness: 300, damping: 20 }}
+              onClick={() => setActiveTab('my-domains')}
+              className="p-5 rounded-[20px] bg-white dark:bg-[#0F172A] border border-slate-150 dark:border-[rgba(255,255,255,0.08)] text-left relative overflow-hidden group shadow-[0_12px_30px_rgba(0,0,0,0.03)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.12)] transition-colors duration-300 flex flex-col justify-between min-h-[125px] cursor-pointer"
+            >
+              {/* Ambient background glow */}
+              <div className="absolute top-0 right-0 -mr-6 -mt-6 w-20 h-20 bg-gradient-to-br from-cyan-500/20 to-blue-500/0 rounded-full blur-xl group-hover:scale-150 transition-transform duration-500 pointer-events-none" />
+              
+              <div className="flex items-center justify-between z-10">
+                <span className="text-[10px] sm:text-[11px] uppercase font-bold tracking-wider text-slate-400 dark:text-slate-500">
+                  {language === 'bn' ? 'পরিচালিত ডোমেন' : 'Managed Suffixes'}
+                </span>
+                <div className="p-2.5 rounded-xl bg-gradient-to-br from-cyan-500/10 to-blue-500/10 text-cyan-500 group-hover:from-cyan-500 group-hover:to-blue-500 group-hover:text-white transition-all duration-300">
+                  <Globe className="w-4 h-4" />
+                </div>
+              </div>
+              
+              <div className="mt-4 z-10">
+                <p className="text-2.5xl sm:text-3xl font-extrabold text-slate-950 dark:text-white tracking-tight leading-none bg-clip-text text-transparent bg-gradient-to-r from-cyan-500 to-blue-600 dark:from-white dark:to-slate-100">
+                  {domains.length}
+                </p>
+                <span className="text-[9px] sm:text-[10px] font-semibold text-slate-400 dark:text-slate-500 mt-1 block">
+                  {language === 'bn' ? 'সক্রিয় ডোমেন ও টিএলডি' : 'Active domains & TLDs'}
+                </span>
+              </div>
+            </motion.div>
+
+            {/* Web Hosting */}
+            <motion.div
+              whileHover={{ y: -6, scale: 1.02 }}
+              transition={{ type: "spring", stiffness: 300, damping: 20 }}
+              onClick={() => setActiveTab('my-hosting')}
+              className="p-5 rounded-[20px] bg-white dark:bg-[#0F172A] border border-slate-150 dark:border-[rgba(255,255,255,0.08)] text-left relative overflow-hidden group shadow-[0_12px_30px_rgba(0,0,0,0.03)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.12)] transition-colors duration-300 flex flex-col justify-between min-h-[125px] cursor-pointer"
+            >
+              {/* Ambient background glow */}
+              <div className="absolute top-0 right-0 -mr-6 -mt-6 w-20 h-20 bg-gradient-to-br from-emerald-500/20 to-teal-500/0 rounded-full blur-xl group-hover:scale-150 transition-transform duration-500 pointer-events-none" />
+              
+              <div className="flex items-center justify-between z-10">
+                <span className="text-[10px] sm:text-[11px] uppercase font-bold tracking-wider text-slate-400 dark:text-slate-500">
+                  {language === 'bn' ? 'ওয়েব হোস্টিং' : 'Web Hosting'}
+                </span>
+                <div className="p-2.5 rounded-xl bg-gradient-to-br from-emerald-500/10 to-teal-500/10 text-emerald-500 group-hover:from-emerald-500 group-hover:to-teal-500 group-hover:text-white transition-all duration-300">
+                  <Server className="w-4 h-4" />
+                </div>
+              </div>
+              
+              <div className="mt-4 z-10">
+                <p className="text-2.5xl sm:text-3xl font-extrabold text-slate-950 dark:text-white tracking-tight leading-none bg-clip-text text-transparent bg-gradient-to-r from-emerald-500 to-teal-600 dark:from-white dark:to-slate-100">
+                  {hostingPackages.length}
+                </p>
+                <span className="text-[9px] sm:text-[10px] font-semibold text-slate-400 dark:text-slate-500 mt-1 block">
+                  {language === 'bn' ? 'সক্রিয় ক্লাউড এসএসডি হোস্টিং' : 'Active SSD cloud server plans'}
+                </span>
+              </div>
+            </motion.div>
+
+            {/* Total Orders */}
+            <motion.div
+              whileHover={{ y: -6, scale: 1.02 }}
+              transition={{ type: "spring", stiffness: 300, damping: 20 }}
+              onClick={() => setActiveTab('my-orders')}
+              className="p-5 rounded-[20px] bg-white dark:bg-[#0F172A] border border-slate-150 dark:border-[rgba(255,255,255,0.08)] text-left relative overflow-hidden group shadow-[0_12px_30px_rgba(0,0,0,0.03)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.12)] transition-colors duration-300 flex flex-col justify-between min-h-[125px] cursor-pointer"
+            >
+              {/* Ambient background glow */}
+              <div className="absolute top-0 right-0 -mr-6 -mt-6 w-20 h-20 bg-gradient-to-br from-rose-500/20 to-pink-500/0 rounded-full blur-xl group-hover:scale-150 transition-transform duration-500 pointer-events-none" />
+              
+              <div className="flex items-center justify-between z-10">
+                <span className="text-[10px] sm:text-[11px] uppercase font-bold tracking-wider text-slate-400 dark:text-slate-500">
+                  {language === 'bn' ? 'মোট অর্ডার' : 'Total Orders'}
+                </span>
+                <div className="p-2.5 rounded-xl bg-gradient-to-br from-rose-500/10 to-pink-500/10 text-rose-500 group-hover:from-rose-500 group-hover:to-pink-500 group-hover:text-white transition-all duration-300">
+                  <ShoppingBag className="w-4 h-4" />
+                </div>
+              </div>
+              
+              <div className="mt-4 z-10">
+                <p className="text-2.5xl sm:text-3xl font-extrabold text-slate-950 dark:text-white tracking-tight leading-none bg-clip-text text-transparent bg-gradient-to-r from-rose-500 to-pink-600 dark:from-white dark:to-slate-100">
+                  {orders.length}
+                </p>
+                <span className="text-[9px] sm:text-[10px] font-semibold text-slate-400 dark:text-slate-500 mt-1 block">
+                  {language === 'bn' ? 'সর্বমোট অর্ডার ইতিবৃত্ত' : 'Total purchase history'}
+                </span>
+              </div>
+            </motion.div>
+          </div>
+        )}
 
         {/* Interactive Billing & Spending Summary Chart */}
-        <div className="bg-white dark:bg-[#0F172A] border border-neutral-200 dark:border-slate-800 rounded-3xl p-6 text-left shadow-md space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 gap-4">
-            <div>
-              <h3 className="text-sm font-black uppercase text-indigo-600 dark:text-cyan-405 flex items-center gap-2">
-                <BarChart3 className="w-5 h-5 text-indigo-500" />
-                <span>{language === 'bn' ? 'বিলিং সারসংক্ষেপ (Billing Summary)' : 'Billing Summary Analytics'}</span>
-              </h3>
-              <p className="text-xs text-slate-400 mt-1 leading-normal">
-                {language === 'bn' 
-                  ? 'বিগত ৬ মাসের প্রোডাক্ট ও সার্ভিস ভিত্তিক মোট খরচের গ্রাফিক্যাল বিশ্লেষণ।' 
-                  : 'Graphical analysis of monthly spending on products, templates, and core software services.'}
-              </p>
-            </div>
-            
-            {/* Real-time Summary Indicators */}
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="p-2 py-1 bg-indigo-500/10 text-indigo-650 dark:text-cyan-300 rounded-xl text-[10px] font-mono font-bold flex items-center gap-1.5 border border-indigo-500/20">
-                <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-ping" />
-                <span>{language === 'bn' ? 'গড় ব্যয়: $৩৮.৯০' : 'AVG: $38.90/MO'}</span>
+        {isLoadingWidgets ? (
+          <DashboardAnalyticsSkeleton />
+        ) : (
+          <div className="bg-white dark:bg-[#0F172A] border border-neutral-200 dark:border-slate-800 rounded-3xl p-6 text-left shadow-md space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 gap-4">
+              <div>
+                <h3 className="text-sm font-black uppercase text-indigo-600 dark:text-cyan-405 flex items-center gap-2">
+                  <BarChart3 className="w-5 h-5 text-indigo-500" />
+                  <span>{language === 'bn' ? 'বিলিং সারসংক্ষেপ (Billing Summary)' : 'Billing Summary Analytics'}</span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-1 leading-normal">
+                  {language === 'bn' 
+                    ? 'বিগত ৬ মাসের প্রোডাক্ট ও সার্ভিস ভিত্তিক মোট খরচের গ্রাফিক্যাল বিশ্লেষণ।' 
+                    : 'Graphical analysis of monthly spending on products, templates, and core software services.'}
+                </p>
               </div>
-              <div className="p-2 py-1 bg-emerald-500/10 text-emerald-650 dark:text-emerald-400 rounded-xl text-[10px] font-mono font-bold flex items-center gap-1.5 border border-emerald-500/20">
-                <span>{language === 'bn' ? `মোট পরিশোধিত: $${chartTotalSpent.toFixed(2)}` : `TOTAL PAID: $${chartTotalSpent.toFixed(2)}`}</span>
+              
+              {/* Real-time Summary Indicators */}
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="p-2 py-1 bg-indigo-500/10 text-indigo-650 dark:text-cyan-300 rounded-xl text-[10px] font-mono font-bold flex items-center gap-1.5 border border-indigo-500/20">
+                  <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-ping" />
+                  <span>{language === 'bn' ? 'গড় ব্যয়: $৩৮.৯০' : 'AVG: $38.90/MO'}</span>
+                </div>
+                <div className="p-2 py-1 bg-emerald-500/10 text-emerald-650 dark:text-emerald-400 rounded-xl text-[10px] font-mono font-bold flex items-center gap-1.5 border border-emerald-500/20">
+                  <span>{language === 'bn' ? `মোট পরিশোধিত: $${chartTotalSpent.toFixed(2)}` : `TOTAL PAID: $${chartTotalSpent.toFixed(2)}`}</span>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="w-full h-72 sm:h-80 pt-2 font-mono text-[10px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart
-                data={chartData}
-                margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-              >
-                <defs>
-                  <linearGradient id="colorServices" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#6366F1" stopOpacity={0.2}/>
-                    <stop offset="95%" stopColor="#6366F1" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid 
-                  stroke={theme === 'dark' ? '#334155' : '#E2E8F0'} 
-                  strokeDasharray="3 3" 
-                  vertical={false}
-                />
-                <XAxis 
-                  dataKey="name" 
-                  stroke={theme === 'dark' ? '#94A3B8' : '#64748B'}
-                  fontSize={10}
-                  tickLine={false}
-                />
-                <YAxis 
-                  stroke={theme === 'dark' ? '#94A3B8' : '#64748B'}
-                  fontSize={10}
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={(val) => `$${val}`}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: theme === 'dark' ? '#0F172A' : '#FFFFFF',
-                    borderColor: theme === 'dark' ? '#334155' : '#E2E8F0',
-                    color: theme === 'dark' ? '#F8FAFC' : '#0F172A',
-                    borderRadius: '12px',
-                    fontSize: '11px',
-                    fontFamily: 'monospace',
-                    fontWeight: 'bold',
-                    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
-                  }}
-                  formatter={(value: any) => [`$${value}`, undefined]}
-                />
-                <Legend 
-                  wrapperStyle={{ fontSize: '10px', paddingTop: '10px' }}
-                />
-                {/* Products category represented as a Bar */}
-                <Bar 
-                  dataKey={language === 'bn' ? 'প্রোডাক্ট' : 'Products'} 
-                  fill="#10B981" 
-                  radius={[4, 4, 0, 0]} 
-                  barSize={18}
-                />
-                {/* Services category represented as a smooth Area */}
-                <Area 
-                  type="monotone" 
-                  dataKey={language === 'bn' ? 'সার্ভিস' : 'Services'} 
-                  fill="url(#colorServices)" 
-                  stroke="#6366F1" 
-                  strokeWidth={2}
-                />
-                {/* Cumulative Monthly Total represented as a Line */}
-                <Line 
-                  type="monotone" 
-                  dataKey={language === 'bn' ? 'মোট ব্যয়' : 'Total Spend'} 
-                  stroke="#0EA5E9" 
-                  strokeWidth={2.5} 
-                  dot={{ r: 3, strokeWidth: 1 }}
-                  activeDot={{ r: 5 }}
-                />
-              </ComposedChart>
-            </ResponsiveContainer>
+            <div className="w-full h-72 sm:h-80 pt-2 font-mono text-[10px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart
+                  data={chartData}
+                  margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                >
+                  <defs>
+                    <linearGradient id="colorServices" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#6366F1" stopOpacity={0.2}/>
+                      <stop offset="95%" stopColor="#6366F1" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid 
+                    stroke={theme === 'dark' ? '#334155' : '#E2E8F0'} 
+                    strokeDasharray="3 3" 
+                    vertical={false}
+                  />
+                  <XAxis 
+                    dataKey="name" 
+                    stroke={theme === 'dark' ? '#94A3B8' : '#64748B'}
+                    fontSize={10}
+                    tickLine={false}
+                  />
+                  <YAxis 
+                    stroke={theme === 'dark' ? '#94A3B8' : '#64748B'}
+                    fontSize={10}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(val) => `$${val}`}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: theme === 'dark' ? '#0F172A' : '#FFFFFF',
+                      borderColor: theme === 'dark' ? '#334155' : '#E2E8F0',
+                      color: theme === 'dark' ? '#F8FAFC' : '#0F172A',
+                      borderRadius: '12px',
+                      fontSize: '11px',
+                      fontFamily: 'monospace',
+                      fontWeight: 'bold',
+                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                    }}
+                    formatter={(value: any) => [`$${value}`, undefined]}
+                  />
+                  <Legend 
+                    wrapperStyle={{ fontSize: '10px', paddingTop: '10px' }}
+                  />
+                  {/* Products category represented as a Bar */}
+                  <Bar 
+                    dataKey={language === 'bn' ? 'প্রোডাক্ট' : 'Products'} 
+                    fill="#10B981" 
+                    radius={[4, 4, 0, 0]} 
+                    barSize={18}
+                  />
+                  {/* Services category represented as a smooth Area */}
+                  <Area 
+                    type="monotone" 
+                    dataKey={language === 'bn' ? 'সার্ভিস' : 'Services'} 
+                    fill="url(#colorServices)" 
+                    stroke="#6366F1" 
+                    strokeWidth={2}
+                  />
+                  {/* Cumulative Monthly Total represented as a Line */}
+                  <Line 
+                    type="monotone" 
+                    dataKey={language === 'bn' ? 'মোট ব্যয়' : 'Total Spend'} 
+                    stroke="#0EA5E9" 
+                    strokeWidth={2.5} 
+                    dot={{ r: 3, strokeWidth: 1 }}
+                    activeDot={{ r: 5 }}
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Row 1: Active Services */}
         <div className="w-full">
           
           {/* Active Services */}
-          <div className="bg-white dark:bg-[#0F172A] border border-neutral-200 dark:border-slate-800 rounded-3xl p-6 text-left shadow-md space-y-4">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-                <h3 className="text-sm font-black uppercase text-indigo-600 dark:text-cyan-405 flex items-center gap-2">
-                  <List className="w-5 h-5 text-indigo-505 text-indigo-500" />
-                  <span>{language === 'bn' ? 'চলতি সক্রিয় সার্ভিস সমূহ (Active Services)' : 'My Active Services'}</span>
-                </h3>
-                <span className="font-mono text-[9px] bg-emerald-500/10 text-emerald-500 px-2.5 py-1 rounded-full uppercase font-black uppercase tracking-widest flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" /> Live
-                </span>
-              </div>
-              
-              <div className="space-y-3">
-                {services.length === 0 ? (
-                  <p className="text-xs text-slate-400 py-4 text-center">{language === 'bn' ? 'কোনো সক্রিয় সার্ভিস পাওয়া হয়নি' : 'No active services registered.'}</p>
-                ) : (
-                  services.map((srv) => (
-                    <div key={srv.id} className="p-3.5 rounded-xl bg-neutral-50 dark:bg-slate-900 border border-slate-150 dark:border-slate-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 text-xs leading-normal">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="p-1 px-2 bg-indigo-500/10 text-indigo-500 dark:text-cyan-405 rounded font-mono text-[8px] uppercase font-black">
-                            {srv.category}
-                          </span>
-                          <span className="text-[10px] text-slate-400 font-mono">ID: {srv.id}</span>
+          {isLoadingWidgets ? (
+            <DashboardServicesSkeleton count={3} />
+          ) : (
+            <div className="bg-white dark:bg-[#0F172A] border border-neutral-200 dark:border-slate-800 rounded-3xl p-6 text-left shadow-md space-y-4">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+                  <h3 className="text-sm font-black uppercase text-indigo-600 dark:text-cyan-405 flex items-center gap-2">
+                    <List className="w-5 h-5 text-indigo-505 text-indigo-500" />
+                    <span>{language === 'bn' ? 'চলতি সক্রিয় সার্ভিস সমূহ (Active Services)' : 'My Active Services'}</span>
+                  </h3>
+                  <span className="font-mono text-[9px] bg-emerald-500/10 text-emerald-500 px-2.5 py-1 rounded-full uppercase font-black uppercase tracking-widest flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" /> Live
+                  </span>
+                </div>
+                
+                <div className="space-y-3">
+                  {services.length === 0 ? (
+                    <p className="text-xs text-slate-400 py-4 text-center">{language === 'bn' ? 'কোনো সক্রিয় সার্ভিস পাওয়া হয়নি' : 'No active services registered.'}</p>
+                  ) : (
+                    services.map((srv) => (
+                      <div key={srv.id} className="p-3.5 rounded-xl bg-neutral-50 dark:bg-slate-900 border border-slate-150 dark:border-slate-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 text-xs leading-normal">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="p-1 px-2 bg-indigo-500/10 text-indigo-500 dark:text-cyan-405 rounded font-mono text-[8px] uppercase font-black">
+                              {srv.category}
+                            </span>
+                            <span className="text-[10px] text-slate-400 font-mono">ID: {srv.id}</span>
+                          </div>
+                          <h4 className="font-extrabold text-slate-900 dark:text-white leading-snug">{srv.name}</h4>
+                          <div className="flex items-center gap-2 text-[10px] text-slate-400 font-mono mt-0.5">
+                            <span>Team: <strong className="text-indigo-400 font-bold">{srv.assignedTeam}</strong></span>
+                            <span>•</span>
+                            <span>Due: <strong className="text-rose-400 font-bold">{srv.dueDate}</strong></span>
+                          </div>
                         </div>
-                        <h4 className="font-extrabold text-slate-900 dark:text-white leading-snug">{srv.name}</h4>
-                        <div className="flex items-center gap-2 text-[10px] text-slate-400 font-mono mt-0.5">
-                          <span>Team: <strong className="text-indigo-400 font-bold">{srv.assignedTeam}</strong></span>
-                          <span>•</span>
-                          <span>Due: <strong className="text-rose-400 font-bold">{srv.dueDate}</strong></span>
-                        </div>
+                        <span className={`p-1 px-2.5 border rounded-full text-[8px] font-mono tracking-wider font-extrabold uppercase shrink-0 self-start sm:self-center text-center ${
+                          srv.status === 'Completed' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-blue-500/10 text-blue-500 border-blue-500/20'
+                        }`}>
+                          {srv.status}
+                        </span>
                       </div>
-                      <span className={`p-1 px-2.5 border rounded-full text-[8px] font-mono tracking-wider font-extrabold uppercase shrink-0 self-start sm:self-center text-center ${
-                        srv.status === 'Completed' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-blue-500/10 text-blue-500 border-blue-500/20'
-                      }`}>
-                        {srv.status}
-                      </span>
-                    </div>
-                  ))
-                )}
+                    ))
+                  )}
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
         </div>
 
@@ -1675,61 +1965,65 @@ export const DashboardWidgets: React.FC<DashboardWidgetsProps> = ({
         <div className="w-full">
 
           {/* Open Tickets */}
-          <div className="bg-white dark:bg-[#0F172A] border border-neutral-200 dark:border-slate-800 rounded-3xl p-6 text-left shadow-md space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-              <h3 className="text-sm font-black uppercase text-indigo-600 dark:text-cyan-405 flex items-center gap-2">
-                <MessageSquare className="w-5 h-5 text-[#7C3AED]" />
-                <span>{language === 'bn' ? 'সাপোর্ট টিকিট সমূহ (Open Tickets)' : 'Open Support Tickets'}</span>
-              </h3>
-              <button onClick={() => setTicketModalOpen(true)} className="text-[10px] font-mono font-bold bg-indigo-600 hover:bg-indigo-700 text-white px-2.5 py-1 rounded-xl transition uppercase active:scale-95 cursor-pointer">
-                + {language === 'bn' ? 'নতুন টিকিট' : 'New Ticket'}
-              </button>
-            </div>
+          {isLoadingWidgets ? (
+            <DashboardRecentActivitySkeleton count={3} />
+          ) : (
+            <div className="bg-white dark:bg-[#0F172A] border border-neutral-200 dark:border-slate-800 rounded-3xl p-6 text-left shadow-md space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+                <h3 className="text-sm font-black uppercase text-indigo-600 dark:text-cyan-405 flex items-center gap-2">
+                  <MessageSquare className="w-5 h-5 text-[#7C3AED]" />
+                  <span>{language === 'bn' ? 'সাপোর্ট টিকিট সমূহ (Open Tickets)' : 'Open Support Tickets'}</span>
+                </h3>
+                <button onClick={() => setTicketModalOpen(true)} className="text-[10px] font-mono font-bold bg-indigo-600 hover:bg-indigo-700 text-white px-2.5 py-1 rounded-xl transition uppercase active:scale-95 cursor-pointer">
+                  + {language === 'bn' ? 'নতুন টিকিট' : 'New Ticket'}
+                </button>
+              </div>
 
-            <div className="space-y-3">
-              {tickets.length === 0 ? (
-                <div className="p-6 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800/80 text-center">
-                  <p className="text-xs text-slate-400 font-medium">✨ {language === 'bn' ? 'কোনো সক্রিয় সাপোর্ট টিকিট নেই' : 'No active client help desk cases open.'}</p>
-                </div>
-              ) : (
-                tickets.slice(0, 3).map((tkt) => (
-                  <div key={tkt.id} className="p-3.5 rounded-xl bg-neutral-50 dark:bg-slate-900/40 border border-slate-150 dark:border-slate-800/80 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 text-xs leading-normal">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2 font-mono text-[9px]">
-                        <span className="font-bold text-slate-400">ID: {tkt.id}</span>
-                        <span className={`p-0.5 px-2 rounded text-[8px] font-black uppercase ${
-                          tkt.priority === 'high' ? 'bg-rose-500/10 text-rose-500' : 'bg-slate-500/10 text-slate-500'
-                        }`}>
-                          {tkt.priority} Priority
-                        </span>
-                      </div>
-                      <h4 className="font-extrabold text-slate-850 dark:text-white leading-snug">{tkt.subject}</h4>
-                      <p className="text-slate-400 text-[10px] font-mono mt-0.5">Category: <span className="text-indigo-400 font-semibold">{tkt.category}</span></p>
-                    </div>
-
-                    <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-1.5 shrink-0">
-                      <span className={`p-1 px-2 text-[8px] font-mono font-black border rounded uppercase tracking-wider ${
-                        tkt.status === 'open' 
-                          ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' 
-                          : 'bg-[#2563EB]/10 text-cyan-405 border-cyan-800/10'
-                      }`}>
-                        {tkt.status}
-                      </span>
-                      <button 
-                        onClick={() => {
-                          setActiveTicketForChat(tkt);
-                          setActiveTab('tickets');
-                        }}
-                        className="px-2.5 py-1 text-slate-950 bg-amber-400 hover:bg-amber-500 font-black text-[8px] uppercase rounded-lg transition cursor-pointer"
-                      >
-                        💬 {language === 'bn' ? 'চ্যাট খুলুন' : 'Join Chat'}
-                      </button>
-                    </div>
+              <div className="space-y-3">
+                {tickets.length === 0 ? (
+                  <div className="p-6 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800/80 text-center">
+                    <p className="text-xs text-slate-400 font-medium">✨ {language === 'bn' ? 'কোনো সক্রিয় সাপোর্ট টিকিট নেই' : 'No active client help desk cases open.'}</p>
                   </div>
-                ))
-              )}
+                ) : (
+                  tickets.slice(0, 3).map((tkt) => (
+                    <div key={tkt.id} className="p-3.5 rounded-xl bg-neutral-50 dark:bg-slate-900/40 border border-slate-150 dark:border-slate-800/80 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 text-xs leading-normal">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 font-mono text-[9px]">
+                          <span className="font-bold text-slate-400">ID: {tkt.id}</span>
+                          <span className={`p-0.5 px-2 rounded text-[8px] font-black uppercase ${
+                            tkt.priority === 'high' ? 'bg-rose-500/10 text-rose-500' : 'bg-slate-500/10 text-slate-500'
+                          }`}>
+                            {tkt.priority} Priority
+                          </span>
+                        </div>
+                        <h4 className="font-extrabold text-slate-850 dark:text-white leading-snug">{tkt.subject}</h4>
+                        <p className="text-slate-400 text-[10px] font-mono mt-0.5">Category: <span className="text-indigo-400 font-semibold">{tkt.category}</span></p>
+                      </div>
+
+                      <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-1.5 shrink-0">
+                        <span className={`p-1 px-2 text-[8px] font-mono font-black border rounded uppercase tracking-wider ${
+                          tkt.status === 'open' 
+                            ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' 
+                            : 'bg-[#2563EB]/10 text-cyan-405 border-cyan-800/10'
+                        }`}>
+                          {tkt.status}
+                        </span>
+                        <button 
+                          onClick={() => {
+                            setActiveTicketForChat(tkt);
+                            setActiveTab('tickets');
+                          }}
+                          className="px-2.5 py-1 text-slate-950 bg-amber-400 hover:bg-amber-500 font-black text-[8px] uppercase rounded-lg transition cursor-pointer"
+                        >
+                          💬 {language === 'bn' ? 'চ্যাট খুলুন' : 'Join Chat'}
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
         </div>
 

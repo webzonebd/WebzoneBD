@@ -143,6 +143,7 @@ export default function BottomNavigation({
   cartCount = 0
 }: BottomNavigationProps) {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+
   const t = translations[language] || translations.en;
   const isRtl = language === 'ar';
 

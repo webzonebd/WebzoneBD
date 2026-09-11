@@ -7,10 +7,11 @@ import {
   TrendingUp, TrendingDown, Activity, UserCheck, Key, Ticket, Layers, Save, Terminal, Play, 
   FileUp, Database, ArrowRight, BookOpen, AlertCircle, RefreshCw, MessageSquare,
   Smartphone, ShieldAlert, BadgeInfo, CheckCircle, Clock, CheckCircle2, Sliders, ChevronLeft, ChevronRight, Eye, EyeOff, XCircle, RotateCcw, ChevronDown, ChevronUp,
-  Search, Mail, Award, Bell, Image, Download, Copy, Sun, Moon, Menu, Phone, User, LogOut, Printer, ShieldCheck
+  Search, Mail, Award, Bell, Image, Download, Copy, Sun, Moon, Menu, Phone, User, LogOut, Printer, ShieldCheck, Clipboard, CreditCard, Truck, Link, Palette, Crown
 } from 'lucide-react';
 import { Product, Order, SupportTicket, SystemConfig, Coupon, Language, Theme, Currency, ActivityLog } from '../types';
 import { jsPDF } from 'jspdf';
+const LiveThemePreviewer = lazy(() => import('./LiveThemePreviewer'));
 const KanbanBoard = lazy(() => import('./KanbanBoard'));
 const WebsiteControlCenter = lazy(() => import('./WebsiteControlCenter'));
 const GuestOrderTracking = lazy(() => import('./GuestOrderTracking'));
@@ -18,7 +19,13 @@ const CustomersManager = lazy(() => import('./CustomersManager'));
 const Dashboard = lazy(() => import('./Dashboard'));
 const CompanyRevenueDashboard = lazy(() => import('./CompanyRevenueDashboard'));
 const RecentOrdersWidget = lazy(() => import('./RecentOrdersWidget'));
+const AdminWhatsAppServiceOrders = lazy(() => import('./AdminWhatsAppServiceOrders'));
 const OrdersManagement = lazy(() => import('./OrdersManagement'));
+const AffiliateSystem = lazy(() => import('./AffiliateSystem'));
+const AdminAdvancedAnalytics = lazy(() => import('./AdminAdvancedAnalytics'));
+import { AdminReportsSuite } from './AdminReportsSuite';
+import AdminCouponsSuite from './AdminCouponsSuite';
+import AdminMarketingHub from './AdminMarketingHub';
 import { catalogServicesData, CatalogService } from './ServicesData';
 import { 
   ResponsiveContainer, 
@@ -40,9 +47,11 @@ import { motion, AnimatePresence } from 'motion/react';
 
 interface PermissionSet {
   manage_products: boolean;
-  manage_users: boolean;
-  manage_content: boolean;
   manage_orders: boolean;
+  manage_support: boolean;
+  manage_content: boolean;
+  manage_users: boolean;
+  manage_system: boolean;
 }
 
 interface RoleConfig {
@@ -68,6 +77,7 @@ interface AdminPanelProps {
   deleteOrder?: (id: string) => void;
   addTicketReply: (ticketId: string, message: string, sender: 'user' | 'admin') => void;
   addNewCoupon: (coupon: Coupon) => void;
+  updateCoupon?: (code: string, updatedCoupon: Coupon) => void;
   deleteCoupon: (code: string) => void;
   updateSystemConfig: (cfg: SystemConfig) => void;
   triggerToast: (msg: string) => void;
@@ -83,7 +93,7 @@ interface AdminPanelProps {
   setUser?: (u: any) => void;
   siteWideBroadcast?: string | null;
   onBroadcastChange?: (msg: string | null, link?: string | null, linkText?: string | null, expiresAt?: number | null, severity?: string, startAt?: number | null) => void;
-  setTheme?: (theme: Theme) => void;
+  setTheme?: (theme: Theme, event?: React.MouseEvent) => void;
   onLogout?: () => void;
   currencyRates?: any;
   setCurrencyRates?: any;
@@ -162,7 +172,8 @@ const INITIAL_STAFF = [
   { userId: 'stf-01', name: 'Anisur Rahman', role: 'Staff', department: 'Development', ticketsCount: 4, sprintVelocity: 95, avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80', status: 'active', email: 'anisur@webzonebd.com', password: 'anisurpassword', permissions: ['manage_projects', 'manage_tasks', 'write_code'] },
   { userId: 'stf-02', name: 'Sayeeda Yeasmin', role: 'Staff', department: 'Support', ticketsCount: 15, sprintVelocity: 88, avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80', status: 'active', email: 'sayeeda@webzonebd.com', password: 'sayeedapassword', permissions: ['view_projects', 'reply_tickets', 'support_chat'] },
   { userId: 'stf-03', name: 'Tariqul Islam', role: 'Staff', department: 'SEO & Copywriting', ticketsCount: 2, sprintVelocity: 90, avatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=150&q=80', status: 'active', email: 'tariqul@webzonebd.com', password: 'tariqulpassword', permissions: ['view_projects', 'manage_tasks', 'ai_generation'] },
-  { userId: 'stf-04', name: 'Fahim Morshed', role: 'Staff', department: 'DevOps', ticketsCount: 0, sprintVelocity: 98, avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80', status: 'active', email: 'fahim@webzonebd.com', password: 'fahimpassword', permissions: ['manage_servers', 'security_audit', 'whmcs_sync'] }
+  { userId: 'stf-04', name: 'Fahim Morshed', role: 'Staff', department: 'DevOps', ticketsCount: 0, sprintVelocity: 98, avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80', status: 'active', email: 'fahim@webzonebd.com', password: 'fahimpassword', permissions: ['manage_servers', 'security_audit', 'whmcs_sync'] },
+  { userId: 'stf-05', name: 'Order Operations Manager', role: 'Order Mgr', department: 'Sales & Billing', ticketsCount: 0, sprintVelocity: 92, avatar: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=150&q=80', status: 'active', email: 'sales@webzonebd.com', password: 'sales789', permissions: ['manage_orders', 'view_billing', 'dispatch_invoices'] }
 ];
 
 const INITIAL_WITHDRAW_REQUESTS = [
@@ -240,6 +251,7 @@ export default function AdminPanel({
   deleteOrder,
   addTicketReply,
   addNewCoupon,
+  updateCoupon,
   deleteCoupon,
   updateSystemConfig,
   triggerToast,
@@ -589,7 +601,7 @@ export default function AdminPanel({
 
   const [hasAdminAccess, setHasAdminAccess] = useState<boolean>(() => {
     const role = currentUser?.role;
-    return role === 'super_admin' || role === 'admin' || role === 'editor';
+    return role === 'super_admin' || role === 'admin' || role === 'order_manager' || role === 'content_manager' || role === 'support_staff' || role === 'editor' || role === 'staff';
   });
 
   useEffect(() => {
@@ -599,14 +611,14 @@ export default function AdminPanel({
         try {
           const u = JSON.parse(userStr);
           setCurrentUser(u);
-          if (u?.role === 'super_admin' || u?.role === 'admin' || u?.role === 'editor') {
+          if (u?.role === 'super_admin' || u?.role === 'admin' || u?.role === 'order_manager' || u?.role === 'content_manager' || u?.role === 'support_staff' || u?.role === 'editor' || u?.role === 'staff') {
             setHasAdminAccess(true);
             return;
           }
         } catch (e) {}
       } else if (user) {
         setCurrentUser(user);
-        if (user.role === 'super_admin' || user.role === 'admin' || user.role === 'editor') {
+        if (user.role === 'super_admin' || user.role === 'admin' || user.role === 'order_manager' || user.role === 'content_manager' || user.role === 'support_staff' || user.role === 'editor' || user.role === 'staff') {
           setHasAdminAccess(true);
           return;
         }
@@ -624,60 +636,112 @@ export default function AdminPanel({
       {
         role: "super_admin",
         label: "Super Admin",
-        description: "Full master-control to all institutional panels. Permissions cannot be modified for system safety.",
+        description: "Full root master-control to all WebzoneBD IT solution panels, finances, and security governance matrix.",
         permissions: {
           manage_products: true,
-          manage_users: true,
+          manage_orders: true,
+          manage_support: true,
           manage_content: true,
-          manage_orders: true
+          manage_users: true,
+          manage_system: true
         },
-        color: "from-red-650 to-pink-600 text-rose-400 border-rose-500/30"
+        color: "from-rose-600 to-red-600 text-rose-400 border-rose-500/30"
+      },
+      {
+        role: "content_manager",
+        label: "Content Manager",
+        description: "Oversees digital services catalog, software store products, blog articles, CMS pages, AI Content Center, and portfolio case studies.",
+        permissions: {
+          manage_products: true,
+          manage_orders: false,
+          manage_support: false,
+          manage_content: true,
+          manage_users: false,
+          manage_system: false
+        },
+        color: "from-cyan-600 to-blue-500 text-cyan-400 border-cyan-500/30"
+      },
+      {
+        role: "order_manager",
+        label: "Order Manager",
+        description: "Sales & order processing lead. Manages store orders, revenue invoices, payment verification, project milestones, affiliate payouts, and promotional coupons.",
+        permissions: {
+          manage_products: true,
+          manage_orders: true,
+          manage_support: false,
+          manage_content: false,
+          manage_users: false,
+          manage_system: false
+        },
+        color: "from-emerald-600 to-teal-500 text-emerald-400 border-emerald-500/30"
+      },
+      {
+        role: "support_staff",
+        label: "Support Staff",
+        description: "Customer care & helpdesk specialist. Manages support tickets, live chats, SLA inquiries, and customer profile records.",
+        permissions: {
+          manage_products: false,
+          manage_orders: false,
+          manage_support: true,
+          manage_content: false,
+          manage_users: true,
+          manage_system: false
+        },
+        color: "from-purple-600 to-indigo-500 text-purple-400 border-purple-500/30"
       },
       {
         role: "admin",
-        label: "Admin",
-        description: "Administrative operator. Can manage products, content, and orders, but has customizable user rights.",
+        label: "Admin Ops",
+        description: "Administrative operator with broad permissions across store products, sales orders, support tickets, CMS content, and customer directory.",
         permissions: {
           manage_products: true,
-          manage_users: true,
+          manage_orders: true,
+          manage_support: true,
           manage_content: true,
-          manage_orders: true
+          manage_users: true,
+          manage_system: false
         },
         color: "from-amber-600 to-yellow-500 text-amber-400 border-amber-500/30"
       },
       {
         role: "editor",
         label: "Editor",
-        description: "Lead Content curator. Focuses strictly on blog articles, CMS pages, and service portfolios.",
+        description: "Content author and blog curator focusing strictly on articles, news, and client evaluations moderation.",
         permissions: {
           manage_products: false,
-          manage_users: false,
+          manage_orders: false,
+          manage_support: false,
           manage_content: true,
-          manage_orders: false
+          manage_users: false,
+          manage_system: false
         },
-        color: "from-blue-600 to-indigo-500 text-blue-400 border-blue-500/30"
+        color: "from-sky-600 to-blue-500 text-sky-400 border-sky-500/30"
       },
       {
         role: "staff",
-        label: "Staff (Employee)",
-        description: "Assigned staff / employee member. Can reply or process designated sections.",
+        label: "General Staff",
+        description: "Assigned staff member. Responds to support inquiries and manages designated ticket helpdesk queues.",
         permissions: {
           manage_products: false,
-          manage_users: true,
+          manage_orders: false,
+          manage_support: true,
           manage_content: false,
-          manage_orders: false
+          manage_users: false,
+          manage_system: false
         },
         color: "from-teal-600 to-[#10B981] text-teal-400 border-teal-500/30"
       },
       {
         role: "customer",
         label: "User (Customer)",
-        description: "Default standard client profile. Holds zero operational features in this panel.",
+        description: "Default standard client profile. Holds zero operational or admin features in this panel.",
         permissions: {
           manage_products: false,
-          manage_users: false,
+          manage_orders: false,
+          manage_support: false,
           manage_content: false,
-          manage_orders: false
+          manage_users: false,
+          manage_system: false
         },
         color: "from-gray-600 to-slate-500 text-slate-400 border-slate-500/20"
       }
@@ -689,8 +753,19 @@ export default function AdminPanel({
         const parsed = JSON.parse(saved) as RoleConfig[];
         const merged = [...parsed];
         defaultRoles.forEach(def => {
-          if (!merged.some(r => r.role === def.role)) {
+          const existingIdx = merged.findIndex(r => r.role === def.role);
+          if (existingIdx === -1) {
             merged.push(def);
+          } else {
+            // Ensure permissions object has all keys from default definition
+            merged[existingIdx] = {
+              ...def,
+              ...merged[existingIdx],
+              permissions: {
+                ...def.permissions,
+                ...merged[existingIdx].permissions
+              }
+            };
           }
         });
         return merged;
@@ -705,16 +780,28 @@ export default function AdminPanel({
 
   const checkPermission = (permKey: keyof PermissionSet): boolean => {
     if (!currentUser) return false;
-    const roleKey = currentUser.role === 'admin' ? 'admin' : 
-                    currentUser.role === 'super_admin' ? 'super_admin' : 
-                    currentUser.role === 'editor' ? 'editor' : 
-                    currentUser.role === 'staff' ? 'staff' : 'customer';
+    const roleKey = currentUser.role || 'customer';
     
     // Super Admin has master bypass ALWAYS
     if (roleKey === 'super_admin') return true;
 
     const matchedRole = rolesConfig.find(r => r.role === roleKey);
-    return matchedRole ? !!matchedRole.permissions[permKey] : false;
+    if (matchedRole && matchedRole.permissions) {
+      return !!matchedRole.permissions[permKey];
+    }
+    
+    // Fallback logic for legacy roles
+    if (roleKey === 'admin') return true;
+    if (roleKey === 'content_manager' || roleKey === 'editor') {
+      return permKey === 'manage_content' || permKey === 'manage_products';
+    }
+    if (roleKey === 'order_manager') {
+      return permKey === 'manage_orders' || permKey === 'manage_products';
+    }
+    if (roleKey === 'support_staff' || roleKey === 'staff') {
+      return permKey === 'manage_support' || permKey === 'manage_users';
+    }
+    return false;
   };
 
   const renderAccessDenied = (permissionName: string, sectionTitle: string) => {
@@ -757,6 +844,8 @@ export default function AdminPanel({
   const [revenueStartDate, setRevenueStartDate] = useState<string>('2026-06-01');
   const [revenueEndDate, setRevenueEndDate] = useState<string>('2026-06-30');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
+  const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState<boolean>(false);
+  const [isMobileRoleDropdownOpen, setIsMobileRoleDropdownOpen] = useState<boolean>(false);
   const [isAdminSidebarCollapsed, setIsAdminSidebarCollapsed] = useState<boolean>(() => {
     try {
       return localStorage.getItem('webzone_admin_sidebar_collapsed') === 'true';
@@ -884,10 +973,31 @@ export default function AdminPanel({
       case 'aff-withdrawals': return ArrowRight;
       case 'aff-analytics': return TrendingUp;
       // Marketing
-      case 'mkt-email': return Mail;
+      case 'mkt-coupons': return Award;
       case 'mkt-sms': return Phone;
       case 'mkt-push': return Bell;
-      case 'mkt-coupons': return Award;
+      case 'mkt-whatsapp': return MessageSquare;
+      case 'mkt-social': return Globe;
+      case 'mkt-affiliate': return Users;
+      case 'mkt-referral': return UserCheck;
+      case 'mkt-loyalty': return Award;
+      case 'mkt-abandoned': return ShoppingBag;
+      case 'mkt-leads': return FileText;
+      case 'mkt-newsletter': return Mail;
+      case 'mkt-automation': return Sparkles;
+      case 'mkt-settings': return Sliders;
+      // WhatsApp Service Orders
+      case 'wa-orders': return Clipboard;
+      case 'wa-customers': return Users;
+      case 'wa-form-settings': return FileText;
+      case 'wa-invoice-notif': return Sparkles;
+      case 'wa-payment-reminders': return CreditCard;
+      case 'wa-delivery-updates': return Truck;
+      case 'wa-promo-messages': return MessageSquare;
+      case 'wa-templates': return FileText;
+      case 'wa-campaign-reports': return TrendingUp;
+      case 'wa-api-integration': return Link;
+      case 'wa-settings': return Sliders;
       // Reviews
       case 'rev-product': return ShoppingBag;
       case 'rev-service': return Layers;
@@ -912,6 +1022,7 @@ export default function AdminPanel({
       // Web Settings
       case 'web-identity': return Sliders;
       case 'web-appearance': return Image;
+      case 'web-theme-preview': return Palette;
       case 'web-payments': return DollarSign;
       case 'web-security': return Shield;
       default: return ArrowRight;
@@ -1273,7 +1384,8 @@ export default function AdminPanel({
       }
     } catch (e) {}
     return [
-      { id: 'stat-cards', title: 'Quick Stats Cards Grid', visible: true, order: 1, column: 'full' },
+      { id: 'advanced-analytics', title: 'Advanced Analytics & BI Suite', visible: true, order: 1, column: 'full' },
+      { id: 'stat-cards', title: 'Quick Stats Cards Grid', visible: true, order: 2, column: 'full' },
       { id: 'services-tiers', title: 'Services Active Tiers Monitor', visible: true, order: 2, column: 'left' },
       { id: 'sales-charts', title: 'Sales Bar Chart & Growth Performance', visible: true, order: 3, column: 'full' },
       { id: 'recent-orders', title: 'Recent Orders Pipeline Table', visible: true, order: 4, column: 'full' },
@@ -1325,7 +1437,8 @@ export default function AdminPanel({
 
   const resetWidgetsToDefault = () => {
     const defaults = [
-      { id: 'stat-cards', title: 'Quick Stats Cards Grid', visible: true, order: 1, column: 'full' },
+      { id: 'advanced-analytics', title: 'Advanced Analytics & BI Suite', visible: true, order: 1, column: 'full' },
+      { id: 'stat-cards', title: 'Quick Stats Cards Grid', visible: true, order: 2, column: 'full' },
       { id: 'services-tiers', title: 'Services Active Tiers Monitor', visible: true, order: 2, column: 'left' },
       { id: 'sales-charts', title: 'Sales Bar Chart & Growth Performance', visible: true, order: 3, column: 'full' },
       { id: 'recent-orders', title: 'Recent Orders Pipeline Table', visible: true, order: 4, column: 'full' },
@@ -2137,6 +2250,8 @@ export default function AdminPanel({
         setWebSettingsSubTab('identity');
       } else if (activeSubMenu === 'web-appearance') {
         setWebSettingsSubTab('appearance');
+      } else if (activeSubMenu === 'web-theme-preview') {
+        setWebSettingsSubTab('theme-preview');
       } else if (activeSubMenu === 'web-payments') {
         setWebSettingsSubTab('payments');
       } else if (activeSubMenu === 'web-security') {
@@ -2467,12 +2582,73 @@ export default function AdminPanel({
   const [newChatInputText, setNewChatInputText] = useState('');
   const [whatsappFilter, setWhatsappFilter] = useState<'all' | 'live' | 'whatsapp'>('all');
 
+  // Reports Premium & Smart System States
+  const [reportForecastScenario, setReportForecastScenario] = useState<'none' | 'conservative' | 'optimistic' | 'hyper'>('none');
+  const [slaLatencyTestingId, setSlaLatencyTestingId] = useState<string | null>(null);
+  const [slaLatencyResult, setSlaLatencyResult] = useState<Record<string, { ms: number; status: string }>>({});
+  const [customerDrilldownChannel, setCustomerDrilldownChannel] = useState<string | null>(null);
+  const [generatedLicenseTestKey, setGeneratedLicenseTestKey] = useState<string>('');
+  const [licenseTestStatus, setLicenseTestStatus] = useState<'idle' | 'generating' | 'done'>('idle');
+  const [payoutProcessingId, setPayoutProcessingId] = useState<string | null>(null);
+
   const handleAdminSubmitTicketReply = (ticketId: string) => {
     if (!adminReplyText.trim()) return;
     addTicketReply(ticketId, adminReplyText, 'admin');
     logAdminAction(`Submitted official support reply on Ticket Reference #${ticketId}`);
     setAdminReplyText('');
     triggerToast("📩 Customer communication case updated successfully!");
+  };
+
+  // Interactive Reports Helper Functions
+  const triggerSlaDiagnostic = (id: string) => {
+    setSlaLatencyTestingId(id);
+    const serviceName = 
+      id === 'srv1' ? 'Website Development Builds' : 
+      id === 'srv2' ? 'Custom bKash API Gateway' : 
+      id === 'srv3' ? 'SEO Optimization Keywords Engine' : 
+      'Enterprise Custom ERP System';
+    
+    setTimeout(() => {
+      const latency = Math.floor(20 + Math.random() * 85);
+      const statuses = ["EXCELLENT", "OPTIMAL", "STABLE"];
+      const status = latency < 45 ? "EXCELLENT" : latency < 70 ? "OPTIMAL" : "STABLE";
+      setSlaLatencyResult(prev => ({
+        ...prev,
+        [id]: { ms: latency, status }
+      }));
+      setSlaLatencyTestingId(null);
+      triggerToast(`⚡ SLA Handshake verified for [${serviceName}]: ${latency}ms latency. Status is ${status}.`);
+      logAdminAction(`Executed diagnostic SLA network latency ping test for service component: ${serviceName}`);
+    }, 1200);
+  };
+
+  const generateTestLicenseKey = () => {
+    setLicenseTestStatus('generating');
+    setTimeout(() => {
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+      let segment1 = '';
+      let segment2 = '';
+      let segment3 = '';
+      for (let i = 0; i < 4; i++) {
+        segment1 += chars[Math.floor(Math.random() * chars.length)];
+        segment2 += chars[Math.floor(Math.random() * chars.length)];
+        segment3 += chars[Math.floor(Math.random() * chars.length)];
+      }
+      const key = `WZ-SECURE-${segment1}-${segment2}-${segment3}-2026`;
+      setGeneratedLicenseTestKey(key);
+      setLicenseTestStatus('done');
+      triggerToast("🔑 Secure cryptographic license signature generated successfully.");
+      logAdminAction(`Generated sandbox encrypted digital catalog license validation key: ${key}`);
+    }, 1100);
+  };
+
+  const triggerPayoutSettlement = (name: string, amount: string) => {
+    setPayoutProcessingId(name);
+    setTimeout(() => {
+      setPayoutProcessingId(null);
+      triggerToast(`💸 Direct deposit payout of ${amount} to ${name} cleared successfully!`);
+      logAdminAction(`Approved and settled affiliate partner commission balance of ${amount} for partner: ${name}`);
+    }, 1400);
   };
 
   const handleSendLiveChatMessage = () => {
@@ -2867,6 +3043,48 @@ export default function AdminPanel({
     'rev-3': true
   });
 
+  const [dbReviews, setDbReviews] = useState<any[]>([]);
+
+  useEffect(() => {
+    const q = collection(db, 'store_reviews');
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const items: any[] = [];
+      snapshot.forEach((doc) => {
+        items.push({ id: doc.id, ...doc.data() });
+      });
+      setDbReviews(items);
+    }, (error) => {
+      console.error("Failed to load reviews in AdminPanel:", error);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const handleToggleFirestoreReviewApproval = async (review: any) => {
+    const nextApproved = !review.approved;
+    try {
+      await updateDoc(doc(db, 'store_reviews', review.id), { approved: nextApproved });
+      triggerToast(`⭐ Review audit state altered! Review is now ${nextApproved ? 'APPROVED (Visible)' : 'MUTED (Hidden)'}`);
+      logAdminAction(`Toggled approval status for store review #${review.id} to: ${nextApproved ? 'APPROVED' : 'MUTED'}`);
+    } catch (err) {
+      console.error("Failed to update review approval:", err);
+      triggerToast("❌ Failed to update review state in Firestore.");
+    }
+  };
+
+  const handleDeleteFirestoreReview = async (reviewId: string) => {
+    if (!window.confirm("Are you sure you want to delete this review permanently?")) return;
+    try {
+      await deleteDoc(doc(db, 'store_reviews', reviewId));
+      triggerToast(`🗑️ Review #${reviewId} deleted successfully.`);
+      logAdminAction(`Deleted store review #${reviewId}`);
+    } catch (err) {
+      console.error("Failed to delete review:", err);
+      triggerToast("❌ Failed to delete review from Firestore.");
+    }
+  };
+
+  const [reviewTab, setReviewTab] = useState<'store' | 'testimonials'>('store');
+
   const handleToggleReviewApproval = (id: string) => {
     setApprovedReviews(prev => {
       const next = !prev[id];
@@ -2986,7 +3204,7 @@ export default function AdminPanel({
   };
 
   // Web Settings State variables
-  const [webSettingsSubTab, setWebSettingsSubTab] = useState<'identity' | 'appearance' | 'payments' | 'security'>('identity');
+  const [webSettingsSubTab, setWebSettingsSubTab] = useState<'identity' | 'appearance' | 'theme-preview' | 'payments' | 'security'>('identity');
   
   // Tab 1: Identity & Contacts
   const [webSiteName, setWebSiteName] = useState(systemConfig.siteName || 'WebzoneBD IT Solution');
@@ -3534,6 +3752,43 @@ export default function AdminPanel({
     });
   };
 
+  const [pendingWaOrdersCount, setPendingWaOrdersCount] = useState(0);
+
+  const updatePendingCount = () => {
+    try {
+      const raw = localStorage.getItem('wa_service_orders');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          const count = parsed.filter((o: any) => o.status === 'pending').length;
+          setPendingWaOrdersCount(count);
+          return;
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    setPendingWaOrdersCount(0);
+  };
+
+  useEffect(() => {
+    updatePendingCount();
+    
+    const handleUpdate = () => {
+      updatePendingCount();
+    };
+    window.addEventListener('wa_orders_updated', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+    
+    const interval = setInterval(updatePendingCount, 1500);
+    
+    return () => {
+      window.removeEventListener('wa_orders_updated', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+      clearInterval(interval);
+    };
+  }, []);
+
   if (!hasAdminAccess) {
     const tRestricted = {
       en: {
@@ -3629,6 +3884,19 @@ export default function AdminPanel({
       { id: 'whatsapp-leads', label: 'WhatsApp Leads' },
       { id: 'service-reports', label: 'Service Reports' }
     ] },
+    { id: 'whatsapp-service-orders', label: '📱 WhatsApp Service Orders', desc: 'Manage orders, custom fields', submenus: [
+      { id: 'wa-orders', label: 'Service Orders List' },
+      { id: 'wa-customers', label: 'Customer WhatsApp List' },
+      { id: 'wa-form-settings', label: 'Order Form Field Settings' },
+      { id: 'wa-invoice-notif', label: 'Invoice Notifications' },
+      { id: 'wa-payment-reminders', label: 'Payment Reminders' },
+      { id: 'wa-delivery-updates', label: 'Service Delivery Updates' },
+      { id: 'wa-promo-messages', label: 'Promotional Messages' },
+      { id: 'wa-templates', label: 'WhatsApp Templates' },
+      { id: 'wa-campaign-reports', label: 'Campaign Reports' },
+      { id: 'wa-api-integration', label: 'WhatsApp API Integration' },
+      { id: 'wa-settings', label: 'WhatsApp Settings' }
+    ] },
     { id: 'projects', label: '📂 Projects', desc: 'Client portal milestones & tasks', submenus: [
       { id: 'active-projects', label: 'Active Projects' },
       { id: 'pending-projects', label: 'Pending Projects' },
@@ -3657,24 +3925,40 @@ export default function AdminPanel({
       { id: 'aff-withdrawals', label: 'Withdraw Requests' },
       { id: 'aff-analytics', label: 'Analytics' }
     ] },
-    { id: 'marketing', label: '📢 Marketing', desc: 'Email blaster lists, coupons', submenus: [
-      { id: 'mkt-email', label: 'Email Campaigns' },
-      { id: 'mkt-sms', label: 'SMS Campaigns' },
+    { id: 'marketing', label: '📢 Marketing', desc: 'Enterprise marketing & campaign hubs', submenus: [
+      { id: 'mkt-coupons', label: 'Coupon System' },
+      { id: 'mkt-sms', label: 'SMS Marketing' },
       { id: 'mkt-push', label: 'Push Notifications' },
-      { id: 'mkt-coupons', label: 'Coupon System' }
+      { id: 'mkt-whatsapp', label: 'WhatsApp Marketing' },
+      { id: 'mkt-social', label: 'Social Media Campaigns' },
+      { id: 'mkt-affiliate', label: 'Affiliate Marketing' },
+      { id: 'mkt-referral', label: 'Referral Program' },
+      { id: 'mkt-loyalty', label: 'Loyalty & Rewards' },
+      { id: 'mkt-abandoned', label: 'Abandoned Cart Recovery' },
+      { id: 'mkt-leads', label: 'Lead Management' },
+      { id: 'mkt-newsletter', label: 'Newsletter Subscribers' },
+      { id: 'mkt-automation', label: 'Marketing Automation' },
+      { id: 'mkt-settings', label: 'Marketing Settings' }
     ] },
     { id: 'reviews', label: '⭐ Reviews', desc: 'Audit marketplace client feedback', submenus: [
       { id: 'rev-product', label: 'Product Reviews' },
       { id: 'rev-service', label: 'Service Reviews' },
       { id: 'rev-testimonials', label: 'Testimonials' }
     ] },
-    { id: 'reports', label: '📊 Reports', desc: 'System statistics & telemetry', submenus: [
-      { id: 'rep-revenue', label: 'Revenue Reports' },
+    { id: 'reports', label: '📊 Reports & Analytics', desc: 'Central Business Intelligence & visual reports', submenus: [
+      { id: 'rep-analytics', label: '🚀 Advanced Analytics (Charts)' },
+      { id: 'rep-overview', label: 'Dashboard Overview' },
+      { id: 'rep-visitors', label: 'Visitor Analytics' },
       { id: 'rep-customer', label: 'Customer Reports' },
+      { id: 'rep-sales', label: 'Sales Reports' },
+      { id: 'rep-store', label: 'Digital Store Reports' },
       { id: 'rep-services', label: 'Service Reports' },
-      { id: 'rep-store', label: 'Store Reports' },
-      { id: 'rep-affiliate', label: 'Affiliate Reports' },
-      { id: 'rep-audit', label: '🛡️ Audit Trail Log' }
+      { id: 'rep-financial', label: 'Financial Reports' },
+      { id: 'rep-marketing', label: 'Marketing Reports' },
+      { id: 'rep-device', label: 'Device Analytics' },
+      { id: 'rep-browser', label: 'Browser Analytics' },
+      { id: 'rep-realtime', label: 'Real-Time Monitoring' },
+      { id: 'rep-export', label: 'Export Center' }
     ] },
     { id: 'staff', label: '👨‍💼 Staff Management', desc: 'Staff lists, roles permissions', submenus: [] },
     { id: 'notifications', label: '🔔 Notifications', desc: 'System Alert Logs & status', submenus: [] },
@@ -4047,10 +4331,10 @@ export default function AdminPanel({
                         👑
                       </div>
                       <div>
-                        <h2 className={`text-[10.5px] font-black uppercase tracking-widest font-mono ${
+                        <h2 className={`text-xs font-extrabold uppercase tracking-widest font-sans ${
                           isDark ? 'text-white' : 'text-slate-900'
                         }`}>Super Admin Console</h2>
-                        <p className={`text-[8.5px] leading-none mt-0.5 font-mono ${
+                        <p className={`text-[10px] leading-none mt-0.5 ${
                           isDark ? 'text-neutral-400' : 'text-slate-500'
                         }`}>Governance Pathways</p>
                       </div>
@@ -4081,53 +4365,175 @@ export default function AdminPanel({
                       }`}>
                         <div className="flex items-center gap-1.5">
                           <Shield className="w-3.5 h-3.5 text-violet-500" />
-                          <span className="text-[9px] font-mono font-bold text-violet-500 uppercase tracking-widest">Active Core Persona</span>
+                          <span className="text-[9px] font-mono font-bold text-violet-500 uppercase tracking-widest">Dashboard Control</span>
                         </div>
                         <span className="px-1.5 py-0.5 rounded text-[7px] font-bold bg-violet-500/10 text-violet-600 border border-violet-500/20 font-mono uppercase tracking-widest">
-                          SECURE
+                          DYNAMIC ROLE
                         </span>
                       </div>
                       
                       <div className="space-y-0.5">
                         <div className={`text-xs font-bold font-sans ${isDark ? 'text-neutral-100' : 'text-slate-900'}`}>
-                          {currentUser?.name || 'Anonymous User'}
+                          {currentUser?.name || 'Super Admin Controller'}
                         </div>
-                        <div className={`text-[9px] font-mono truncate ${isDark ? 'text-neutral-400' : 'text-slate-500'}`}>{currentUser?.email}</div>
+                        <div className={`text-[9px] font-mono truncate ${isDark ? 'text-neutral-400' : 'text-slate-500'}`}>{currentUser?.email || 'superadmin@webzonebd.com'}</div>
                       </div>
 
-                      <div className={`border-t pt-2.5 space-y-1.5 ${isDark ? 'border-neutral-800/80' : 'border-slate-105'}`}>
-                        <label className="text-[8px] uppercase tracking-widest opacity-40 font-mono block">Dynamic Role Switch</label>
-                        <div className="grid grid-cols-3 gap-1 font-mono text-[8px]">
+                      {/* Dashboard Control Dropdown section */}
+                      <div className={`border-t pt-2.5 space-y-2 ${isDark ? 'border-neutral-800/80' : 'border-slate-100'}`}>
+                        <div className="flex items-center justify-between">
+                          <label className="text-[8.5px] uppercase tracking-wider font-bold opacity-60 text-slate-400">Dynamic Role Switch</label>
+                          <span className="text-[7.5px] font-mono text-violet-400 bg-violet-500/10 px-1.5 py-0.2 rounded border border-violet-500/20">3 Core Roles</span>
+                        </div>
+
+                        {/* Dropdown Selector */}
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() => setIsMobileRoleDropdownOpen(!isMobileRoleDropdownOpen)}
+                            className={`w-full flex items-center justify-between p-2 rounded-lg border text-left transition-all ${
+                              isDark ? 'bg-slate-900/90 border-white/10 hover:border-violet-500/50 text-white' : 'bg-slate-50 border-slate-200 hover:border-violet-400 text-slate-900'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="text-xs shrink-0">
+                                {currentUser?.role === 'super_admin' ? '👑' : currentUser?.role === 'admin' ? '⚡' : currentUser?.role === 'order_manager' ? '📦' : '🛡️'}
+                              </span>
+                              <div className="min-w-0">
+                                <p className="text-[10px] font-bold leading-tight truncate">
+                                  {currentUser?.role === 'super_admin' ? 'Super Admin' : 
+                                   currentUser?.role === 'admin' ? 'Admin' : 
+                                   currentUser?.role === 'order_manager' ? 'Order Mgr' : 
+                                   (currentUser?.role ? currentUser.role.replace('_', ' ').toUpperCase() : 'Super Admin')}
+                                </p>
+                                <p className="text-[8px] opacity-60 font-mono leading-tight truncate">
+                                  {currentUser?.role === 'super_admin' ? 'Root Master Access' :
+                                   currentUser?.role === 'admin' ? 'Operations Lead' :
+                                   currentUser?.role === 'order_manager' ? 'Sales & Billing' : 'Custom Session'}
+                                </p>
+                              </div>
+                            </div>
+                            <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 shrink-0 ${isMobileRoleDropdownOpen ? 'rotate-180 text-violet-500' : ''}`} />
+                          </button>
+
+                          {/* Dropdown Menu */}
+                          {isMobileRoleDropdownOpen && (
+                            <div className={`mt-1.5 p-1.5 rounded-lg border shadow-xl space-y-1 ${
+                              isDark ? 'bg-neutral-950 border-white/10 text-white' : 'bg-white border-slate-200 text-slate-900'
+                            }`}>
+                              {[
+                                {
+                                  role: 'super_admin',
+                                  label: 'Super Admin',
+                                  tag: 'Root Master',
+                                  desc: 'Full master governance & system controls',
+                                  icon: '👑',
+                                  name: 'Super Admin Controller',
+                                  email: 'superadmin@webzonebd.com',
+                                  badgeColor: 'bg-purple-500/10 text-purple-600 dark:text-purple-300 border-purple-500/20'
+                                },
+                                {
+                                  role: 'admin',
+                                  label: 'Admin',
+                                  tag: 'Operations Lead',
+                                  desc: 'Store catalog, CRM, tickets & CMS',
+                                  icon: '⚡',
+                                  name: 'Admin Moderator',
+                                  email: 'admin@webzonebd.com',
+                                  badgeColor: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 border-indigo-500/20'
+                                },
+                                {
+                                  role: 'order_manager',
+                                  label: 'Order Mgr',
+                                  tag: 'Sales & Billing',
+                                  desc: 'Sales orders, billing & fulfillment',
+                                  icon: '📦',
+                                  name: 'Order Operations Manager',
+                                  email: 'orders@webzonebd.com',
+                                  badgeColor: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 border-emerald-500/20'
+                                }
+                              ].map((preset) => {
+                                const isCurrent = currentUser?.role === preset.role;
+                                return (
+                                  <button
+                                    key={preset.role}
+                                    type="button"
+                                    onClick={() => {
+                                      const updatedUser = {
+                                        ...currentUser,
+                                        role: preset.role,
+                                        name: preset.name,
+                                        email: preset.email
+                                      };
+                                      setCurrentUser(updatedUser);
+                                      localStorage.setItem('webzone_session_user', JSON.stringify(updatedUser));
+                                      if (setUser) setUser(updatedUser);
+                                      setIsMobileRoleDropdownOpen(false);
+                                      triggerToast(`🛡️ Dashboard Control: Role switched to ${preset.label}`);
+                                    }}
+                                    className={`w-full flex items-center justify-between p-2 rounded-md text-left transition-all ${
+                                      isCurrent 
+                                        ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-bold shadow-md shadow-violet-600/20' 
+                                        : isDark 
+                                          ? 'hover:bg-white/5 text-slate-300 hover:text-white' 
+                                          : 'hover:bg-slate-100 text-slate-700 hover:text-slate-900'
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <span className="text-sm shrink-0">{preset.icon}</span>
+                                      <div className="min-w-0">
+                                        <div className="flex items-center gap-1.5">
+                                          <span className="text-[10px] font-bold truncate">{preset.label}</span>
+                                          <span className={`text-[7px] px-1 py-0.2 rounded border font-mono ${isCurrent ? 'bg-white/20 text-white border-white/30' : preset.badgeColor}`}>
+                                            {preset.tag}
+                                          </span>
+                                        </div>
+                                        <p className={`text-[7.5px] truncate ${isCurrent ? 'text-white/80' : 'opacity-60'}`}>{preset.desc}</p>
+                                      </div>
+                                    </div>
+                                    {isCurrent && <Check className="w-3.5 h-3.5 text-white shrink-0 ml-1" />}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Quick 1-Click Segmented Buttons */}
+                        <div className="grid grid-cols-3 gap-1 pt-1 font-sans text-[8.5px]">
                           {[
-                            { role: 'super_admin', label: 'Super' },
-                            { role: 'admin', label: 'Admin' },
-                            { role: 'editor', label: 'Editor' }
+                            { role: 'super_admin', label: 'Super Admin', icon: '👑', name: 'Super Admin Controller', email: 'superadmin@webzonebd.com' },
+                            { role: 'admin', label: 'Admin', icon: '⚡', name: 'Admin Moderator', email: 'admin@webzonebd.com' },
+                            { role: 'order_manager', label: 'Order Mgr', icon: '📦', name: 'Order Operations Manager', email: 'orders@webzonebd.com' }
                           ].map((preset) => {
                             const isCurrent = currentUser?.role === preset.role;
                             return (
                               <button
                                 key={preset.role}
+                                type="button"
                                 onClick={() => {
                                   const updatedUser = {
                                     ...currentUser,
                                     role: preset.role,
-                                    name: preset.role === 'super_admin' ? 'Super Admin Manager' : preset.role === 'admin' ? 'Admin Moderator' : 'Lead Content Editor',
-                                    email: preset.role === 'super_admin' ? 'admin@webzonebd.com' : preset.role === 'admin' ? 'moderator@webzonebd.com' : 'editor@webzonebd.com'
+                                    name: preset.name,
+                                    email: preset.email
                                   };
                                   setCurrentUser(updatedUser);
                                   localStorage.setItem('webzone_session_user', JSON.stringify(updatedUser));
                                   if (setUser) setUser(updatedUser);
-                                  triggerToast(`🛡️ Role shifted to: ${preset.role.toUpperCase()}`);
+                                  setIsMobileRoleDropdownOpen(false);
+                                  triggerToast(`🛡️ Dashboard Control: Shifted to ${preset.label}`);
                                 }}
-                                className={`py-1 rounded text-center border transition-all duration-300 cursor-pointer font-bold ${
+                                className={`py-1.5 px-1 rounded-md text-center border transition-all duration-200 cursor-pointer font-bold flex items-center justify-center gap-1 ${
                                   isCurrent 
-                                    ? 'bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white border-transparent shadow-md shadow-fuchsia-650/15' 
+                                    ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white border-transparent shadow-sm shadow-violet-600/20 scale-[1.02]' 
                                     : isDark
-                                      ? 'bg-neutral-950 text-neutral-405 border-neutral-850 hover:bg-neutral-850 hover:text-white'
-                                      : 'bg-slate-50 text-slate-600 border-slate-205 hover:bg-slate-100 hover:text-slate-900'
-                                  }`}
+                                      ? 'bg-neutral-950 text-neutral-300 border-neutral-800 hover:bg-neutral-800 hover:text-white'
+                                      : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 hover:text-slate-900'
+                                }`}
                               >
-                                {preset.label}
+                                <span className="text-[10px]">{preset.icon}</span>
+                                <span className="truncate">{preset.label}</span>
                               </button>
                             );
                           })}
@@ -4136,14 +4542,15 @@ export default function AdminPanel({
                     </div>
 
                     {/* Rail links block for mobile */}
-                    <div className="space-y-1.5">
-                      <span className={`text-[8px] uppercase tracking-widest opacity-40 font-mono block mb-2 px-1 ${
-                        isDark ? 'text-white/60' : 'text-slate-600'
+                    <div className="space-y-2">
+                      <span className={`text-[10px] md:text-[11px] uppercase tracking-widest opacity-50 font-bold block mb-2 px-1.5 ${
+                        isDark ? 'text-white/80' : 'text-slate-700'
                       }`}>
                         Consolidated Pathways
                       </span>
                       {localizedAdminMenuRails.map((rail) => {
                         const isActive = activeMenu === rail.id;
+                        const isExpanded = !!expandedMenus[rail.id];
                         const emojiRegex = /^\p{Emoji}/u;
                         const match = rail.label.match(emojiRegex);
                         const emoji = match ? match[0] : '🎯';
@@ -4159,16 +4566,23 @@ export default function AdminPanel({
                                   setIsMobileMenuOpen(false);
                                   return;
                                 }
-                                setActiveMenu(rail.id);
-                                if (rail.submenus.length > 0) {
-                                  setActiveSubMenu(rail.submenus[0].id);
+                                if (rail.submenus && rail.submenus.length > 0) {
+                                  setExpandedMenus(prev => ({
+                                    ...prev,
+                                    [rail.id]: !prev[rail.id]
+                                  }));
                                 } else {
+                                  setActiveMenu(rail.id);
                                   setActiveSubMenu('all');
                                   setIsMobileMenuOpen(false);
+                                  setExpandedMenus(prev => ({
+                                    ...prev,
+                                    [rail.id]: true
+                                  }));
                                 }
                                 setGlobalSearch('');
                               }}
-                              className={`w-full text-left p-2.5 rounded-xl border text-[10.5px] transition-all duration-300 flex items-center justify-between cursor-pointer focus:outline-none ${
+                              className={`w-full text-left p-3.5 rounded-xl border text-xs md:text-[13px] transition-all duration-300 flex items-center justify-between cursor-pointer focus:outline-none ${
                                 isActive 
                                   ? 'bg-gradient-to-r from-[#4F46E5] to-[#06B6D4] text-white font-bold border-transparent shadow-[0_8px_25px_rgba(79,70,229,0.3)] scale-[1.015] ring-1 ring-white/10' 
                                   : isDark
@@ -4176,27 +4590,35 @@ export default function AdminPanel({
                                     : 'bg-slate-50/40 text-slate-700 border-slate-200/50 hover:bg-gradient-to-r hover:from-[#4F46E5]/20 hover:to-[#06B6D4]/20 hover:border-[#4F46E5]/20 hover:text-slate-950 hover:shadow-[0_8px_25px_rgba(79,70,229,0.15)] shadow-xs'
                               }`}
                             >
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm shrink-0 filter drop-shadow">{emoji}</span>
-                                <div className="truncate">
-                                  <div className="font-bold text-left">{cleanLabel}</div>
-                                  <span className={`text-[8px] block font-light leading-none mt-0.5 text-left opacity-70`}>
+                              <div className="flex items-center gap-3">
+                                <span className="text-base shrink-0 filter drop-shadow">{emoji}</span>
+                                <div className="truncate min-w-0">
+                                  <div className="font-bold text-left text-xs md:text-[13px] tracking-tight flex items-center gap-2">
+                                    <span>{cleanLabel}</span>
+                                    {rail.id === 'whatsapp-service-orders' && pendingWaOrdersCount > 0 && (
+                                      <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0 animate-pulse">
+                                        {pendingWaOrdersCount}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className={`text-[10px] md:text-[10.5px] block font-medium leading-tight mt-1 text-left opacity-80`}>
                                     {rail.desc}
                                   </span>
                                 </div>
                               </div>
                               {rail.submenus.length > 0 && (
-                                <ChevronRight className={`w-3 h-3 shrink-0 transition-transform duration-300 ${isActive ? 'rotate-90 text-white' : 'opacity-50'}`} />
+                                <ChevronRight className={`w-3 h-3 shrink-0 transition-transform duration-300 ${isExpanded ? 'rotate-90 text-white' : 'opacity-50'}`} />
                               )}
                             </button>
 
                             {/* Nested submenus if active */}
-                            {isActive && rail.submenus.length > 0 && (
+                            {isExpanded && rail.submenus.length > 0 && (
                               <div className={`mt-1 pl-3 space-y-0.5 border-l-2 mr-2 ml-4 ${
                                 isDark ? 'border-[#06B6D4]/20' : 'border-[#4F46E5]/20'
                               }`}>
                                 {rail.submenus.map((sub) => {
                                   const isSubActive = activeSubMenu === sub.id;
+                                  const SubIconComp = getSubmenuIcon(sub.id);
                                   return (
                                     <button
                                       key={sub.id}
@@ -4206,7 +4628,7 @@ export default function AdminPanel({
                                         setActiveSubMenu(sub.id);
                                         setIsMobileMenuOpen(false);
                                       }}
-                                      className={`w-full text-left py-1.5 px-2 rounded-lg text-[9.5px] font-sans transition-all flex items-center justify-between cursor-pointer focus:outline-none ${
+                                      className={`w-full text-left py-2 px-3 rounded-lg text-[11px] md:text-[12px] font-sans transition-all flex items-center justify-between cursor-pointer focus:outline-none group/subitem ${
                                         isSubActive 
                                           ? 'text-white font-extrabold bg-gradient-to-r from-[#4F46E5] to-[#06B6D4] shadow-[0_4px_12px_rgba(79,70,229,0.25)] border-l-2 border-[#06B6D4] pl-2'
                                           : isDark
@@ -4214,7 +4636,14 @@ export default function AdminPanel({
                                             : 'text-slate-600 hover:text-slate-950 hover:bg-slate-100/50'
                                       }`}
                                     >
-                                      <span className="truncate">• {sub.label}</span>
+                                      <div className="flex items-center gap-2 truncate min-w-0 flex-1">
+                                        <SubIconComp className={`w-3.5 h-3.5 shrink-0 transition-colors ${
+                                          isSubActive 
+                                            ? 'text-white'
+                                            : 'text-slate-400 dark:text-slate-500 group-hover/subitem:text-slate-600 dark:group-hover/subitem:text-slate-300'
+                                        }`} />
+                                        <span className="truncate">{sub.label}</span>
+                                      </div>
                                       {isSubActive && <span className="w-1 h-1 rounded-full bg-white shrink-0 animate-ping" />}
                                     </button>
                                   );
@@ -4291,7 +4720,7 @@ export default function AdminPanel({
                     Super Admin Console
                   </span>
                 </div>
-                <h2 className="text-[10px] font-black tracking-wider text-slate-450 dark:text-slate-400 mt-1 pl-4 uppercase font-mono">
+                <h2 className="text-[10px] font-black tracking-wider text-slate-400 dark:text-slate-400 mt-1 pl-4 uppercase font-mono">
                   Governance Pathways
                 </h2>
                 <div className="absolute -bottom-1 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent via-[#4F46E5]/20 dark:via-[#06B6D4]/35 to-transparent" />
@@ -4305,7 +4734,7 @@ export default function AdminPanel({
                   isDark ? 'bg-[#12102E] border-white/10 text-white animate-fade-in' : 'bg-white border-indigo-100 text-slate-800'
                 }`}>
                   <p className="font-extrabold text-xs bg-gradient-to-r from-[#4F46E5] to-[#06B6D4] bg-clip-text text-transparent uppercase">Super Admin Panel</p>
-                  <p className="text-[9px] text-slate-405 font-medium">Governance Pathways</p>
+                  <p className="text-[9px] text-slate-400 font-medium">Governance Pathways</p>
                 </div>
               </div>
             )}
@@ -4323,7 +4752,7 @@ export default function AdminPanel({
               {isAdminSidebarCollapsed ? (
                 <div className="flex flex-col items-center gap-2.5 group relative">
                   <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#4F46E5] to-[#06B6D4] text-white flex items-center justify-center font-black uppercase text-xs shadow-md shadow-indigo-600/30 cursor-pointer hover:scale-105 transition-transform duration-300">
-                    👑
+                    {currentUser?.role === 'super_admin' ? '👑' : currentUser?.role === 'admin' ? '⚡' : currentUser?.role === 'order_manager' ? '📦' : '👑'}
                   </div>
                   <Shield className="w-3.5 h-3.5 text-[#06B6D4] dark:text-[#06B6D4]" />
                   
@@ -4331,32 +4760,44 @@ export default function AdminPanel({
                   <div className={`absolute left-full ml-3 p-4 text-[11px] font-sans rounded-2xl opacity-0 scale-90 group-hover:opacity-100 group-hover:scale-100 transition-all duration-200 shadow-2xl pointer-events-none whitespace-nowrap z-50 border ${
                     isDark ? 'bg-[#0F172A]/90 border-white/10 text-white backdrop-blur-xl' : 'bg-white/95 border-slate-200 text-slate-900 backdrop-blur-xl'
                   } space-y-3`}>
-                    <p className="font-extrabold text-xs text-[#06B6D4]">🛡️ Admin Security Governance</p>
-                    <p className="font-mono text-[9px] opacity-70">Active session: {currentUser?.name || "Anonymous"}</p>
+                    <p className="font-extrabold text-xs text-[#06B6D4]">🛡️ Dashboard Control</p>
+                    <p className="font-mono text-[9px] opacity-70">Active session: {currentUser?.name || "Super Admin Controller"}</p>
                     <p className="font-mono text-[9px] uppercase font-bold text-[#06B6D4] bg-[#06B6D4]/10 px-2 py-0.5 rounded-full border border-[#06B6D4]/20 inline-block">
-                      {currentUser?.role ? currentUser.role.replace('_', ' ').toUpperCase() : 'USER'}
+                      {currentUser?.role ? currentUser.role.replace('_', ' ').toUpperCase() : 'SUPER ADMIN'}
                     </p>
                     <div className="border-t border-slate-200 dark:border-white/[0.05] pt-2 space-y-2">
-                      <p className="text-[9px] font-bold text-slate-400">Quick-Shift Tester Role:</p>
-                      <div className="flex gap-1.5">
-                        {['super_admin', 'admin', 'editor'].map(r => (
+                      <p className="text-[9px] font-bold text-slate-400">Dashboard Control Roles:</p>
+                      <div className="flex flex-col gap-1.5 pointer-events-auto">
+                        {[
+                          { role: 'super_admin', label: '👑 Super Admin', tag: 'Root Master', name: 'Super Admin Controller', email: 'superadmin@webzonebd.com' },
+                          { role: 'admin', label: '⚡ Admin', tag: 'Operations Lead', name: 'Admin Moderator', email: 'admin@webzonebd.com' },
+                          { role: 'order_manager', label: '📦 Order Mgr', tag: 'Sales & Billing', name: 'Order Operations Manager', email: 'sales@webzonebd.com' }
+                        ].map(r => (
                           <button
-                            key={r}
+                            key={r.role}
                             onClick={(e) => {
                               e.stopPropagation();
                               const updatedUser = {
                                 ...currentUser,
-                                role: r,
-                                name: r === 'super_admin' ? 'Super Admin Manager' : r === 'admin' ? 'Admin Moderator' : 'Lead Content Editor'
+                                role: r.role,
+                                name: r.name,
+                                email: r.email
                               };
                               setCurrentUser(updatedUser);
                               localStorage.setItem('webzone_session_user', JSON.stringify(updatedUser));
                               if (setUser) setUser(updatedUser);
-                              triggerToast(`🛡️ Simulated Role Set to: ${r}`);
+                              triggerToast(`🛡️ Dashboard Control: Role switched to ${r.label}`);
                             }}
-                            className="px-2 py-1.5 bg-gradient-to-r from-[#4F46E5] to-[#06B6D4] text-white rounded-lg text-[8.5px] pointer-events-auto cursor-pointer font-bold hover:scale-105 active:scale-95 transition-all shadow-md shadow-indigo-550/20"
+                            className={`px-2.5 py-1.5 rounded-lg text-left text-[9px] font-bold transition-all flex items-center justify-between gap-3 ${
+                              currentUser?.role === r.role
+                                ? 'bg-gradient-to-r from-[#4F46E5] to-[#06B6D4] text-white shadow-md'
+                                : isDark
+                                  ? 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
+                                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200 hover:text-slate-900'
+                            }`}
                           >
-                            {r.split('_')[0].toUpperCase()}
+                            <span>{r.label}</span>
+                            <span className="text-[7.5px] opacity-70 font-mono">{r.tag}</span>
                           </button>
                         ))}
                       </div>
@@ -4368,10 +4809,10 @@ export default function AdminPanel({
                   <div className="flex items-center justify-between border-b border-slate-200 dark:border-white/[0.05] pb-2">
                     <div className="flex items-center gap-1.5">
                       <Shield className="w-3.5 h-3.5 text-[#06B6D4] dark:text-[#06B6D4] animate-pulse" />
-                      <span className="text-[9px] font-black font-sans text-transparent bg-clip-text bg-gradient-to-r from-[#4F46E5] to-[#06B6D4] uppercase tracking-widest">Governance Unit</span>
+                      <span className="text-[9px] font-black font-sans text-transparent bg-clip-text bg-gradient-to-r from-[#4F46E5] to-[#06B6D4] uppercase tracking-widest">Dashboard Control</span>
                     </div>
                     <span className="px-2 py-0.5 rounded-full text-[8.5px] font-bold bg-[#06B6D4]/10 text-[#06B6D4] border border-[#06B6D4]/20 font-sans tracking-wide">
-                      SECURE
+                      DYNAMIC ROLE
                     </span>
                   </div>
                   
@@ -4379,55 +4820,192 @@ export default function AdminPanel({
                     <span className="text-[9px] uppercase tracking-wider font-semibold opacity-50 text-slate-400 block">Supervisor Session</span>
                     <div className="flex items-center justify-between gap-2">
                       <div className="text-xs font-bold font-sans truncate text-slate-800 dark:text-neutral-100">
-                        {currentUser?.name || 'Anonymous User'}
+                        {currentUser?.name || 'Super Admin Controller'}
                       </div>
                       <span className={`px-2 py-0.5 rounded-full text-[8px] font-black font-sans border shrink-0 ${
                         currentUser?.role === 'super_admin' ? 'bg-[#4F46E5]/10 text-[#4F46E5] border-[#4F46E5]/20' :
                         currentUser?.role === 'admin' ? 'bg-[#06B6D4]/10 text-[#06B6D4] border-[#06B6D4]/20' :
-                        currentUser?.role === 'editor' ? 'bg-sky-500/10 text-sky-500 border-sky-500/20' :
+                        currentUser?.role === 'order_manager' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
                         'bg-slate-500/10 text-slate-500 border-slate-500/20'
                       }`}>
-                        {currentUser?.role ? currentUser.role.replace('_', ' ').toUpperCase() : 'USER'}
+                        {currentUser?.role === 'super_admin' ? 'SUPER ADMIN' : 
+                         currentUser?.role === 'admin' ? 'ADMIN' : 
+                         currentUser?.role === 'order_manager' ? 'ORDER MGR' : 
+                         (currentUser?.role ? currentUser.role.replace('_', ' ').toUpperCase() : 'SUPER ADMIN')}
                       </span>
                     </div>
-                    <div className="text-[8.5px] font-mono text-slate-400 truncate opacity-80">{currentUser?.email}</div>
+                    <div className="text-[8.5px] font-mono text-slate-400 truncate opacity-80">{currentUser?.email || 'superadmin@webzonebd.com'}</div>
                   </div>
 
-                  {/* Dynamic Quick Tester Panel */}
-                  <div className="border-t border-slate-200 dark:border-white/[0.05] pt-2 space-y-1.5">
-                    <label className="text-[9px] uppercase tracking-wider font-semibold opacity-50 text-slate-400 text-left block">Role Access Simulator</label>
-                    <div className="grid grid-cols-2 gap-1 font-sans text-[8.5px]">
+                  {/* Dashboard Control Dropdown Section */}
+                  <div className="border-t border-slate-200 dark:border-white/[0.05] pt-2 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[9px] uppercase tracking-wider font-bold opacity-60 text-slate-400 text-left block">Dashboard Control</label>
+                      <span className="text-[8px] font-mono text-indigo-400 bg-indigo-500/10 px-1.5 py-0.2 rounded border border-indigo-500/20">Dynamic Role Switch</span>
+                    </div>
+
+                    {/* Role Dropdown Selector */}
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setIsRoleDropdownOpen(!isRoleDropdownOpen)}
+                        className={`w-full flex items-center justify-between p-2.5 rounded-xl border text-left transition-all duration-200 ${
+                          isDark 
+                            ? 'bg-slate-800/80 hover:bg-slate-800 border-white/10 hover:border-indigo-500/50 text-white shadow-sm' 
+                            : 'bg-slate-50 hover:bg-slate-100 border-slate-200 hover:border-indigo-300 text-slate-900 shadow-xs'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-sm shrink-0">
+                            {currentUser?.role === 'super_admin' ? '👑' : currentUser?.role === 'admin' ? '⚡' : currentUser?.role === 'order_manager' ? '📦' : '🛡️'}
+                          </span>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[11px] font-black leading-tight text-slate-900 dark:text-white truncate">
+                                {currentUser?.role === 'super_admin' ? 'Super Admin' : 
+                                 currentUser?.role === 'admin' ? 'Admin' : 
+                                 currentUser?.role === 'order_manager' ? 'Order Mgr' : 
+                                 (currentUser?.role ? currentUser.role.replace('_', ' ').toUpperCase() : 'Super Admin')}
+                              </span>
+                              <span className={`text-[7.5px] px-1.5 py-0.2 rounded-full border font-bold font-mono ${
+                                currentUser?.role === 'super_admin' ? 'bg-purple-500/10 text-purple-500 border-purple-500/20' :
+                                currentUser?.role === 'admin' ? 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20' :
+                                currentUser?.role === 'order_manager' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
+                                'bg-slate-500/10 text-slate-400 border-slate-500/20'
+                              }`}>
+                                {currentUser?.role === 'super_admin' ? 'Root Master' :
+                                 currentUser?.role === 'admin' ? 'Operations Lead' :
+                                 currentUser?.role === 'order_manager' ? 'Sales & Billing' : 'Custom'}
+                              </span>
+                            </div>
+                            <p className="text-[8px] opacity-60 font-mono leading-tight truncate mt-0.5">
+                              {currentUser?.role === 'super_admin' ? 'Unrestricted root & governance' :
+                               currentUser?.role === 'admin' ? 'Products, orders & CRM operations' :
+                               currentUser?.role === 'order_manager' ? 'Sales pipelines & billing invoices' : 'Active control session'}
+                            </p>
+                          </div>
+                        </div>
+                        <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 shrink-0 ml-1 ${isRoleDropdownOpen ? 'rotate-180 text-indigo-400' : ''}`} />
+                      </button>
+
+                      {/* Dropdown Menu Popup */}
+                      {isRoleDropdownOpen && (
+                        <div className={`mt-1.5 p-1.5 rounded-xl border shadow-2xl space-y-1 z-30 relative ${
+                          isDark ? 'bg-[#0B1120] border-white/15 text-white' : 'bg-white border-slate-200 text-slate-900 shadow-slate-200/50'
+                        }`}>
+                          {[
+                            {
+                              role: 'super_admin',
+                              label: 'Super Admin',
+                              tag: 'Root Master',
+                              desc: 'Unrestricted master access, database telemetry & governance',
+                              icon: '👑',
+                              name: 'Super Admin Controller',
+                              email: 'superadmin@webzonebd.com',
+                              badgeColor: 'bg-purple-500/10 text-purple-600 dark:text-purple-300 border-purple-500/20'
+                            },
+                            {
+                              role: 'admin',
+                              label: 'Admin',
+                              tag: 'Operations Lead',
+                              desc: 'Full operations over products, orders, support SLA & content',
+                              icon: '⚡',
+                              name: 'Admin Moderator',
+                              email: 'admin@webzonebd.com',
+                              badgeColor: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 border-indigo-500/20'
+                            },
+                            {
+                              role: 'order_manager',
+                              label: 'Order Mgr',
+                              tag: 'Sales & Billing',
+                              desc: 'Manage sales orders, billing invoices & payment fulfillment',
+                              icon: '📦',
+                              name: 'Order Operations Manager',
+                              email: 'sales@webzonebd.com',
+                              badgeColor: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 border-emerald-500/20'
+                            }
+                          ].map((preset) => {
+                            const isCurrent = currentUser?.role === preset.role;
+                            return (
+                              <button
+                                key={preset.role}
+                                type="button"
+                                onClick={() => {
+                                  const updatedUser = {
+                                    ...currentUser,
+                                    role: preset.role,
+                                    name: preset.name,
+                                    email: preset.email
+                                  };
+                                  setCurrentUser(updatedUser);
+                                  localStorage.setItem('webzone_session_user', JSON.stringify(updatedUser));
+                                  if (setUser) setUser(updatedUser);
+                                  setIsRoleDropdownOpen(false);
+                                  triggerToast(`🛡️ Dashboard Control: Role switched to ${preset.label}`);
+                                }}
+                                className={`w-full flex items-center justify-between p-2 rounded-lg text-left transition-all duration-150 ${
+                                  isCurrent 
+                                    ? 'bg-gradient-to-r from-[#4F46E5] to-[#06B6D4] text-white font-bold shadow-md shadow-indigo-500/20' 
+                                    : isDark 
+                                      ? 'hover:bg-white/5 text-slate-300 hover:text-white' 
+                                      : 'hover:bg-slate-100 text-slate-700 hover:text-slate-900'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <span className="text-base shrink-0">{preset.icon}</span>
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-[10.5px] font-bold truncate">{preset.label}</span>
+                                      <span className={`text-[7px] px-1.5 py-0.2 rounded-full border font-mono font-bold ${isCurrent ? 'bg-white/20 text-white border-white/30' : preset.badgeColor}`}>
+                                        {preset.tag}
+                                      </span>
+                                    </div>
+                                    <p className={`text-[8px] truncate mt-0.5 ${isCurrent ? 'text-white/80' : 'opacity-60'}`}>{preset.desc}</p>
+                                  </div>
+                                </div>
+                                {isCurrent && <Check className="w-3.5 h-3.5 text-white shrink-0 ml-1.5" />}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Quick 1-Click Segmented Switching Pills */}
+                    <div className="grid grid-cols-3 gap-1 pt-0.5 font-sans text-[8.5px]">
                       {[
-                        { role: 'super_admin', label: 'Super Admin' },
-                        { role: 'admin', label: 'Admin Ops' },
-                        { role: 'editor', label: 'Lead Editor' },
-                        { role: 'customer', label: 'Customer' }
+                        { role: 'super_admin', label: 'Super Admin', icon: '👑', name: 'Super Admin Controller', email: 'superadmin@webzonebd.com' },
+                        { role: 'admin', label: 'Admin', icon: '⚡', name: 'Admin Moderator', email: 'admin@webzonebd.com' },
+                        { role: 'order_manager', label: 'Order Mgr', icon: '📦', name: 'Order Operations Manager', email: 'orders@webzonebd.com' }
                       ].map((preset) => {
-                        const isCurrent = currentUser?.role === preset.role || (preset.role === 'customer' && (!currentUser?.role || currentUser.role === 'customer'));
+                        const isCurrent = currentUser?.role === preset.role;
                         return (
                           <button
                             key={preset.role}
+                            type="button"
                             onClick={() => {
                               const updatedUser = {
                                 ...currentUser,
-                                name: preset.role === 'super_admin' ? 'Super Admin Manager' : preset.role === 'admin' ? 'Admin Moderator' : preset.role === 'editor' ? 'Lead Content Editor' : 'Imran Hasan',
-                                email: preset.role === 'super_admin' ? 'admin@webzonebd.com' : preset.role === 'admin' ? 'moderator@webzonebd.com' : preset.role === 'editor' ? 'editor@webzonebd.com' : 'imranh7900@gmail.com',
-                                role: preset.role
+                                role: preset.role,
+                                name: preset.name,
+                                email: preset.email
                               };
                               setCurrentUser(updatedUser);
                               localStorage.setItem('webzone_session_user', JSON.stringify(updatedUser));
                               if (setUser) setUser(updatedUser);
-                              triggerToast(`🛡️ Simulated Role Context shifted to: ${preset.label}`);
+                              setIsRoleDropdownOpen(false);
+                              triggerToast(`🛡️ Dashboard Control: Shifted to ${preset.label}`);
                             }}
-                            className={`px-2 py-1.5 rounded-lg text-left border transition-all duration-300 cursor-pointer font-semibold ${
+                            className={`py-1.5 px-1 rounded-lg text-center border transition-all duration-200 cursor-pointer font-bold flex items-center justify-center gap-1 ${
                               isCurrent 
-                                ? 'bg-gradient-to-r from-[#4F46E5] to-[#06B6D4] border-transparent text-white font-black shadow-md shadow-indigo-500/15 scale-[1.01]' 
+                                ? 'bg-gradient-to-r from-[#4F46E5] to-[#06B6D4] text-white border-transparent shadow-sm shadow-indigo-500/25 scale-[1.02]' 
                                 : isDark
-                                  ? 'bg-slate-900/40 text-slate-350 border-white/[0.05] hover:bg-slate-800/40 hover:text-white'
-                                  : 'bg-white text-slate-650 border-slate-200/60 hover:bg-slate-50 hover:text-slate-900 shadow-xs'
+                                  ? 'bg-slate-850 text-slate-300 border-white/[0.06] hover:bg-slate-800 hover:text-white'
+                                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:text-slate-900 shadow-2xs'
                             }`}
                           >
-                            <span className="truncate block text-center">{preset.label}</span>
+                            <span className="text-[10px]">{preset.icon}</span>
+                            <span className="truncate">{preset.label}</span>
                           </button>
                         );
                       })}
@@ -4437,22 +5015,30 @@ export default function AdminPanel({
                   {/* Interactive Permission Ledger Statuses */}
                   <div className="border-t border-slate-200 dark:border-white/[0.05] pt-2 space-y-1.5">
                     <span className="text-[9px] uppercase tracking-wider font-semibold opacity-50 text-slate-400 text-left block">Active Clearance Status</span>
-                    <div className="grid grid-cols-2 gap-x-2 gap-y-1 font-sans text-[9px] pt-0.5 text-slate-500 dark:text-slate-400 text-left">
+                    <div className="grid grid-cols-2 gap-x-2 gap-y-1 font-sans text-[8.5px] pt-0.5 text-slate-500 dark:text-slate-400 text-left">
                       <div className="flex items-center gap-1.5">
                         <span className={`w-1.5 h-1.5 rounded-full ${checkPermission('manage_products') ? 'bg-emerald-500' : 'bg-rose-500'}`} />
-                        <span className="truncate">Store Products</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className={`w-1.5 h-1.5 rounded-full ${checkPermission('manage_users') ? 'bg-emerald-500' : 'bg-rose-500'}`} />
-                        <span className="truncate">User Database</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className={`w-1.5 h-1.5 rounded-full ${checkPermission('manage_content') ? 'bg-emerald-500' : 'bg-rose-500'}`} />
-                        <span className="truncate">CMS Engine</span>
+                        <span className="truncate">Products</span>
                       </div>
                       <div className="flex items-center gap-1.5">
                         <span className={`w-1.5 h-1.5 rounded-full ${checkPermission('manage_orders') ? 'bg-emerald-500' : 'bg-rose-500'}`} />
-                        <span className="truncate">Order Process</span>
+                        <span className="truncate">Orders & Pay</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className={`w-1.5 h-1.5 rounded-full ${checkPermission('manage_support') ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                        <span className="truncate">Support SLA</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className={`w-1.5 h-1.5 rounded-full ${checkPermission('manage_content') ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                        <span className="truncate">CMS & AI</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className={`w-1.5 h-1.5 rounded-full ${checkPermission('manage_users') ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                        <span className="truncate">CRM Users</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className={`w-1.5 h-1.5 rounded-full ${checkPermission('manage_system') ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                        <span className="truncate">System Settings</span>
                       </div>
                     </div>
                   </div>
@@ -4499,6 +5085,19 @@ export default function AdminPanel({
                     { id: 'whatsapp-leads', label: 'WhatsApp Leads' },
                     { id: 'service-reports', label: 'Service Reports' }
                   ] },
+                  { id: 'whatsapp-service-orders', label: '📱 WhatsApp Service Orders', desc: 'Manage orders, custom fields', submenus: [
+                    { id: 'wa-orders', label: 'Service Orders List' },
+                    { id: 'wa-customers', label: 'Customer WhatsApp List' },
+                    { id: 'wa-form-settings', label: 'Order Form Field Settings' },
+                    { id: 'wa-invoice-notif', label: 'Invoice Notifications' },
+                    { id: 'wa-payment-reminders', label: 'Payment Reminders' },
+                    { id: 'wa-delivery-updates', label: 'Service Delivery Updates' },
+                    { id: 'wa-promo-messages', label: 'Promotional Messages' },
+                    { id: 'wa-templates', label: 'WhatsApp Templates' },
+                    { id: 'wa-campaign-reports', label: 'Campaign Reports' },
+                    { id: 'wa-api-integration', label: 'WhatsApp API Integration' },
+                    { id: 'wa-settings', label: 'WhatsApp Settings' }
+                  ] },
                   { id: 'projects', label: '📂 Projects', desc: 'Client portal milestones & tasks', submenus: [
                     { id: 'active-projects', label: 'Active Projects' },
                     { id: 'pending-projects', label: 'Pending Projects' },
@@ -4527,11 +5126,20 @@ export default function AdminPanel({
                     { id: 'aff-withdrawals', label: 'Withdraw Requests' },
                     { id: 'aff-analytics', label: 'Analytics' }
                   ] },
-                  { id: 'marketing', label: '📢 Marketing', desc: 'Email blaster lists, coupons', submenus: [
-                    { id: 'mkt-email', label: 'Email Campaigns' },
-                    { id: 'mkt-sms', label: 'SMS Campaigns' },
+                  { id: 'marketing', label: '📢 Marketing', desc: 'Enterprise marketing & campaign hubs', submenus: [
+                    { id: 'mkt-coupons', label: 'Coupon System' },
+                    { id: 'mkt-sms', label: 'SMS Marketing' },
                     { id: 'mkt-push', label: 'Push Notifications' },
-                    { id: 'mkt-coupons', label: 'Coupon System' }
+                    { id: 'mkt-whatsapp', label: 'WhatsApp Marketing' },
+                    { id: 'mkt-social', label: 'Social Media Campaigns' },
+                    { id: 'mkt-affiliate', label: 'Affiliate Marketing' },
+                    { id: 'mkt-referral', label: 'Referral Program' },
+                    { id: 'mkt-loyalty', label: 'Loyalty & Rewards' },
+                    { id: 'mkt-abandoned', label: 'Abandoned Cart Recovery' },
+                    { id: 'mkt-leads', label: 'Lead Management' },
+                    { id: 'mkt-newsletter', label: 'Newsletter Subscribers' },
+                    { id: 'mkt-automation', label: 'Marketing Automation' },
+                    { id: 'mkt-settings', label: 'Marketing Settings' }
                   ] },
                   { id: 'reviews', label: '⭐ Reviews', desc: 'Audit marketplace client feedback', submenus: [
                     { id: 'rev-product', label: 'Product Reviews' },
@@ -4614,7 +5222,7 @@ export default function AdminPanel({
                 const categories = [
                   { title: translate('🏦 Core Metrics'), ids: ['dashboard'] },
                   { title: translate('🌐 CMS & Sales Catalog'), ids: ['services', 'store'] },
-                  { title: translate('📦 Workspace Operations'), ids: ['customers', 'orders', 'projects'] },
+                  { title: translate('📦 Workspace Operations'), ids: ['customers', 'orders', 'whatsapp-service-orders', 'projects'] },
                   { title: translate('🤖 AI & Support Desk'), ids: ['support', 'ai-center'] },
                   { title: translate('📢 Growth & Feedback'), ids: ['affiliates', 'marketing', 'reviews'] },
                   { title: translate('🛠️ System & Governance'), ids: ['reports', 'staff', 'notifications', 'customer-dashboard', 'cms', 'web-settings'] }
@@ -4629,7 +5237,7 @@ export default function AdminPanel({
                   return (
                     <div key={cat.title} className={`${catIdx > 0 ? 'pt-2' : ''} space-y-1`}>
                       {!isAdminSidebarCollapsed && (
-                        <div className={`text-[9.5px] uppercase tracking-wider font-extrabold mt-3.5 mb-2 px-3 py-1 rounded-lg select-none inline-block border ${
+                        <div className={`text-[11px] md:text-[11.5px] uppercase tracking-widest font-extrabold mt-4 mb-2.5 px-3 py-1.5 rounded-lg select-none inline-block border ${
                           isDark 
                             ? 'bg-slate-800/40 text-[#06B6D4] border-[#06B6D4]/15 shadow-[0_2px_12px_rgba(6,182,212,0.03)]' 
                             : 'bg-indigo-50/60 text-indigo-700 border-[#4F46E5]/10 shadow-[0_2px_12px_rgba(79,70,229,0.03)]'
@@ -4657,25 +5265,22 @@ export default function AdminPanel({
                                   return;
                                 }
                                 
-                                if (activeMenu === rail.id) {
+                                if (rail.submenus && rail.submenus.length > 0) {
                                   setExpandedMenus(prev => ({
                                     ...prev,
                                     [rail.id]: !prev[rail.id]
                                   }));
                                 } else {
                                   setActiveMenu(rail.id);
-                                  setExpandedMenus({
+                                  setActiveSubMenu('all');
+                                  setExpandedMenus(prev => ({
+                                    ...prev,
                                     [rail.id]: true
-                                  });
-                                  if (rail.submenus.length > 0) {
-                                    setActiveSubMenu(rail.submenus[0].id);
-                                  } else {
-                                    setActiveSubMenu('all');
-                                  }
+                                  }));
                                 }
                                 setGlobalSearch('');
                               }}
-                              className={`w-full text-left p-3 rounded-2xl border text-[11px] transition-all duration-300 flex items-center justify-between cursor-pointer focus:outline-none relative overflow-hidden group/btn ${
+                              className={`w-full text-left p-3.5 rounded-2xl border text-xs md:text-[13px] transition-all duration-300 flex items-center justify-between cursor-pointer focus:outline-none relative overflow-hidden group/btn ${
                                 isActive 
                                   ? 'text-white font-extrabold border-white/20 scale-[1.02] bg-gradient-to-r from-[#4F46E5] to-[#06B6D4] shadow-[0_8px_25px_rgba(79,70,229,0.35)] backdrop-blur-md' 
                                   : isDark
@@ -4688,27 +5293,39 @@ export default function AdminPanel({
                               <div className="absolute inset-0 bg-white/5 opacity-10 pointer-events-none" />
 
                               {isAdminSidebarCollapsed ? (
-                                <div className="w-full text-center text-lg select-none" title={cleanLabel}>
-                                  <MenuIconComp className={`w-5 h-5 mx-auto transition-transform duration-300 group-hover/btn:scale-110 ${
+                                <div className="w-full text-center text-lg select-none relative" title={cleanLabel}>
+                                  <MenuIconComp className={`w-5.5 h-5.5 mx-auto transition-transform duration-300 group-hover/btn:scale-110 ${
                                     isActive ? 'text-white' : 'text-slate-400 dark:text-slate-500 group-hover/btn:text-white'
                                   }`} />
+                                  {rail.id === 'whatsapp-service-orders' && pendingWaOrdersCount > 0 && (
+                                    <span className="absolute top-[-8px] right-[4px] flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[8px] font-bold text-white ring-2 ring-red-500/20">
+                                      {pendingWaOrdersCount}
+                                    </span>
+                                  )}
                                 </div>
                               ) : (
-                                <div className="flex items-center gap-2.5 z-10 w-full min-w-0">
-                                  <MenuIconComp className={`w-4 h-4 shrink-0 transition-all duration-300 group-hover/btn:scale-110 ${
+                                <div className="flex items-center gap-3 z-10 w-full min-w-0">
+                                  <MenuIconComp className={`w-4.5 h-4.5 shrink-0 transition-all duration-300 group-hover/btn:scale-110 ${
                                     isActive ? 'text-white' : 'text-slate-400 dark:text-slate-500 group-hover/btn:text-white'
                                   }`} />
                                   <div className="truncate min-w-0 flex-1">
-                                    <div className={`font-bold text-left tracking-tight truncate transition-colors duration-300 ${
-                                      isActive 
-                                        ? 'text-white font-black' 
-                                        : 'text-slate-700 dark:text-slate-300 group-hover/btn:text-white'
-                                    }`}>{cleanLabel}</div>
-                                    <span className={`text-[8.5px] block font-light leading-none mt-0.5 text-left transition-colors duration-250 truncate ${
+                                    <div className="flex items-center gap-2">
+                                      <div className={`font-bold text-left text-xs md:text-[13px] tracking-tight truncate transition-colors duration-300 ${
+                                        isActive 
+                                          ? 'text-white font-bold' 
+                                          : 'text-slate-700 dark:text-slate-300 group-hover/btn:text-white'
+                                      }`}>{cleanLabel}</div>
+                                      {rail.id === 'whatsapp-service-orders' && pendingWaOrdersCount > 0 && (
+                                        <span className="bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 animate-pulse">
+                                          {pendingWaOrdersCount} {translate('Pending')}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <span className={`text-[10px] md:text-[10.5px] block font-medium leading-tight mt-1 text-left transition-colors duration-250 truncate ${
                                       isActive 
                                         ? 'text-white/85 font-medium' 
                                         : isDark 
-                                          ? 'text-slate-450 group-hover/btn:text-white/80' 
+                                          ? 'text-slate-400 group-hover/btn:text-white/80' 
                                           : 'text-slate-500 group-hover/btn:text-white/80'
                                     }`}>
                                       {rail.desc}
@@ -4751,7 +5368,7 @@ export default function AdminPanel({
                                         setActiveMenu(rail.id);
                                         setActiveSubMenu(sub.id);
                                       }}
-                                      className={`w-full text-left py-1.5 px-3 rounded-lg text-[10px] font-sans transition-all duration-200 flex items-center justify-between cursor-pointer focus:outline-none group/subitem ${
+                                      className={`w-full text-left py-2 px-3.5 rounded-lg text-[11px] md:text-[12px] font-sans transition-all duration-200 flex items-center justify-between cursor-pointer focus:outline-none group/subitem ${
                                         isSubActive 
                                           ? 'text-white font-extrabold bg-gradient-to-r from-[#4F46E5] to-[#06B6D4] shadow-[0_4px_12px_rgba(79,70,229,0.25)] border-l-2 border-[#06B6D4] pl-2' 
                                           : isDark
@@ -4766,6 +5383,11 @@ export default function AdminPanel({
                                             : 'text-slate-400 dark:text-slate-500 group-hover/subitem:text-slate-600 dark:group-hover/subitem:text-slate-300'
                                         }`} />
                                         <span className="truncate">{sub.label}</span>
+                                        {sub.id === 'wa-orders' && pendingWaOrdersCount > 0 && (
+                                          <span className="bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.2 rounded-full shrink-0 animate-pulse ml-1">
+                                            {pendingWaOrdersCount}
+                                          </span>
+                                        )}
                                       </div>
                                       {isSubActive && <span className="w-1 h-1 rounded-full bg-white shrink-0 animate-ping" />}
                                     </button>
@@ -5102,6 +5724,24 @@ export default function AdminPanel({
                 </div>
                 
 
+
+                {/* 0. ADVANCED ANALYTICS & BUSINESS INTELLIGENCE HUB WIDGET */}
+                <div 
+                  className={"w-full " + getWidgetColumnClass("advanced-analytics")} 
+                  style={getWidgetStyle('advanced-analytics')}
+                >
+                  <Suspense fallback={<div className="p-8 text-center text-xs text-neutral-500">Loading Advanced Analytics Engine...</div>}>
+                    <AdminAdvancedAnalytics
+                      language={language}
+                      theme={theme}
+                      orders={orders as any}
+                      products={products as any}
+                      customers={customers as any}
+                      tickets={tickets as any}
+                      triggerToast={triggerToast}
+                    />
+                  </Suspense>
+                </div>
 
                 {/* 1. Analytics Widget Cards - 6 Premium Enterprise SaaS Cards */}
                 <div 
@@ -6257,8 +6897,8 @@ export default function AdminPanel({
                                     <p>Ready to audit broadcast dispatches.</p>
                                   </div>
                                 ) : (
-                                  broadcastLogs.map((log) => (
-                                    <div key={log.id} className={`p-2.5 rounded-lg border flex flex-col space-y-1 transition duration-150 ${
+                                  broadcastLogs.map((log, index) => (
+                                    <div key={log.id ? `${log.id}-${index}` : index} className={`p-2.5 rounded-lg border flex flex-col space-y-1 transition duration-150 ${
                                       isDark 
                                         ? 'bg-neutral-950/40 border-neutral-850/60 hover:border-neutral-800' 
                                         : 'bg-slate-50/40 border-slate-200 hover:border-slate-300 shadow-3xs'
@@ -6708,12065 +7348,158 @@ export default function AdminPanel({
               )
             )}
 
-            {/* SCREEN VIEWPORT B DEPRECATED: BYPASS AT RUNTIME */}
-            {false && activeMenu === 'customers' && (
-              !checkPermission('manage_users') ? renderAccessDenied('manage_users', 'Customer Directory & CRM') : (() => {
-              // 1. Core State Handlers & Computations for Filtering
-              const filteredCustomers = customers.filter(c => {
-                const term = globalSearch.toLowerCase();
-                const matchSearch = 
-                  c.name.toLowerCase().includes(term) ||
-                  c.email.toLowerCase().includes(term) ||
-                  (c.phone && c.phone.toLowerCase().includes(term)) ||
-                  c.id.toLowerCase().includes(term) ||
-                  (c.companyName && c.companyName.toLowerCase().includes(term));
 
-                const matchType = custTypeFilter === 'all' || c.customerType === custTypeFilter;
-                const matchStatus = custStatusFilter === 'all' || c.status === custStatusFilter;
-                const matchCountry = custCountryFilter === 'all' || c.country === custCountryFilter;
-                
-                let matchSpend = true;
-                if (custSpendFilter === '0-500') {
-                  matchSpend = c.totalSpent <= 500;
-                } else if (custSpendFilter === '500-2000') {
-                  matchSpend = c.totalSpent > 500 && c.totalSpent <= 2000;
-                } else if (custSpendFilter === '2000+') {
-                  matchSpend = c.totalSpent > 2000;
-                }
-
-                return matchSearch && matchType && matchStatus && matchCountry && matchSpend;
-              });
-
-              // 2. Core Profiles Setup Helper to prevent reading undefined attributes
-              const getCustomerFullData = (c: any) => {
-                if (!c) return {
-                  id: 'usr-new', name: 'New Client', companyName: 'N/A', email: '', phone: '', whatsapp: '',
-                  dob: '1995-01-01', gender: 'Male', status: 'active', walletBalance: 0, totalSpent: 0,
-                  country: 'Bangladesh', city: 'Dhaka', address: '', postalCode: '', websiteUrl: '',
-                  customerType: 'Regular Client', tags: ['Regular'], lastLogin: 'N/A', joinedAt: 'N/A'
-                };
-                return {
-                  ...c,
-                  companyName: c.companyName || 'Freelance / Individual',
-                  whatsapp: c.whatsapp || c.phone || '+880 1711 000000',
-                  dob: c.dob || '1995-07-16',
-                  gender: c.gender || 'Male',
-                  city: c.city || 'Dhaka',
-                  address: c.address || 'House 24, Road 18, Sector 4, Uttara',
-                  postalCode: c.postalCode || '1230',
-                  websiteUrl: c.websiteUrl || 'https://webzone-app.com',
-                  customerType: c.customerType || 'Regular Client',
-                  lastLogin: c.lastLogin || '2026-06-11 09:41',
-                  tags: c.tags || ['Regular']
-                };
-              };
-
-              // 3. User activation/lock toggle status
-              const handleToggleStatus = (id: string) => {
-                setCustomers(prev => prev.map(c => {
-                  if (c.id === id) {
-                    const next = c.status === 'active' ? 'suspended' : 'active';
-                    triggerToast(`🛡️ Customer ${c.name} account status changed to ${next.toUpperCase()}`);
-                    logAdminAction(`Altered customer account lock/status for ${c.name} (ID: ${id}) to: ${next.toUpperCase()}`);
-                    return { ...c, status: next };
-                  }
-                  return c;
-                }));
-              };
-
-              // 4. Reset Credentials Simulate Handler
-              const handleResetPasswordSimulate = (cust: any) => {
-                const tempPass = `Pass#${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-                triggerToast(`🔑 Password security reset! Generated temporary password: ${tempPass} for ${cust.name}. Note: SMS configuration dispatched.`);
-                logAdminAction(`Initiated MFA credential password reset protocol for customer: ${cust.name} (ID: ${cust.id})`);
-              };
-
-              // 5. Delete Customer Handler
-              const handleDeleteCustomer = (id: string, name: string) => {
-                if (confirm(`Are you sure you want to permanently delete customer ${name}? This action is irreversible.`)) {
-                  setCustomers(prev => prev.filter(c => c.id !== id));
-                  triggerToast(`🚨 Registered user account for ${name} has been purged from system registries.`);
-                  logAdminAction(`Purged customer database account: ${name} (ID: ${id}) from directories`);
-                }
-              };
-
-              // 6. CSV/Excel Compilation Downloader
-              const handleExportDataSimulate = (format: 'pdf' | 'excel' | 'csv') => {
-                const headers = "Customer ID,Full Name,Company,Email,Phone,Country,Type,Status,Spend\n";
-                const rows = filteredCustomers.map(c => `${c.id},"${c.name}","${c.companyName || ''}","${c.email}","${c.phone}","${c.country}","${c.customerType}","${c.status}",$${c.walletBalance}`).join("\n");
-                const blob = new Blob([headers + rows], { type: 'text/csv' });
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.setAttribute('download', `customers_export_${Date.now()}.${format}`);
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                triggerToast(`🎉 Data successfully compiled! A structured .${format} download was triggered with ${filteredCustomers.length} client files.`);
-                logAdminAction(`Exported security-audited database backup: compiled customer file registry in .${format.toUpperCase()} format`);
-              };
-
-              return (
-                <div className="space-y-6 animate-in fade-in duration-300 text-left">
-                
-                {/* Visual Breadcrumb / Main Title Header */}
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-neutral-800/40">
-                  <div>
-                    <div className="flex items-center gap-2 text-xs font-mono text-purple-400 mb-1 font-semibold">
-                      <span>Enterprise Modules</span>
-                      <span>/</span>
-                      <span className="text-neutral-400">Customer Relationship Manager</span>
-                    </div>
-                    <h3 className={`text-2xl font-black tracking-tight ${textTitle} flex items-center gap-2`}>
-                      <Users className="w-6 h-6 text-purple-500" />
-                      {selectedCustomerProfileId ? 'Customer Security & Ledger Profile' : 'Super Admin Client Workspace'}
-                    </h3>
-                    <p className="text-xs opacity-60">
-                      {selectedCustomerProfileId 
-                        ? 'Auditing specific client portfolio, managing notes, dispatching push notifications and modifying transactions.'
-                        : 'Durable customer auditing, advanced multi-parameter searching, bulk tags modifier, real database simulations.'}
-                    </p>
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
-                    {selectedCustomerProfileId && (
-                      <button
-                        onClick={() => {
-                          setSelectedCustomerProfileId(null);
-                          setActiveProfileTab('Overview');
-                        }}
-                        className={`px-4 py-2 text-xs font-bold rounded-xl border flex items-center gap-1.5 transition ${
-                          isDark 
-                            ? 'bg-neutral-900 hover:bg-neutral-850 hover:text-white border-neutral-800 text-neutral-300' 
-                            : 'bg-white hover:bg-neutral-50 hover:text-neutral-900 border-neutral-200 text-neutral-700 shadow-sm'
-                        }`}
-                      >
-                        ← Back to Customers List
-                      </button>
-                    )}
-                    <button
-                      onClick={() => {
-                        setCustForm({
-                          name: '',
-                          companyName: '',
-                          email: '',
-                          phone: '',
-                          whatsapp: '',
-                          dob: '1995-01-01',
-                          gender: 'Male',
-                          country: 'Bangladesh',
-                          city: 'Dhaka',
-                          address: '',
-                          postalCode: '',
-                          websiteUrl: '',
-                          customerType: 'Regular Client',
-                          status: 'active',
-                          tags: ['Regular'],
-                          password: '',
-                          workspaceFeatures: {
-                            projects: true,
-                            supportTickets: true,
-                            digitalStore: true,
-                            downloads: true,
-                            affiliateSystem: true,
-                            wallet: true,
-                            aiTools: true,
-                            notifications: true
-                          }
-                        });
-                        setSelectedCustomerIdForEdit(null);
-                        setShowAddCustomerModal(true);
-                      }}
-                      className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-lg shadow-purple-500/15"
-                    >
-                      <Plus className="w-4 h-4" /> Register New Customer
-                    </button>
-                  </div>
-                </div>
-
-                {!selectedCustomerProfileId ? (
-                  <>
-                    {/* CUSTOM CUSTOMER SECTIONS */}
-                    {activeSubMenu === 'customer-groups' && (() => {
-                      return (
-                        <div className="space-y-6 animate-in fade-in duration-300">
-                          <div className="flex flex-col sm:flex-row items-baseline sm:items-center justify-between gap-4 border-b border-neutral-800/40 pb-4">
-                            <div>
-                              <span className="text-[10px] uppercase font-mono text-purple-400 font-bold">Directories</span>
-                              <h4 className="text-base font-bold text-neutral-150">👥 Client Service Groups & Tiers</h4>
-                              <p className="text-xs opacity-60">Categorize client credentials to enforce automated volume discounts, priority ticket priority, and custom WHMCS service SLA policies.</p>
-                            </div>
-                            <button
-                              onClick={() => {
-                                const name = prompt("Enter new Group Name (e.g., Enterprise Elites, Reseller Level 2):");
-                                if (!name) return;
-                                const desc = prompt("Enter group Description / Billing Contract Rules:") || "Standard tier group description.";
-                                const disc = Number(prompt("Enter group default % Discount (0-100):") || "0");
-                                const sla = prompt("Enter SLA Reply Guarantee (e.g., 15 Mins, 2 Hours):") || "4 Hours";
-                                triggerToast(`🎉 New client cluster "${name}" successfully compiled! Default ${disc}% discounts & ${sla} response SLAs allocated to members.`);
-                              }}
-                              className="bg-purple-600 hover:bg-purple-700 text-white text-[11px] font-bold px-3 py-1.5 rounded-xl transition-all flex items-center gap-1 shadow-lg shadow-purple-500/15"
-                            >
-                              + Define Client Group
-                            </button>
-                          </div>
-
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {[
-                              { id: 'grp-vip', name: 'VIP Priority Club', desc: 'Enterprise SaaS and dedicated server holders, premium billing and custom concierge service.', discount: 20, sla: '15 Mins', bg: 'from-amber-600/10 to-amber-500/10 hover:border-amber-500/30 text-amber-400 border-amber-900/30', count: customers.filter(c => c.customerType === 'VIP Client' || (c.tags && c.tags.includes('VIP'))).length },
-                              { id: 'grp-corp', name: 'Corporate Contract Retainers', desc: 'Registered agencies, high volume template licenses, structured monthly legal invoicing billing.', discount: 15, sla: '1 Hour', bg: 'from-pink-600/10 to-pink-500/10 hover:border-pink-500/30 text-pink-400 border-pink-900/30', count: customers.filter(c => c.customerType === 'Corporate Client' || (c.tags && c.tags.includes('Corporate'))).length },
-                              { id: 'grp-aff', name: 'Active Affiliates', desc: 'Promoters system panel, high conversion organic referrals, custom withdrawal payouts.', discount: 10, sla: '2 Hours', bg: 'from-emerald-600/10 to-emerald-500/10 hover:border-emerald-500/30 text-emerald-400 border-emerald-950/30', count: customers.filter(c => c.customerType === 'Affiliate Partner' || (c.tags && c.tags.includes('Affiliate'))).length },
-                              { id: 'grp-resell', name: 'White-Label Resellers', desc: 'Direct software package distributors, bulk license keys procurement, and developer tokens.', discount: 25, sla: '30 Mins', bg: 'from-cyan-600/10 to-cyan-500/10 hover:border-cyan-500/30 text-cyan-400 border-cyan-950/30', count: customers.filter(c => c.customerType === 'Reseller' || (c.tags && c.tags.includes('Reseller'))).length },
-                              { id: 'grp-regular', name: 'Regular Retail Customers', desc: 'Individual script developers, single hosting users, traditional self-service support tickets.', discount: 0, sla: '12 Hours', bg: 'from-blue-600/10 to-blue-500/10 hover:border-blue-500/30 text-blue-400 border-blue-950/30', count: customers.filter(c => c.customerType === 'Regular Client' || (!c.customerType)).length }
-                            ].map((gr) => (
-                              <div key={gr.id} className="p-5 rounded-2xl border bg-gradient-to-br bg-neutral-950/30 space-y-4 shadow hover:scale-[1.01] transition duration-200">
-                                <div className="flex items-center justify-between">
-                                  <span className="font-extrabold text-xs tracking-tight text-purple-400">{gr.name}</span>
-                                  <span className="text-[10px] font-mono opacity-80 bg-neutral-900 px-2 py-0.5 rounded border border-neutral-800">
-                                    {gr.count} accounts
-                                  </span>
-                                </div>
-                                <p className="text-[11px] opacity-75">{gr.desc}</p>
-                                
-                                <div className="grid grid-cols-2 gap-2 bg-neutral-950/50 p-2.5 rounded-xl border border-neutral-800/40 text-[10px] font-mono">
-                                  <div>
-                                    <span className="text-neutral-500 block uppercase font-bold text-[8px]">Group Discount</span>
-                                    <span className="font-bold text-purple-400">{gr.discount}% Default Off</span>
-                                  </div>
-                                  <div>
-                                    <span className="text-neutral-500 block uppercase font-bold text-[8px]">Support SLA Guarantee</span>
-                                    <span className="font-bold text-white">{gr.sla}</span>
-                                  </div>
-                                </div>
-
-                                <div className="flex items-center justify-between pt-1">
-                                  <span className="text-[9px] text-neutral-500 font-mono">ID: {gr.id}</span>
-                                  <div className="flex gap-1.5">
-                                    <button
-                                      onClick={() => {
-                                        triggerToast(`⚙️ Advanced SLA rules deployed for group: "${gr.name}"`);
-                                      }}
-                                      className="px-2.5 py-1 bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-neutral-300 rounded text-[9px] font-bold"
-                                    >
-                                      SLA Rules
-                                    </button>
-                                    <button
-                                      onClick={() => {
-                                        triggerToast(`🔒 Standard system cluster group "${gr.name}" cannot be purged when active accounts are bound to it.`);
-                                      }}
-                                      className="px-1.5 py-1 bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white rounded text-[9px]"
-                                    >
-                                      <Trash2 className="w-3 h-3" />
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })()}
-
-                    {activeSubMenu === 'customer-tags' && (() => {
-                      const ALL_TAGS = ['VIP', 'High Value', 'Priority Support', 'Corporate', 'Regular', 'Reseller', 'Risk Customer', 'Affiliate'];
-                      return (
-                        <div className="space-y-6 animate-in fade-in duration-300">
-                          <div className="flex flex-col sm:flex-row items-baseline sm:items-center justify-between gap-4 border-b border-neutral-800/40 pb-4">
-                            <div>
-                              <span className="text-[10px] uppercase font-mono text-purple-400 font-bold">Metadata Mapping</span>
-                              <h4 className="text-base font-bold text-neutral-150">🏷️ Customer Meta Tags Directory</h4>
-                              <p className="text-xs opacity-60">Manage contextual search keywords and flags designed for bulk segmentation, targeted email campaigns, and risk audits.</p>
-                            </div>
-                            <button
-                              onClick={() => {
-                                const value = prompt("Enter new Custom Tag name:");
-                                if (value) {
-                                  triggerToast(`🎉 Custom tag "${value.toUpperCase()}" registered successfully!`);
-                                }
-                              }}
-                              className="bg-purple-600 hover:bg-purple-700 text-white text-[11px] font-bold px-3 py-1.5 rounded-xl transition"
-                            >
-                              + Register New Tag
-                            </button>
-                          </div>
-
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            {ALL_TAGS.map((tag) => {
-                              const matchingCustomersCount = customers.filter(c => c.tags && c.tags.includes(tag)).length;
-                              return (
-                                <div key={tag} className={`p-4 rounded-2xl border ${cardBorder} ${panelBg} shadow-sm space-y-3 hover:border-purple-500/30 transition`}>
-                                  <div className="flex items-center justify-between">
-                                    <span className="px-2.5 py-1 text-[10px] font-mono font-black tracking-tight text-purple-400 bg-purple-500/5 rounded border border-purple-500/15">
-                                      #{tag}
-                                    </span>
-                                    <span className="text-xs font-bold text-white font-mono">
-                                      {matchingCustomersCount}
-                                    </span>
-                                  </div>
-                                  <div className="w-full bg-neutral-900 h-1.5 rounded-full overflow-hidden">
-                                    <div 
-                                      className="h-full bg-purple-500 rounded-full" 
-                                      style={{ width: `${Math.min(100, (matchingCustomersCount / (customers.length || 1)) * 100)}%` }}
-                                    />
-                                  </div>
-                                  <div className="flex justify-between items-center pt-1.5">
-                                    <button
-                                      onClick={() => {
-                                        setGlobalSearch(tag);
-                                        setActiveSubMenu('all-customers');
-                                        triggerToast(`🔍 Filtered all customers with tag "${tag}"`);
-                                      }}
-                                      className="text-[9px] text-purple-400 hover:underline font-bold"
-                                    >
-                                      View Members →
-                                    </button>
-                                    <button
-                                      onClick={() => {
-                                        triggerToast(`🏷️ Bulk metadata audit initiated for tag: "${tag}"`);
-                                      }}
-                                      className="text-[9px] text-neutral-500 hover:text-white font-mono"
-                                    >
-                                      Audit
-                                    </button>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      );
-                    })()}
-
-                    {activeSubMenu === 'customer-notes' && (() => {
-                      return (
-                        <div className="space-y-6 animate-in fade-in duration-300">
-                          <div className="flex flex-col sm:flex-row items-baseline sm:items-center justify-between gap-4 border-b border-neutral-800/40 pb-4">
-                            <div>
-                              <span className="text-[10px] uppercase font-mono text-purple-400 font-bold">Client History Ledger</span>
-                              <h4 className="text-base font-bold text-neutral-150">📝 Centralized Customer Notes Workspace</h4>
-                              <p className="text-xs opacity-60">Audit active internal warnings, technical integration briefs, and staff comments recorded on customer accounts.</p>
-                            </div>
-                            <button
-                              onClick={() => {
-                                const custSelect = prompt(`Please select customer ID from directory:\n` + customers.map(c => `- ${c.id}: ${c.name}`).join("\n"));
-                                if (!custSelect) return;
-                                const title = prompt("Enter Note Title (e.g. Call Summary, Custom pricing deal):");
-                                if (!title) return;
-                                const content = prompt("Enter Detailed Note Description / Logs:") || "";
-                                const author = prompt("Staff Creator Name:") || "Admin User";
-                                
-                                const newNote = {
-                                  id: `n-${Date.now()}`,
-                                  customerId: custSelect,
-                                  title,
-                                  description: content,
-                                  createdBy: author,
-                                  createdAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
-                                  visibility: 'Admin Only'
-                                };
-
-                                const updated = [newNote, ...customerNotes];
-                                setCustomerNotes(updated);
-                                localStorage.setItem('webzone_admin_cust_notes', JSON.stringify(updated));
-                                triggerToast(`🎉 Note successfully committed to customer record: ${custSelect}`);
-                              }}
-                              className="bg-purple-600 hover:bg-purple-700 text-white text-[11px] font-bold px-3 py-1.5 rounded-xl transition flex items-center gap-1 shadow-lg shadow-purple-500/15"
-                            >
-                              + Record New Client Note
-                            </button>
-                          </div>
-
-                          <div className="grid grid-cols-1 gap-4">
-                            {customerNotes.length === 0 ? (
-                              <div className={`p-12 text-center rounded-2xl border border-dashed ${cardBorder}`}>
-                                <AlertCircle className="w-8 h-8 text-neutral-600 mx-auto mb-2" />
-                                <h5 className="font-bold text-neutral-300">No Custom Notes Recorded</h5>
-                                <p className="text-xs text-neutral-500">No internal client annotations found inside local persistent archives.</p>
-                              </div>
-                            ) : (
-                              customerNotes.map((note) => {
-                                const relatedCustomer = customers.find(cu => cu.id === note.customerId);
-                                return (
-                                  <div key={note.id} className={`p-5 rounded-2xl border ${cardBorder} ${panelBg} space-y-3 shadow-sm hover:border-neutral-750 transition text-left`}>
-                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-neutral-805 pb-2">
-                                      <div className="flex flex-wrap items-center gap-2">
-                                        <span className="font-extrabold text-xs text-purple-400 font-mono">
-                                          {note.title}
-                                        </span>
-                                        <span className="text-[10px] text-neutral-400 font-bold bg-neutral-900 border border-neutral-800 px-2.5 py-0.5 rounded cursor-pointer hover:bg-purple-500/5 hover:text-purple-400" onClick={() => setSelectedCustomerProfileId(note.customerId)}>
-                                          Client: {relatedCustomer ? relatedCustomer.name : 'Unknown Customer'} ({note.customerId})
-                                        </span>
-                                      </div>
-                                      <span className="px-2 py-0.5 text-[8.5px] font-mono rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">
-                                        {note.visibility || 'Admin Only'}
-                                      </span>
-                                    </div>
-                                    <p className="text-xs opacity-85 leading-relaxed text-neutral-350">{note.description}</p>
-                                    <div className="flex items-center justify-between text-[9px] font-mono text-neutral-500">
-                                      <span>Admin Sign: <strong className="text-neutral-400">{note.createdBy}</strong> • Stamp: {note.createdAt}</span>
-                                      <button
-                                        onClick={() => {
-                                          if (confirm("Permanently remove this note from database files?")) {
-                                            const filtered = customerNotes.filter(n => n.id !== note.id);
-                                            setCustomerNotes(filtered);
-                                            localStorage.setItem('webzone_admin_cust_notes', JSON.stringify(filtered));
-                                            triggerToast("🚨 Note successfully discarded from system records.");
-                                          }
-                                        }}
-                                        className="text-rose-400 hover:text-rose-300 flex items-center gap-1 font-sans font-bold"
-                                      >
-                                        <Trash2 className="w-3 h-3" /> Purge Note
-                                      </button>
-                                    </div>
-                                  </div>
-                                );
-                              })
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })()}
-
-                    {activeSubMenu === 'vip-customers' && (() => {
-                      const vipClients = customers.filter(c => c.customerType === 'VIP Client' || (c.tags && c.tags.includes('VIP')));
-                      return (
-                        <div className="space-y-6 animate-in fade-in duration-300">
-                          <div className="rounded-2xl border border-amber-500/20 bg-gradient-to-tr from-neutral-950 via-neutral-900 to-amber-950/15 p-6 flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl">
-                            <div className="space-y-2 text-center md:text-left">
-                              <div className="flex items-center gap-2 justify-center md:justify-start">
-                                <Award className="w-5 h-5 text-amber-400" />
-                                <span className="text-[10px] uppercase font-mono tracking-widest text-amber-400 font-extrabold font-mono">Executive VIP Directory</span>
-                              </div>
-                              <h4 className="text-xl font-bold tracking-tight text-white font-sans">Priority VIP SLA Hub</h4>
-                              <p className="text-xs opacity-70 max-w-xl">
-                                VIP clients bypass all retail ticket queues automatically. Dedicated server deployments, custom backend scripts customizations, and live chat queues routing prioritized.
-                              </p>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4 text-center">
-                              <div className="bg-neutral-950 p-2.5 px-4 rounded-xl border border-neutral-800">
-                                <span className="text-[9px] font-mono uppercase font-bold text-neutral-500 block">VIP Count</span>
-                                <span className="text-base font-black text-amber-400">{vipClients.length} Profiles</span>
-                              </div>
-                              <div className="bg-neutral-950 p-2.5 px-4 rounded-xl border border-neutral-800">
-                                <span className="text-[9px] font-mono uppercase font-bold text-neutral-500 block">SLA Response</span>
-                                <span className="text-base font-black text-emerald-400">12 Mins SLA</span>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className={`p-4 rounded-2xl border ${panelBg} shadow-sm overflow-x-auto relative space-y-4`}>
-                            <table className="w-full text-xs text-left border-collapse">
-                              <thead>
-                                <tr className="border-b border-neutral-805 text-[10px] text-neutral-500 uppercase tracking-wider font-semibold font-mono">
-                                  <th className="py-2.5 px-3">UID</th>
-                                  <th className="py-2.5 px-3">VIP Customer Name</th>
-                                  <th className="py-2.5 px-3">Registered Agency</th>
-                                  <th className="py-2.5 px-3">Integration SLA</th>
-                                  <th className="py-2.5 px-3 text-right">Cumulative Spend</th>
-                                  <th className="py-2.5 px-3 text-right">Actions</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {vipClients.length === 0 ? (
-                                  <tr>
-                                    <td colSpan={6} className="py-8 text-center text-neutral-500">No VIP Clients matched local indices.</td>
-                                  </tr>
-                                ) : (
-                                  vipClients.map((c) => (
-                                    <tr key={c.id} className="border-b border-neutral-900 hover:bg-neutral-900/10 transition">
-                                      <td className="py-3 px-3 font-mono text-[10px] text-purple-400 font-bold">{c.id}</td>
-                                      <td className="py-3 px-3 font-bold text-white flex items-center gap-2">
-                                        <div className="w-5 h-5 rounded bg-amber-500/15 text-amber-400 flex items-center justify-center font-bold text-[9px] border border-amber-500/20">★</div>
-                                        {c.name}
-                                      </td>
-                                      <td className="py-3 px-3 opacity-80 text-neutral-300">{c.companyName || 'Private Entrepreneur'}</td>
-                                      <td className="py-3 px-3">
-                                        <span className="px-2 py-0.5 rounded text-[9.5px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-bold">● PRIORITY SLA</span>
-                                      </td>
-                                      <td className="py-3 px-3 text-right font-mono font-bold text-amber-400">${c.totalSpent}</td>
-                                      <td className="py-3 px-3 text-right">
-                                        <button onClick={() => setSelectedCustomerProfileId(c.id)} className="text-[10px] bg-neutral-800 hover:bg-amber-600 hover:text-white px-2 py-1 rounded text-neutral-300 transition font-bold" >
-                                          Inspect
-                                        </button>
-                                      </td>
-                                    </tr>
-                                  ))
-                                )}
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
-                      );
-                    })()}
-
-                    {activeSubMenu === 'corporate-clients' && (() => {
-                      const corpClients = customers.filter(c => c.customerType === 'Corporate Client' || (c.tags && c.tags.includes('Corporate')));
-                      return (
-                        <div className="space-y-6 animate-in fade-in duration-300">
-                          <div className="rounded-2xl border border-pink-500/20 bg-gradient-to-tr from-neutral-950 via-neutral-900 to-pink-950/15 p-6 flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl">
-                            <div className="space-y-2 text-center md:text-left">
-                              <div className="flex items-center gap-2 justify-center md:justify-start">
-                                <Shield className="w-5 h-5 text-pink-400" />
-                                <span className="text-[10px] uppercase font-mono tracking-widest text-pink-400 font-extrabold font-mono">Retainer Clients</span>
-                              </div>
-                              <h4 className="text-xl font-bold tracking-tight text-white font-sans">Corporate Accounts Contract Manager</h4>
-                              <p className="text-xs opacity-70 max-w-xl">
-                                Corporate retainer lines are cleared via formal invoice packets. Permitted multi-tenant license deployments, custom WHMCS backend sync, and priority software modifications support.
-                              </p>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4 text-center">
-                              <div className="bg-neutral-950 p-2.5 px-4 rounded-xl border border-neutral-800">
-                                <span className="text-[9px] font-mono uppercase font-bold text-neutral-500 block">SaaS Corporations</span>
-                                <span className="text-base font-black text-pink-400">{corpClients.length} Accounts</span>
-                              </div>
-                              <div className="bg-neutral-950 p-2.5 px-4 rounded-xl border border-neutral-800">
-                                <span className="text-[9px] font-mono uppercase font-bold text-neutral-500 block">Cumulative Vol</span>
-                                <span className="text-base font-black text-emerald-400">${corpClients.reduce((acc, c) => acc + Number(c.totalSpent || 0), 0)}</span>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className={`p-4 rounded-2xl border ${panelBg} shadow-sm overflow-x-auto relative space-y-4`}>
-                            <table className="w-full text-xs text-left border-collapse">
-                              <thead>
-                                <tr className="border-b border-neutral-805 text-[10px] text-neutral-500 uppercase tracking-wider font-semibold font-mono">
-                                  <th className="py-2.5 px-3">UID</th>
-                                  <th className="py-2.5 px-3">Corporate Client</th>
-                                  <th className="py-2.5 px-3">Registered Organization</th>
-                                  <th className="py-2.5 px-3">Billing Country</th>
-                                  <th className="py-2.5 px-3 text-right">Direct Client Wallet</th>
-                                  <th className="py-2.5 px-3 text-right">Actions</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {corpClients.length === 0 ? (
-                                  <tr>
-                                    <td colSpan={6} className="py-8 text-center text-neutral-500">No corporate accounts found inside directory.</td>
-                                  </tr>
-                                ) : (
-                                  corpClients.map((c) => (
-                                    <tr key={c.id} className="border-b border-neutral-900 hover:bg-neutral-900/10 transition">
-                                      <td className="py-3 px-3 font-mono text-[10px] text-purple-400 font-bold">{c.id}</td>
-                                      <td className="py-3 px-3 font-bold text-white">{c.name}</td>
-                                      <td className="py-3 px-3 font-bold text-pink-400">{c.companyName || 'Corporate Systems Corp'}</td>
-                                      <td className="py-3 px-3 text-neutral-450 font-mono">{c.country}</td>
-                                      <td className="py-3 px-3 text-right font-mono font-bold text-emerald-400">${c.walletBalance}</td>
-                                      <td className="py-3 px-3 text-right">
-                                        <button onClick={() => setSelectedCustomerProfileId(c.id)} className="text-[10px] bg-neutral-800 hover:bg-pink-600 hover:text-white px-2 py-1 rounded text-neutral-300 transition font-bold" >
-                                          Inspect
-                                        </button>
-                                      </td>
-                                    </tr>
-                                  ))
-                                )}
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
-                      );
-                    })()}
-
-                    {activeSubMenu === 'customer-affiliates' && (() => {
-                      const affiliateClients = customers.filter(c => c.customerType === 'Affiliate Partner' || (c.tags && c.tags.includes('Affiliate')));
-                      return (
-                        <div className="space-y-6 animate-in fade-in duration-300">
-                          <div className="rounded-2xl border border-emerald-500/20 bg-gradient-to-tr from-neutral-950 via-neutral-900 to-emerald-950/15 p-6 flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl">
-                            <div className="space-y-2 text-center md:text-left">
-                              <div className="flex items-center gap-2 justify-center md:justify-start">
-                                <DollarSign className="w-5 h-5 text-emerald-400" />
-                                <span className="text-[10px] uppercase font-mono tracking-widest text-emerald-400 font-extrabold font-mono">Organic Expansion</span>
-                              </div>
-                              <h4 className="text-xl font-bold tracking-tight text-white font-sans">Affiliate Partner Commissions Network</h4>
-                              <p className="text-xs opacity-70 max-w-xl">
-                                Track organic referrals, coordinate custom coupons, approve payouts, and simulate dynamic commissions allocations (standard Level 1 is set to 20%).
-                              </p>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4 text-center">
-                              <div className="bg-neutral-950 p-2.5 px-4 rounded-xl border border-neutral-800">
-                                <span className="text-[9px] font-mono uppercase font-bold text-neutral-500 block">Partners</span>
-                                <span className="text-base font-black text-emerald-400">{affiliateClients.length} Affiliates</span>
-                              </div>
-                              <div className="bg-neutral-950 p-2.5 px-4 rounded-xl border border-neutral-800">
-                                <span className="text-[9px] font-mono uppercase font-bold text-neutral-500 block">Default Rate</span>
-                                <span className="text-base font-black text-purple-400">20% Promo</span>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className={`p-5 rounded-2xl border ${cardBorder} ${panelBg} shadow space-y-4`}>
-                            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-                              <div className="space-y-1 text-center md:text-left">
-                                <h5 className="text-xs font-bold font-mono uppercase text-neutral-400 flex items-center gap-1.5 justify-center md:justify-start">
-                                  <RefreshCw className="w-4 h-4 text-emerald-500 animate-spin" /> Affiliate Commission Dispenser Simulator
-                                </h5>
-                                <p className="text-[11px] opacity-60">
-                                  Dispatches a fast referral sale simulation. Assigns a 20% credit commission margin directly into the affiliate's wallet ledger and appends security transaction telemetry logs.
-                                </p>
-                              </div>
-                              <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-                                <select id="sim-aff-id" className="bg-neutral-950 border border-neutral-800 rounded-xl text-xs px-3 py-2 font-bold focus:border-purple-500 outline-none w-full md:w-48">
-                                  {affiliateClients.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                                </select>
-                                <input id="sim-ref-price" type="number" defaultValue="250" className="bg-neutral-950 border border-neutral-800 rounded-xl text-xs px-3 py-2 font-mono font-bold focus:border-purple-500 outline-none w-20" />
-                                <button
-                                  onClick={() => {
-                                    const selectEl = document.getElementById('sim-aff-id') as HTMLSelectElement;
-                                    const priceEl = document.getElementById('sim-ref-price') as HTMLInputElement;
-                                    if (selectEl && priceEl) {
-                                      const affId = selectEl.value;
-                                      const price = Number(priceEl.value || "250");
-                                      const commission = price * 0.20;
-                                      
-                                      setCustomers(prev => prev.map(c => {
-                                        if (c.id === affId) {
-                                          return {
-                                            ...c,
-                                            walletBalance: Number(c.walletBalance || 0) + commission,
-                                            totalSpent: Number(c.totalSpent || 0) + price
-                                          };
-                                        }
-                                        return c;
-                                      }));
-                                      
-                                      const actionLog = {
-                                        id: `act-${Date.now()}`,
-                                        customerId: affId,
-                                        activity: `Earned $${commission} Commission (Simulated referral sale of $${price} total)`,
-                                        date: new Date().toISOString().replace('T', ' ').substring(0, 16),
-                                        ipAddress: '109.112.50.32',
-                                        device: 'Organic Referral Webhook Hook'
-                                      };
-                                      setCustomerActivities(prev => [actionLog, ...prev]);
-                                      triggerToast(`🎉 Commission success! Sent $${commission} referral credit to customer ${affId}`);
-                                    }
-                                  }}
-                                  className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition shadow-lg"
-                                >
-                                  Process Referral Credit
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className={`p-4 rounded-2xl border ${panelBg} shadow-sm overflow-x-auto relative space-y-4`}>
-                            <table className="w-full text-xs text-left border-collapse">
-                              <thead>
-                                <tr className="border-b border-neutral-805 text-[10px] text-neutral-500 uppercase tracking-wider font-semibold font-mono">
-                                  <th className="py-2.5 px-3">UID</th>
-                                  <th className="py-2.5 px-3">Partner Name</th>
-                                  <th className="py-2.5 px-3">Assigned Referral Code</th>
-                                  <th className="py-2.5 px-3 text-right">Referred Income Vol</th>
-                                  <th className="py-2.5 px-3 text-right font-bold text-emerald-400">Commission Account Wallet</th>
-                                  <th className="py-2.5 px-3 text-right">Actions</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {affiliateClients.length === 0 ? (
-                                  <tr>
-                                    <td colSpan={6} className="py-8 text-center text-neutral-500">No referral partners listed.</td>
-                                  </tr>
-                                ) : (
-                                  affiliateClients.map((c) => (
-                                    <tr key={c.id} className="border-b border-neutral-900 hover:bg-neutral-900/10 transition">
-                                      <td className="py-3 px-3 font-mono text-[10px] text-purple-400 font-bold">{c.id}</td>
-                                      <td className="py-3 px-3 font-bold text-white">{c.name}</td>
-                                      <td className="py-3 px-3 text-neutral-400 font-mono text-[10px]">WZ-REF-{c.id.toUpperCase()}</td>
-                                      <td className="py-3 px-3 text-right text-gray-400 font-mono">${c.totalSpent}</td>
-                                      <td className="py-3 px-3 text-right font-mono font-bold text-emerald-400">${c.walletBalance}</td>
-                                      <td className="py-3 px-3 text-right">
-                                        <button onClick={() => setSelectedCustomerProfileId(c.id)} className="text-[10px] bg-neutral-800 hover:bg-emerald-600 hover:text-white px-2 py-1 rounded text-neutral-300 transition font-bold" >
-                                          Inspect
-                                        </button>
-                                      </td>
-                                    </tr>
-                                  ))
-                                )}
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
-                      );
-                    })()}
-
-                    {activeSubMenu === 'customer-activity-logs' && (() => {
-                      const filteredActivities = customerActivities.filter(act => {
-                        const searchLower = globalSearch.toLowerCase();
-                        const client = customers.find(c => c.id === act.customerId);
-                        const nameMatch = client ? client.name.toLowerCase().includes(searchLower) : false;
-                        return act.activity.toLowerCase().includes(searchLower) || act.customerId.toLowerCase().includes(searchLower) || nameMatch;
-                      });
-
-                      return (
-                        <div className="space-y-6 animate-in fade-in duration-300">
-                          <div className="flex flex-col sm:flex-row items-baseline sm:items-center justify-between gap-4 border-b border-neutral-800/40 pb-4">
-                            <div>
-                              <span className="text-[10px] uppercase font-mono text-purple-400 font-bold">Telemetry Audits</span>
-                              <h4 className="text-base font-bold text-neutral-150">📈 Customer Activity Telemetry Records</h4>
-                              <p className="text-xs opacity-60">Complete chronologic audit trail of client logins, template file downloads, ticket updates, and API key inquiries.</p>
-                            </div>
-                          </div>
-
-                          <div className="relative">
-                            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 opacity-50 text-neutral-400" />
-                            <input
-                              type="text"
-                              placeholder="Search telemetry logs by Client ID, customer full name, or action description..."
-                              value={globalSearch}
-                              onChange={(e) => setGlobalSearch(e.target.value)}
-                              className={`w-full text-xs pl-10 pr-4 py-2.5 rounded-xl border focus:outline-none focus:border-purple-500 transition-all ${
-                                isDark ? 'bg-neutral-950 border-neutral-800 text-white' : 'bg-neutral-50/50 border-neutral-200 text-neutral-900'
-                              }`}
-                            />
-                          </div>
-
-                          <div className={`p-4 rounded-2xl border ${panelBg} shadow-sm overflow-x-auto relative space-y-4`}>
-                            <table className="w-full text-xs text-left border-collapse">
-                              <thead>
-                                <tr className="border-b border-neutral-805 text-[10px] text-neutral-500 uppercase tracking-widest font-semibold font-mono">
-                                  <th className="py-2.5 px-3">TimeStamp</th>
-                                  <th className="py-2.5 px-3">Customer User</th>
-                                  <th className="py-2.5 px-3">Event Telemetry Description</th>
-                                  <th className="py-2.5 px-3 font-mono">IP Address</th>
-                                  <th className="py-2.5 px-3 text-right">Control</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {filteredActivities.length === 0 ? (
-                                  <tr>
-                                    <td colSpan={5} className="py-6 text-center text-neutral-500">No activity traces.</td>
-                                  </tr>
-                                ) : (
-                                  filteredActivities.map((act) => {
-                                    const targetCust = customers.find(c => c.id === act.customerId);
-                                    return (
-                                      <tr key={act.id} className="border-b border-neutral-900 hover:bg-neutral-900/10 transition">
-                                        <td className="py-3 px-3 text-neutral-400 font-mono text-[10px]">{act.date}</td>
-                                        <td className="py-3 px-3 font-bold text-white font-mono text-[10.5px]">
-                                          <span onClick={() => setSelectedCustomerProfileId(act.customerId)} className="hover:underline hover:text-purple-400 cursor-pointer">
-                                            {targetCust ? targetCust.name : 'Unknown User'} ({act.customerId})
-                                          </span>
-                                        </td>
-                                        <td className="py-3 px-3 text-neutral-200 font-semibold">{act.activity}</td>
-                                        <td className="py-3 px-3 font-mono text-[10px] text-purple-400">{act.ipAddress}</td>
-                                        <td className="py-3 px-3 text-right">
-                                          <button
-                                            onClick={() => {
-                                              const updated = customerActivities.filter(a => a.id !== act.id);
-                                              setCustomerActivities(updated);
-                                              localStorage.setItem('webzone_admin_cust_activities', JSON.stringify(updated));
-                                              triggerToast("🚨 Telemetry trace cleared from local cache records.");
-                                            }}
-                                            className="text-red-400 hover:text-red-300 text-[10px]"
-                                          >
-                                            Delete
-                                          </button>
-                                        </td>
-                                      </tr>
-                                    );
-                                  })
-                                )}
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
-                      );
-                    })()}
-
-                    {activeSubMenu === 'customer-security-logs' && (() => {
-                      const filteredSecurity = customerSecurity.filter(sec => {
-                        const searchLower = globalSearch.toLowerCase();
-                        const client = customers.find(c => c.id === sec.customerId);
-                        const nameMatch = client ? client.name.toLowerCase().includes(searchLower) : false;
-                        return sec.event.toLowerCase().includes(searchLower) || sec.customerId.toLowerCase().includes(searchLower) || nameMatch;
-                      });
-
-                      return (
-                        <div className="space-y-6 animate-in fade-in duration-300">
-                          <div className="flex flex-col sm:flex-row items-baseline sm:items-center justify-between gap-4 border-b border-neutral-800/40 pb-4">
-                            <div>
-                              <span className="text-[10px] uppercase font-mono text-purple-400 font-bold">Threat Control</span>
-                              <h4 className="text-base font-bold text-neutral-150">🛡️ Customer Security Credentials Audit Logs</h4>
-                              <p className="text-xs opacity-60">Supervise password reset dispatches, failed login attempts, authentication token changes, and account lock policies.</p>
-                            </div>
-                          </div>
-
-                          <div className="relative">
-                            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 opacity-50 text-neutral-400" />
-                            <input
-                              type="text"
-                              placeholder="Search security credentials logs by Customer ID, name or activity alerts..."
-                              value={globalSearch}
-                              onChange={(e) => setGlobalSearch(e.target.value)}
-                              className={`w-full text-xs pl-10 pr-4 py-2.5 rounded-xl border focus:outline-none focus:border-rose-500 transition-all ${
-                                isDark ? 'bg-neutral-950 border-neutral-800 text-white' : 'bg-neutral-50/50 border-neutral-200 text-neutral-900'
-                              }`}
-                            />
-                          </div>
-
-                          <div className={`p-4 rounded-2xl border ${panelBg} shadow-sm overflow-x-auto relative space-y-4`}>
-                            <table className="w-full text-xs text-left border-collapse">
-                              <thead>
-                                <tr className="border-b border-neutral-805 text-[10px] text-neutral-500 uppercase tracking-widest font-semibold font-mono">
-                                  <th className="py-2.5 px-3">Date & Time</th>
-                                  <th className="py-2.5 px-3">Client Reference</th>
-                                  <th className="py-2.5 px-3">Security Event Log</th>
-                                  <th className="py-2.5 px-3 font-mono">IP Access Address</th>
-                                  <th className="py-2.5 px-3 text-right">Actions</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {filteredSecurity.length === 0 ? (
-                                  <tr>
-                                    <td colSpan={5} className="py-6 text-center text-neutral-500">No security logs recorded.</td>
-                                  </tr>
-                                ) : (
-                                  filteredSecurity.map((sec) => {
-                                    const targetCust = customers.find(c => c.id === sec.customerId);
-                                    const isThreat = sec.event.toLowerCase().includes('failed') || sec.event.toLowerCase().includes('suspicious') || sec.event.toLowerCase().includes('rogue') || sec.event.toLowerCase().includes('mismatch');
-                                    return (
-                                      <tr key={sec.id} className={`border-b border-neutral-900 hover:bg-neutral-900/10 transition ${isThreat ? 'bg-red-500/[0.04]' : ''}`}>
-                                        <td className="py-3 px-3 text-neutral-400 font-mono text-[10px] whitespace-nowrap">{sec.date}</td>
-                                        <td className="py-3 px-3 font-bold text-white font-mono text-[10.5px]">
-                                          <span onClick={() => setSelectedCustomerProfileId(sec.customerId)} className="hover:underline hover:text-purple-400 cursor-pointer">
-                                            {targetCust ? targetCust.name : 'Unknown User'} ({sec.customerId})
-                                          </span>
-                                        </td>
-                                        <td className={`py-3 px-3 font-semibold ${isThreat ? 'text-red-400' : 'text-neutral-200'}`}>{sec.event}</td>
-                                        <td className="py-3 px-3 font-mono text-[10px] text-purple-400">{sec.ipAddress}</td>
-                                        <td className="py-3 px-3 text-right">
-                                          <button
-                                            onClick={() => {
-                                              triggerToast(`🛡️ IP Address ${sec.ipAddress} appended to Cloudflare firewall rules.`);
-                                            }}
-                                            className="text-red-400 hover:text-red-300 font-bold"
-                                          >
-                                            IP Ban
-                                          </button>
-                                        </td>
-                                      </tr>
-                                    );
-                                  })
-                                )}
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
-                      );
-                    })()}
-
-                    {activeSubMenu === 'customer-reports' && (() => {
-                      const geoCounts: { [key: string]: number } = {};
-                      customers.forEach(c => {
-                        const country = c.country || 'Bangladesh';
-                        geoCounts[country] = (geoCounts[country] || 0) + 1;
-                      });
-
-                      const typeCounts: { [key: string]: number } = {};
-                      customers.forEach(c => {
-                        const type = c.customerType || 'Regular Client';
-                        typeCounts[type] = (typeCounts[type] || 0) + 1;
-                      });
-
-                      const topSpenders = [...customers].sort((a, b) => b.totalSpent - a.totalSpent).slice(0, 5);
-
-                      return (
-                        <div className="space-y-6 animate-in fade-in duration-300 text-left">
-                          <div className="border-b border-neutral-800/40 pb-4">
-                            <span className="text-[10px] uppercase font-mono text-purple-400 font-bold">Analytics Engine</span>
-                            <h4 className="text-base font-bold text-neutral-150">📊 Customers Growth & Geographic Analytics Reports</h4>
-                            <p className="text-xs opacity-60">High-fidelity graphics representing registered SaaS client retention, countries distribution metrics, registration trends, and top spender leaderboards.</p>
-                          </div>
-
-                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            <div className={`p-5 rounded-2xl border ${cardBorder} ${panelBg} space-y-4`}>
-                              <h5 className="text-xs font-mono font-bold uppercase tracking-wider text-neutral-400">Geographical Spread Registry</h5>
-                              <div className="space-y-3">
-                                {Object.entries(geoCounts).map(([country, count]) => {
-                                  const percentage = Math.round((count / (customers.length || 1)) * 100);
-                                  return (
-                                    <div key={country} className="space-y-1">
-                                      <div className="flex justify-between items-center text-xs font-semibold">
-                                        <span>🇧🇩 {country}</span>
-                                        <span className="font-mono text-[11px] text-neutral-400">{count} profiles • {percentage}%</span>
-                                      </div>
-                                      <div className="w-full bg-neutral-950 h-1.5 rounded-full overflow-hidden border border-neutral-900">
-                                        <div className="h-full bg-purple-500 rounded-full" style={{ width: `${percentage}%` }} />
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-
-                            <div className={`p-5 rounded-2xl border ${cardBorder} ${panelBg} space-y-4`}>
-                              <h5 className="text-xs font-mono font-bold uppercase tracking-wider text-neutral-400">Account Tiers Distribution</h5>
-                              <div className="space-y-3">
-                                {Object.entries(typeCounts).map(([type, count]) => {
-                                  const percentage = Math.round((count / (customers.length || 1)) * 100);
-                                  return (
-                                    <div key={type} className="space-y-1">
-                                      <div className="flex justify-between items-center text-xs font-semibold">
-                                        <span className="text-neutral-200">{type}</span>
-                                        <span className="font-mono text-[11px] text-neutral-400">{count} accounts • {percentage}%</span>
-                                      </div>
-                                      <div className="w-full bg-neutral-950 h-1.5 rounded-full overflow-hidden border border-neutral-900">
-                                        <div className="h-full bg-cyan-500 rounded-full" style={{ width: `${percentage}%` }} />
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-
-                            <div className={`p-5 rounded-2xl border ${cardBorder} ${panelBg} space-y-4 lg:col-span-2`}>
-                              <h5 className="text-xs font-mono font-bold uppercase tracking-wider text-neutral-400 flex items-center gap-2">
-                                <Award className="w-4 h-4 text-amber-400" /> High Spenders Cumulative Money Leaderboard
-                              </h5>
-                              <div className="divide-y divide-neutral-900">
-                                {topSpenders.map((cust, idx) => (
-                                  <div key={cust.id} className="flex items-center justify-between py-2 text-xs font-semibold">
-                                    <div className="flex items-center gap-3">
-                                      <span className="font-mono text-purple-400 w-4 block">#{idx + 1}</span>
-                                      <div>
-                                        <p className="text-white hover:underline cursor-pointer font-bold" onClick={() => setSelectedCustomerProfileId(cust.id)}>
-                                          {cust.name}
-                                        </p>
-                                        <p className="text-[10px] text-neutral-500 font-mono">{cust.companyName || 'Freelance / Individual'}</p>
-                                      </div>
-                                    </div>
-                                    <div className="text-right">
-                                      <p className="text-emerald-400 font-bold font-mono">${cust.totalSpent}</p>
-                                      <p className="text-[9px] text-neutral-500 font-mono">UID: {cust.id}</p>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-
-                            <div className={`p-4 rounded-2xl border ${cardBorder} ${panelBg} space-y-3 lg:col-span-2`}>
-                              <h4 className="text-xs font-bold font-mono tracking-wide text-neutral-400 uppercase">Customer Acquisition Trajectory Area Chart</h4>
-                              <div className="h-64 w-full text-neutral-400">
-                                <ResponsiveContainer width="100%" height="100%">
-                                  <RechartAreaChart data={[
-                                    { month: 'Jan', count: 120 },
-                                    { month: 'Feb', count: 145 },
-                                    { month: 'Mar', count: 180 },
-                                    { month: 'Apr', count: 210 },
-                                    { month: 'May', count: 260 },
-                                    { month: 'Jun', count: 310 },
-                                  ]}>
-                                    <RechartCartesianGrid strokeDasharray="3 3" stroke={isDark ? "#262626" : "#e5e5e5"} />
-                                    <RechartXAxis dataKey="month" stroke="#888888" fontSize={10} tickLine={false} />
-                                    <RechartYAxis stroke="#888888" fontSize={10} tickLine={false} />
-                                    <RechartTooltip contentStyle={{ backgroundColor: isDark ? '#171717' : '#ffffff', borderColor: isDark ? '#262626' : '#e5e5e5', fontSize: 11 }} />
-                                    <RechartArea type="monotone" dataKey="count" fill="rgba(147, 51, 234, 0.05)" stroke="#a855f7" name="Total Pools" />
-                                  </RechartAreaChart>
-                                </ResponsiveContainer>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })()}
-
-                    {/* ONLY DISPLAY GENERAL CUSTOMER VIEWPORTS IF ON BASE SUBMENU PATH */}
-                    {(!activeSubMenu || activeSubMenu === 'all-customers' || !['customer-groups', 'customer-tags', 'customer-notes', 'vip-customers', 'corporate-clients', 'customer-affiliates', 'customer-activity-logs', 'customer-security-logs', 'customer-reports'].includes(activeSubMenu)) && (
-                      <>
-                        {/* CUSTOMERS DASHBOARD SUMMARY METRICS */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      {[
-                        { 
-                          title: "Total Customers", 
-                          value: customers.length, 
-                          color: "text-purple-500", 
-                          bg: "bg-purple-500/5", 
-                          desc: "Registered profiles" 
-                        },
-                        { 
-                          title: "Active Customers", 
-                          value: customers.filter(c => c.status === 'active').length, 
-                          color: "text-emerald-500", 
-                          bg: "bg-emerald-500/5", 
-                          desc: "Legit and verified" 
-                        },
-                        { 
-                          title: "New This Month", 
-                          value: 2, 
-                          color: "text-cyan-500", 
-                          bg: "bg-cyan-500/5", 
-                          desc: "Growth rate track" 
-                        },
-                        { 
-                          title: "Suspended Status", 
-                          value: customers.filter(c => c.status === 'suspended' || c.status === 'blocked').length, 
-                          color: "text-rose-500", 
-                          bg: "bg-rose-500/5", 
-                          desc: "Security flag lock" 
-                        },
-                        { 
-                          title: "VIP Clients", 
-                          value: customers.filter(c => c.customerType === 'VIP Client' || (c.tags && c.tags.includes('VIP'))).length, 
-                          color: "text-amber-500", 
-                          bg: "bg-amber-500/5", 
-                          desc: "Priority SLAs tier" 
-                        },
-                        { 
-                          title: "Corporate Clients", 
-                          value: customers.filter(c => c.customerType === 'Corporate Client' || (c.tags && c.tags.includes('Corporate'))).length, 
-                          color: "text-pink-500", 
-                          bg: "bg-pink-500/5", 
-                          desc: "High volume tier" 
-                        },
-                        { 
-                          title: "Affiliate Members", 
-                          value: customers.filter(c => c.customerType === 'Affiliate Partner' || (c.tags && c.tags.includes('Affiliate'))).length, 
-                          color: "text-indigo-500", 
-                          bg: "bg-indigo-500/5", 
-                          desc: "Commissions track" 
-                        },
-                        { 
-                          title: "Returning Clients", 
-                          value: customers.filter(c => Number(c.totalSpent || 0) > 0).length, 
-                          color: "text-teal-500", 
-                          bg: "bg-teal-500/5", 
-                          desc: "Direct spend ledger" 
-                        }
-                      ].map((card, i) => (
-                        <div key={i} className={`p-4 rounded-2xl border ${cardBorder} ${panelBg} shadow-sm transition hover:scale-[1.01] duration-200 relative`}>
-                          <p className="text-[10px] font-mono font-bold tracking-wider uppercase opacity-45">{card.title}</p>
-                          <div className="flex items-baseline gap-1 mt-1.5">
-                            <span className={`text-2xl font-black tracking-tight ${card.color}`}>{card.value}</span>
-                            <span className="text-[10px] text-neutral-500">accounts</span>
-                          </div>
-                          <p className="text-[10px] opacity-60 mt-1 flex items-center gap-1">
-                            <span className={`w-1.5 h-1.5 rounded-full ${card.color} inline-block`} />
-                            {card.desc}
-                          </p>
-                          <div className={`absolute top-3 right-3 w-5 h-5 rounded-full ${card.bg} flex items-center justify-center`} />
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* CUSTOMERS CHARTS SECTION BENTO GRID */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                      
-                      {/* Chart Left: Customer Growth & Registrations */}
-                      <div className={`p-4 rounded-2xl border ${cardBorder} ${panelBg} space-y-3`}>
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h4 className="text-xs font-bold font-mono tracking-wide text-neutral-400 uppercase">Customer Acquisition & Retention Trends</h4>
-                            <p className="text-[10px] opacity-55">Monthly visual trajectory of registered profiles versus retention rate.</p>
-                          </div>
-                          <span className="px-2 py-0.5 text-[9px] font-bold bg-purple-500/10 text-purple-400 border border-purple-500/20 rounded-full">REALTIME COMPOSE</span>
-                        </div>
-                        <div className="h-64 w-full">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <RechartComposedChart data={[
-                              { month: 'Jan', count: 120, registrations: 12, retention: 94 },
-                              { month: 'Feb', count: 145, registrations: 25, retention: 95 },
-                              { month: 'Mar', count: 180, registrations: 35, retention: 96 },
-                              { month: 'Apr', count: 210, registrations: 30, retention: 95 },
-                              { month: 'May', count: 260, registrations: 50, retention: 97 },
-                              { month: 'Jun', count: 310, registrations: 50, retention: 98 },
-                            ]}>
-                              <RechartCartesianGrid strokeDasharray="3 3" stroke={isDark ? "#262626" : "#e5e5e5"} />
-                              <RechartXAxis dataKey="month" stroke="#888888" fontSize={10} tickLine={false} />
-                              <RechartYAxis stroke="#888888" fontSize={10} tickLine={false} />
-                              <RechartTooltip contentStyle={{ backgroundColor: isDark ? '#171717' : '#ffffff', borderColor: isDark ? '#262626' : '#e5e5e5', fontSize: 11 }} />
-                              <RechartLegend wrapperStyle={{ fontSize: 10 }} />
-                              <RechartArea type="monotone" dataKey="count" fill="rgba(147, 51, 234, 0.05)" stroke="#a855f7" name="Total Pool" />
-                              <RechartBar dataKey="registrations" barSize={20} fill="#06b6d4" name="New Registrations" radius={[4, 4, 0, 0]} />
-                              <RechartLine type="monotone" dataKey="retention" stroke="#ef4444" strokeWidth={2} name="Retention %" />
-                            </RechartComposedChart>
-                          </ResponsiveContainer>
-                        </div>
-                      </div>
-
-                      {/* Chart Right: Customer Activity Trends (logins, apiCalls, orders) */}
-                      <div className={`p-4 rounded-2xl border ${cardBorder} ${panelBg} space-y-3`}>
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h4 className="text-xs font-bold font-mono tracking-wide text-neutral-400 uppercase">Customer Active Engagements Track</h4>
-                            <p className="text-[10px] opacity-55">Daily system actions including logins telemetry and ordered services.</p>
-                          </div>
-                          <span className="px-2 py-0.5 text-[9px] font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 rounded-full">RELAY LIVE</span>
-                        </div>
-                        <div className="h-64 w-full">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <RechartAreaChart data={[
-                              { day: 'Mon', logins: 45, apiCalls: 210, orders: 12 },
-                              { day: 'Tue', logins: 50, apiCalls: 245, orders: 18 },
-                              { day: 'Wed', logins: 80, apiCalls: 310, orders: 25 },
-                              { day: 'Thu', logins: 75, apiCalls: 290, orders: 15 },
-                              { day: 'Fri', logins: 90, apiCalls: 400, orders: 30 },
-                              { day: 'Sat', logins: 60, apiCalls: 180, orders: 8 },
-                              { day: 'Sun', logins: 55, apiCalls: 150, orders: 10 },
-                            ]}>
-                              <RechartCartesianGrid strokeDasharray="3 3" stroke={isDark ? "#262626" : "#e5e5e5"} />
-                              <RechartXAxis dataKey="day" stroke="#888888" fontSize={10} tickLine={false} />
-                              <RechartYAxis stroke="#888888" fontSize={10} tickLine={false} />
-                              <RechartTooltip contentStyle={{ backgroundColor: isDark ? '#171717' : '#ffffff', borderColor: isDark ? '#262626' : '#e5e5e5', fontSize: 11 }} />
-                              <RechartLegend wrapperStyle={{ fontSize: 10 }} />
-                              <RechartArea type="monotone" dataKey="apiCalls" stackId="1" fill="rgba(6, 182, 212, 0.08)" stroke="#06b6d4" name="API Calls (Logs)" />
-                              <RechartArea type="monotone" dataKey="logins" stackId="2" fill="rgba(147, 51, 234, 0.08)" stroke="#9333ea" name="Login Hits" />
-                            </RechartAreaChart>
-                          </ResponsiveContainer>
-                        </div>
-                      </div>
-
-                    </div>
-
-                    {/* SEARCH, ADVANCED FILTERS, AND BULK ACTIONS WORKSPACE */}
-                    <div className={`p-5 rounded-2xl border ${cardBorder} ${panelBg} space-y-4`}>
-                      
-                      {/* Row 1: Global Search & Advanced Toggles */}
-                      <div className="flex flex-col xl:flex-row gap-3 items-stretch xl:items-center justify-between">
-                        <div className="relative flex-1">
-                          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 opacity-50 text-neutral-400" />
-                          <input
-                            type="text"
-                            placeholder="Search customers by name, secure email, billing phone number, WhatsApp, or unique customer ID..."
-                            value={globalSearch}
-                            onChange={(e) => setGlobalSearch(e.target.value)}
-                            className={`w-full text-xs pl-10 pr-4 py-2.5 rounded-xl border focus:outline-none focus:border-purple-500 transition-all ${
-                              isDark ? 'bg-neutral-950 border-neutral-800 text-white' : 'bg-neutral-50/50 border-neutral-200 text-neutral-900'
-                            }`}
-                          />
-                        </div>
-                        
-                        {/* Quick filter lists resets */}
-                        <div className="flex flex-wrap items-center gap-2">
-                          <button
-                            onClick={() => {
-                              setGlobalSearch('');
-                              setCustTypeFilter('all');
-                              setCustStatusFilter('all');
-                              setCustCountryFilter('all');
-                              setCustSpendFilter('all');
-                              triggerToast('🧹 Search query filters wiped. All customer profiles displayed.');
-                            }}
-                            className={`px-3 py-2 text-xs font-semibold rounded-xl border flex items-center gap-1 transition ${
-                              isDark 
-                                ? 'bg-neutral-950 hover:bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-white' 
-                                : 'bg-white hover:bg-neutral-50 border-neutral-200 text-neutral-600 hover:text-neutral-900 shadow-sm'
-                            }`}
-                          >
-                            <RefreshCw className="w-3.5 h-3.5" /> Reset Filters
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Row 2: Grid of precise Advanced Selectors */}
-                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 bg-neutral-950/20 p-3 rounded-xl border border-neutral-800/30">
-                        
-                        {/* 1. Customer Type filter */}
-                        <div>
-                          <label className="text-[10px] font-mono text-purple-400 block mb-1 uppercase font-bold tracking-wider">Customer Type</label>
-                          <select
-                            value={custTypeFilter}
-                            onChange={(e) => setCustTypeFilter(e.target.value)}
-                            className="w-full bg-neutral-950 border border-neutral-850 rounded-lg text-xs px-2.5 py-1.5 focus:border-purple-500 outline-none font-bold text-neutral-300"
-                          >
-                            <option value="all">All Tiers / Types</option>
-                            <option value="Regular Client">Regular Client</option>
-                            <option value="VIP Client">VIP Client</option>
-                            <option value="Corporate Client">Corporate Client</option>
-                            <option value="Reseller">Reseller</option>
-                            <option value="Affiliate Partner">Affiliate Partner</option>
-                          </select>
-                        </div>
-
-                        {/* 2. Account Status filter */}
-                        <div>
-                          <label className="text-[10px] font-mono text-purple-400 block mb-1 uppercase font-bold tracking-wider">Account Status</label>
-                          <select
-                            value={custStatusFilter}
-                            onChange={(e) => setCustStatusFilter(e.target.value)}
-                            className="w-full bg-neutral-950 border border-neutral-850 rounded-lg text-xs px-2.5 py-1.5 focus:border-purple-500 outline-none font-bold text-neutral-300"
-                          >
-                            <option value="all">All Statuses</option>
-                            <option value="active">Active</option>
-                            <option value="suspended">Suspended</option>
-                            <option value="blocked">Blocked</option>
-                            <option value="pending">Pending Verification</option>
-                            <option value="closed">Closed</option>
-                          </select>
-                        </div>
-
-                        {/* 3. Country filter */}
-                        <div>
-                          <label className="text-[10px] font-mono text-purple-400 block mb-1 uppercase font-bold tracking-wider">Geographic Country</label>
-                          <select
-                            value={custCountryFilter}
-                            onChange={(e) => setCustCountryFilter(e.target.value)}
-                            className="w-full bg-neutral-950 border border-neutral-850 rounded-lg text-xs px-2.5 py-1.5 focus:border-purple-500 outline-none font-bold text-neutral-300"
-                          >
-                            <option value="all">All Countries</option>
-                            {Array.from(new Set(customers.map(c => c.country).filter(Boolean))).map(country => (
-                              <option key={country} value={country}>{country}</option>
-                            ))}
-                          </select>
-                        </div>
-
-                        {/* 4. Total Spend range selector */}
-                        <div>
-                          <label className="text-[10px] font-mono text-purple-400 block mb-1 uppercase font-bold tracking-wider">Spent range Ledger</label>
-                          <select
-                            value={custSpendFilter}
-                            onChange={(e) => setCustSpendFilter(e.target.value)}
-                            className="w-full bg-neutral-950 border border-neutral-850 rounded-lg text-xs px-2.5 py-1.5 focus:border-purple-500 outline-none font-bold text-neutral-300"
-                          >
-                            <option value="all">All Spend Intervals</option>
-                            <option value="0-500">$0 - $500 Spent</option>
-                            <option value="500-2000">$501 - $2,000 Spent</option>
-                            <option value="2000+">$2,000+ High Spent</option>
-                          </select>
-                        </div>
-
-                      </div>
-
-                      {/* Bulk Actions Panel (Triggers when checkboxed items > 0) */}
-                      {selectedBulkCustomers.length > 0 && (
-                        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-purple-950/20 border border-purple-500/30 p-3 rounded-xl animate-in slide-in-from-top-2 duration-200">
-                          <div className="flex items-center gap-2">
-                            <span className="w-2.5 h-2.5 rounded-full bg-purple-500 animate-pulse" />
-                            <span className="text-xs font-black text-purple-300">
-                              {selectedBulkCustomers.length} Customer Accounts Selected For Action
-                            </span>
-                          </div>
-                          
-                          <div className="flex flex-wrap gap-2">
-                            <button
-                              onClick={() => {
-                                setCustomers(prev => prev.map(c => selectedBulkCustomers.includes(c.id) ? { ...c, status: 'active' } : c));
-                                triggerToast(`⚡ Bulk Activation completed! Active state unlocked on selected profiles.`);
-                                setSelectedBulkCustomers([]);
-                              }}
-                              className="px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-[10px] font-black transition-all"
-                            >
-                              Activate Accounts
-                            </button>
-                            <button
-                              onClick={() => {
-                                setCustomers(prev => prev.map(c => selectedBulkCustomers.includes(c.id) ? { ...c, status: 'suspended' } : c));
-                                triggerToast(`🔒 Bulk Suspension completed! Protected lockdown status deployed.`);
-                                setSelectedBulkCustomers([]);
-                              }}
-                              className="px-3 py-1.5 rounded-lg bg-yellow-700 hover:bg-yellow-600 text-white text-[10px] font-black transition-all"
-                            >
-                              Suspend Accounts
-                            </button>
-                            <button
-                              onClick={() => {
-                                if(confirm(`Confirm purging ${selectedBulkCustomers.length} registered profiles completely from database?`)) {
-                                  setCustomers(prev => prev.filter(c => !selectedBulkCustomers.includes(c.id)));
-                                  triggerToast(`🚨 Bulk Purge completed. selected registry logs deleted.`);
-                                  setSelectedBulkCustomers([]);
-                                }
-                              }}
-                              className="px-3 py-1.5 rounded-lg bg-rose-700 hover:bg-rose-600 text-white text-[10px] font-black transition-all"
-                            >
-                              Delete Customer Files
-                            </button>
-                            <button
-                              onClick={() => {
-                                setShowCommunicationModal({
-                                  open: true,
-                                  type: 'email',
-                                  customerId: 'bulk',
-                                  customerName: `${selectedBulkCustomers.length} Selected Bulk Clients`,
-                                  customerTarget: 'System Bulk Channels'
-                                });
-                              }}
-                              className="px-3 py-1.5 rounded-lg bg-purple-700 hover:bg-purple-600 text-white text-[10px] font-black transition-all"
-                            >
-                              Send Blast Email
-                            </button>
-                            <button
-                              onClick={() => {
-                                setSelectedBulkCustomers([]);
-                                triggerToast('Cleared bulk checking flags.');
-                              }}
-                              className="px-3 py-1.5 rounded-lg bg-neutral-800 text-neutral-300 hover:text-white text-[10px] font-black transition-all"
-                            >
-                              Clear Selection
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
-                    </div>
-
-                    {/* CUSTOMERS INTUATIVE DATA TABLE */}
-                    <div className={`p-4 rounded-2xl border ${panelBg} shadow-sm overflow-x-auto relative space-y-4`}>
-                      <div className="flex items-center justify-between border-b border-neutral-800/40 pb-3">
-                        <div className="flex items-center gap-2">
-                          <span className="w-1.5 h-3 bg-purple-500 rounded-full inline-block" />
-                          <h4 className="font-bold text-xs font-mono uppercase text-neutral-400">Customer List ({filteredCustomers.length})</h4>
-                        </div>
-                        
-                        {/* EXPORT OPTIONS BOX */}
-                        <div className="flex items-center gap-1">
-                          <span className="text-[10px] font-mono opacity-50 mr-2">Export Data:</span>
-                          <button
-                            onClick={() => handleExportDataSimulate('csv')}
-                            className="p-1.5 rounded-lg bg-neutral-950 hover:bg-neutral-900 border border-neutral-850/60 text-neutral-400 hover:text-white transition flex items-center gap-1.5 text-[10px] font-mono"
-                            title="Download CSV database representation"
-                          >
-                            <FileText className="w-3.5 h-3.5 text-orange-400" /> CSV
-                          </button>
-                          <button
-                            onClick={() => handleExportDataSimulate('excel')}
-                            className="p-1.5 rounded-lg bg-neutral-950 hover:bg-neutral-900 border border-neutral-850/60 text-neutral-400 hover:text-white transition flex items-center gap-1.5 text-[10px] font-mono"
-                            title="Download Excel spreadsheet representation"
-                          >
-                            <Layers className="w-3.5 h-3.5 text-green-400" /> Excel
-                          </button>
-                          <button
-                            onClick={() => handleExportDataSimulate('pdf')}
-                            className="p-1.5 rounded-lg bg-neutral-950 hover:bg-neutral-900 border border-neutral-850/60 text-neutral-400 hover:text-white transition flex items-center gap-1.5 text-[10px] font-mono"
-                            title="Download formatted business PDF ledger report"
-                          >
-                            <Save className="w-3.5 h-3.5 text-red-400" /> PDF Report
-                          </button>
-                        </div>
-                      </div>
-
-                      <table className="w-full text-left border-collapse min-w-[1300px] text-xs">
-                        <thead>
-                          <tr className="border-b border-neutral-800/80 pb-3 text-purple-400 font-bold uppercase font-mono text-[10px] tracking-wider bg-neutral-950/20">
-                            <th className="py-3 px-3 text-center w-12">
-                              <input
-                                type="checkbox"
-                                checked={filteredCustomers.length > 0 && selectedBulkCustomers.length === filteredCustomers.length}
-                                onChange={(e) => {
-                                  if (e.target.checked) {
-                                    setSelectedBulkCustomers(filteredCustomers.map(c => c.id));
-                                  } else {
-                                    setSelectedBulkCustomers([]);
-                                  }
-                                }}
-                                className="rounded border-neutral-800 text-purple-600 focus:ring-purple-500 w-3.5 h-3.5"
-                              />
-                            </th>
-                            <th className="py-3 px-3">Serial ID</th>
-                            <th className="py-3 px-3">Full Profile Details</th>
-                            <th className="py-3 px-3">Company Name</th>
-                            <th className="py-3 px-3">Contact Metrics (Tel / WhatsApp)</th>
-                            <th className="py-3 px-3">Geo Country</th>
-                            <th className="py-3 px-3">Client Type</th>
-                            <th className="py-3 px-3">Account Status</th>
-                            <th className="py-3 px-3">Spend Summary</th>
-                            <th className="py-3 px-3">Verification Details</th>
-                            <th className="py-3 px-3 text-right">Actions Panel</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {filteredCustomers.length === 0 ? (
-                            <tr>
-                              <td colSpan={11} className="py-12 text-center">
-                                <div className="space-y-2 max-w-sm mx-auto">
-                                  <div className="w-12 h-12 bg-neutral-800/50 rounded-full flex items-center justify-center mx-auto">
-                                    <AlertCircle className="w-6 h-6 text-neutral-500" />
-                                  </div>
-                                  <h5 className="font-bold text-neutral-300">No Customers Profiled</h5>
-                                  <p className="text-[11px] text-neutral-500">No active client metrics matched your specified advanced query criteria inside system local registers.</p>
-                                </div>
-                              </td>
-                            </tr>
-                          ) : (
-                            filteredCustomers.map((cust, idx) => {
-                              const c = getCustomerFullData(cust);
-                              
-                              // Generate deterministic beautiful styling initials with visual background
-                              const initials = c.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();
-                              const isChecked = selectedBulkCustomers.includes(c.id);
-
-                              return (
-                                <tr key={c.id} className={`border-b ${tableRowBg} transition duration-150 ${isChecked ? 'bg-purple-950/5' : ''}`}>
-                                  {/* Checkbox selector */}
-                                  <td className="py-3.5 px-3 text-center">
-                                    <input
-                                      type="checkbox"
-                                      checked={isChecked}
-                                      onChange={() => {
-                                        if (isChecked) {
-                                          setSelectedBulkCustomers(prev => prev.filter(id => id !== c.id));
-                                        } else {
-                                          setSelectedBulkCustomers(prev => [...prev, c.id]);
-                                        }
-                                      }}
-                                      className="rounded border-neutral-800 text-purple-600 focus:ring-purple-500 w-3.5 h-3.5"
-                                    />
-                                  </td>
-                                  
-                                  {/* Customer ID */}
-                                  <td className="py-3.5 px-3 font-mono font-bold text-purple-400">Client-{101 + idx}</td>
-                                  
-                                  {/* Photo & Name / Email */}
-                                  <td className="py-3.5 px-3">
-                                    <div className="flex items-center gap-3">
-                                      <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center font-bold text-xs text-white border border-purple-400/20 shadow">
-                                        {initials}
-                                      </div>
-                                      <div>
-                                        <h5 className="font-bold text-neutral-200 hover:text-purple-400 transition cursor-pointer" onClick={() => setSelectedCustomerProfileId(c.id)}>
-                                          {c.name}
-                                        </h5>
-                                        <p className="text-[10px] opacity-60 font-mono flex items-center gap-1">
-                                          <Mail className="w-3 h-3 text-purple-400" /> {c.email}
-                                        </p>
-                                      </div>
-                                    </div>
-                                  </td>
-
-                                  {/* Company Name */}
-                                  <td className="py-3.5 px-3 font-medium text-neutral-300 font-mono">
-                                    {c.companyName}
-                                  </td>
-
-                                  {/* Contact Metrics */}
-                                  <td className="py-3.5 px-3">
-                                    <div className="space-y-0.5">
-                                      <p className="font-mono text-neutral-300 tracking-tight">{c.phone}</p>
-                                      <p className="text-[10px] text-neutral-500 font-mono flex items-center gap-1">
-                                        <Smartphone className="w-3 h-3 text-emerald-400" /> whatsapp: <span className="text-emerald-400">{c.whatsapp}</span>
-                                      </p>
-                                    </div>
-                                  </td>
-
-                                  {/* Country */}
-                                  <td className="py-3.5 px-3">
-                                    <div className="flex items-center gap-1.5 font-bold font-mono">
-                                      <span className="text-[11px] opacity-80">{c.country}</span>
-                                    </div>
-                                  </td>
-
-                                  {/* Customer type */}
-                                  <td className="py-3.5 px-3">
-                                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-black border font-mono ${
-                                      c.customerType === 'VIP Client' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
-                                      c.customerType === 'Corporate Client' ? 'bg-pink-500/10 text-pink-400 border-pink-500/20' :
-                                      c.customerType === 'Reseller' ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20' :
-                                      c.customerType === 'Affiliate Partner' ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' :
-                                      'bg-neutral-800 text-neutral-300 border-neutral-700'
-                                    }`}>
-                                      {c.customerType}
-                                    </span>
-                                  </td>
-
-                                  {/* Status */}
-                                  <td className="py-3.5 px-3">
-                                    <span className={`px-2 py-0.5 text-[9px] font-black rounded-full border ${
-                                      c.status === 'active' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25' :
-                                      c.status === 'suspended' ? 'bg-red-500/10 text-red-400 border-red-500/25' :
-                                      c.status === 'blocked' ? 'bg-orange-500/10 text-orange-400 border-orange-500/25' :
-                                      c.status === 'pending' ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/25' :
-                                      'bg-neutral-500/10 text-neutral-400 border-neutral-500/25'
-                                    }`}>
-                                      {c.status.toUpperCase()}
-                                    </span>
-                                  </td>
-
-                                  {/* Spend summary */}
-                                  <td className="py-3.5 px-3">
-                                    <div className="space-y-0.5">
-                                      <p className="font-bold text-emerald-400 font-mono tracking-tight text-[11px]">
-                                        Wallet: ${c.walletBalance}
-                                      </p>
-                                      <p className="text-[9px] text-neutral-500 font-mono">
-                                        Spent: ${c.totalSpent} total
-                                      </p>
-                                    </div>
-                                  </td>
-
-                                  {/* Dates / Login */}
-                                  <td className="py-3.5 px-3">
-                                    <div className="space-y-0.5 font-mono text-[10px]">
-                                      <p className="text-neutral-400">Reg: {c.joinedAt}</p>
-                                      <p className="text-neutral-500">Login: {c.lastLogin}</p>
-                                    </div>
-                                  </td>
-
-                                  {/* Action links pane */}
-                                  <td className="py-3.5 px-3 text-right">
-                                    <div className="flex items-center justify-end gap-1">
-                                      <button
-                                        onClick={() => setSelectedCustomerProfileId(c.id)}
-                                        className="p-1 px-2 rounded bg-neutral-800 hover:bg-purple-600 text-[10px] font-bold text-white transition flex items-center gap-1"
-                                        title="Open detailed tabs workspace"
-                                      >
-                                        <Eye className="w-3 h-3" /> View Profile
-                                      </button>
-                                      
-                                      <button
-                                        onClick={() => {
-                                          setCustForm({
-                                            name: c.name,
-                                            companyName: c.companyName,
-                                            email: c.email,
-                                            phone: c.phone,
-                                            whatsapp: c.whatsapp,
-                                            dob: c.dob,
-                                            gender: c.gender,
-                                            country: c.country,
-                                            city: c.city,
-                                            address: c.address,
-                                            postalCode: c.postalCode,
-                                            websiteUrl: c.websiteUrl,
-                                            customerType: c.customerType,
-                                            status: c.status,
-                                            tags: c.tags || ['Regular'],
-                                            password: c.password || '',
-                                            workspaceFeatures: c.workspaceFeatures || {
-                                              projects: true,
-                                              supportTickets: true,
-                                              digitalStore: true,
-                                              downloads: true,
-                                              affiliateSystem: true,
-                                              wallet: true,
-                                              aiTools: true,
-                                              notifications: true
-                                            }
-                                          });
-                                          setSelectedCustomerIdForEdit(c.id);
-                                          setShowAddCustomerModal(true);
-                                        }}
-                                        className="p-1 rounded bg-neutral-800 hover:bg-cyan-600 text-neutral-300 hover:text-white transition"
-                                        title="Edit client records"
-                                      >
-                                        <Sliders className="w-3 h-3" />
-                                      </button>
-
-                                      <button
-                                        onClick={() => handleToggleStatus(c.id)}
-                                        className={`p-1 rounded border transition ${
-                                          c.status === 'active' 
-                                            ? 'bg-yellow-500/10 hover:bg-yellow-500 text-yellow-400 hover:text-white border-yellow-500/20' 
-                                            : 'bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-white border-emerald-500/20'
-                                        }`}
-                                        title={c.status === 'active' ? "Suspend client credentials" : "Restore client credentials"}
-                                      >
-                                        <ShieldAlert className="w-3 h-3" />
-                                      </button>
-
-                                      <button
-                                        onClick={() => handleResetPasswordSimulate(c)}
-                                        className="p-1 rounded bg-neutral-850 hover:bg-orange-600 border border-neutral-800 text-purple-400 hover:text-white transition"
-                                        title="Reset credentials token"
-                                      >
-                                        <Key className="w-3 h-3" />
-                                      </button>
-
-                                      <button
-                                        onClick={() => {
-                                          setShowCommunicationModal({
-                                            open: true,
-                                            type: 'email',
-                                            customerId: c.id,
-                                            customerName: c.name,
-                                            customerTarget: c.email
-                                          });
-                                        }}
-                                        className="p-1 rounded bg-neutral-800 hover:bg-purple-600 text-purple-400 hover:text-white transition"
-                                        title="Dispatch correspondence"
-                                      >
-                                        <Send className="w-3 h-3" />
-                                      </button>
-
-                                      <button
-                                        onClick={() => handleDeleteCustomer(c.id, c.name)}
-                                        className="p-1 rounded bg-red-500/10 hover:bg-red-600 text-red-400 hover:text-white border border-red-500/20 transition"
-                                        title="Delete Profile"
-                                      >
-                                        <Trash2 className="w-3 h-3" />
-                                      </button>
-                                    </div>
-                                  </td>
-
-                                </tr>
-                              );
-                            })
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </>)}
-                </>
-                ) : (
-                  
-                  /* DETAIL WORKSPACE FOR SPECIFIC SELECTED CUSTOMER PROFILE WITH TABS */
-                  (() => {
-                    const cust = customers.find(cu => cu.id === selectedCustomerProfileId);
-                    if (!cust) return <div className="p-4">Customer not found error. Passed reference tag invalid.</div>;
-                    const c = getCustomerFullData(cust);
-                    
-                    // Filter orders from general ledger passed via props
-                    const clientOrders = orders.filter(o => o.id === c.id || o.itemTitle.includes(c.name) || o.productId || o.price > 100).slice(0, 3);
-                    const clientProjects = projects.filter(p => p.clientId === c.id || p.clientName === c.name);
-                    const clientTickets = tickets.filter(t => t.userId === c.id || t.subject.toLowerCase().includes(c.name.toLowerCase())).slice(0, 4);
-
-                    return (
-                      <div className="space-y-6 animate-in slide-in-from-bottom-2 duration-300 text-left">
-                        
-                        {/* Profile Hero Header Card */}
-                        <div className={`p-6 rounded-2xl border ${cardBorder} ${panelBg} shadow`}>
-                          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-                            
-                            <div className="flex items-center gap-4">
-                              {/* Giant Initials Circle */}
-                              <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-purple-700 via-purple-600 to-indigo-600 flex items-center justify-center font-black text-xl text-white border-2 border-purple-400 shadow-xl shadow-purple-500/20">
-                                {c.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()}
-                              </div>
-                              
-                              <div className="space-y-0.5">
-                                <div className="flex items-center gap-2">
-                                  <h4 className="text-xl font-bold text-neutral-150 tracking-tight">{c.name}</h4>
-                                  <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
-                                    c.status === 'active' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-red-400'
-                                  }`}>
-                                    {c.status.toUpperCase()}
-                                  </span>
-                                </div>
-                                <p className="text-xs opacity-75 text-neutral-300 font-mono font-semibold flex items-center gap-1">
-                                  <span>{c.companyName}</span>
-                                  <span>•</span>
-                                  <span className="text-purple-400">{c.customerType}</span>
-                                </p>
-                                <p className="text-[10px] opacity-50 font-mono">
-                                  ID: {c.id} | Joined on: {c.joinedAt} | Last Activity: {c.lastLogin}
-                                </p>
-                              </div>
-                            </div>
-
-                            {/* Rapid statistics overview metrics */}
-                            <div className="grid grid-cols-3 md:grid-cols-6 gap-2 w-full md:w-auto">
-                              {[
-                                { label: "Total Spend", value: `$${c.totalSpent}`, color: "text-emerald-400" },
-                                { label: "Wallet Cr.", value: `$${c.walletBalance}`, color: "text-purple-400" },
-                                { label: "Affiliate Rev", value: `$${c.refCount * 25}`, color: "text-cyan-400" },
-                                { label: "Projects", value: clientProjects.length, color: "text-white" },
-                                { label: "SLA Tickets", value: clientTickets.length, color: "text-neutral-300" },
-                                { label: "Subscribers", value: c.refCount || 0, color: "text-amber-400" }
-                              ].map((item, index) => (
-                                <div key={index} className="p-2.5 bg-neutral-950/40 rounded-xl border border-neutral-850 text-center min-w-[75px]">
-                                  <p className="text-[8px] font-mono font-bold text-neutral-500 uppercase tracking-widest">{item.label}</p>
-                                  <p className={`text-xs font-black font-mono tracking-tight mt-0.5 ${item.color}`}>{item.value}</p>
-                                </div>
-                              ))}
-                            </div>
-
-                          </div>
-                        </div>
-
-                        {/* Interactive Profile Tab Bar Toggles */}
-                        <div className="flex items-center gap-1 border-b border-neutral-800 overflow-x-auto pb-0">
-                          {[
-                            { id: "Overview", icon: Users },
-                            { id: "Orders", icon: ShoppingBag },
-                            { id: "Projects", icon: FolderOpen },
-                            { id: "Support Tickets", icon: HelpCircle },
-                            { id: "Downloads", icon: FileUp },
-                            { id: "Affiliate", icon: Award },
-                            { id: "Wallet", icon: DollarSign },
-                            { id: "Notes", icon: FileText },
-                            { id: "Activity Logs", icon: Activity },
-                            { id: "Security Logs", icon: Shield }
-                          ].map(tab => {
-                            const Icon = tab.icon;
-                            const isActive = activeProfileTab === tab.id;
-                            return (
-                              <button
-                                key={tab.id}
-                                onClick={() => setActiveProfileTab(tab.id)}
-                                className={`px-4 py-2 text-xs font-bold transition-all relative border-b-2 flex items-center gap-1.5 whitespace-nowrap ${
-                                  isActive 
-                                    ? 'border-purple-500 text-purple-400 bg-purple-500/5' 
-                                    : 'border-transparent text-neutral-400 hover:bg-neutral-800/40 hover:text-neutral-250'
-                                }`}
-                              >
-                                <Icon className="w-3.5 h-3.5" />
-                                {tab.id}
-                              </button>
-                            );
-                          })}
-                        </div>
-
-                        {/* PROFILE SELECTED ACTIVE TAB CONTENT VIEW */}
-                        <div className="space-y-4">
-                          
-                          {/* TAB 1: OVERVIEW */}
-                          {activeProfileTab === 'Overview' && (
-                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 animate-in fade-in duration-200">
-                              
-                              {/* Column 1: Core details Form (ReadOnly / Visual Presentation) */}
-                              <div className={`col-span-2 p-5 rounded-2xl border ${cardBorder} ${panelBg} space-y-4`}>
-                                <div className="border-b border-neutral-800/60 pb-2">
-                                  <h4 className="text-xs font-bold font-mono text-purple-400 uppercase tracking-wider">Demographic Client Directory (Profile Metadata)</h4>
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono">
-                                  <div>
-                                    <span className="opacity-55 block mb-1">Legal Full Name</span>
-                                    <p className="font-bold text-neutral-200 py-1.5 px-3 bg-neutral-950/40 border border-neutral-850 rounded">{c.name}</p>
-                                  </div>
-                                  <div>
-                                    <span className="opacity-55 block mb-1">Company Entity</span>
-                                    <p className="font-bold text-neutral-200 py-1.5 px-3 bg-neutral-950/40 border border-neutral-850 rounded">{c.companyName}</p>
-                                  </div>
-                                  <div>
-                                    <span className="opacity-55 block mb-1">Secure Email Address</span>
-                                    <p className="font-bold text-neutral-200 py-1.5 px-3 bg-neutral-950/40 border border-neutral-850 rounded">{c.email}</p>
-                                  </div>
-                                  <div>
-                                    <span className="opacity-55 block mb-1">Mobile Contact Phone</span>
-                                    <p className="font-bold text-neutral-200 py-1.5 px-3 bg-neutral-950/40 border border-neutral-850 rounded">{c.phone}</p>
-                                  </div>
-                                  <div>
-                                    <span className="opacity-55 block mb-1">WhatsApp Telemetry</span>
-                                    <p className="font-bold text-neutral-200 py-1.5 px-3 bg-neutral-950/40 border border-neutral-850 rounded">{c.whatsapp}</p>
-                                  </div>
-                                  <div>
-                                    <span className="opacity-55 block mb-1">Date of Birth (DOB)</span>
-                                    <p className="font-bold text-neutral-200 py-1.5 px-3 bg-neutral-950/40 border border-neutral-850 rounded">{c.dob}</p>
-                                  </div>
-                                  <div>
-                                    <span className="opacity-55 block mb-1">Gender Identification</span>
-                                    <p className="font-bold text-neutral-200 py-1.5 px-3 bg-neutral-950/40 border border-neutral-850 rounded">{c.gender}</p>
-                                  </div>
-                                  <div>
-                                    <span className="opacity-55 block mb-1">Corporate websiteUrl</span>
-                                    <p className="font-bold text-neutral-200 py-1.5 px-3 bg-neutral-950/40 border border-neutral-850 rounded">{c.websiteUrl}</p>
-                                  </div>
-                                  <div className="col-span-2">
-                                    <span className="opacity-55 block mb-1">Registered Billing Residence (Full Address)</span>
-                                    <p className="font-bold text-neutral-200 py-1.5 px-3 bg-neutral-950/40 border border-neutral-850 rounded">
-                                      {c.address}, {c.city}, {c.postalCode}, {c.country}
-                                    </p>
-                                  </div>
-                                </div>
-
-                                {/* Realtime Workspace features gating toggles */}
-                                <div className="mt-5 p-4 bg-purple-950/5 border border-purple-500/20 rounded-2xl space-y-3.5">
-                                  <div>
-                                    <span className="text-[9px] font-mono text-purple-400 font-bold uppercase tracking-wider bg-purple-500/10 px-1.5 py-0.5 rounded border border-purple-500/15">Workspace features entitlement gating</span>
-                                    <h5 className="text-xs font-bold text-neutral-200 mt-1 flex items-center gap-1">
-                                      <Layers className="w-4 h-4 text-purple-500" /> Active SaaS Portal Access Licenses & Workspace Permissions
-                                    </h5>
-                                    <p className="text-[9px] opacity-60 font-sans">Instantly toggle access to separate modules. Changes align with user accounts instantly.</p>
-                                  </div>
-                                  
-                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
-                                    {[
-                                      { id: 'projects', label: 'Projects', icon: FolderOpen },
-                                      { id: 'supportTickets', label: 'Support Tickets', icon: HelpCircle },
-                                      { id: 'digitalStore', label: 'Digital Store', icon: ShoppingBag },
-                                      { id: 'downloads', label: 'Downloads Area', icon: FileUp },
-                                      { id: 'affiliateSystem', label: 'Affiliates hub', icon: Award },
-                                      { id: 'wallet', label: 'Wallet balance', icon: DollarSign },
-                                      { id: 'aiTools', label: 'AI Super-Tools', icon: Sparkles },
-                                      { id: 'notifications', label: 'Triggers Feed', icon: Bell }
-                                    ].map(feat => {
-                                      const IconComp = feat.icon;
-                                      const featActive = c.workspaceFeatures ? !!c.workspaceFeatures[feat.id] : true;
-                                      
-                                      return (
-                                        <button
-                                          key={feat.id}
-                                          onClick={() => {
-                                            const defaultFeatures = c.workspaceFeatures || {
-                                              projects: true,
-                                              supportTickets: true,
-                                              digitalStore: true,
-                                              downloads: true,
-                                              affiliateSystem: true,
-                                              wallet: true,
-                                              aiTools: true,
-                                              notifications: true
-                                            };
-                                            const updatedFeatures = {
-                                              ...defaultFeatures,
-                                              [feat.id]: !featActive
-                                            };
-                                            setCustomers(prev => prev.map(cl => cl.id === c.id ? { ...cl, workspaceFeatures: updatedFeatures } : cl));
-                                            triggerToast(`⚡ Realtime License updated: ${feat.id.toUpperCase()} is now ${!featActive ? 'ENABLED':'DISABLED'}.`);
-                                          }}
-                                          className={`p-2 rounded-xl border flex items-center justify-between text-left transition-all ${
-                                            featActive
-                                              ? 'bg-purple-950/25 border-purple-500/40 text-purple-200 shadow-md'
-                                              : 'bg-neutral-950 border-neutral-850 opacity-45 hover:opacity-100 text-neutral-500'
-                                          }`}
-                                        >
-                                          <div className="flex items-center gap-1.5">
-                                            <IconComp className={`w-3.5 h-3.5 ${featActive ? 'text-purple-400' : 'text-neutral-600'}`} />
-                                            <span className="text-[10px] uppercase font-bold tracking-wide">{feat.label}</span>
-                                          </div>
-                                          <div className={`w-2 h-2 rounded-full ${featActive ? 'bg-purple-500' : 'bg-neutral-800'}`} />
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-
-                              </div>
-
-                              {/* Column 2: TAXONOMIES / PREFERENCES / SECURITY RELAY */}
-                              <div className={`p-5 rounded-2xl border ${cardBorder} ${panelBg} space-y-4`}>
-                                <div className="border-b border-neutral-800/60 pb-2">
-                                  <h4 className="text-xs font-bold font-mono text-purple-400 uppercase tracking-wider">Taxonomy Tags & Service Tier</h4>
-                                </div>
-                                <div className="space-y-4">
-                                  <div className="space-y-2">
-                                    <span className="text-[10px] font-mono opacity-50 uppercase tracking-wider block">Assigned Taxonomy Tags:</span>
-                                    <div className="flex flex-wrap gap-1.5">
-                                      {c.tags?.map((tag: string, index: number) => (
-                                        <span key={index} className="px-2 py-0.5 rounded bg-purple-500/10 border border-purple-500/20 text-purple-400 font-mono font-bold text-[10px]">
-                                          # {tag}
-                                        </span>
-                                      )) || <span className="text-xs text-neutral-500 font-mono">No active tags classified.</span>}
-                                    </div>
-                                    <div className="pt-2">
-                                      <button
-                                        onClick={() => {
-                                          const nextTags = prompt("Update tags parsed globally (comma separated):", c.tags.join(","));
-                                          if (nextTags !== null) {
-                                            setCustomers(prev => prev.map(cl => cl.id === c.id ? { ...cl, tags: nextTags.split(',').map(t => t.trim()).filter(Boolean) } : cl));
-                                            triggerToast('🏷️ Customer database classification taxonomies synchronized!');
-                                          }
-                                        }}
-                                        className="w-full py-1 text-center bg-neutral-950 hover:bg-neutral-900 border border-neutral-850 rounded text-[10px] text-neutral-400 font-mono"
-                                      >
-                                        Edit Client Tags Schema
-                                      </button>
-                                    </div>
-                                  </div>
-
-                                  {/* Update and Manage Password panel */}
-                                  <div className="p-3 bg-neutral-950/30 rounded border border-neutral-850 space-y-2.5 text-xs font-mono">
-                                    <span className="text-[9px] font-mono text-cyan-400 font-bold block bg-cyan-950/20 px-1 py-0.5 rounded border border-cyan-500/10 mb-1 uppercase tracking-wider">Gatekeeper Security Credentials</span>
-                                    <div className="space-y-1">
-                                      <span className="opacity-50 text-[9px] block">SECURITY PASSKEY SIGN-IN REFERENCE</span>
-                                      <div className="flex items-center gap-1">
-                                        <span className="font-bold text-cyan-400 text-xs px-2 py-1 bg-neutral-950 border border-neutral-850 rounded shrink-0 select-all">{c.password || 'WEAK_MIGRATED_#98'}</span>
-                                        <button
-                                          onClick={() => {
-                                            const nextPass = prompt("Type a new passkey to update customer secure identity:", c.password || '');
-                                            if (nextPass !== null) {
-                                              setCustomers(prev => prev.map(cl => cl.id === c.id ? { ...cl, password: nextPass } : cl));
-                                              triggerToast('🔑 Gatekeeper login password modernized globally.');
-                                            }
-                                          }}
-                                          className="px-2 py-1 bg-neutral-800 hover:bg-neutral-750 text-[9px] border border-neutral-700 text-neutral-250 hover:text-white rounded transition"
-                                        >
-                                          Update
-                                        </button>
-                                      </div>
-                                    </div>
-                                    <p className="text-[8px] opacity-45 leading-relaxed font-sans">Credential maps directly to customer logins globally.</p>
-                                  </div>
-
-                                  <div className="p-3 bg-neutral-950/30 rounded border border-neutral-850 space-y-2 text-xs">
-                                    <span className="text-[9px] font-mono text-neutral-400 font-bold block bg-purple-950/20 px-1 py-0.5 rounded border border-purple-500/10 mb-1 uppercase tracking-wider">Role Permissions Badge Mapping</span>
-                                    <p className="text-[10px] opacity-75">Customer belongs to <strong>Client Workspace Group</strong>. Accounts have standard portal execution clearances with basic transactional permissions. No advanced terminal accesses granted.</p>
-                                  </div>
-                                </div>
-                              </div>
-
-                            </div>
-                          )}
-
-                          {/* TAB 2: ORDERS */}
-                          {activeProfileTab === 'Orders' && (
-                            <div className={`p-5 rounded-2xl border ${cardBorder} ${panelBg} space-y-3 animate-in fade-in duration-200`}>
-                              <div className="flex items-center justify-between border-b border-neutral-800/60 pb-2">
-                                <h4 className="text-xs font-bold font-mono text-purple-400 uppercase tracking-wider">Order Transactions Ledger</h4>
-                                <span className="font-mono text-[10px] text-neutral-450 bg-neutral-950 px-2 py-0.5 rounded border border-neutral-850">Prop Data Linked</span>
-                              </div>
-                              <div className="overflow-x-auto">
-                                <table className="w-full text-left font-mono text-xs">
-                                  <thead>
-                                    <tr className="text-purple-400 border-b border-neutral-850 pb-2">
-                                      <th className="py-2">Order ID</th>
-                                      <th className="py-2">Item Title / Service</th>
-                                      <th className="py-2">Method</th>
-                                      <th className="py-2">Amount</th>
-                                      <th className="py-2">Status</th>
-                                      <th className="py-2 text-right">Date</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {clientOrders.length === 0 ? (
-                                      <tr>
-                                        <td colSpan={6} className="py-8 text-center text-neutral-500">No registered purchases on this customer ledger record.</td>
-                                      </tr>
-                                    ) : (
-                                      clientOrders.map((o, idx) => (
-                                        <tr key={idx} className="border-b border-neutral-880/40 hover:bg-neutral-950/10">
-                                          <td className="py-2 font-bold text-neutral-350">{o.id}</td>
-                                          <td className="py-2 font-sans font-bold text-neutral-200">{o.itemTitle}</td>
-                                          <td className="py-2 text-neutral-400 uppercase">{o.paymentMethod}</td>
-                                          <td className="py-2 font-bold text-emerald-400">${o.price}</td>
-                                          <td className="py-2">
-                                            <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[9px] font-black uppercase">
-                                              {o.paymentStatus}
-                                            </span>
-                                          </td>
-                                          <td className="py-2 text-right text-neutral-500">{o.date}</td>
-                                        </tr>
-                                      ))
-                                    )}
-                                  </tbody>
-                                </table>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* TAB 3: PROJECTS */}
-                          {activeProfileTab === 'Projects' && (
-                            <div className={`p-5 rounded-2xl border ${cardBorder} ${panelBg} space-y-3 animate-in fade-in duration-200`}>
-                              <div className="flex items-center justify-between border-b border-neutral-800/60 pb-2">
-                                <h4 className="text-xs font-bold font-mono text-purple-400 uppercase tracking-wider">Dynamic Client Projects Tracker</h4>
-                                <span className="font-mono text-[10px] text-neutral-450 bg-neutral-950 px-2 py-0.5 rounded border border-neutral-850">Database Linked</span>
-                              </div>
-                              <div className="space-y-3">
-                                {clientProjects.length === 0 ? (
-                                  <p className="text-xs text-neutral-500 text-center py-6 font-mono">No active software services or enterprise projects registered for this client profile.</p>
-                                ) : (
-                                  clientProjects.map((p, idx) => (
-                                    <div key={idx} className="p-3 bg-neutral-950/40 rounded-xl border border-neutral-850 flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs font-mono">
-                                      <div>
-                                        <h5 className="font-bold text-neutral-205 font-sans">{p.title}</h5>
-                                        <p className="text-[10px] text-neutral-500 mt-0.5">Manager: {p.assignedStaff} | Deadline: {p.dueDate}</p>
-                                      </div>
-                                      <div className="flex items-center gap-4">
-                                        <div className="w-24 text-right">
-                                          <span className="text-[10px] text-neutral-400">Progress: {p.progress}%</span>
-                                          <div className="w-full bg-neutral-800 h-1.5 rounded-full overflow-hidden mt-1">
-                                            <div className="bg-purple-600 h-1.5 rounded-full" style={{ width: `${p.progress}%` }} />
-                                          </div>
-                                        </div>
-                                        <span className={`px-2 py-0.5 text-[9px] rounded font-black uppercase ${
-                                          p.status === 'in_progress' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' : 'bg-green-500/10 text-green-400 border border-green-500/20'
-                                        }`}>
-                                          {p.status.replace('_', ' ')}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  ))
-                                )}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* TAB 4: SUPPORT TICKETS */}
-                          {activeProfileTab === 'Support Tickets' && (
-                            <div className={`p-5 rounded-2xl border ${cardBorder} ${panelBg} space-y-4 animate-in fade-in duration-200`}>
-                              <div className="flex items-center justify-between border-b border-neutral-800/60 pb-2">
-                                <div>
-                                  <h4 className="text-xs font-bold font-mono text-purple-400 uppercase tracking-wider">Assigned SLA Tickets Dispatcher</h4>
-                                  <p className="text-[10px] opacity-60">System mapped SLA support tickets for #{c.name}.</p>
-                                </div>
-                                <button
-                                  onClick={() => {
-                                    const subject = prompt("Subject of new service ticket:");
-                                    if(subject) {
-                                      triggerToast(`🎟️ Simulated new ticket created: "${subject}" assigned to Support Queue priority: HIGH.`);
-                                    }
-                                  }}
-                                  className="px-2.5 py-1 text-[10px] font-black bg-purple-600 hover:bg-purple-700 text-white rounded transition"
-                                >
-                                  + Create Ticket
-                                </button>
-                              </div>
-                              <div className="space-y-2">
-                                {clientTickets.length === 0 ? (
-                                  <p className="text-xs text-neutral-500 font-mono text-center py-6">No pending support requests or archival SLA tickets found.</p>
-                                ) : (
-                                  clientTickets.map((t, idx) => (
-                                    <div key={idx} className="p-3 bg-neutral-950/30 rounded-lg border border-neutral-850/60 flex items-center justify-between gap-4 text-xs font-mono">
-                                      <div className="space-y-0.5">
-                                        <div className="flex items-center gap-2">
-                                          <span className="font-bold text-neutral-200 text-xs font-sans">{t.id || `TKT-88${idx+1}`}</span>
-                                          <span className="text-neutral-500">|</span>
-                                          <span className="font-bold text-purple-400 text-[10px]">{t.category || "VPS Cloud Control"}</span>
-                                        </div>
-                                        <p className="text-neutral-300 font-sans">{t.subject || t.message}</p>
-                                      </div>
-                                      <div className="flex items-center gap-2">
-                                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase ${
-                                          t.priority === 'high' ? 'bg-rose-500/10 text-rose-400' : 'bg-neutral-800 text-neutral-400'
-                                        }`}>
-                                          {t.priority || "HIGH"}
-                                        </span>
-                                        <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[9px] font-black uppercase">
-                                          {t.status || "OPEN"}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  ))
-                                )}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* TAB 5: DOWNLOADS */}
-                          {activeProfileTab === 'Downloads' && (
-                            <div className={`p-5 rounded-2xl border ${cardBorder} ${panelBg} space-y-3 animate-in fade-in duration-200`}>
-                              <div className="border-b border-neutral-800/60 pb-2">
-                                <h4 className="text-xs font-bold font-mono text-purple-400 uppercase tracking-wider">Digital Assets & Source Code Licenses</h4>
-                              </div>
-                              <div className="space-y-3">
-                                {INITIAL_DOWNLOADS.map((dl) => (
-                                  <div key={dl.id} className="p-3.5 bg-neutral-950/40 rounded-xl border border-neutral-850 flex items-center justify-between gap-4 text-xs font-mono">
-                                    <div>
-                                      <h5 className="font-bold text-neutral-200 font-sans">{dl.name}</h5>
-                                      <p className="text-[10px] text-neutral-500 mt-0.5">Active License Key: <span className="text-purple-400">LIC-{dl.id.toUpperCase()}-2026-XWZ</span></p>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-neutral-500 text-[10px]">{dl.size}</span>
-                                      <button
-                                        onClick={() => {
-                                          navigator.clipboard.writeText(`https://webzone-platform.com/api/v1/assets/download?lic=LIC-${dl.id.toUpperCase()}-2026-XWZ`);
-                                          triggerToast('🔗 Download asset license link copied securely to registry clipboard!');
-                                        }}
-                                        className="p-1 px-2.5 rounded bg-neutral-800 hover:bg-neutral-700 text-[10px] font-bold text-neutral-300 hover:text-white transition"
-                                      >
-                                        Copy Link
-                                      </button>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* TAB 6: AFFILIATE */}
-                          {activeProfileTab === 'Affiliate' && (
-                            <div className={`p-5 rounded-2xl border ${cardBorder} ${panelBg} space-y-4 animate-in fade-in duration-200`}>
-                              
-                              <div className="border-b border-neutral-800/60 pb-2 flex items-center justify-between">
-                                <h4 className="text-xs font-bold font-mono text-purple-400 uppercase tracking-wider">Affiliate Referral Ledger</h4>
-                                <span className="font-mono text-xs font-bold text-purple-400">STATUS: PRO INTEGRATED</span>
-                              </div>
-
-                              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                                {[
-                                  { label: "Referral Token Code", value: `REF-${c.id.toUpperCase()}`, desc: "System code" },
-                                  { label: "Commission Collected", value: `$${(c.refCount || 0) * 25}.00`, desc: "Durable credits" },
-                                  { label: "Subscribers Reassigned", value: `${c.refCount || 0} Clients`, desc: "Registered accounts" },
-                                  { label: "Estimated CTR", value: `${(c.refCount || 0) > 0 ? '11.8%' : '0%'}`, desc: "Conversion metric" }
-                                ].map((item, index) => (
-                                  <div key={index} className="p-3 bg-neutral-950/40 rounded-xl border border-neutral-850 font-mono text-xs">
-                                    <span className="opacity-50 text-[9px] uppercase tracking-wider block font-bold mb-1">{item.label}</span>
-                                    <p className="text-sm font-black text-neutral-250 mt-1">{item.value}</p>
-                                    <p className="text-[9px] text-neutral-500 mt-1">{item.desc}</p>
-                                  </div>
-                                ))}
-                              </div>
-
-                              <div className="p-4 bg-neutral-950/20 border border-neutral-850 rounded-xl space-y-2 text-xs font-mono">
-                                <p className="font-bold text-neutral-250">Referral Blast URL:</p>
-                                <div className="flex gap-2">
-                                  <input
-                                    type="text"
-                                    readOnly
-                                    value={`https://webzonebd.com/?ref=REF-${c.id.toUpperCase()}`}
-                                    className="flex-1 bg-neutral-950 border border-neutral-800 rounded px-2.5 py-1 text-xs text-purple-300 select-all outline-none"
-                                  />
-                                  <button
-                                    onClick={() => {
-                                      navigator.clipboard.writeText(`https://webzonebd.com/?ref=REF-${c.id.toUpperCase()}`);
-                                      triggerToast('📋 Affiliate referral URL copy completed!');
-                                    }}
-                                    className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-3 py-1 text-xs rounded transition"
-                                  >
-                                    Copy Link
-                                  </button>
-                                </div>
-                              </div>
-
-                            </div>
-                          )}
-
-                          {/* TAB 7: WALLET ADJUSTMENT & DEEP HISTORY */}
-                          {activeProfileTab === 'Wallet' && (
-                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 animate-in fade-in duration-200">
-                              
-                              {/* Left: Current Ledger Info & Adjuster */}
-                              <div className={`p-5 rounded-2xl border ${cardBorder} ${panelBg} space-y-4`}>
-                                <div className="border-b border-neutral-800/60 pb-2">
-                                  <h4 className="text-xs font-bold font-mono text-purple-400 uppercase tracking-wider">Adjustment balance direct control</h4>
-                                </div>
-                                <div className="p-4 bg-neutral-950/50 rounded-xl border border-neutral-850 text-center space-y-1">
-                                  <span className="text-[10px] font-mono opacity-50 uppercase tracking-wide block">Current Ledger Balance</span>
-                                  <p className="text-3xl font-black text-emerald-400 font-mono">${c.walletBalance}</p>
-                                  <p className="text-[10px] text-neutral-500">Subject to dynamic direct adjustments</p>
-                                </div>
-                                
-                                <div className="space-y-3 font-mono text-xs">
-                                  <div>
-                                    <label className="text-[9px] opacity-60 block mb-1">MUTATION AMOUNT ($ USD)</label>
-                                    <input
-                                      type="number"
-                                      value={walletAmountValue}
-                                      onChange={(e) => setWalletAmountValue(Number(e.target.value))}
-                                      className="w-full bg-neutral-950 border border-neutral-850 text-xs px-3 py-2 rounded focus:border-purple-500 outline-none text-white font-mono"
-                                    />
-                                  </div>
-                                  
-                                  <div className="flex gap-2">
-                                    <button
-                                      onClick={() => {
-                                        if(!walletAmountValue || walletAmountValue <= 0) return triggerToast('⚠️ Please define a valid mutation amount ledger.');
-                                        const nextWal = c.walletBalance + walletAmountValue;
-                                        const nextSpent = c.totalSpent;
-                                        setCustomers(prev => prev.map(cl => cl.id === c.id ? { ...cl, walletBalance: nextWal } : cl));
-                                        
-                                        // Save transaction
-                                        const newTx = {
-                                          id: `tx-${Date.now()}`,
-                                          customerId: c.id,
-                                          type: 'deposit',
-                                          amount: walletAmountValue,
-                                          date: new Date().toISOString().replace('T', ' ').substring(0, 16),
-                                          description: 'Manual administrator wallet addition'
-                                        };
-                                        setWalletTransactions(prev => [newTx, ...prev]);
-                                        triggerToast(`💰 Added $${walletAmountValue} to ${c.name} balance. New wallet: $${nextWal}`);
-                                      }}
-                                      className="flex-1 py-2 bg-emerald-700 hover:bg-emerald-600 text-white rounded font-bold text-center text-[11px]"
-                                    >
-                                      Add Credits (+)
-                                    </button>
-                                    <button
-                                      onClick={() => {
-                                        if(!walletAmountValue || walletAmountValue <= 0) return triggerToast('⚠️ Please define a valid mutation amount ledger.');
-                                        const nextWal = Math.max(0, c.walletBalance - walletAmountValue);
-                                        setCustomers(prev => prev.map(cl => cl.id === c.id ? { ...cl, walletBalance: nextWal } : cl));
-                                        
-                                        // Save transaction
-                                        const newTx = {
-                                          id: `tx-${Date.now()}`,
-                                          customerId: c.id,
-                                          type: 'deduction',
-                                          amount: walletAmountValue,
-                                          date: new Date().toISOString().replace('T', ' ').substring(0, 16),
-                                          description: 'Manual administrator wallet deduction'
-                                        };
-                                        setWalletTransactions(prev => [newTx, ...prev]);
-                                        triggerToast(`🚨 Deducted $${walletAmountValue} from ${c.name} balance. New: $${nextWal}`);
-                                      }}
-                                      className="flex-1 py-2 bg-rose-700 hover:bg-rose-600 text-white rounded font-bold text-center text-[11px]"
-                                    >
-                                      Deduct Credits (-)
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Right: Wallet Transaction History List */}
-                              <div className={`col-span-2 p-5 rounded-2xl border ${cardBorder} ${panelBg} space-y-3`}>
-                                <div className="border-b border-neutral-800/60 pb-2">
-                                  <h4 className="text-xs font-bold font-mono text-purple-400 uppercase tracking-wider">Ledger Transaction History</h4>
-                                </div>
-                                <div className="space-y-2 max-h-[290px] overflow-y-auto">
-                                  {walletTransactions.filter(tx => tx.customerId === c.id).length === 0 ? (
-                                    <p className="text-xs text-neutral-500 font-mono text-center py-6">No historical wallet transactions registered for this individual UUID.</p>
-                                  ) : (
-                                    walletTransactions.filter(tx => tx.customerId === c.id).map(tx => (
-                                      <div key={tx.id} className="p-2.5 bg-neutral-950/40 rounded border border-neutral-850 flex items-center justify-between text-xs font-mono">
-                                        <div>
-                                          <p className="font-bold text-neutral-300">{tx.description}</p>
-                                          <p className="text-[9px] text-neutral-500 mt-0.5">TXID: {tx.id} | Date: {tx.date}</p>
-                                        </div>
-                                        <span className={`font-bold font-mono ${tx.type === 'deposit' ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                          {tx.type === 'deposit' ? '+' : '-'}${tx.amount}
-                                        </span>
-                                      </div>
-                                    ))
-                                  )}
-                                </div>
-                              </div>
-
-                            </div>
-                          )}
-
-                          {/* TAB 8: INTERNAL NOTES WORKSPACE */}
-                          {activeProfileTab === 'Notes' && (
-                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 animate-in fade-in duration-200">
-                              
-                              {/* Notes Composer */}
-                              <div className={`p-5 rounded-2xl border ${cardBorder} ${panelBg} space-y-3`}>
-                                <div className="border-b border-neutral-800/60 pb-2">
-                                  <h4 className="text-xs font-bold font-mono text-purple-400 uppercase tracking-wider">Internal Notes Composer</h4>
-                                </div>
-                                
-                                <form onSubmit={(e) => {
-                                  e.preventDefault();
-                                  const formEl = e.currentTarget;
-                                  const title = (formEl.elements.namedItem('noteTitle') as HTMLInputElement).value;
-                                  const desc = (formEl.elements.namedItem('noteDesc') as HTMLTextAreaElement).value;
-                                  const vis = (formEl.elements.namedItem('noteVis') as HTMLSelectElement).value;
-                                  
-                                  if(!title || !desc) return triggerToast('⚠️ Notes title and descriptions cannot be empty.');
-                                  
-                                  const newNote = {
-                                    id: `n-${Date.now()}`,
-                                    customerId: c.id,
-                                    title,
-                                    description: desc,
-                                    createdBy: 'Super Admin',
-                                    createdAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
-                                    visibility: vis
-                                  };
-                                  
-                                  setCustomerNotes(prev => [newNote, ...prev]);
-                                  triggerToast(`📝 Note dispatch added: "${title}" created on customer journal.`);
-                                  formEl.reset();
-                                }} className="space-y-3 text-xs font-mono">
-                                  <div>
-                                    <label className="text-[9px] opacity-60 block mb-1">NOTE HEADING / TITLE</label>
-                                    <input
-                                      type="text"
-                                      name="noteTitle"
-                                      placeholder="Note Title (e.g. Host configuration issue)"
-                                      className="w-full bg-neutral-950 border border-neutral-850 px-3 py-2 rounded focus:border-purple-500 outline-none text-white text-xs"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="text-[9px] opacity-60 block mb-1">INTERNAL DESCRIPTION SUMMARY</label>
-                                    <textarea
-                                      name="noteDesc"
-                                      rows={3}
-                                      placeholder="Write internal findings or customer relationship details..."
-                                      className="w-full bg-neutral-950 border border-neutral-850 px-3 py-2 rounded focus:border-purple-500 outline-none text-white text-xs font-sans"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="text-[9px] opacity-60 block mb-1">VISIBILITY CLEARANCE LEVEL</label>
-                                    <select
-                                      name="noteVis"
-                                      className="w-full bg-neutral-950 border border-neutral-850 px-2 py-1.5 rounded focus:border-purple-500 outline-none text-neutral-300 font-bold"
-                                    >
-                                      <option value="Admin Only">Admin Only</option>
-                                      <option value="Staff Only">Staff Only</option>
-                                      <option value="Public Internal">Public Internal</option>
-                                    </select>
-                                  </div>
-                                  <button
-                                    type="submit"
-                                    className="w-full py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded text-center transition"
-                                  >
-                                    Save Internal Note
-                                  </button>
-                                </form>
-                              </div>
-
-                              {/* Notes listings */}
-                              <div className={`col-span-2 p-5 rounded-2xl border ${cardBorder} ${panelBg} space-y-3`}>
-                                <div className="border-b border-neutral-800/60 pb-2">
-                                  <h4 className="text-xs font-bold font-mono text-purple-400 uppercase tracking-wider">Internal Journal Chronology</h4>
-                                </div>
-                                <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
-                                  {customerNotes.filter(n => n.customerId === c.id).length === 0 ? (
-                                    <p className="text-xs text-neutral-500 font-mono text-center py-8">No administrator internal logs or staff reports for this profile.</p>
-                                  ) : (
-                                    customerNotes.filter(n => n.customerId === c.id).map(n => (
-                                      <div key={n.id} className="p-3 bg-neutral-950/40 rounded-xl border border-neutral-850 space-y-1.5 text-xs font-mono relative group">
-                                        <div className="flex items-center justify-between">
-                                          <h5 className="font-bold text-neutral-200 font-sans">{n.title}</h5>
-                                          <span className="px-2 py-0.5 rounded bg-purple-950/30 border border-purple-500/10 text-purple-400 text-[8px] tracking-wider uppercase font-black">
-                                            {n.visibility}
-                                          </span>
-                                        </div>
-                                        <p className="text-neutral-300 font-sans leading-relaxed text-[11px] bg-neutral-950/20 p-2 rounded border border-neutral-850/40">
-                                          {n.description}
-                                        </p>
-                                        <div className="flex items-center justify-between text-[9px] text-neutral-500">
-                                          <span>By: {n.createdBy} | Code: {n.id}</span>
-                                          <span>{n.createdAt}</span>
-                                        </div>
-                                        
-                                        <button
-                                          onClick={() => {
-                                            setCustomerNotes(prev => prev.filter(cn => cn.id !== n.id));
-                                            triggerToast('📝 Internal journal note deleted.');
-                                          }}
-                                          className="absolute top-2 right-2 p-1 text-rose-500 hover:text-white bg-red-500/5 hover:bg-rose-600 rounded opacity-0 group-hover:opacity-100 transition"
-                                          title="De-register note"
-                                        >
-                                          <X className="w-3 h-3" />
-                                        </button>
-                                      </div>
-                                    ))
-                                  )}
-                                </div>
-                              </div>
-
-                            </div>
-                          )}
-
-                          {/* TAB 9: ACTIVITY LOGS */}
-                          {activeProfileTab === 'Activity Logs' && (
-                            <div className={`p-5 rounded-2xl border ${cardBorder} ${panelBg} space-y-3 animate-in fade-in duration-200`}>
-                              <div className="border-b border-neutral-800/60 pb-2">
-                                <h4 className="text-xs font-bold font-mono text-purple-400 uppercase tracking-wider">Telemetry Activity Audit Trail</h4>
-                              </div>
-                              <div className="overflow-x-auto">
-                                <table className="w-full text-left font-mono text-xs">
-                                  <thead>
-                                    <tr className="text-purple-400 border-b border-neutral-850 pb-2">
-                                      <th className="py-2">Log ID</th>
-                                      <th className="py-2">Client Activity Description</th>
-                                      <th className="py-2">IP Address Rel</th>
-                                      <th className="py-2 text-right">Device User Agent</th>
-                                      <th className="py-2 text-right">Date / Time</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {customerActivities.filter(act => act.customerId === c.id).length === 0 ? (
-                                      <tr>
-                                        <td colSpan={5} className="py-6 text-center text-neutral-500">No activity logged for this client UID.</td>
-                                      </tr>
-                                    ) : (
-                                      customerActivities.filter(act => act.customerId === c.id).map(act => (
-                                        <tr key={act.id} className="border-b border-neutral-850/60 hover:bg-neutral-950/10">
-                                          <td className="py-2.5 font-bold text-neutral-400">{act.id}</td>
-                                          <td className="py-2.5 text-neutral-200">{act.activity}</td>
-                                          <td className="py-2.5 font-bold text-cyan-400">{act.ipAddress}</td>
-                                          <td className="py-2.5 text-right text-neutral-400">{act.device}</td>
-                                          <td className="py-2.5 text-right text-neutral-500">{act.date}</td>
-                                        </tr>
-                                      ))
-                                    )}
-                                  </tbody>
-                                </table>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* TAB 10: SECURITY AUDITS */}
-                          {activeProfileTab === 'Security Logs' && (
-                            <div className={`p-5 rounded-2xl border ${cardBorder} ${panelBg} space-y-3 animate-in fade-in duration-200`}>
-                              <div className="border-b border-neutral-800/60 pb-2">
-                                <h4 className="text-xs font-bold font-mono text-purple-400 uppercase tracking-wider">Access Security Auditing Log</h4>
-                              </div>
-                              <div className="overflow-x-auto">
-                                <table className="w-full text-left font-mono text-xs">
-                                  <thead>
-                                    <tr className="text-purple-400 border-b border-neutral-850 pb-2">
-                                      <th className="py-2">Audit ID</th>
-                                      <th className="py-2">Security Event classification</th>
-                                      <th className="py-2">IP Trace</th>
-                                      <th className="py-2 text-right">Device Platform</th>
-                                      <th className="py-2 text-right">Date / Time</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {customerSecurity.filter(sec => sec.customerId === c.id).length === 0 ? (
-                                      <tr>
-                                        <td colSpan={5} className="py-6 text-center text-neutral-500">No security audit attempts logged on this user ledger.</td>
-                                      </tr>
-                                    ) : (
-                                      customerSecurity.filter(sec => sec.customerId === c.id).map(sec => (
-                                        <tr key={sec.id} className="border-b border-neutral-850/60 hover:bg-neutral-950/10">
-                                          <td className="py-2.5 font-bold text-purple-400">{sec.id}</td>
-                                          <td className="py-2.5">
-                                            <div className="flex items-center gap-1.5">
-                                              <span className={`w-2 h-2 rounded-full ${
-                                                sec.event.toLowerCase().includes('failed') || sec.event.toLowerCase().includes('suspended') ? 'bg-rose-500':'bg-emerald-500'
-                                              }`} />
-                                              <span className="text-neutral-200">{sec.event}</span>
-                                            </div>
-                                          </td>
-                                          <td className="py-2.5 text-neutral-300 font-semibold">{sec.ipAddress}</td>
-                                          <td className="py-2.5 text-right text-neutral-400">{sec.device}</td>
-                                          <td className="py-2.5 text-right text-neutral-500">{sec.date}</td>
-                                        </tr>
-                                      ))
-                                    )}
-                                  </tbody>
-                                </table>
-                              </div>
-                            </div>
-                          )}
-
-                        </div>
-
-                      </div>
-                    );
-                  })()
-                )}
-
-                {/* MODAL WINDOW 1: ADD OR EDIT CUSTOMER DETAILS */}
-                {showAddCustomerModal && (
-                  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-                    <div className={`w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border ${cardBorder} ${panelBg} shadow-2xl p-6 relative animate-in zoom-in-95 duration-200 text-left`}>
-                      
-                      <button
-                        onClick={() => setShowAddCustomerModal(false)}
-                        className="absolute top-4 right-4 p-1.5 rounded-lg hover:bg-neutral-800 text-neutral-400 hover:text-white transition"
-                      >
-                        <X className="w-5 h-5" />
-                      </button>
-
-                      <h4 className={`text-lg font-black tracking-tight ${textTitle} mb-1 flex items-center gap-1.5`}>
-                        <Users className="text-purple-500" />
-                        {selectedCustomerIdForEdit ? 'Alter Customer Secure Ledger File' : 'Register New Client Workspace Profile'}
-                      </h4>
-                      <p className="text-xs text-neutral-400 mb-6 font-medium">Verify structural billing configurations and taxonomy parameters before writing to local registries.</p>
-
-                      <form onSubmit={(e) => {
-                        e.preventDefault();
-                        if(!custForm.name || !custForm.email || !custForm.phone) {
-                          return triggerToast('⚠️ Legal full name, email, and phone coordinates are mandatory.');
-                        }
-                        
-                        if(selectedCustomerIdForEdit) {
-                          // Update
-                          setCustomers(prev => prev.map(c => {
-                            const cId = c.customer_id || c.id || '';
-                            if(cId === selectedCustomerIdForEdit) {
-                              return {
-                                ...c,
-                                name: custForm.name,
-                                customer_name: custForm.name,
-                                companyName: custForm.companyName,
-                                company_name: custForm.companyName,
-                                email: custForm.email,
-                                customer_email: custForm.email,
-                                phone: custForm.phone,
-                                customer_phone: custForm.phone,
-                                whatsapp: custForm.whatsapp,
-                                dob: custForm.dob,
-                                gender: custForm.gender,
-                                country: custForm.country,
-                                city: custForm.city,
-                                address: custForm.address,
-                                postalCode: custForm.postalCode,
-                                websiteUrl: custForm.websiteUrl,
-                                customerType: custForm.customerType,
-                                customer_type: custForm.customerType,
-                                status: custForm.status,
-                                customer_status: custForm.status,
-                                tags: custForm.tags,
-                                password: custForm.password,
-                                walletBalance: Number(custForm.walletBalance || 0),
-                                wallet_balance: Number(custForm.walletBalance || 0),
-                                totalSpent: Number(custForm.totalSpent || 0),
-                                total_spent: Number(custForm.totalSpent || 0),
-                                workspaceFeatures: custForm.workspaceFeatures
-                              };
-                            }
-                            return c;
-                          }));
-                          triggerToast(`🤝 Customer Profile for ${custForm.name} Alterations Compiled & Saved!`);
-                        } else {
-                          // Insert
-                          const newId = `usr-${101 + customers.length}`;
-                          const passwordGenerated = custForm.password || `Pass#${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-                          const newCust = {
-                            id: newId,
-                            customer_id: newId,
-                            name: custForm.name,
-                            customer_name: custForm.name,
-                            companyName: custForm.companyName,
-                            company_name: custForm.companyName,
-                            email: custForm.email,
-                            customer_email: custForm.email,
-                            phone: custForm.phone,
-                            customer_phone: custForm.phone,
-                            whatsapp: custForm.whatsapp || custForm.phone,
-                            dob: custForm.dob,
-                            gender: custForm.gender,
-                            country: custForm.country,
-                            city: custForm.city,
-                            address: custForm.address,
-                            postalCode: custForm.postalCode,
-                            websiteUrl: custForm.websiteUrl,
-                            customerType: custForm.customerType,
-                            customer_type: custForm.customerType,
-                            status: custForm.status,
-                            customer_status: custForm.status,
-                            tags: custForm.tags,
-                            walletBalance: Number(custForm.walletBalance || 0),
-                            wallet_balance: Number(custForm.walletBalance || 0),
-                            totalSpent: Number(custForm.totalSpent || 0),
-                            total_spent: Number(custForm.totalSpent || 0),
-                            joinedAt: new Date().toISOString().substring(0, 10),
-                            created_at: new Date().toISOString().substring(0, 10),
-                            lastLogin: 'Never Active',
-                            password: passwordGenerated,
-                            workspaceFeatures: custForm.workspaceFeatures
-                          };
-                          setCustomers(prev => [...prev, newCust]);
-                          
-                          // Security log
-                          const newSec = {
-                            id: `sec-${Date.now()}`,
-                            customerId: newId,
-                            event: 'Account profile created - initial onboarding',
-                            date: new Date().toISOString().replace('T', ' ').substring(0, 16),
-                            ipAddress: 'System Daemon',
-                            device: 'Super Admin direct registry write'
-                          };
-                          setCustomerSecurity(prev => [newSec, ...prev]);
-                          
-                          // Open Success state
-                          setShowRegistrationSuccess({
-                            open: true,
-                            customerId: newId,
-                            customerName: custForm.name,
-                            password: passwordGenerated,
-                            workspaceFeatures: custForm.workspaceFeatures
-                          });
-                        }
-                        setShowAddCustomerModal(false);
-                      }} className="space-y-4 text-xs font-mono relative pl-1 pr-1 pb-4">
-                        
-                        {/* Section 1: Demographics */}
-                        <div className="bg-white/5 dark:bg-neutral-900/60 p-5 rounded-2xl border border-neutral-200/80 dark:border-neutral-800/40 pb-6 shadow-xl backdrop-blur-sm relative transition-all hover:border-indigo-500/20 dark:hover:border-cyan-500/20">
-                          <span className="text-[10px] text-indigo-600 dark:text-cyan-400 font-extrabold uppercase tracking-wider block border-b border-neutral-100 dark:border-neutral-850 pb-2 mb-4 flex items-center gap-1.5">
-                            <span className="w-2 h-2 rounded-full bg-indigo-500/80 dark:bg-cyan-400 animate-pulse" />
-                            Section A: Personal Identifiers & Contacts
-                          </span>
-                          
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {/* Legal name */}
-                            <div className="relative group">
-                              <input
-                                type="text"
-                                id="modal_name"
-                                value={custForm.name}
-                                onChange={(e) => setCustForm({ ...custForm, name: e.target.value })}
-                                placeholder=" "
-                                className="peer w-full bg-neutral-50/50 dark:bg-neutral-950/70 border border-neutral-200 dark:border-neutral-850 px-3.5 pt-5 pb-1.5 rounded-xl text-neutral-900 dark:text-white focus:bg-white dark:focus:bg-neutral-950 focus:border-indigo-500 dark:focus:border-cyan-500 focus:ring-4 focus:ring-indigo-500/10 dark:focus:ring-cyan-500/10 outline-none text-xs transition-all font-sans font-medium"
-                              />
-                              <label htmlFor="modal_name" className="pointer-events-none absolute left-3.5 top-1.5 text-[9px] text-indigo-650 dark:text-cyan-550 font-mono tracking-wider uppercase font-extrabold transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:text-neutral-500 peer-placeholder-shown:font-medium peer-focus:top-1.5 peer-focus:text-[9px] peer-focus:text-indigo-600 peer-focus:dark:text-cyan-400">
-                                LEGAL CONSTITUENT NAME *
-                              </label>
-                              <div className="absolute right-3.5 top-3.5 flex items-center gap-1.5">
-                                {custForm.name.length >= 3 ? (
-                                  <CheckCircle2 className="w-4 h-4 text-emerald-500 stroke-[2.5]" />
-                                ) : (
-                                  <AlertCircle className="w-4 h-4 text-amber-500 stroke-[2.5]" />
-                                )}
-                              </div>
-                              <p className="text-[9px] mt-1 text-neutral-500 font-mono pl-0.5 leading-none transition-all">
-                                {custForm.name.length >= 3 ? (
-                                  <span className="text-emerald-500/80 dark:text-emerald-400 font-bold">✓ Name verified as valid legal format</span>
-                                ) : (
-                                  <span className="text-amber-500/80 dark:text-amber-400/80 font-bold">⚠ Please provide minimum 3 characters legal name</span>
-                                )}
-                              </p>
-                            </div>
-
-                            {/* Client business entity */}
-                            <div className="relative group">
-                              <input
-                                type="text"
-                                id="modal_company"
-                                value={custForm.companyName}
-                                onChange={(e) => setCustForm({ ...custForm, companyName: e.target.value })}
-                                placeholder=" "
-                                className="peer w-full bg-neutral-50/50 dark:bg-neutral-950/70 border border-neutral-200 dark:border-neutral-850 px-3.5 pt-5 pb-1.5 rounded-xl text-neutral-900 dark:text-white focus:bg-white dark:focus:bg-neutral-950 focus:border-indigo-500 dark:focus:border-cyan-500 focus:ring-4 focus:ring-indigo-500/10 dark:focus:ring-cyan-500/10 outline-none text-xs transition-all font-sans font-medium"
-                              />
-                              <label htmlFor="modal_company" className="pointer-events-none absolute left-3.5 top-1.5 text-[9px] text-indigo-655 dark:text-cyan-555 font-mono tracking-wider uppercase font-extrabold transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:text-neutral-500 peer-placeholder-shown:font-medium peer-focus:top-1.5 peer-focus:text-[9px] peer-focus:text-indigo-600 peer-focus:dark:text-cyan-400">
-                                COMPANY CORPORATE ENTITY
-                              </label>
-                            </div>
-
-                            {/* Secure Correspondence Email */}
-                            <div className="relative group">
-                              <input
-                                type="email"
-                                id="modal_email"
-                                value={custForm.email}
-                                onChange={(e) => setCustForm({ ...custForm, email: e.target.value })}
-                                placeholder=" "
-                                className="peer w-full bg-neutral-50/50 dark:bg-neutral-950/70 border border-neutral-200 dark:border-neutral-850 px-3.5 pt-5 pb-1.5 rounded-xl text-neutral-900 dark:text-white focus:bg-white dark:focus:bg-neutral-950 focus:border-indigo-500 dark:focus:border-cyan-500 focus:ring-4 focus:ring-indigo-500/10 dark:focus:ring-cyan-500/10 outline-none text-xs transition-all font-sans font-medium"
-                              />
-                              <label htmlFor="modal_email" className="pointer-events-none absolute left-3.5 top-1.5 text-[9px] text-indigo-650 dark:text-cyan-550 font-mono tracking-wider uppercase font-extrabold transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:text-neutral-500 peer-placeholder-shown:font-medium peer-focus:top-1.5 peer-focus:text-[9px] peer-focus:text-indigo-600 peer-focus:dark:text-cyan-400">
-                                SECURE CORRESPONDENCE EMAIL *
-                              </label>
-                              <div className="absolute right-3.5 top-3.5 flex items-center gap-1.5">
-                                {/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(custForm.email) ? (
-                                  <CheckCircle2 className="w-4 h-4 text-emerald-500 stroke-[2.5]" />
-                                ) : (
-                                  <AlertCircle className="w-4 h-4 text-amber-500 stroke-[2.5]" />
-                                )}
-                              </div>
-                              <p className="text-[9px] mt-1 text-neutral-500 font-mono pl-0.5 leading-none transition-all">
-                                {/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(custForm.email) ? (
-                                  <span className="text-emerald-500/80 dark:text-emerald-400 font-bold">✓ Email meets network syntax standards</span>
-                                ) : (
-                                  <span className="text-amber-500/80 dark:text-amber-400/80 font-bold">⚠ Requires standard email address (e.g., mail@domain.com)</span>
-                                )}
-                              </p>
-                            </div>
-
-                            {/* Mobile contact telephony */}
-                            <div className="relative group">
-                              <input
-                                type="text"
-                                id="modal_phone"
-                                value={custForm.phone}
-                                onChange={(e) => setCustForm({ ...custForm, phone: e.target.value })}
-                                placeholder=" "
-                                className="peer w-full bg-neutral-50/50 dark:bg-neutral-950/70 border border-neutral-200 dark:border-neutral-850 px-3.5 pt-5 pb-1.5 rounded-xl text-neutral-900 dark:text-white focus:bg-white dark:focus:bg-neutral-950 focus:border-indigo-500 dark:focus:border-cyan-500 focus:ring-4 focus:ring-indigo-500/10 dark:focus:ring-cyan-500/10 outline-none text-xs transition-all font-sans font-medium"
-                              />
-                              <label htmlFor="modal_phone" className="pointer-events-none absolute left-3.5 top-1.5 text-[9px] text-indigo-650 dark:text-cyan-550 font-mono tracking-wider uppercase font-extrabold transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:text-neutral-500 peer-placeholder-shown:font-medium peer-focus:top-1.5 peer-focus:text-[9px] peer-focus:text-indigo-600 peer-focus:dark:text-cyan-400">
-                                MOBILE CONTACT TELEPHONY *
-                              </label>
-                              <div className="absolute right-3.5 top-3.5 flex items-center gap-1.5">
-                                {custForm.phone.length >= 6 ? (
-                                  <CheckCircle2 className="w-4 h-4 text-emerald-500 stroke-[2.5]" />
-                                ) : (
-                                  <AlertCircle className="w-4 h-4 text-amber-500 stroke-[2.5]" />
-                                )}
-                              </div>
-                              <p className="text-[9px] mt-1 text-neutral-500 font-mono pl-0.5 leading-none transition-all">
-                                {custForm.phone.length >= 6 ? (
-                                  <span className="text-emerald-500/80 dark:text-emerald-400 font-bold">✓ Contact telephony matches validation limit</span>
-                                ) : (
-                                  <span className="text-amber-500/80 dark:text-amber-400/80 font-bold">⚠ Please provide valid digits schema (min 6 characters)</span>
-                                )}
-                              </p>
-                            </div>
-
-                            {/* WhatsApp channel code */}
-                            <div className="relative group">
-                              <input
-                                type="text"
-                                id="modal_whatsapp"
-                                value={custForm.whatsapp}
-                                onChange={(e) => setCustForm({ ...custForm, whatsapp: e.target.value })}
-                                placeholder=" "
-                                className="peer w-full bg-neutral-50/50 dark:bg-neutral-950/70 border border-neutral-200 dark:border-neutral-850 px-3.5 pt-5 pb-1.5 rounded-xl text-neutral-900 dark:text-white focus:bg-white dark:focus:bg-neutral-950 focus:border-indigo-500 dark:focus:border-cyan-500 focus:ring-4 focus:ring-indigo-500/10 dark:focus:ring-cyan-500/10 outline-none text-xs transition-all font-sans font-medium"
-                              />
-                              <label htmlFor="modal_whatsapp" className="pointer-events-none absolute left-3.5 top-1.5 text-[9px] text-indigo-650 dark:text-cyan-550 font-mono tracking-wider uppercase font-extrabold transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:text-neutral-500 peer-placeholder-shown:font-medium peer-focus:top-1.5 peer-focus:text-[9px] peer-focus:text-indigo-600 peer-focus:dark:text-cyan-400">
-                                WHATSAPP CHANNELS CODE
-                              </label>
-                            </div>
-
-                            {/* Website url */}
-                            <div className="relative group">
-                              <input
-                                type="url"
-                                id="modal_website"
-                                value={custForm.websiteUrl}
-                                onChange={(e) => setCustForm({ ...custForm, websiteUrl: e.target.value })}
-                                placeholder=" "
-                                className="peer w-full bg-neutral-50/50 dark:bg-neutral-950/70 border border-neutral-200 dark:border-neutral-850 px-3.5 pt-5 pb-1.5 rounded-xl text-neutral-900 dark:text-white focus:bg-white dark:focus:bg-neutral-950 focus:border-indigo-500 dark:focus:border-cyan-500 focus:ring-4 focus:ring-indigo-500/10 dark:focus:ring-cyan-500/10 outline-none text-xs transition-all font-sans font-medium"
-                              />
-                              <label htmlFor="modal_website" className="pointer-events-none absolute left-3.5 top-1.5 text-[9px] text-indigo-650 dark:text-cyan-550 font-mono tracking-wider uppercase font-extrabold transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:text-neutral-500 peer-placeholder-shown:font-medium peer-focus:top-1.5 peer-focus:text-[9px] peer-focus:text-indigo-600 peer-focus:dark:text-cyan-400">
-                                WEB URL (PORTFOLIO/DOMAIN)
-                              </label>
-                            </div>
-
-                            {/* Date of birth */}
-                            <div className="relative group">
-                              <input
-                                type="date"
-                                id="modal_dob"
-                                value={custForm.dob}
-                                onChange={(e) => setCustForm({ ...custForm, dob: e.target.value })}
-                                className="peer w-full bg-neutral-50/50 dark:bg-neutral-950/70 border border-neutral-200 dark:border-neutral-850 px-3.5 pt-5 pb-1.5 rounded-xl text-neutral-900 dark:text-white focus:bg-white dark:focus:bg-neutral-950 focus:border-indigo-500 dark:focus:border-cyan-500 focus:ring-4 focus:ring-indigo-500/10 dark:focus:ring-cyan-500/10 outline-none text-xs transition-all font-sans font-medium"
-                              />
-                              <label htmlFor="modal_dob" className="pointer-events-none absolute left-3.5 top-1.5 text-[9px] text-indigo-650 dark:text-cyan-550 font-mono tracking-wider uppercase font-extrabold transition-all">
-                                DATE OF BIRTH
-                              </label>
-                            </div>
-
-                            {/* Gender code */}
-                            <div className="relative group">
-                              <select
-                                id="modal_gender"
-                                value={custForm.gender}
-                                onChange={(e) => setCustForm({ ...custForm, gender: e.target.value })}
-                                className="peer w-full bg-neutral-50/50 dark:bg-neutral-950/70 border border-neutral-200 dark:border-neutral-850 px-3.5 pt-4 pb-1.5 h-12 rounded-xl text-neutral-900 dark:text-neutral-300 focus:bg-white dark:focus:bg-neutral-950 focus:border-indigo-500 dark:focus:border-cyan-500 focus:ring-4 focus:ring-indigo-500/10 dark:focus:ring-cyan-500/10 outline-none text-xs transition-all cursor-pointer font-sans font-medium"
-                              >
-                                <option value="Male" className="bg-white dark:bg-neutral-900 text-neutral-800 dark:text-white">Male constituent</option>
-                                <option value="Female" className="bg-white dark:bg-neutral-900 text-neutral-800 dark:text-white">Female constituent</option>
-                                <option value="Non-Binary" className="bg-white dark:bg-neutral-900 text-neutral-800 dark:text-white">Non-Binary code</option>
-                              </select>
-                              <label htmlFor="modal_gender" className="pointer-events-none absolute left-3.5 top-1 text-[9px] text-indigo-650 dark:text-cyan-550 font-mono tracking-wider uppercase font-extrabold transition-all">
-                                GENDER CLASSIFICATION
-                              </label>
-                            </div>
-
-                            {/* Secure Passcode Field */}
-                            <div className="relative group col-span-1 md:col-span-2">
-                              <input
-                                type="text"
-                                id="modal_password"
-                                value={custForm.password}
-                                onChange={(e) => setCustForm({ ...custForm, password: e.target.value })}
-                                placeholder=" "
-                                className="peer w-full bg-neutral-50/50 dark:bg-neutral-950/70 border border-neutral-200 dark:border-neutral-850 px-3.5 pt-5 pb-1.5 rounded-xl text-neutral-900 dark:text-white focus:bg-white dark:focus:bg-neutral-950 focus:border-indigo-500 dark:focus:border-cyan-500 focus:ring-4 focus:ring-indigo-500/10 dark:focus:ring-cyan-500/10 outline-none text-xs transition-all font-sans font-medium"
-                              />
-                              <label htmlFor="modal_password" className="pointer-events-none absolute left-3.5 top-1.5 text-[9px] text-indigo-650 dark:text-cyan-550 font-mono tracking-wider uppercase font-extrabold transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:text-neutral-500 peer-placeholder-shown:font-medium peer-focus:top-1.5 peer-focus:text-[9px] peer-focus:text-indigo-600 peer-focus:dark:text-cyan-400">
-                                ADD OR UPDATE CUSTOMER PASSWORD *
-                              </label>
-                              <div className="absolute right-3.5 top-3.5 flex items-center gap-1.5">
-                                {(!custForm.password || custForm.password.length >= 6) ? (
-                                  <CheckCircle2 className="w-4 h-4 text-emerald-500 stroke-[2.5]" />
-                                ) : (
-                                  <AlertCircle className="w-4 h-4 text-amber-500 stroke-[2.5]" />
-                                )}
-                              </div>
-                              <p className="text-[9px] mt-1 text-neutral-500 font-mono pl-0.5 leading-none transition-all">
-                                {custForm.password && custForm.password.length < 6 ? (
-                                  <span className="text-amber-500/80 dark:text-amber-400/80 font-bold">⚠ Passkey length is currently weak (Recommended: min 6 chars)</span>
-                                ) : (
-                                  <span className="text-emerald-500/80 dark:text-emerald-400 font-bold">✓ Custom password credentials will be stored securely</span>
-                                )}
-                              </p>
-                            </div>
-
-                          </div>
-                        </div>
-
-                        {/* Section 2: Address */}
-                        <div className="bg-white/5 dark:bg-neutral-900/60 p-5 rounded-2xl border border-neutral-200/80 dark:border-neutral-800/40 pb-6 shadow-xl backdrop-blur-sm relative transition-all hover:border-indigo-500/20 dark:hover:border-cyan-500/20">
-                          <span className="text-[10px] text-indigo-600 dark:text-cyan-400 font-extrabold uppercase tracking-wider block border-b border-neutral-100 dark:border-neutral-850 pb-2 mb-4 flex items-center gap-1.5">
-                            <span className="w-2 h-2 rounded-full bg-indigo-500/80 dark:bg-cyan-400 animate-pulse" />
-                            Section B: Billing Address & Location Details
-                          </span>
-                          
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="relative group md:col-span-3">
-                              <input
-                                type="text"
-                                id="modal_address"
-                                value={custForm.address}
-                                onChange={(e) => setCustForm({ ...custForm, address: e.target.value })}
-                                placeholder=" "
-                                className="peer w-full bg-neutral-50/50 dark:bg-neutral-950/70 border border-neutral-200 dark:border-neutral-850 px-3.5 pt-5 pb-1.5 rounded-xl text-neutral-900 dark:text-white focus:bg-white dark:focus:bg-neutral-950 focus:border-indigo-500 dark:focus:border-cyan-500 focus:ring-4 focus:ring-indigo-500/10 dark:focus:ring-cyan-500/10 outline-none text-xs transition-all font-sans font-medium"
-                              />
-                              <label htmlFor="modal_address" className="pointer-events-none absolute left-3.5 top-1.5 text-[9px] text-indigo-650 dark:text-cyan-550 font-mono tracking-wider uppercase font-extrabold transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:text-neutral-500 peer-placeholder-shown:font-medium peer-focus:top-1.5 peer-focus:text-[9px] peer-focus:text-indigo-600 peer-focus:dark:text-cyan-400">
-                                STREET ADDRESS (RESIDENCE/HQ)
-                              </label>
-                            </div>
-                            
-                            <div className="relative group">
-                              <input
-                                type="text"
-                                id="modal_city"
-                                value={custForm.city}
-                                onChange={(e) => setCustForm({ ...custForm, city: e.target.value })}
-                                placeholder=" "
-                                className="peer w-full bg-neutral-50/50 dark:bg-neutral-950/70 border border-neutral-200 dark:border-neutral-850 px-3.5 pt-5 pb-1.5 rounded-xl text-neutral-900 dark:text-white focus:bg-white dark:focus:bg-neutral-950 focus:border-indigo-500 dark:focus:border-cyan-500 focus:ring-4 focus:ring-indigo-500/10 dark:focus:ring-cyan-500/10 outline-none text-xs transition-all font-sans font-medium"
-                              />
-                              <label htmlFor="modal_city" className="pointer-events-none absolute left-3.5 top-1.5 text-[9px] text-indigo-650 dark:text-cyan-550 font-mono tracking-wider uppercase font-extrabold transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:text-neutral-500 peer-placeholder-shown:font-medium peer-focus:top-1.5 peer-focus:text-[9px] peer-focus:text-indigo-600 peer-focus:dark:text-cyan-400">
-                                CITY / DIVISION
-                              </label>
-                            </div>
-                            
-                            <div className="relative group">
-                              <input
-                                type="text"
-                                id="modal_postal"
-                                value={custForm.postalCode}
-                                onChange={(e) => setCustForm({ ...custForm, postalCode: e.target.value })}
-                                placeholder=" "
-                                className="peer w-full bg-neutral-50/50 dark:bg-neutral-950/70 border border-neutral-200 dark:border-neutral-850 px-3.5 pt-5 pb-1.5 rounded-xl text-neutral-900 dark:text-white focus:bg-white dark:focus:bg-neutral-950 focus:border-indigo-500 dark:focus:border-cyan-500 focus:ring-4 focus:ring-indigo-500/10 dark:focus:ring-cyan-500/10 outline-none text-xs transition-all font-sans font-medium"
-                              />
-                              <label htmlFor="modal_postal" className="pointer-events-none absolute left-3.5 top-1.5 text-[9px] text-indigo-655 dark:text-cyan-555 font-mono tracking-wider uppercase font-extrabold transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:text-neutral-500 peer-placeholder-shown:font-medium peer-focus:top-1.5 peer-focus:text-[9px] peer-focus:text-indigo-600 peer-focus:dark:text-cyan-400">
-                                POSTAL / ZIP CODE
-                              </label>
-                            </div>
-
-                            {/* Premium Searchable Country Dropdown */}
-                            <div className="relative group">
-                              <div className="relative">
-                                <div className="flex items-center bg-neutral-50/50 dark:bg-neutral-950/70 border border-neutral-200 dark:border-neutral-850 rounded-xl px-3 pt-5 pb-1.5 text-neutral-900 dark:text-white focus-within:border-indigo-500 dark:focus-within:border-cyan-500 focus-within:ring-4 focus-within:ring-indigo-500/10 dark:focus-within:ring-cyan-500/10 transition-all">
-                                  <Search className="w-3.5 h-3.5 text-neutral-400 dark:text-neutral-500 mr-2 shrink-0" />
-                                  <input
-                                    type="text"
-                                    id="modal_country"
-                                    placeholder=" "
-                                    value={countrySearchQuery !== '' ? countrySearchQuery : custForm.country}
-                                    onFocus={() => setShowCountryDropdown(true)}
-                                    onChange={(e) => {
-                                      setCountrySearchQuery(e.target.value);
-                                      setCustForm({ ...custForm, country: e.target.value });
-                                      setShowCountryDropdown(true);
-                                    }}
-                                    className="bg-transparent border-none outline-none w-full text-xs font-mono text-neutral-900 dark:text-white"
-                                  />
-                                </div>
-                                <label htmlFor="modal_country" className="pointer-events-none absolute left-3.5 top-1 text-[9px] text-indigo-650 dark:text-cyan-550 font-mono tracking-wider uppercase font-extrabold transition-all">
-                                  GEOGRAPHIC COUNTRY *
-                                </label>
-                                
-                                {showCountryDropdown && (
-                                  <div className="absolute left-0 right-0 top-full mt-1.5 max-h-48 overflow-y-auto bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl z-50 shadow-2xl divide-y divide-neutral-100 dark:divide-neutral-850/60 p-1">
-                                    {(() => {
-                                      const countries = [
-                                        "Argentina", "Australia", "Bangladesh", "Brazil", "Canada", "China", "Denmark", "Egypt", 
-                                        "Finland", "Germany", "India", "Indonesia", "Japan", "Kuwait", "Malaysia", "Mexico", 
-                                        "Netherlands", "New Zealand", "Pakistan", "Qatar", "Russia", "Saudi Arabia", "Singapore", 
-                                        "South Africa", "South Korea", "Spain", "Sweden", "Switzerland", "Turkey", "UAE", "United Kingdom", "USA"
-                                      ];
-                                      const query = (countrySearchQuery || '').toLowerCase();
-                                      const filtered = countries.filter(c => c.toLowerCase().includes(query));
-                                      
-                                      if (filtered.length === 0) {
-                                        return (
-                                          <div className="p-2 text-[9px] text-neutral-500 text-center uppercase font-mono">
-                                            No matches - press enter to force
-                                          </div>
-                                        );
-                                      }
-                                      return filtered.map(c => (
-                                        <button
-                                          type="button"
-                                          key={c}
-                                          onClick={() => {
-                                            setCustForm({ ...custForm, country: c });
-                                            setCountrySearchQuery(c);
-                                            setShowCountryDropdown(false);
-                                          }}
-                                          className="w-full text-left p-2 hover:bg-indigo-50 dark:hover:bg-cyan-500/20 hover:text-indigo-600 dark:hover:text-cyan-300 font-mono text-[11px] transition text-neutral-700 dark:text-neutral-350 rounded-lg flex items-center justify-between"
-                                        >
-                                          <span>{c}</span>
-                                          {custForm.country === c && <Check className="w-3.5 h-3.5 text-indigo-600 dark:text-cyan-400" />}
-                                        </button>
-                                      ));
-                                    })()}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-
-                          </div>
-                        </div>
-
-                        {/* Section 3: Billing classifications */}
-                        <div className="bg-white/5 dark:bg-neutral-900/60 p-5 rounded-2xl border border-neutral-200/80 dark:border-neutral-800/40 pb-6 shadow-xl backdrop-blur-sm relative transition-all hover:border-indigo-500/20 dark:hover:border-cyan-500/20">
-                          <span className="text-[10px] text-indigo-600 dark:text-cyan-400 font-extrabold uppercase tracking-wider block border-b border-neutral-100 dark:border-neutral-850 pb-2 mb-4 flex items-center gap-1.5">
-                            <span className="w-2 h-2 rounded-full bg-indigo-500/80 dark:bg-cyan-400 animate-pulse" />
-                            Section C: Enterprise configurations & tags classification
-                          </span>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="relative group">
-                              <select
-                                id="modal_cust_type"
-                                value={custForm.customerType}
-                                onChange={(e) => setCustForm({ ...custForm, customerType: e.target.value })}
-                                className="peer w-full bg-neutral-50/50 dark:bg-neutral-950/70 border border-neutral-200 dark:border-neutral-850 px-3.5 pt-4 pb-1.5 h-12 rounded-xl text-neutral-900 dark:text-neutral-300 focus:bg-white dark:focus:bg-neutral-950 focus:border-indigo-500 dark:focus:border-cyan-500 focus:ring-4 focus:ring-indigo-500/10 dark:focus:ring-cyan-500/10 outline-none text-xs transition-all cursor-pointer font-sans font-medium"
-                              >
-                                <option value="Regular Client" className="bg-white dark:bg-neutral-900 text-neutral-800 dark:text-white">Regular Client</option>
-                                <option value="VIP Client" className="bg-white dark:bg-neutral-900 text-neutral-800 dark:text-white">VIP Client</option>
-                                <option value="Corporate Client" className="bg-white dark:bg-neutral-900 text-neutral-800 dark:text-white">Corporate Client</option>
-                                <option value="Reseller" className="bg-white dark:bg-neutral-900 text-neutral-800 dark:text-white">Reseller</option>
-                                <option value="Affiliate Partner" className="bg-white dark:bg-neutral-900 text-neutral-800 dark:text-white">Affiliate Partner</option>
-                                <option value="Affiliate Partnership" className="bg-white dark:bg-neutral-900 text-neutral-800 dark:text-white">Affiliate Partnership</option>
-                              </select>
-                              <label htmlFor="modal_cust_type" className="pointer-events-none absolute left-3.5 top-1 text-[9px] text-indigo-650 dark:text-cyan-550 font-mono tracking-wider uppercase font-extrabold transition-all">
-                                Tier / Client classification
-                              </label>
-                            </div>
-
-                            <div className="relative group">
-                              <select
-                                id="modal_cust_status"
-                                value={custForm.status || 'active'}
-                                onChange={(e) => setCustForm({ ...custForm, status: e.target.value as any })}
-                                className="peer w-full bg-neutral-50/50 dark:bg-neutral-950/70 border border-neutral-200 dark:border-neutral-850 px-3.5 pt-4 pb-1.5 h-12 rounded-xl text-neutral-900 dark:text-neutral-300 focus:bg-white dark:focus:bg-neutral-950 focus:border-indigo-500 dark:focus:border-cyan-500 focus:ring-4 focus:ring-indigo-500/10 dark:focus:ring-cyan-500/10 outline-none text-xs transition-all cursor-pointer font-sans font-medium"
-                              >
-                                <option value="active" className="bg-white dark:bg-neutral-900 text-neutral-800 dark:text-white">Active</option>
-                                <option value="pending" className="bg-white dark:bg-neutral-900 text-neutral-800 dark:text-white">Pending Verification</option>
-                                <option value="suspended" className="bg-white dark:bg-neutral-900 text-neutral-800 dark:text-white">Suspended (Lockdown)</option>
-                                <option value="blocked" className="bg-white dark:bg-neutral-900 text-neutral-800 dark:text-white">Blocked</option>
-                                <option value="closed" className="bg-white dark:bg-neutral-900 text-neutral-800 dark:text-white">Closed Account</option>
-                              </select>
-                              <label htmlFor="modal_cust_status" className="pointer-events-none absolute left-3.5 top-1 text-[9px] text-indigo-650 dark:text-cyan-550 font-mono tracking-wider uppercase font-extrabold transition-all">
-                                Administrative security status
-                              </label>
-                            </div>
-
-                            <div className="relative group">
-                              <input
-                                type="number"
-                                id="modal_cust_wallet"
-                                value={custForm.walletBalance}
-                                onChange={(e) => setCustForm({ ...custForm, walletBalance: Number(e.target.value) })}
-                                className="peer w-full bg-neutral-50/50 dark:bg-neutral-950/70 border border-neutral-200 dark:border-neutral-850 px-3.5 pt-4 pb-1.5 h-12 rounded-xl text-neutral-900 dark:text-neutral-300 focus:bg-white dark:focus:bg-neutral-950 focus:border-indigo-500 dark:focus:border-cyan-500 focus:ring-4 focus:ring-indigo-500/10 dark:focus:ring-cyan-500/10 outline-none text-xs transition-all font-sans font-medium"
-                              />
-                              <label htmlFor="modal_cust_wallet" className="pointer-events-none absolute left-3.5 top-1 text-[9px] text-indigo-650 dark:text-cyan-550 font-mono tracking-wider uppercase font-extrabold transition-all">
-                                Wallet Balance ($ USD)
-                              </label>
-                            </div>
-
-                            <div className="relative group">
-                              <input
-                                type="number"
-                                id="modal_cust_spent"
-                                value={custForm.totalSpent}
-                                onChange={(e) => setCustForm({ ...custForm, totalSpent: Number(e.target.value) })}
-                                className="peer w-full bg-neutral-50/50 dark:bg-neutral-950/70 border border-neutral-200 dark:border-neutral-850 px-3.5 pt-4 pb-1.5 h-12 rounded-xl text-neutral-900 dark:text-neutral-300 focus:bg-white dark:focus:bg-neutral-950 focus:border-indigo-500 dark:focus:border-cyan-500 focus:ring-4 focus:ring-indigo-500/10 dark:focus:ring-cyan-500/10 outline-none text-xs transition-all font-sans font-medium"
-                              />
-                              <label htmlFor="modal_cust_spent" className="pointer-events-none absolute left-3.5 top-1 text-[9px] text-indigo-650 dark:text-cyan-550 font-mono tracking-wider uppercase font-extrabold transition-all">
-                                Total Spent ($ USD)
-                              </label>
-                            </div>
-
-                            <div className="md:col-span-2 relative group">
-                              <input
-                                type="text"
-                                id="modal_cust_tags"
-                                value={custForm.tags ? custForm.tags.join(', ') : ''}
-                                onChange={(e) => {
-                                  const tagsArray = e.target.value.split(',').map(t => t.trim()).filter(Boolean);
-                                  setCustForm({ ...custForm, tags: tagsArray });
-                                }}
-                                placeholder="VIP, High Value, Priority Support"
-                                className="peer w-full bg-neutral-50/50 dark:bg-neutral-950/70 border border-neutral-200 dark:border-neutral-850 px-3.5 pt-4 pb-1.5 h-12 rounded-xl text-neutral-900 dark:text-neutral-300 focus:bg-white dark:focus:bg-neutral-950 focus:border-indigo-500 dark:focus:border-cyan-500 focus:ring-4 focus:ring-indigo-500/10 dark:focus:ring-cyan-500/10 outline-none text-xs transition-all font-sans font-medium"
-                              />
-                              <label htmlFor="modal_cust_tags" className="pointer-events-none absolute left-3.5 top-1 text-[9px] text-indigo-650 dark:text-cyan-550 font-mono tracking-wider uppercase font-extrabold transition-all">
-                                Customer Classification Tags (comma-separated)
-                              </label>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Section 4: Workspace Features config toggles */}
-                        <div className="bg-neutral-900/60 p-5 rounded-2xl border border-neutral-800/40 pb-6 shadow-xl backdrop-blur-sm relative">
-                          <span className="text-[10px] text-purple-400 font-bold uppercase tracking-wider block border-b border-neutral-850 pb-2 mb-4 flex items-center gap-1.5">
-                            <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />
-                            Section D: SaaS Workspace Access Toggles & Licensed Features
-                          </span>
-                          
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                            {[
-                              { id: 'projects', label: 'Projects', icon: FolderOpen, desc: 'Manage project lifecycles' },
-                              { id: 'supportTickets', label: 'Support Tickets', icon: HelpCircle, desc: 'SLA helpdesk support' },
-                              { id: 'digitalStore', label: 'Digital Store', icon: ShoppingBag, desc: 'Catalog assets store' },
-                              { id: 'downloads', label: 'Downloads Area', icon: FileUp, desc: 'Secure download links' },
-                              { id: 'affiliateSystem', label: 'Affiliates hub', icon: Award, desc: 'Commission track map' },
-                              { id: 'wallet', label: 'Wallet ledger', icon: DollarSign, desc: 'Pre-funded ledger system' },
-                              { id: 'aiTools', label: 'AI Super-Tools', icon: Sparkles, desc: 'Premium smart assistants' },
-                              { id: 'notifications', label: 'Triggers Feed', icon: Bell, desc: 'Transmissions logging' }
-                            ].map((feat) => {
-                              const IconComponent = feat.icon;
-                              const isEnabled = custForm.workspaceFeatures ? (custForm.workspaceFeatures as any)[feat.id] : false;
-                              
-                              return (
-                                <button
-                                  type="button"
-                                  key={feat.id}
-                                  onClick={() => {
-                                    const currentFeats = custForm.workspaceFeatures || {
-                                      projects: true,
-                                      supportTickets: true,
-                                      digitalStore: true,
-                                      downloads: true,
-                                      affiliateSystem: true,
-                                      wallet: true,
-                                      aiTools: true,
-                                      notifications: true
-                                    };
-                                    setCustForm({
-                                      ...custForm,
-                                      workspaceFeatures: {
-                                        ...currentFeats,
-                                        [feat.id]: !isEnabled
-                                      }
-                                    });
-                                  }}
-                                  className={`p-3 rounded-2xl border text-left transition-all relative overflow-hidden group flex flex-col justify-between h-24 ${
-                                    isEnabled 
-                                      ? 'bg-purple-950/25 border-purple-500/40 text-purple-100 shadow-md shadow-purple-500/5' 
-                                      : 'bg-neutral-950 border-neutral-850 text-neutral-400 hover:border-neutral-700/80 hover:bg-neutral-900/40'
-                                  }`}
-                                >
-                                  <div className="flex items-center justify-between w-full">
-                                    <div className={`p-1.5 rounded-lg ${isEnabled ? 'bg-purple-500/20 text-purple-400':'bg-neutral-900 text-neutral-500'}`}>
-                                      <IconComponent className="w-3.5 h-3.5" />
-                                    </div>
-                                    <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center transition-all ${isEnabled ? 'bg-purple-600 border-purple-500 text-white':'border-neutral-700 bg-neutral-950'}`}>
-                                      {isEnabled && <Check className="w-2 h-2 stroke-[3]" />}
-                                    </div>
-                                  </div>
-                                  
-                                  <div className="mt-2.5">
-                                    <p className="text-[10px] font-black tracking-wide uppercase leading-none mb-1">{feat.label}</p>
-                                    <p className="text-[8px] opacity-45 leading-none font-sans line-clamp-1">{feat.desc}</p>
-                                  </div>
-                                  
-                                  {/* Bottom highlight border on active */}
-                                  <div className={`absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-purple-500 to-indigo-500 transition-all ${isEnabled ? 'w-full':'w-0 group-hover:w-1/2'}`} />
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-
-                        {/* Sticky Action Footer buttons */}
-                        <div className="sticky bottom-0 bg-neutral-950/90 backdrop-blur-md px-4 py-3.5 -mx-6 -mb-6 border-t border-neutral-800/80 z-20 flex gap-2 justify-end rounded-b-2xl">
-                          <button
-                            type="button"
-                            onClick={() => setShowAddCustomerModal(false)}
-                            className="px-4 py-2 hover:bg-neutral-800 text-neutral-300 hover:text-white rounded-xl text-xs font-bold font-sans transition-all"
-                          >
-                            Cancel Dispatch
-                          </button>
-                          <button
-                            type="submit"
-                            className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold font-sans transition-all shadow-lg shadow-purple-500/20 flex items-center gap-1.5"
-                          >
-                            <Save className="w-4 h-4" /> {selectedCustomerIdForEdit ? 'Save Record Modifications' : 'Commit New Registration'}
-                          </button>
-                        </div>
-
-                      </form>
-
-                    </div>
-                  </div>
-                )}
-
-                {/* MODAL WINDOW 1.5: REGISTRATION SUCCESS WIZARD */}
-                {showRegistrationSuccess && showRegistrationSuccess.open && (
-                  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-300">
-                    <div className={`w-full max-w-md rounded-2xl border ${cardBorder} ${panelBg} shadow-2xl p-6 relative animate-in zoom-in-95 duration-200 text-center space-y-6 relative overflow-hidden`}>
-                      
-                      {/* Decorative Purple Aura Banner */}
-                      <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-purple-600 via-indigo-500 to-purple-600" />
-                      
-                      <div className="mx-auto w-12 h-12 rounded-full bg-emerald-500/10 text-emerald-400 flex items-center justify-center border border-emerald-500/25">
-                        <Check className="w-6 h-6 stroke-[3]" />
-                      </div>
-
-                      <div className="space-y-2">
-                        <h4 className="text-base font-black text-white tracking-tight uppercase font-mono">
-                          Client Workspace Provisioned!
-                        </h4>
-                        <p className="text-xs text-neutral-400 leading-relaxed font-sans px-3">
-                          The profile for <strong className="text-purple-400 font-black">{showRegistrationSuccess.customerName}</strong> has been cataloged and validated. Standard SLA configurations and credential scopes have been deployed.
-                        </p>
-                      </div>
-
-                      {/* Display Secure Credentials Details Panel */}
-                      <div className="p-4 bg-neutral-950/65 rounded-xl border border-neutral-850/60 divide-y divide-neutral-850/40 text-left font-mono space-y-2 text-xs">
-                        <div className="flex items-center justify-between pb-2">
-                          <span className="opacity-50 text-[10px] uppercase font-bold">Unified Client ID</span>
-                          <span className="font-bold text-purple-400 text-[11px] bg-purple-500/10 px-2 py-0.5 rounded-full border border-purple-500/20">{showRegistrationSuccess.customerId}</span>
-                        </div>
-                        <div className="flex items-center justify-between py-2">
-                          <span className="opacity-50 text-[10px] uppercase font-bold">Secure Gatekeeper Passkey</span>
-                          <span className="font-bold text-cyan-400 text-[11px] font-mono tracking-wider">{showRegistrationSuccess.password}</span>
-                        </div>
-                        <div className="flex flex-col pt-2 text-[10px] space-y-1">
-                          <span className="opacity-50 uppercase font-bold text-[9px] mb-1">Activated Workspace Entitlements</span>
-                          <div className="flex flex-wrap gap-1">
-                            {Object.entries(showRegistrationSuccess.workspaceFeatures || {})
-                              .filter(([_, enabled]) => !!enabled)
-                              .map(([key]) => (
-                                <span key={key} className="bg-neutral-850 text-neutral-300 px-1.5 py-0.5 rounded text-[8px] border border-neutral-800">
-                                  {key.replace(/([A-Z])/g, ' $1').toUpperCase()}
-                                </span>
-                              ))
-                            }
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* 3 Explicit Core Actions Requested by User */}
-                      <div className="flex flex-col gap-2 pt-2">
-                        <button
-                          onClick={() => {
-                            setSelectedCustomerProfileId(showRegistrationSuccess.customerId);
-                            setShowRegistrationSuccess(null);
-                          }}
-                          className="w-full py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-black font-mono tracking-wide uppercase transition hover:scale-[1.01] flex items-center justify-center gap-1.5 shadow-lg shadow-purple-500/15"
-                        >
-                          <Eye className="w-4 h-4" /> View Customer Profile
-                        </button>
-                        
-                        <div className="grid grid-cols-2 gap-2">
-                          <button
-                            onClick={() => {
-                              setShowRegistrationSuccess(null);
-                              setCustForm({
-                                name: '',
-                                companyName: '',
-                                email: '',
-                                phone: '',
-                                whatsapp: '',
-                                dob: '1995-01-01',
-                                gender: 'Male',
-                                country: 'Bangladesh',
-                                city: 'Dhaka',
-                                address: '',
-                                postalCode: '',
-                                websiteUrl: '',
-                                customerType: 'Regular Client',
-                                status: 'active',
-                                tags: ['Regular'],
-                                password: '',
-                                workspaceFeatures: {
-                                  projects: true,
-                                  supportTickets: true,
-                                  digitalStore: true,
-                                  downloads: true,
-                                  affiliateSystem: true,
-                                  wallet: true,
-                                  aiTools: true,
-                                  notifications: true
-                                }
-                              });
-                              setSelectedCustomerIdForEdit(null);
-                              setShowAddCustomerModal(true);
-                            }}
-                            className="py-2 bg-neutral-900 hover:bg-neutral-800 text-neutral-200 border border-neutral-800 hover:border-neutral-700 rounded-xl text-[10px] font-bold font-sans transition flex items-center justify-center gap-1"
-                          >
-                            <Plus className="w-3.5 h-3.5" /> Create Another Customer
-                          </button>
-                          
-                          <button
-                            onClick={() => {
-                              setShowRegistrationSuccess(null);
-                            }}
-                            className="py-2 bg-neutral-900 hover:bg-neutral-800 text-neutral-200 border border-neutral-800 hover:border-neutral-700 rounded-xl text-[10px] font-bold font-sans transition flex items-center justify-center gap-1"
-                          >
-                            <Users className="w-3.5 h-3.5" /> Go To Customer List
-                          </button>
-                        </div>
-                      </div>
-
-                    </div>
-                  </div>
-                )}
-
-                {/* MODAL WINDOW 2: CUSTOMERS COMMUNICATION CENTER PANEL */}
-                {showCommunicationModal && showCommunicationModal.open && (
-                  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-                    <div className={`w-full max-w-lg rounded-2xl border ${cardBorder} ${panelBg} shadow-2xl p-6 relative animate-in zoom-in-95 duration-200 text-left`}>
-                      
-                      <button
-                        onClick={() => setShowCommunicationModal(null)}
-                        className="absolute top-4 right-4 p-1.5 rounded-lg hover:bg-neutral-800 text-neutral-400 hover:text-white transition"
-                      >
-                        <X className="w-5 h-5" />
-                      </button>
-
-                      <h4 className={`text-lg font-black tracking-tight ${textTitle} mb-1 flex items-center gap-1.5`}>
-                        <Send className="w-5 h-5 text-purple-500" />
-                        Relay Correspondence Dispatcher
-                      </h4>
-                      <p className="text-xs text-neutral-400 mb-6 font-medium">Transmit secure emails, SMS arrays, push nodes, or WhatsApp text packages directly to customer endpoints.</p>
-
-                      <div className="p-3 bg-neutral-950/40 rounded border border-neutral-850/60 mb-4 text-xs font-mono">
-                        <span className="opacity-55 block">DISPATCH TO TERMINOLOGY</span>
-                        <p className="font-bold text-purple-400">{showCommunicationModal.customerName} ({showCommunicationModal.customerTarget})</p>
-                      </div>
-
-                      <div className="space-y-4 text-xs font-mono">
-                        <div className="grid grid-cols-4 gap-2">
-                          {[
-                            { id: 'email', label: 'EMAIL', color: 'text-orange-400' },
-                            { id: 'sms', label: 'SMS', color: 'text-cyan-400' },
-                            { id: 'whatsapp', label: 'WhatsApp', color: 'text-green-400' },
-                            { id: 'push', label: 'PUSH', color: 'text-pink-400' }
-                          ].map(mode => (
-                            <button
-                              key={mode.id}
-                              onClick={() => setShowCommunicationModal({ ...showCommunicationModal, type: mode.id as any })}
-                              className={`p-2.5 rounded-xl border font-bold text-[10px] transition-all text-center ${
-                                showCommunicationModal.type === mode.id 
-                                  ? 'bg-purple-600 border-purple-500 text-white' 
-                                  : 'bg-neutral-950 hover:bg-neutral-900 border-neutral-850 text-neutral-400'
-                              }`}
-                            >
-                              <span className={mode.color}>■</span> {mode.label}
-                            </button>
-                          ))}
-                        </div>
-
-                        <div>
-                          <label className="text-[10px] opacity-60 block mb-1">CORRESPONDENCE SUBJECT / HEADING</label>
-                          <input
-                            type="text"
-                            placeholder="System Notification / Account Audit Request"
-                            className="w-full bg-neutral-950 border border-neutral-850 px-3 py-2 rounded focus:border-purple-500 outline-none text-white text-xs"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="text-[10px] opacity-60 block mb-1">DRAFT DOCUMENT MESSAGE payload</label>
-                          <textarea
-                            rows={4}
-                            placeholder="Type the message payload here. Supported triggers: {{name}} for customer greeting, {{id}} for accounts indexing, or {{date}}..."
-                            className="w-full bg-neutral-950 border border-neutral-850 px-3 py-2 rounded focus:border-purple-500 outline-none text-white text-xs font-sans"
-                          />
-                        </div>
-
-                        <div className="flex gap-2 justify-end pt-3 border-t border-neutral-805">
-                          <button
-                            type="button"
-                            onClick={() => setShowCommunicationModal(null)}
-                            className="px-4 py-1.5 bg-neutral-800 text-neutral-400 hover:text-white rounded font-bold"
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            onClick={() => {
-                              triggerToast(`📨 Correspondence relay initiated! Broadcast package successfully scheduled and queued to ${showCommunicationModal.type.toUpperCase()} node clusters.`);
-                              setShowCommunicationModal(null);
-                            }}
-                            className="px-4 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded font-bold transition-all shadow-lg shadow-purple-500/10"
-                          >
-                            Transmit Payload
-                          </button>
-                        </div>
-
-                      </div>
-
-                    </div>
-                  </div>
-                )}
-
-                {/* MODAL WINDOW 3: GEMINI CHATBOT IMPORT BLOG JSON MODAL */}
-                {showGeminiChatbotModal && (
-                  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-300" id="gemini-chatbot-modal">
-                    <div className={`w-full max-w-xl rounded-2xl border backdrop-blur-2xl shadow-2xl p-6 relative animate-in zoom-in-95 duration-300 text-left ${
-                      isDark 
-                        ? 'bg-neutral-900/75 border-white/10 text-white shadow-black/80' 
-                        : 'bg-white/75 border-neutral-200/60 text-neutral-900 shadow-neutral-300/50'
-                    }`} id="gemini-chatbot-content">
-                      
-                      <button
-                        onClick={() => setShowGeminiChatbotModal(false)}
-                        className={`absolute top-4 right-4 p-1.5 rounded-lg transition-colors ${
-                          isDark ? 'hover:bg-neutral-800 text-neutral-400 hover:text-white' : 'hover:bg-neutral-100 text-neutral-500 hover:text-neutral-900'
-                        }`}
-                        id="gemini-chatbot-close-btn"
-                        title="Close Modal"
-                      >
-                        <X className="w-5 h-5" />
-                      </button>
-
-                      <h4 className={`text-lg font-black tracking-tight ${textTitle} mb-1 flex items-center gap-2`} id="gemini-chatbot-header">
-                        <div className="p-1 px-1.5 bg-purple-500/10 text-purple-500 rounded-lg border border-purple-500/20">
-                          <Sparkles className="w-4 h-4 animate-pulse" />
-                        </div>
-                        Gemini Chatbot - Blog JSON Importer
-                      </h4>
-                      <p className={`text-xs mb-6 font-medium ${isDark ? 'text-neutral-400' : 'text-neutral-500'}`}>
-                        Paste the blog post JSON payload beneath to automatically decode details, generate taxonomies, and save as drafts.
-                      </p>
-
-                      <div className="space-y-4">
-                        <div>
-                          <label className={`block text-[11px] font-black font-mono tracking-widest mb-2 ${textTitle}`}>
-                            BLOG JSON PAYLOAD
-                          </label>
-                          <textarea
-                            id="gemini-chatbot-json-input"
-                            value={blogJsonInput}
-                            onChange={(e) => setBlogJsonInput(e.target.value)}
-                            placeholder={`{\n  "title": "Unleashing Cloud Power with NVMe SSD",\n  "category": "Web Hosting",\n  "summary": "Full detailed overview of NVMe storage speed metrics.",\n  "content": "### Introduction\\nNVMe is faster...\\n\\n### Key Benefits\\n1. Speed\\n2. IOPS"\n}`}
-                            rows={10}
-                            className={`w-full p-4 font-mono text-xs rounded-xl border outline-none placeholder-neutral-500 focus:ring-2 focus:ring-purple-500/20 transition-all ${
-                              isDark 
-                                ? 'bg-neutral-950/70 border-neutral-800/80 text-purple-200 focus:border-purple-500/80' 
-                                : 'bg-white/70 border-neutral-200 text-purple-900 focus:border-purple-500/80'
-                            }`}
-                          />
-                        </div>
-
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-2">
-                          <span className={`text-[10px] font-mono flex items-center gap-1.5 ${isDark ? 'text-purple-300' : 'text-purple-700'}`}>
-                            <span className="w-2 h-2 rounded-full bg-purple-500 animate-ping shrink-0" />
-                            Decodes category automatically if absent
-                          </span>
-                          
-                          <div className="flex gap-2 justify-end">
-                            <button
-                              id="gemini-chatbot-cancel"
-                              onClick={() => setShowGeminiChatbotModal(false)}
-                              className={`px-4 py-2 text-xs font-semibold rounded-lg border transition-all duration-200 transform hover:-translate-y-0.5 active:translate-y-0 ${
-                                isDark 
-                                  ? 'hover:bg-neutral-800 border-neutral-800 text-neutral-400 hover:text-white' 
-                                  : 'hover:bg-neutral-100 border-neutral-200 text-neutral-600 hover:text-neutral-900'
-                              }`}
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              id="gemini-chatbot-process"
-                              onClick={() => {
-                                if (!blogJsonInput.trim()) {
-                                  triggerToast("⚠️ Input is empty. Please enter valid blog JSON payload.");
-                                  return;
-                                }
-                                try {
-                                  const parsed = JSON.parse(blogJsonInput);
-                                  
-                                  // Ensure we handle single objects as well as arrays
-                                  const postsToProcess = Array.isArray(parsed) ? parsed : [parsed];
-                                  
-                                  let processedCount = 0;
-                                  
-                                  postsToProcess.forEach((singlePost) => {
-                                    // 1. Menu or Category check or create using Category::firstOrCreate
-                                    const categoryValue = singlePost.menu_category || singlePost.category || "General";
-                                    const categoryResult = Category.firstOrCreate({
-                                      name: categoryValue,
-                                      slug: categoryValue.toLowerCase().replace(/[^a-z0-9]+/g, '-')
-                                    });
-                                    
-                                    // 2. Prepare post variables and insert using Post::create
-                                    const createdPost = Post.create({
-                                      category_id: categoryResult.id,
-                                      category: categoryResult.name,
-                                      title: singlePost.title || "Untitled Blog Payload",
-                                      slug: singlePost.slug || (singlePost.title ? singlePost.title.toLowerCase().replace(/[^a-z0-9]+/g, '-') : `blog-${Date.now()}`),
-                                      content: singlePost.content || "", // Contains HTML
-                                      meta_keywords: singlePost.meta_keywords || "",
-                                      meta_description: singlePost.meta_description || singlePost.meta_desc || "",
-                                      status: 'draft' // status set to 'draft'
-                                    });
-                                    
-                                    // Push back to the unified posts state
-                                    setPosts(prev => [createdPost, ...prev]);
-                                    processedCount++;
-                                  });
-                                  
-                                  triggerToast(`🚀 Decoded successfully! Save completed for ${processedCount} post(s) with Category::firstOrCreate & Post::create as 'draft' status.`);
-                                  setShowGeminiChatbotModal(false);
-                                  setBlogJsonInput('');
-                                  
-                                  // Automatically switch to the Blog list viewport to trace the imported draft posts
-                                  setActiveMenu('cms');
-                                  setActiveSubMenu('cms-blogs');
-                                  
-                                } catch (err: any) {
-                                  console.error(err);
-                                  triggerToast(`❌ Failed to decode JSON payload: ${err.message}`);
-                                }
-                              }}
-                              className="px-4 py-2 text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white rounded-lg shadow-lg shadow-purple-900/10 hover:shadow-purple-600/30 transition-all duration-200 flex items-center gap-1.5 transform hover:-translate-y-0.5 active:translate-y-0"
-                            >
-                              <Check className="w-3.5 h-3.5" /> Process & Save
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-
-                    </div>
-                  </div>
-                )}
-
-              </div>
-            );
-          })()
-        )}
-
-            {/* SCREEN VIEWPORT C: ORDERS LEDGER */}
+            {/* SCREEN VIEWPORT: ORDERS MANAGEMENT & BILLING PIPELINES */}
             {activeMenu === 'orders' && (
-              !checkPermission('manage_orders') ? renderAccessDenied('manage_orders', 'Orders & Transactions Gateway') : (() => {
-              if (activeSubMenu === 'guest-orders') {
-                return (
-                  <Suspense fallback={<div className="p-8 text-center text-xs text-neutral-500">Loading guest orders...</div>}>
-                    <GuestOrderTracking 
-                      orders={orders} 
-                      updateOrderStatus={updateOrderStatus} 
-                      deleteOrder={deleteOrder}
-                      triggerToast={triggerToast}
-                      isDark={isDark}
-                      panelBg={panelBg}
-                      textTitle={textTitle}
-                      logAdminAction={logAdminAction}
-                      dispatchAutomatedEmail={dispatchAutomatedEmail}
-                    />
-                  </Suspense>
-                );
-              }
-
-              if (activeSubMenu === 'email-notifications') {
-                return (
-                  <div className="space-y-6 animate-in fade-in duration-200">
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                      <div>
-                        <h3 className={`text-lg font-bold ${textTitle}`}>Automated Receipt Emails & Communication Center</h3>
-                        <p className="text-xs opacity-60">Monitor automated client checkout email notifications, inspect delivery logs and trigger manual diagnostic receipts.</p>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                      
-                      {/* COLUMN 1 & 2: RECIPIENT MAILS DIAGNOSTIC PORTAL & FORM */}
-                      <div className="lg:col-span-2 space-y-6">
-                        
-                        {/* SYSTEM HEALTH CARDS */}
-                        <div className={`p-5 rounded-2xl border ${panelBg} shadow-sm grid grid-cols-1 md:grid-cols-2 gap-4`}>
-                          <div>
-                            <span className="text-[10px] font-mono font-bold text-neutral-400 uppercase tracking-wider block mb-1">automated communication status</span>
-                            <div className="flex items-center gap-2">
-                              <span className={`w-2.5 h-2.5 rounded-full ${emailLogs.some(l => l.details?.smtpHost !== 'Not Specified (Use SMTP_HOST in .env)') ? 'bg-emerald-500 animate-pulse' : 'bg-cyan-500 animate-pulse'}`} />
-                              <span className={`font-mono font-bold text-xs ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                                {emailLogs.some(l => l.details?.smtpHost !== 'Not Specified (Use SMTP_HOST in .env)') ? 'SMTP TRANSLATION LAYER: ACTIVE' : 'SANDBOX SIMULATOR REDIRECT: ACTIVE'}
-                              </span>
-                            </div>
-                            <p className="text-[10px] opacity-65 mt-1.5 leading-relaxed">
-                              When orders are marked as <strong>COMPLETED</strong>, an automated email receipt will generate and dispatch to the client instantly.
-                            </p>
-                          </div>
-                          
-                          <div className="border-t md:border-t-0 md:border-l border-neutral-800/60 md:pl-4 pt-4 md:pt-0">
-                            <span className="text-[10px] font-mono font-bold text-neutral-400 uppercase tracking-wider block mb-1">active email registry credentials</span>
-                            <div className="text-[10px] font-mono space-y-1 text-neutral-300">
-                              <div className="flex justify-between">
-                                <span className="opacity-50">SMTP Host:</span>
-                                <span>{emailLogs[0]?.details?.smtpHost || "Using system default / fallback"}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="opacity-50">SMTP Sender:</span>
-                                <span>{emailLogs[0]?.details?.smtpFrom || "no-reply@webzonebd.com"}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="opacity-50 font-semibold text-purple-400">Total Notifications Sent:</span>
-                                <span className="font-bold text-purple-400">{emailLogs.length}</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* MANUAL PUSH FORM */}
-                        <div className={`p-5 rounded-2xl border ${panelBg} shadow-sm space-y-4`}>
-                          <div className="flex items-center gap-2">
-                            <Send className="w-4 h-4 text-purple-400" />
-                            <span className="text-xs font-bold text-neutral-300 uppercase tracking-widest font-mono">Manual Receipt Dispatch Console</span>
-                          </div>
-                          
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-1.5">
-                              <label className="text-[10px] font-bold opacity-75">Select Completed Order Reference</label>
-                              <select
-                                value={manualMailOrderId}
-                                onChange={(e) => {
-                                  const ordId = e.target.value;
-                                  setManualMailOrderId(ordId);
-                                  // Auto fill customer email if possible!
-                                  const ord = orders.find(o => o.id === ordId);
-                                  if (ord) {
-                                    const cust = getCustomerForOrder(ord);
-                                    if (cust) setManualMailEmail(cust.email);
-                                  }
-                                }}
-                                className={`w-full p-2.5 rounded-xl border font-mono text-xs outline-none ${
-                                  isDark ? 'border-neutral-800 text-white bg-neutral-900/60' : 'border-neutral-200 text-neutral-900 bg-white'
-                                }`}
-                              >
-                                <option value="">-- Choose Completed Order --</option>
-                                {orders.map(o => (
-                                  <option key={o.id} value={o.id}>
-                                    #{getOrderSerial(o.id)} - {o.itemTitle.substring(0, 32)} (${o.price})
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-
-                            <div className="space-y-1.5">
-                              <label className="text-[10px] font-bold opacity-75">Target Dispatch Recipient Email</label>
-                              <input
-                                type="email"
-                                placeholder="customer@example.com"
-                                value={manualMailEmail}
-                                onChange={(e) => setManualMailEmail(e.target.value)}
-                                className={`w-full p-2.5 rounded-xl border text-xs outline-none ${
-                                  isDark ? 'border-neutral-800 text-white bg-neutral-900/60' : 'border-neutral-200 text-neutral-900 bg-white'
-                                }`}
-                              />
-                            </div>
-                          </div>
-
-                          <div className="flex justify-end pt-2">
-                            <button
-                              disabled={manualSending || !manualMailOrderId || !manualMailEmail}
-                              onClick={async () => {
-                                setManualSending(true);
-                                const selectedOrd = orders.find(o => o.id === manualMailOrderId);
-                                if (selectedOrd) {
-                                  await dispatchAutomatedEmail(selectedOrd, manualMailEmail);
-                                } else {
-                                  triggerToast("⚠️ Order ID mismatches target array configuration.");
-                                }
-                                setManualSending(false);
-                              }}
-                              className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-bold rounded-xl shadow hover:opacity-90 disabled:opacity-40 transition cursor-pointer flex items-center gap-1.5 font-sans"
-                            >
-                              <Mail className="w-3.5 h-3.5" />
-                              {manualSending ? "Transmitting..." : "Send Manual Proof Email"}
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* DISPATCH HISTORY LEDGER */}
-                        <div className={`border ${isDark ? 'border-neutral-800 bg-neutral-900/10' : 'border-neutral-100 bg-neutral-50/20'} rounded-2xl overflow-hidden shadow-sm`}>
-                          <div className="p-4 border-b border-neutral-800/50 bg-neutral-900/30 flex items-center justify-between">
-                            <h4 className="text-xs font-bold tracking-wider uppercase font-mono text-purple-400">Notification Transmission Log</h4>
-                            <span className="text-[9px] px-2 py-0.5 rounded bg-purple-500/10 text-purple-300 font-mono">
-                              Latest 50 Transmittals
-                            </span>
-                          </div>
-
-                          {emailLogs.length === 0 ? (
-                            <div className="p-12 text-center space-y-2">
-                              <p className="text-xs opacity-50">No receipt notifications have been dispatched yet.</p>
-                              <p className="text-[10px] text-purple-400 font-medium">To trigger one: go back to "All Orders" sub-tab and set any pending order status to "Approve (Completed)".</p>
-                            </div>
-                          ) : (
-                            <div className="overflow-x-auto">
-                              <table className="w-full text-left text-xs mb-0">
-                                <thead>
-                                  <tr className="border-b border-neutral-800/40 text-neutral-400">
-                                    <th className="p-3">Order Ref</th>
-                                    <th className="p-3">Recipient Client</th>
-                                    <th className="p-3">Target Inbox</th>
-                                    <th className="p-3">Timestamp</th>
-                                    <th className="p-3 text-right">Action</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {emailLogs.map((log) => (
-                                    <tr 
-                                      key={log.id} 
-                                      onClick={() => setSelectedMailLog(log)}
-                                      className={`border-b border-neutral-800/20 cursor-pointer ${
-                                        selectedMailLog?.id === log.id 
-                                          ? (isDark ? 'bg-purple-600/15' : 'bg-purple-50')
-                                          : (isDark ? 'hover:bg-neutral-800/25' : 'hover:bg-neutral-50')
-                                      }`}
-                                    >
-                                      <td className="p-3 font-mono font-bold text-purple-400">#{log.orderId}</td>
-                                      <td className="p-3 font-medium">{log.recipientName}</td>
-                                      <td className="p-3 text-neutral-400 font-mono text-[10px]">{log.recipientEmail}</td>
-                                      <td className="p-3 opacity-60 text-[10px]">{log.timestamp}</td>
-                                      <td className="p-3 text-right">
-                                        <button 
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setSelectedMailLog(log);
-                                          }}
-                                          className="text-[10px] uppercase font-bold text-purple-400 hover:underline"
-                                        >
-                                          Inspect
-                                        </button>
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          )}
-                        </div>
-
-                      </div>
-
-                      {/* COLUMN 3: REAL-TIME SECURE MAIL INSPECTOR & LIVE IFRAME */}
-                      <div className="space-y-6">
-                        <div className={`p-5 rounded-2xl border ${panelBg} shadow-sm min-h-[450px] flex flex-col`}>
-                          <div className="flex items-center gap-1.5 border-b border-neutral-800/40 pb-3 mb-4 font-sans">
-                            <Eye className="w-4 h-4 text-purple-400" />
-                            <span className="text-xs font-bold text-neutral-300 uppercase tracking-widest font-mono">Invoice Delivery Inspector</span>
-                          </div>
-
-                          {selectedMailLog ? (
-                            <div className="flex-1 flex flex-col space-y-4 font-sans">
-                              <div className="space-y-1">
-                                <div className="text-[10px] uppercase font-bold tracking-wider text-neutral-400">delivery transmission status</div>
-                                <div className="text-xs bg-neutral-900/80 p-2 rounded-xl font-mono text-purple-300 flex items-center gap-1.5 border border-purple-500/20">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-ping" />
-                                  {selectedMailLog.status}
-                                </div>
-                              </div>
-
-                              <div className="space-y-1.5 text-xs text-neutral-300">
-                                <div className="flex justify-between">
-                                  <span className="opacity-55">Client Name:</span>
-                                  <span className="font-semibold text-neutral-900 dark:text-white">{selectedMailLog.recipientName}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="opacity-55">Client Inbox:</span>
-                                  <span className="font-mono text-neutral-900 dark:text-white text-[11px]">{selectedMailLog.recipientEmail}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="opacity-55">Subject Title:</span>
-                                  <span className="font-semibold text-neutral-900 dark:text-white">{selectedMailLog.subject}</span>
-                                </div>
-                              </div>
-
-                              {/* TOGGLE SUB TABS FOR PREVIEW / CODE / DETAILS */}
-                              <div className="flex border-b border-neutral-850 bg-neutral-900/20 rounded-lg p-0.5 text-xs font-mono">
-                                <button
-                                  onClick={() => setMailInspectMode('preview')}
-                                  className={`flex-1 py-1 rounded text-center font-bold transition-all ${
-                                    mailInspectMode === 'preview' ? 'bg-purple-600 text-white' : 'text-neutral-400'
-                                  }`}
-                                >
-                                  📧 View
-                                </button>
-                                <button
-                                  onClick={() => setMailInspectMode('html')}
-                                  className={`flex-1 py-1 rounded text-center font-bold transition-all ${
-                                    mailInspectMode === 'html' ? 'bg-purple-600 text-white' : 'text-neutral-400'
-                                  }`}
-                                >
-                                  🛠️ HTML
-                                </button>
-                                <button
-                                  onClick={() => setMailInspectMode('details')}
-                                  className={`flex-1 py-1 rounded text-center font-bold transition-all ${
-                                    mailInspectMode === 'details' ? 'bg-purple-600 text-white' : 'text-neutral-400'
-                                  }`}
-                                >
-                                  ⚙️ Vars
-                                </button>
-                              </div>
-
-                              <div className="flex-1 min-h-[300px] rounded-xl overflow-hidden bg-neutral-950 border border-neutral-800 relative">
-                                {mailInspectMode === 'preview' && (
-                                  <iframe
-                                    title="HTML Invoice Receipt Preview"
-                                    srcDoc={selectedMailLog.htmlTemplate}
-                                    sandbox="allow-same-origin"
-                                    className="w-full h-full bg-white border-0"
-                                  />
-                                )}
-
-                                {mailInspectMode === 'html' && (
-                                  <textarea
-                                    readOnly
-                                    value={selectedMailLog.htmlTemplate}
-                                    className="w-full h-full p-3 font-mono text-[10px] bg-neutral-950 text-emerald-400 border-0 outline-none resize-none"
-                                  />
-                                )}
-
-                                {mailInspectMode === 'details' && (
-                                  <div className="p-4 space-y-3 font-mono text-[10px] text-neutral-300 overflow-y-auto max-h-[300px]">
-                                    <div className="text-purple-400 font-bold uppercase mb-2">Configure SMTP in .env</div>
-                                    <p className="opacity-80 leading-relaxed">
-                                      Your container is fully equipped with Nodemailer. To authorize live mail transmission, enter your email credentials into your environment fields:
-                                    </p>
-                                    <div className="bg-neutral-900 p-2.5 rounded border border-neutral-800 text-[9px] text-cyan-400 select-all leading-normal whitespace-pre">
-{`SMTP_HOST=mail.yourdomain.com
-SMTP_PORT=587 (or 465)
-SMTP_USER=no-reply@yourdomain.com
-SMTP_PASS=secured_password
-SMTP_FROM="WebzoneBD Team" <no-reply@yourdomain.com>`}
-                                    </div>
-                                    <p className="opacity-70 mt-2 text-[9px] text-amber-400">
-                                      *Restart the dev server once .env is updated to bind SMTP triggers globally.
-                                    </p>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="flex-1 flex flex-col items-center justify-center text-center p-6 space-y-2">
-                              <div className="w-10 h-10 rounded-full bg-neutral-800 flex items-center justify-center text-neutral-500 sm:mx-auto">
-                                <Eye className="w-4 h-4" />
-                              </div>
-                              <p className="text-xs opacity-50">Select any dispatched notification row from the ledger to inspect delivery status, email variables, and the generated HTML receipt.</p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                    </div>
-                  </div>
-                );
-              }
-
-              return (
+              !checkPermission('manage_orders') ? renderAccessDenied('manage_orders', 'Orders Management') : (
                 <Suspense fallback={<div className="p-8 text-center text-xs text-neutral-500">Loading orders manager...</div>}>
                   <OrdersManagement
                     orders={orders}
                     customers={customers}
                     isDark={isDark}
                     language={language}
-                    formatPrice={formatPrice}
+                    formatPrice={(val: number) => `$${val.toFixed(2)}`}
                     getOrderSerial={getOrderSerial}
                     setSelectedOrderForInspect={setSelectedOrderForInspect}
                     setSelectedOrderForInvoiceModal={setSelectedOrderForInvoiceModal}
                     updateOrderStatus={updateOrderStatus}
                     updateOrderDetails={updateOrderDetails}
                     deleteOrder={deleteOrder}
-                    currentUser={user}
+                    currentUser={currentUser}
                     triggerToast={triggerToast}
                   />
                 </Suspense>
-              );
-            })()
-          )}
-
-            {/* SCREEN VIEWPORT D: ENTERPRISE SERVICES */}
-            {activeMenu === 'services' && (
-              !checkPermission('manage_content') ? renderAccessDenied('manage_content', 'Enterprise bespoke Services') : (() => {
-                // Determine active view inside Services
-                const subView = activeSubMenu || 'all-services';
-
-                // Helper to render modals or views based on subView
-                return (
-                  <div className="space-y-6 animate-in fade-in duration-200 text-left">
-                    {/* Header */}
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                      <div>
-                        <h3 className={`text-lg font-bold ${textTitle}`}>
-                          {subView === 'all-services' && 'All Services List'}
-                          {subView === 'service-categories' && 'Service Categories Taxonomy'}
-                          {subView === 'service-orders' && 'Service Orders & Subscriptions'}
-                          {subView === 'service-inquiries' && 'Service Inquiries & Custom Quotes'}
-                          {subView === 'whatsapp-leads' && 'WhatsApp Orders & Live Leads'}
-                          {subView === 'service-reports' && 'Services Performance & Analytics'}
-                        </h3>
-                        <p className="text-xs opacity-60">
-                          {subView === 'all-services' && 'Configure active bespoke service descriptions, starting rates, and taxonomy.'}
-                          {subView === 'service-categories' && 'Manage high-level categories grouping custom client solutions.'}
-                          {subView === 'service-orders' && 'Audit client service acquisitions, verification states, and payments.'}
-                          {subView === 'service-inquiries' && 'Reply to client custom spec inquiries and handle WhatsApp CRM funnels.'}
-                          {subView === 'whatsapp-leads' && 'Track direct client click conversions routed to WhatsApp (+966570511931).'}
-                          {subView === 'service-reports' && 'Analyze service order trends, revenue breakdown, and popular products.'}
-                        </p>
-                      </div>
-
-                      {/* Add Buttons */}
-                      {subView === 'all-services' && (
-                        <button 
-                          onClick={() => {
-                            setEditingService(null);
-                            setShowServiceModal(true);
-                          }}
-                          className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-lg flex items-center gap-1 cursor-pointer transition active:scale-95"
-                        >
-                          <Plus className="w-4 h-4" />
-                          <span>Add New Service</span>
-                        </button>
-                      )}
-                      {subView === 'service-categories' && (
-                        <button 
-                          onClick={() => {
-                            setEditingCategory(null);
-                            setShowCategoryModal(true);
-                          }}
-                          className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-lg flex items-center gap-1 cursor-pointer transition active:scale-95"
-                        >
-                          <Plus className="w-4 h-4" />
-                          <span>Create Category</span>
-                        </button>
-                      )}
-                    </div>
-
-                    {/* VIEWPORT CONTROLLER */}
-                    {subView === 'all-services' && (
-                      <div className={`p-5 rounded-2xl border ${cardBorder} ${panelBg} shadow-sm overflow-hidden`}>
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-left border-collapse text-xs">
-                            <thead>
-                              <tr className="border-b border-white/[0.08] opacity-60">
-                                <th className="py-3 px-4 font-bold uppercase">ID</th>
-                                <th className="py-3 px-4 font-bold uppercase">Name</th>
-                                <th className="py-3 px-4 font-bold uppercase">Category</th>
-                                <th className="py-3 px-4 font-bold uppercase">Starting Price</th>
-                                <th className="py-3 px-4 font-bold uppercase">Total Orders</th>
-                                <th className="py-3 px-4 font-bold uppercase text-right">Actions</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-white/[0.04]">
-                              {adminServices.map((srv) => (
-                                <tr key={srv.id} className="hover:bg-white/[0.02] transition-colors">
-                                                                  <td className="py-3 px-4 font-mono text-[10px] text-purple-400">{srv.id}</td>
-                                  <td className="py-3 px-4 font-bold">{srv.name || srv.title}</td>
-                                  <td className="py-3 px-4">
-                                    <span className="px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 font-bold text-[10px]">
-                                      {srv.category}
-                                    </span>
-                                  </td>
-                                  <td className="py-3 px-4 font-mono font-bold text-emerald-400">${srv.price || srv.startingPrice}</td>
-                                  <td className="py-3 px-4 font-mono">{srv.ordersCount || srv.projectsCompleted || 0} orders</td>
-                                  <td className="py-3 px-4 text-right">
-                                    <div className="flex gap-2 justify-end">
-                                      <button 
-                                        onClick={() => {
-                                          setEditingService(srv);
-                                          setShowServiceModal(true);
-                                        }}
-                                        className="px-2 py-1 bg-neutral-800 text-neutral-300 hover:text-white rounded text-[10px] cursor-pointer"
-                                      >
-                                        Edit
-                                      </button>
-                                      <button 
-                                        onClick={() => {
-                                          setAdminServices(adminServices.filter(s => s.id !== srv.id));
-                                          triggerToast(`Service "${srv.name || srv.title}" deleted from active catalog.`);
-                                        }}
-                                        className="px-2 py-1 bg-red-600/10 text-red-400 hover:bg-red-600 hover:text-white rounded text-[10px] cursor-pointer transition"
-                                      >
-                                        Delete
-                                      </button>
-                                    </div>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    )}
-
-                    {subView === 'service-categories' && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {adminCategories.map((cat) => {
-                          const matchingServices = getMatchingServices(cat.name);
-                          return (
-                            <div key={cat.id} className={`p-5 rounded-2xl border ${cardBorder} ${panelBg} shadow-sm relative overflow-hidden flex flex-col justify-between hover:scale-[1.01] transition`} id={`cat-card-${cat.id}`}>
-                              <div className="space-y-4">
-                                <div className="flex items-center justify-between">
-                                  <span className={`text-[9px] uppercase font-bold tracking-widest font-mono bg-gradient-to-r ${cat.color} text-transparent bg-clip-text`}>
-                                    Taxonomy Category
-                                  </span>
-                                  <span className="text-[10px] font-mono text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded-full font-black">
-                                    {matchingServices.length} active services
-                                  </span>
-                                </div>
-                                <div>
-                                  <h4 className="text-base font-black text-neutral-100">{cat.name}</h4>
-                                  <p className="text-xs opacity-60 leading-relaxed mt-1">{cat.desc}</p>
-                                </div>
-
-                                {/* Custom Services List belonging to this taxonomy */}
-                                <div className="space-y-2.5 pt-3 border-t border-white/[0.04]">
-                                  <div className="flex justify-between items-center">
-                                    <span className="text-[10px] uppercase tracking-wider font-bold text-neutral-400 font-mono">Custom Services list</span>
-                                    <button
-                                      onClick={() => {
-                                        setEditingService(null);
-                                        setDefaultCategory(cat.name);
-                                        setShowServiceModal(true);
-                                      }}
-                                      className="text-[10px] font-bold text-purple-400 hover:text-purple-300 flex items-center gap-1 cursor-pointer"
-                                    >
-                                      <Plus className="w-3 h-3" /> Add Service
-                                    </button>
-                                  </div>
-
-                                  <div className="space-y-1.5 max-h-[220px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-neutral-850 scrollbar-track-transparent">
-                                    {matchingServices.length === 0 ? (
-                                      <p className="text-[10.5px] text-neutral-500 italic py-3 text-center bg-neutral-950/20 rounded-xl border border-dashed border-white/[0.03]">
-                                        No custom services in this category.
-                                      </p>
-                                    ) : (
-                                      matchingServices.map((srv) => (
-                                        <div key={srv.id} className="p-2 bg-neutral-950/40 rounded-xl border border-white/[0.03] hover:border-white/[0.08] transition flex items-center justify-between gap-2 text-left">
-                                          <div className="min-w-0 flex-1">
-                                            <div className="flex items-center gap-1.5">
-                                              <span className="text-[11px] font-bold truncate text-neutral-200">{srv.name || srv.title}</span>
-                                              <span className="text-[9.5px] text-emerald-400 font-mono font-bold shrink-0">${srv.price || srv.startingPrice}</span>
-                                            </div>
-                                            <p className="text-[9.5px] opacity-50 truncate" title={srv.desc || srv.shortDescription}>{srv.desc || srv.shortDescription}</p>
-                                          </div>
-                                          <div className="flex gap-1 shrink-0">
-                                            <button
-                                              onClick={() => {
-                                                setEditingService(srv);
-                                                setShowServiceModal(true);
-                                              }}
-                                              className="p-1 hover:bg-neutral-800 text-neutral-400 hover:text-white rounded cursor-pointer transition"
-                                              title="Edit Service"
-                                            >
-                                              <Edit className="w-3 h-3" />
-                                            </button>
-                                            <button
-                                              onClick={() => {
-                                                setAdminServices(adminServices.filter(s => s.id !== srv.id));
-                                                triggerToast(`Service "${srv.name || srv.title}" deleted from active catalog.`);
-                                              }}
-                                              className="p-1 hover:bg-red-950/40 text-neutral-450 hover:text-red-400 rounded cursor-pointer transition"
-                                              title="Delete Service"
-                                            >
-                                              <Trash2 className="w-3 h-3" />
-                                            </button>
-                                          </div>
-                                        </div>
-                                      ))
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className="flex justify-between items-center mt-6 pt-4 border-t border-white/[0.04] text-[10px] font-bold">
-                                <button 
-                                  onClick={() => {
-                                    setEditingCategory(cat);
-                                    setShowCategoryModal(true);
-                                  }}
-                                  className="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-750 text-neutral-300 hover:text-white rounded cursor-pointer transition"
-                                >
-                                  Edit Category
-                                </button>
-                                <button 
-                                  onClick={() => {
-                                    setAdminCategories(adminCategories.filter(c => c.id !== cat.id));
-                                    triggerToast(`Category "${cat.name}" removed.`);
-                                  }}
-                                  className="text-red-405 hover:text-red-400 cursor-pointer transition"
-                                >
-                                  Delete
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    {subView === 'service-orders' && (() => {
-                      // Filter service orders
-                      const serviceOrders = orders.filter(o => 
-                        o.id.startsWith('ord-fixed-') || 
-                        o.id.startsWith('ord-featured-') || 
-                        o.id.startsWith('ord-det-buy-') || 
-                        o.id.startsWith('ord-mob-instant-') ||
-                        o.paymentMethod === 'WhatsApp Order Direct'
-                      );
-
-                      if (serviceOrders.length === 0) {
-                        return (
-                          <div className={`p-12 text-center rounded-2xl border border-dashed ${cardBorder} ${panelBg}`}>
-                            <ShoppingBag className="w-10 h-10 mx-auto text-slate-500 opacity-40 mb-3" />
-                            <h4 className="text-sm font-bold">No Service Orders Yet</h4>
-                            <p className="text-xs opacity-60 max-w-sm mx-auto mt-1">Customer orders generated via client checkout will populate here instantly.</p>
-                          </div>
-                        );
-                      }
-
-                      return (
-                        <div className={`p-5 rounded-2xl border ${cardBorder} ${panelBg} shadow-sm overflow-hidden`}>
-                          <div className="overflow-x-auto">
-                            <table className="w-full text-left border-collapse text-xs">
-                              <thead>
-                                <tr className="border-b border-white/[0.08] opacity-60">
-                                  <th className="py-3 px-4 font-bold uppercase">Serial ID</th>
-                                  <th className="py-3 px-4 font-bold uppercase">Order Item / Service</th>
-                                  <th className="py-3 px-4 font-bold uppercase">Price</th>
-                                  <th className="py-3 px-4 font-bold uppercase">Date</th>
-                                  <th className="py-3 px-4 font-bold uppercase">Payment Gateway</th>
-                                  <th className="py-3 px-4 font-bold uppercase">Status</th>
-                                  <th className="py-3 px-4 font-bold uppercase text-right">Actions</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-white/[0.04]">
-                                {serviceOrders.map((o, idx) => {
-                                  // Map serial index dynamically
-                                  const serialId = `usr-${101 + idx}`;
-                                  return (
-                                    <tr key={o.id} className="hover:bg-white/[0.02] transition-colors">
-                                      <td className="py-3 px-4 font-mono text-[10px] text-purple-400 font-bold">{serialId}</td>
-                                      <td className="py-3 px-4">
-                                        <span className="font-semibold block">{o.itemTitle}</span>
-                                        <span className="text-[9px] opacity-50 block font-mono">Ref: {o.id}</span>
-                                      </td>
-                                      <td className="py-3 px-4 font-mono font-bold text-emerald-400">${o.price}</td>
-                                      <td className="py-3 px-4">{o.date}</td>
-                                      <td className="py-3 px-4 font-mono">
-                                        <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 text-[10px]">
-                                          {o.paymentMethod}
-                                        </span>
-                                      </td>
-                                      <td className="py-3 px-4">
-                                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                                          o.paymentStatus === 'completed' 
-                                            ? 'bg-emerald-500/10 text-emerald-400' 
-                                            : o.paymentStatus === 'pending'
-                                              ? 'bg-amber-500/10 text-amber-400'
-                                              : 'bg-red-500/10 text-red-400'
-                                        }`}>
-                                          {o.paymentStatus.toUpperCase()}
-                                        </span>
-                                      </td>
-                                      <td className="py-3 px-4 text-right">
-                                        <div className="flex gap-1.5 justify-end">
-                                          {o.paymentStatus !== 'completed' && (
-                                            <button 
-                                              onClick={() => {
-                                                updateOrderStatus(o.id, 'completed');
-                                                triggerToast(`Order ${o.id} marked completed!`);
-                                              }}
-                                              className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-[9px]"
-                                            >
-                                              Approve
-                                            </button>
-                                          )}
-                                          <button 
-                                            onClick={() => {
-                                              window.open(`https://wa.me/966570511931?text=${encodeURIComponent(`Assalamu Alaikum, referring to service order ${o.itemTitle} (Serial ID: ${serialId}). Please share current specification update.`)}`, '_blank');
-                                            }}
-                                            className="px-2 py-0.5 bg-neutral-800 text-slate-300 hover:text-white rounded text-[9px] flex items-center gap-0.5"
-                                          >
-                                            <MessageSquare className="w-2.5 h-2.5" />
-                                            <span>WhatsApp</span>
-                                          </button>
-                                        </div>
-                                      </td>
-                                    </tr>
-                                  );
-                                })}
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
-                      );
-                    })()}
-
-                    {subView === 'service-inquiries' && (
-                      <div className={`p-5 rounded-2xl border ${cardBorder} ${panelBg} shadow-sm overflow-hidden`}>
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-left border-collapse text-xs">
-                            <thead>
-                              <tr className="border-b border-white/[0.08] opacity-60">
-                                <th className="py-3 px-4 font-bold uppercase">Client</th>
-                                <th className="py-3 px-4 font-bold uppercase">Requested Service</th>
-                                <th className="py-3 px-4 font-bold uppercase">Budget Offer</th>
-                                <th className="py-3 px-4 font-bold uppercase">Client Message</th>
-                                <th className="py-3 px-4 font-bold uppercase">Status</th>
-                                <th className="py-3 px-4 font-bold uppercase text-right">Actions</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-white/[0.04]">
-                              {adminInquiries.map((inq) => (
-                                <tr key={inq.id} className="hover:bg-white/[0.02] transition-colors">
-                                  <td className="py-3 px-4">
-                                    <span className="font-bold block">{inq.name}</span>
-                                    <span className="text-[10px] opacity-60 block font-mono">{inq.email} • {inq.phone}</span>
-                                  </td>
-                                  <td className="py-3 px-4 font-semibold">{inq.serviceName}</td>
-                                  <td className="py-3 px-4 font-mono font-bold text-yellow-500">${inq.budget}</td>
-                                  <td className="py-3 px-4 max-w-xs truncate" title={inq.message}>{inq.message}</td>
-                                  <td className="py-3 px-4">
-                                    <div className="flex gap-1 items-center">
-                                      {['Pending', 'Contacted', 'Responded'].map((statusOption) => {
-                                        const isActive = inq.status === statusOption;
-                                        let btnColor = '';
-                                        if (statusOption === 'Responded') {
-                                          btnColor = isActive 
-                                            ? 'bg-blue-600 text-white font-bold border-blue-500 shadow-sm' 
-                                            : 'text-blue-400 bg-blue-500/5 hover:bg-blue-500/15 border-blue-500/10 hover:border-blue-500/30';
-                                        } else if (statusOption === 'Contacted') {
-                                          btnColor = isActive 
-                                            ? 'bg-purple-600 text-white font-bold border-purple-500 shadow-sm' 
-                                            : 'text-purple-400 bg-purple-500/5 hover:bg-purple-500/15 border-purple-500/10 hover:border-purple-500/30';
-                                        } else {
-                                          btnColor = isActive 
-                                            ? 'bg-amber-500 text-slate-950 font-bold border-amber-400 shadow-sm' 
-                                            : 'text-amber-400 bg-amber-500/5 hover:bg-amber-500/15 border-amber-500/10 hover:border-amber-500/30';
-                                        }
-                                        return (
-                                          <button
-                                            key={statusOption}
-                                            onClick={async () => {
-                                              try {
-                                                // Always update local state immediately for high-fidelity interactive experience
-                                                setAdminInquiries(adminInquiries.map(i => i.id === inq.id ? { ...i, status: statusOption } : i));
-                                                
-                                                if (!inq.id.startsWith('inq-')) {
-                                                  await updateDoc(doc(db, 'service_inquiries', inq.id), { status: statusOption });
-                                                }
-                                                triggerToast(`Inquiry status updated to ${statusOption}.`);
-                                              } catch (error) {
-                                                console.error(error);
-                                                triggerToast(`Status update failed, but applied locally.`);
-                                              }
-                                            }}
-                                            className={`px-2 py-0.5 rounded text-[9px] border transition-all cursor-pointer ${btnColor}`}
-                                            title={`Set status of ${inq.name} to ${statusOption}`}
-                                          >
-                                            {statusOption}
-                                          </button>
-                                        );
-                                      })}
-                                    </div>
-                                  </td>
-                                  <td className="py-3 px-4 text-right">
-                                    <div className="flex gap-1.5 justify-end">
-                                      <button 
-                                        onClick={async () => {
-                                          try {
-                                            setAdminInquiries(adminInquiries.map(i => i.id === inq.id ? { ...i, status: 'Responded' } : i));
-                                            if (!inq.id.startsWith('inq-')) {
-                                              await updateDoc(doc(db, 'service_inquiries', inq.id), { status: 'Responded' });
-                                            }
-                                            triggerToast(`Inquiry from ${inq.name} marked as responded.`);
-                                          } catch (error) {
-                                            console.error(error);
-                                          }
-                                        }}
-                                        className="px-2 py-1 bg-neutral-800 text-neutral-300 hover:text-white rounded text-[10px]"
-                                      >
-                                        Reply Mark
-                                      </button>
-                                      <button 
-                                        onClick={() => {
-                                          window.open(`https://wa.me/${inq.phone.replace(/[^0-9+]/g, '')}?text=${encodeURIComponent(`Assalamu Alaikum ${inq.name}, regarding your inquiry for "${inq.serviceName}" on WebzoneBD with budget of $${inq.budget}. Let's finalize details.`)}`, '_blank');
-                                        }}
-                                        className="px-2 py-1 bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white rounded text-[10px] flex items-center gap-0.5 cursor-pointer"
-                                      >
-                                        <MessageSquare className="w-2.5 h-2.5" />
-                                        <span>Chat WhatsApp</span>
-                                      </button>
-                                    </div>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    )}
-
-                    {subView === 'whatsapp-leads' && (() => {
-                      // Gather direct whatsapp orders
-                      const actualLeads = orders.filter(o => o.paymentMethod === "WhatsApp Order Direct");
-
-                      return (
-                        <div className="space-y-4">
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className={`p-4 rounded-xl border ${cardBorder} ${panelBg} space-y-1`}>
-                              <span className="text-[10px] uppercase font-bold text-slate-400 block">Total WhatsApp Hits</span>
-                              <h3 className="text-2xl font-black text-emerald-400 font-mono">{actualLeads.length + adminWhatsAppLeads.length}</h3>
-                              <p className="text-[9px] opacity-55">Total redirects logged via "Order via WhatsApp" clicks</p>
-                            </div>
-                            <div className={`p-4 rounded-xl border ${cardBorder} ${panelBg} space-y-1`}>
-                              <span className="text-[10px] uppercase font-bold text-slate-400 block">Converted Leads</span>
-                              <h3 className="text-2xl font-black text-purple-400 font-mono">{actualLeads.length + adminWhatsAppLeads.length}</h3>
-                              <p className="text-[9px] opacity-55">WhatsApp orders verified and invoiced in backend</p>
-                            </div>
-                            <div className={`p-4 rounded-xl border ${cardBorder} ${panelBg} space-y-1`}>
-                              <span className="text-[10px] uppercase font-bold text-slate-400 block">System WhatsApp API</span>
-                              <h3 className="text-xs font-bold text-slate-200 mt-2 truncate font-mono">+966 57 051 1931</h3>
-                              <p className="text-[9px] opacity-55">Primary routing contact verified</p>
-                            </div>
-                          </div>
-
-                          <div className={`p-5 rounded-2xl border ${cardBorder} ${panelBg} shadow-sm overflow-hidden`}>
-                            <h4 className="font-bold text-sm text-emerald-400 mb-4 flex items-center gap-1.5">
-                              <MessageSquare className="w-4 h-4 text-emerald-400" />
-                              <span>Live Customer Redirection Log Tracker</span>
-                            </h4>
-                            <div className="overflow-x-auto">
-                              <table className="w-full text-left border-collapse text-xs">
-                                <thead>
-                                  <tr className="border-b border-white/[0.08] opacity-60">
-                                    <th className="py-3 px-4 font-bold uppercase">Lead Name</th>
-                                    <th className="py-3 px-4 font-bold uppercase">WhatsApp Link</th>
-                                    <th className="py-3 px-4 font-bold uppercase">Requested Service</th>
-                                    <th className="py-3 px-4 font-bold uppercase">Direct Cost</th>
-                                    <th className="py-3 px-4 font-bold uppercase">Routing State</th>
-                                    <th className="py-3 px-4 font-bold uppercase text-right">Actions</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-white/[0.04]">
-                                  {/* Render Real Firestore Leads */}
-                                  {adminWhatsAppLeads.map((l) => (
-                                    <tr key={l.id} className="hover:bg-white/[0.02] transition-colors bg-emerald-500/[0.03]">
-                                      <td className="py-3 px-4">
-                                        <span className="font-bold block text-emerald-400">{l.name}</span>
-                                        <span className="text-[10px] opacity-60 block font-mono">ID: {l.id} • {l.date}</span>
-                                      </td>
-                                      <td className="py-3 px-4 font-mono text-[10px] text-purple-400 font-bold">{l.phone}</td>
-                                      <td className="py-3 px-4 font-semibold text-slate-350">{l.service}</td>
-                                      <td className="py-3 px-4 font-mono font-bold text-emerald-400">{l.budget}</td>
-                                      <td className="py-3 px-4">
-                                        <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 rounded text-[9px] font-bold">
-                                          WhatsApp Lead Saved
-                                        </span>
-                                      </td>
-                                      <td className="py-3 px-4 text-right">
-                                        <button 
-                                          onClick={() => {
-                                            window.open(`https://wa.me/${l.phone.replace(/[^0-9+]/g, '')}?text=${encodeURIComponent(`Assalamu Alaikum ${l.name}, I received your WebzoneBD custom request for: ${l.service}. Let's discuss!`)}`, '_blank');
-                                          }}
-                                          className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-[10px] font-bold"
-                                        >
-                                          Open Chat
-                                        </button>
-                                      </td>
-                                    </tr>
-                                  ))}
-
-                                  {/* Render Actual Real Click Leads */}
-                                  {actualLeads.map((o, idx) => (
-                                    <tr key={o.id} className="hover:bg-white/[0.02] transition-colors bg-emerald-500/[0.01]">
-                                      <td className="py-3 px-4 font-bold text-emerald-400">Guest Customer ({idx + 1})</td>
-                                      <td className="py-3 px-4 font-mono text-[10px] text-purple-400 font-bold">+966 57 051 1931</td>
-                                      <td className="py-3 px-4 font-semibold">{o.itemTitle}</td>
-                                      <td className="py-3 px-4 font-mono font-bold text-emerald-400">${o.price}</td>
-                                      <td className="py-3 px-4">
-                                        <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 rounded text-[9px] font-bold">
-                                          Real Click Captured
-                                        </span>
-                                      </td>
-                                      <td className="py-3 px-4 text-right">
-                                        <button 
-                                          onClick={() => {
-                                            window.open(`https://wa.me/966570511931?text=${encodeURIComponent(`Assalamu Alaikum WebzoneBD, checking on real click captured for: ${o.itemTitle}.`)}`, '_blank');
-                                          }}
-                                          className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-[10px] font-bold"
-                                        >
-                                          Open Chat
-                                        </button>
-                                      </td>
-                                    </tr>
-                                  ))}
-
-                                  {adminWhatsAppLeads.length === 0 && actualLeads.length === 0 && (
-                                    <tr>
-                                      <td colSpan={6} className="py-8 text-center text-slate-500">
-                                        No recent WhatsApp inquiries or lead clicks logged.
-                                      </td>
-                                    </tr>
-                                  )}
-                                </tbody>
-                              </table>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })()}
-
-                    {subView === 'service-reports' && (() => {
-                      // Gather analytics data
-                      const totalServiceOrders = orders.filter(o => 
-                        o.id.startsWith('ord-fixed-') || 
-                        o.id.startsWith('ord-featured-') || 
-                        o.id.startsWith('ord-det-buy-') || 
-                        o.id.startsWith('ord-mob-instant-') ||
-                        o.paymentMethod === 'WhatsApp Order Direct'
-                      );
-
-                      const serviceRevSum = totalServiceOrders.reduce((sum, o) => sum + Number(o.price || 0), 0);
-                      const whatsappCount = totalServiceOrders.filter(o => o.paymentMethod === "WhatsApp Order Direct").length;
-
-                      // Category volumes for the graph
-                      const categoryChartData = [
-                        { name: 'Dev', value: 3 },
-                        { name: 'SEO', value: 1 },
-                        { name: 'Design', value: 1 },
-                        { name: 'Marketing', value: 1 },
-                        { name: 'Mobile', value: 1 }
-                      ];
-
-                      return (
-                        <div className="space-y-6">
-                          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                            <div className={`p-5 rounded-2xl border ${cardBorder} ${panelBg} space-y-2`}>
-                              <span className="text-[10px] font-black tracking-widest text-slate-400 uppercase block">Service Catalog Revenue</span>
-                              <h3 className="text-3xl font-black text-purple-400 font-mono">${serviceRevSum + 4200}</h3>
-                              <p className="text-[10px] opacity-50 block font-light">Includes bespoke & package deals</p>
-                            </div>
-                            <div className={`p-5 rounded-2xl border ${cardBorder} ${panelBg} space-y-2`}>
-                              <span className="text-[10px] font-black tracking-widest text-slate-400 uppercase block">Total Service Orders</span>
-                              <h3 className="text-3xl font-black text-emerald-400 font-mono">{totalServiceOrders.length + 185}</h3>
-                              <p className="text-[10px] opacity-50 block font-light">Seeded completed log milestones</p>
-                            </div>
-                            <div className={`p-5 rounded-2xl border ${cardBorder} ${panelBg} space-y-2`}>
-                              <span className="text-[10px] font-black tracking-widest text-slate-400 uppercase block">WhatsApp Redirects</span>
-                              <h3 className="text-3xl font-black text-cyan-400 font-mono">{whatsappCount + 89}</h3>
-                              <p className="text-[10px] opacity-50 block font-light">Routed through wa.me API gateway</p>
-                            </div>
-                            <div className={`p-5 rounded-2xl border ${cardBorder} ${panelBg} space-y-2`}>
-                              <span className="text-[10px] font-black tracking-widest text-slate-400 uppercase block">Catalog Services count</span>
-                              <h3 className="text-3xl font-black text-yellow-500 font-mono">{adminServices.length}</h3>
-                              <p className="text-[10px] opacity-50 block font-light">Active custom products</p>
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className={`p-5 rounded-2xl border ${cardBorder} ${panelBg} shadow-sm space-y-4`}>
-                              <h4 className="font-bold text-sm text-purple-400">Services Active taxonomy shares</h4>
-                              <div className="h-64">
-                                <ResponsiveContainer width="100%" height="100%">
-                                  <RechartBarChart data={categoryChartData}>
-                                    <RechartCartesianGrid strokeDasharray="3 3" opacity={0.1} />
-                                    <RechartXAxis dataKey="name" stroke="#94a3b8" fontSize={11} tickLine={false} />
-                                    <RechartYAxis stroke="#94a3b8" fontSize={11} tickLine={false} />
-                                    <RechartTooltip contentStyle={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px' }} />
-                                    <RechartBar dataKey="value" fill="#7C3AED" radius={[4, 4, 0, 0]}>
-                                      <RechartCell fill="#7C3AED" />
-                                      <RechartCell fill="#EC4899" />
-                                      <RechartCell fill="#06B6D4" />
-                                      <RechartCell fill="#F59E0B" />
-                                      <RechartCell fill="#10B981" />
-                                    </RechartBar>
-                                  </RechartBarChart>
-                                </ResponsiveContainer>
-                              </div>
-                            </div>
-
-                            <div className={`p-5 rounded-2xl border ${cardBorder} ${panelBg} shadow-sm space-y-4`}>
-                              <h4 className="font-bold text-sm text-purple-400">Revenue Contribution Estimation</h4>
-                              <div className="space-y-3 pt-2">
-                                {[
-                                  { name: 'Website Development', rev: '$28,400', percentage: '60%' },
-                                  { name: 'Ecommerce Development', rev: '$12,500', percentage: '26%' },
-                                  { name: 'SEO Audits & Strategy', rev: '$4,150', percentage: '9%' },
-                                  { name: 'Other Design & Marketing', rev: '$2,300', percentage: '5%' }
-                                ].map((item, i) => (
-                                  <div key={i} className="p-3 rounded-lg bg-neutral-900 border border-neutral-800 flex justify-between items-center text-xs">
-                                    <div>
-                                      <span className="font-semibold block text-neutral-200">{item.name}</span>
-                                      <span className="text-[10px] opacity-60 block">Share: {item.percentage}</span>
-                                    </div>
-                                    <div className="text-right">
-                                      <span className="text-emerald-400 font-mono font-bold block">{item.rev}</span>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })()}
-
-                    {/* SERVICE MODAL */}
-                    {showServiceModal && (
-                      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-neutral-950/80 backdrop-blur-xs overflow-y-auto">
-                        <div className={`w-full max-w-3xl rounded-2xl border ${cardBorder} ${panelBg} shadow-2xl p-6 space-y-4 text-left animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto scrollbar-thin`}>
-                          <div className="flex justify-between items-center border-b border-white/[0.08] pb-3">
-                            <h4 className="text-base font-black text-neutral-100 flex items-center gap-2">
-                              <span className="w-2.5 h-2.5 rounded-full bg-purple-500 animate-pulse"></span>
-                              {editingService ? 'Edit Service Details & Packages' : 'Add New Custom Service'}
-                            </h4>
-                            <button 
-                              onClick={() => setShowServiceModal(false)}
-                              className="text-neutral-400 hover:text-white transition text-sm font-bold cursor-pointer"
-                            >
-                              ✕
-                            </button>
-                          </div>
-
-                          <form onSubmit={(e) => {
-                            e.preventDefault();
-                            if (!srvForm.title || !srvForm.shortDescription) {
-                              triggerToast("Please provide at least an English title and short description!");
-                              return;
-                            }
-
-                            const techArray = srvForm.technologies ? srvForm.technologies.split(',').map(s => s.trim()).filter(Boolean) : ['React', 'TailwindCSS'];
-                            const featuresArray = srvForm.features ? srvForm.features.split(',').map(s => s.trim()).filter(Boolean) : ['Custom Layout design', 'Fast Page Load Speed'];
-                            const featuresBnArray = featuresArray;
-
-                            // Resolve category mappings for languages
-                            const catMapping: Record<string, { bn: string, ar: string }> = {
-                              'website-development': { bn: 'ওয়েবসাইট ডেভেলপমেন্ট', ar: 'تطوير المواقع' },
-                              'ecommerce': { bn: 'ই-কমার্স', ar: 'التجارة الإلكترونية' },
-                              'news-portal': { bn: 'নিউজ পোর্টাল', ar: 'بوابة إخبارية' },
-                              'school-management': { bn: 'স্কুল ম্যানেজমেন্ট', ar: 'إدارة المدارس' },
-                              'digital-marketing': { bn: 'ডিজিটাল মার্কেটিং', ar: 'التسويق الرقمي' },
-                              'wordpress-services': { bn: 'ওয়ার্ডপ্রেস সার্ভিসেস', ar: 'خدمات ووردبريس' },
-                              'whmcs-solutions': { bn: 'WHMCS সলিউশনস', ar: 'حلول WHMCS' },
-                              'mobile-app-development': { bn: 'মোবাইল অ্যাপ ডেভেলপমেন্ট', ar: 'تطوير تطبيقات الجوال' },
-                              'business-software': { bn: 'বিজনেস সফটওয়্যার', ar: 'برمجيات الأعمال' },
-                              'custom-development': { bn: 'কাস্টম ডেভেলপমেন্ট', ar: 'التطوير المخصص' },
-                              'graphic-design': { bn: 'গ্রাফিক ডিজাইন', ar: 'التصميم الجرافيكي' }
-                            };
-
-                            const selectedCat = catMapping[srvForm.category] || { bn: 'ওয়েবসাইট ডেভেলপমেন্ট', ar: 'تطوير المواقع' };
-
-                            const resolvedLvlBn = srvForm.serviceLevel === 'Starter' ? 'স্টার্টার' : srvForm.serviceLevel === 'Business' ? 'বিজনেস' : 'এন্টারপ্রাইজ';
-                            const resolvedLvlAr = srvForm.serviceLevel === 'Starter' ? 'مبتدئ' : srvForm.serviceLevel === 'Business' ? 'أعمال' : 'مؤسسات';
-
-                            const defaultImg = srvForm.thumbnail || 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=800&q=80';
-
-                            if (editingService) {
-                              const updated = adminServices.map(srv => srv.id === editingService.id ? {
-                                ...srv,
-                                name: srvForm.title,
-                                price: Number(srvForm.startingPrice),
-                                desc: srvForm.shortDescription,
-                                title: srvForm.title,
-                                titleBn: srvForm.title,
-                                titleAr: editingService.titleAr || srvForm.title,
-                                category: srvForm.category,
-                                categoryBn: selectedCat.bn,
-                                categoryAr: selectedCat.ar,
-                                projectBudgetCategory: srvForm.projectBudgetCategory,
-                                deliveryDays: Number(srvForm.deliveryDays) || 7,
-                                deliveryTimelineCategory: srvForm.deliveryTimelineCategory,
-                                serviceLevel: srvForm.serviceLevel,
-                                serviceLevelBn: resolvedLvlBn,
-                                serviceLevelAr: resolvedLvlAr,
-                                startingPrice: Number(srvForm.startingPrice) || 199,
-                                starterPrice: Number(srvForm.starterPrice) || Math.round((Number(srvForm.startingPrice) || 199) * 0.8),
-                                businessPrice: Number(srvForm.businessPrice) || Number(srvForm.startingPrice) || 199,
-                                enterprisePrice: Number(srvForm.enterprisePrice) || Math.round((Number(srvForm.startingPrice) || 199) * 2.1),
-                                rating: Number(srvForm.rating) || 4.9,
-                                projectsCompleted: Number(srvForm.projectsCompleted) || 24,
-                                technologies: techArray,
-                                thumbnail: defaultImg,
-                                image: defaultImg,
-                                shortDescription: srvForm.shortDescription,
-                                shortDescriptionBn: srvForm.shortDescription,
-                                shortDescriptionAr: editingService.shortDescriptionAr || srvForm.shortDescription,
-                                fullDescription: srvForm.fullDescription || srvForm.shortDescription,
-                                fullDescriptionBn: srvForm.fullDescription || srvForm.shortDescription,
-                                fullDescriptionAr: editingService.fullDescriptionAr || srvForm.shortDescription,
-                                features: featuresArray,
-                                featuresBn: featuresBnArray,
-                                featuresAr: editingService.featuresAr || [],
-                                views: Number(srvForm.views) || srv.views || 120,
-                                likes: Number(srvForm.likes) || srv.likes || 45
-                              } : srv);
-
-                              setAdminServices(updated);
-                              triggerToast(`Service "${srvForm.title}" successfully updated.`);
-                            } else {
-                              const newId = `srv-cms-${Date.now()}`;
-                              const newSrv = {
-                                id: newId,
-                                name: srvForm.title,
-                                price: Number(srvForm.startingPrice),
-                                desc: srvForm.shortDescription,
-                                title: srvForm.title,
-                                titleBn: srvForm.title,
-                                titleAr: srvForm.title,
-                                iconName: 'Globe',
-                                category: srvForm.category,
-                                categoryBn: selectedCat.bn,
-                                categoryAr: selectedCat.ar,
-                                projectBudgetCategory: srvForm.projectBudgetCategory,
-                                deliveryDays: Number(srvForm.deliveryDays) || 7,
-                                deliveryTimelineCategory: srvForm.deliveryTimelineCategory,
-                                serviceLevel: srvForm.serviceLevel,
-                                serviceLevelBn: resolvedLvlBn,
-                                serviceLevelAr: resolvedLvlAr,
-                                startingPrice: Number(srvForm.startingPrice) || 199,
-                                starterPrice: Number(srvForm.starterPrice) || Math.round((Number(srvForm.startingPrice) || 199) * 0.8),
-                                businessPrice: Number(srvForm.businessPrice) || Number(srvForm.startingPrice) || 199,
-                                enterprisePrice: Number(srvForm.enterprisePrice) || Math.round((Number(srvForm.startingPrice) || 199) * 2.1),
-                                rating: Number(srvForm.rating) || 4.9,
-                                projectsCompleted: Number(srvForm.projectsCompleted) || 24,
-                                technologies: techArray,
-                                thumbnail: defaultImg,
-                                image: defaultImg,
-                                shortDescription: srvForm.shortDescription,
-                                shortDescriptionBn: srvForm.shortDescription,
-                                shortDescriptionAr: srvForm.shortDescription,
-                                fullDescription: srvForm.fullDescription || srvForm.shortDescription,
-                                fullDescriptionBn: srvForm.fullDescription || srvForm.shortDescription,
-                                fullDescriptionAr: srvForm.shortDescription,
-                                features: featuresArray,
-                                featuresBn: featuresBnArray,
-                                featuresAr: [],
-                                views: Number(srvForm.views) || 120,
-                                likes: Number(srvForm.likes) || 45
-                              };
-
-                              setAdminServices([newSrv, ...adminServices]);
-                              triggerToast(`✅ New Custom Service "${srvForm.title}" added successfully!`);
-                            }
-                            setShowServiceModal(false);
-                          }} className="space-y-4 text-xs">
-                            
-                            {/* SECTION 1: Titles & Localization */}
-                            <div className="p-3 bg-neutral-900/50 rounded-xl border border-white/[0.04] space-y-3">
-                              <h5 className="font-bold text-neutral-200 border-b border-white/[0.04] pb-1.5 uppercase text-[10px] tracking-wider text-purple-400">Basic Info & Identification</h5>
-                              <div className="space-y-1">
-                                <label className="text-[10px] uppercase font-bold text-slate-400">Service Title</label>
-                                <input 
-                                  required
-                                  value={srvForm.title}
-                                  onChange={(e) => setSrvForm({ ...srvForm, title: e.target.value })}
-                                  className="w-full px-3 py-2 bg-neutral-950 border border-white/[0.08] rounded-lg text-white focus:outline-none focus:border-purple-500 font-semibold"
-                                  placeholder="e.g. Premium E-commerce Platform"
-                                />
-                              </div>
-                            </div>
-
-                            {/* SECTION 2: Taxonomy & Pricing Setup */}
-                            <div className="p-3 bg-neutral-900/50 rounded-xl border border-white/[0.04] space-y-3">
-                              <h5 className="font-bold text-neutral-200 border-b border-white/[0.04] pb-1.5 uppercase text-[10px] tracking-wider text-purple-400">Taxonomy & Pricing Packages Setup (প্যাকেজ এবং মূল্য)</h5>
-                              
-                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div className="space-y-1">
-                                  <label className="text-[10px] uppercase font-bold text-slate-400">Taxonomy Category</label>
-                                  <select 
-                                    value={srvForm.category}
-                                    onChange={(e) => setSrvForm({ ...srvForm, category: e.target.value })}
-                                    className="w-full px-3 py-2 bg-neutral-950 border border-white/[0.08] rounded-lg text-white focus:outline-none focus:border-purple-500"
-                                  >
-                                    <option value="website-development">Website Development (ওয়েবসাইট ডেভেলপমেন্ট)</option>
-                                    <option value="ecommerce">E-Commerce (ই-কমার্স)</option>
-                                    <option value="news-portal">News Portal (নিউজ পোর্টাল)</option>
-                                    <option value="school-management">School Management (স্কুল ম্যানেজমেন্ট)</option>
-                                    <option value="digital-marketing">Digital Marketing (ডিজিটাল মার্কেটিং)</option>
-                                    <option value="wordpress-services">WordPress Services (ওয়ার্ডপ্রেস সার্ভিসেস)</option>
-                                    <option value="whmcs-solutions">WHMCS Solutions (WHMCS সলিউশনস)</option>
-                                    <option value="mobile-app-development">Mobile App Development (মোবাইল অ্যাপ ডেভেলপমেন্ট)</option>
-                                    <option value="business-software">Business Software (বিজনেস সফটওয়্যার)</option>
-                                    <option value="custom-development">Custom Development (কাস্টম ডেভেলপমেন্ট)</option>
-                                    <option value="graphic-design">Graphic Design (গ্রাফিক ডিজাইন)</option>
-                                  </select>
-                                </div>
-
-                                <div className="space-y-1">
-                                  <label className="text-[10px] uppercase font-bold text-slate-400">Budget Range Class</label>
-                                  <select 
-                                    value={srvForm.projectBudgetCategory}
-                                    onChange={(e) => setSrvForm({ ...srvForm, projectBudgetCategory: e.target.value })}
-                                    className="w-full px-3 py-2 bg-neutral-950 border border-white/[0.08] rounded-lg text-white focus:outline-none focus:border-purple-500"
-                                  >
-                                    <option value="100-500">$100 - $500 (৳১১,৫০০ - ৳৫৭,৫  ০০)</option>
-                                    <option value="500-2000">$500 - $2,000 (৳৫৭,৫০০ - ৳২,৩০,০০০)</option>
-                                    <option value="2000-5000">$2,000 - $5,000 (৳২,৩০,০০০ - ৳৫,৭৫,০০০)</option>
-                                    <option value="5000+">$5,000+ (৳৫,৭৫,০০০+)</option>
-                                  </select>
-                                </div>
-
-                                <div className="space-y-1">
-                                  <label className="text-[10px] uppercase font-bold text-slate-400">Primary Level</label>
-                                  <select 
-                                    value={srvForm.serviceLevel}
-                                    onChange={(e) => setSrvForm({ ...srvForm, serviceLevel: e.target.value })}
-                                    className="w-full px-3 py-2 bg-neutral-950 border border-white/[0.08] rounded-lg text-white focus:outline-none focus:border-purple-500"
-                                  >
-                                    <option value="Starter">Starter (স্টার্টার)</option>
-                                    <option value="Business">Business (বিজনেস)</option>
-                                    <option value="Enterprise">Enterprise (এন্টারপ্রাইজ)</option>
-                                  </select>
-                                </div>
-                              </div>
-
-                              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-1">
-                                <div className="space-y-1">
-                                  <label className="text-[10px] uppercase font-bold text-slate-400">Starting Price ($)</label>
-                                  <div className="relative">
-                                    <span className="absolute left-2.5 top-2 text-neutral-500">$</span>
-                                    <input 
-                                      type="number"
-                                      required
-                                      value={srvForm.startingPrice}
-                                      onChange={(e) => {
-                                        const val = Number(e.target.value);
-                                        setSrvForm({ 
-                                          ...srvForm, 
-                                          startingPrice: val,
-                                          starterPrice: Math.round(val * 0.8),
-                                          businessPrice: val,
-                                          enterprisePrice: Math.round(val * 2.1)
-                                        });
-                                      }}
-                                      className="w-full pl-6 pr-3 py-1.5 bg-neutral-950 border border-white/[0.08] rounded-lg text-white focus:outline-none focus:border-purple-500"
-                                    />
-                                  </div>
-                                  <span className="text-[9px] text-neutral-400 font-bold">≈ ৳{Math.round(srvForm.startingPrice * 115).toLocaleString()} BDT</span>
-                                </div>
-
-                                <div className="space-y-1">
-                                  <label className="text-[10px] uppercase font-bold text-slate-400">Starter Package ($)</label>
-                                  <div className="relative">
-                                    <span className="absolute left-2.5 top-2 text-neutral-500">$</span>
-                                    <input 
-                                      type="number"
-                                      value={srvForm.starterPrice}
-                                      onChange={(e) => setSrvForm({ ...srvForm, starterPrice: Number(e.target.value) })}
-                                      className="w-full pl-6 pr-3 py-1.5 bg-neutral-950 border border-white/[0.08] rounded-lg text-white focus:outline-none focus:border-purple-500"
-                                    />
-                                  </div>
-                                  <span className="text-[9px] text-neutral-400 font-bold">≈ ৳{Math.round(srvForm.starterPrice * 115).toLocaleString()} BDT</span>
-                                </div>
-
-                                <div className="space-y-1">
-                                  <label className="text-[10px] uppercase font-bold text-slate-400">Business Package ($)</label>
-                                  <div className="relative">
-                                    <span className="absolute left-2.5 top-2 text-neutral-500">$</span>
-                                    <input 
-                                      type="number"
-                                      value={srvForm.businessPrice}
-                                      onChange={(e) => setSrvForm({ ...srvForm, businessPrice: Number(e.target.value) })}
-                                      className="w-full pl-6 pr-3 py-1.5 bg-neutral-950 border border-white/[0.08] rounded-lg text-white focus:outline-none focus:border-purple-500"
-                                    />
-                                  </div>
-                                  <span className="text-[9px] text-neutral-400 font-bold">≈ ৳{Math.round(srvForm.businessPrice * 115).toLocaleString()} BDT</span>
-                                </div>
-
-                                <div className="space-y-1">
-                                  <label className="text-[10px] uppercase font-bold text-slate-400">Enterprise Package ($)</label>
-                                  <div className="relative">
-                                    <span className="absolute left-2.5 top-2 text-neutral-500">$</span>
-                                    <input 
-                                      type="number"
-                                      value={srvForm.enterprisePrice}
-                                      onChange={(e) => setSrvForm({ ...srvForm, enterprisePrice: Number(e.target.value) })}
-                                      className="w-full pl-6 pr-3 py-1.5 bg-neutral-950 border border-white/[0.08] rounded-lg text-white focus:outline-none focus:border-purple-500"
-                                    />
-                                  </div>
-                                  <span className="text-[9px] text-neutral-400 font-bold">≈ ৳{Math.round(srvForm.enterprisePrice * 115).toLocaleString()} BDT</span>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* SECTION 3: Duration & Meta Metrics */}
-                            <div className="p-3 bg-neutral-900/50 rounded-xl border border-white/[0.04] space-y-3">
-                              <h5 className="font-bold text-neutral-200 border-b border-white/[0.04] pb-1.5 uppercase text-[10px] tracking-wider text-purple-400">Delivery Schedule & Performance (ডেলিভারি এবং প্রজেক্ট বিবরণ)</h5>
-                              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                <div className="space-y-1">
-                                  <label className="text-[10px] uppercase font-bold text-slate-400">Delivery Days</label>
-                                  <input 
-                                    type="number"
-                                    value={srvForm.deliveryDays}
-                                    onChange={(e) => setSrvForm({ ...srvForm, deliveryDays: Number(e.target.value) })}
-                                    className="w-full px-3 py-1.5 bg-neutral-950 border border-white/[0.08] rounded-lg text-white focus:outline-none focus:border-purple-500"
-                                  />
-                                </div>
-                                <div className="space-y-1">
-                                  <label className="text-[10px] uppercase font-bold text-slate-400">Timeline Class</label>
-                                  <select 
-                                    value={srvForm.deliveryTimelineCategory}
-                                    onChange={(e) => setSrvForm({ ...srvForm, deliveryTimelineCategory: e.target.value })}
-                                    className="w-full px-3 py-1.5 bg-neutral-950 border border-white/[0.08] rounded-lg text-white focus:outline-none focus:border-purple-500"
-                                  >
-                                    <option value="1-3-days">1 - 3 Days</option>
-                                    <option value="7-days">7 Days</option>
-                                    <option value="14-days">14 Days</option>
-                                    <option value="30-days">30 Days</option>
-                                    <option value="custom">Custom Timeline</option>
-                                  </select>
-                                </div>
-                                <div className="space-y-1">
-                                  <label className="text-[10px] uppercase font-bold text-slate-400">Completed Projects</label>
-                                  <input 
-                                    type="number"
-                                    value={srvForm.projectsCompleted}
-                                    onChange={(e) => setSrvForm({ ...srvForm, projectsCompleted: Number(e.target.value) })}
-                                    className="w-full px-3 py-1.5 bg-neutral-950 border border-white/[0.08] rounded-lg text-white focus:outline-none focus:border-purple-500"
-                                  />
-                                </div>
-                                <div className="space-y-1">
-                                  <label className="text-[10px] uppercase font-bold text-slate-400">Thumbnail Image URL</label>
-                                  <input 
-                                    value={srvForm.thumbnail}
-                                    onChange={(e) => setSrvForm({ ...srvForm, thumbnail: e.target.value })}
-                                    placeholder="https://images.unsplash.com/..."
-                                    className="w-full px-3 py-1.5 bg-neutral-950 border border-white/[0.08] rounded-lg text-white focus:outline-none focus:border-purple-500"
-                                  />
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* SECTION 4: Descriptions & Features */}
-                            <div className="p-3 bg-neutral-900/50 rounded-xl border border-white/[0.04] space-y-3">
-                              <h5 className="font-bold text-neutral-200 border-b border-white/[0.04] pb-1.5 uppercase text-[10px] tracking-wider text-purple-400">Features, Stack & Narrative</h5>
-                              
-                              <div className="space-y-1">
-                                <label className="text-[10px] uppercase font-bold text-slate-400">Short Description</label>
-                                <textarea 
-                                  required
-                                  value={srvForm.shortDescription}
-                                  onChange={(e) => setSrvForm({ ...srvForm, shortDescription: e.target.value })}
-                                  rows={2}
-                                  className="w-full px-3 py-2 bg-neutral-950 border border-white/[0.08] rounded-lg text-white focus:outline-none focus:border-purple-500"
-                                  placeholder="High performance database-backed store with standard UI..."
-                                />
-                              </div>
-
-                              <div className="space-y-1">
-                                <label className="text-[10px] uppercase font-bold text-slate-400">Full Description</label>
-                                <textarea 
-                                  value={srvForm.fullDescription}
-                                  onChange={(e) => setSrvForm({ ...srvForm, fullDescription: e.target.value })}
-                                  rows={3}
-                                  className="w-full px-3 py-2 bg-neutral-950 border border-white/[0.08] rounded-lg text-white focus:outline-none focus:border-purple-500"
-                                  placeholder="Detailed overview explaining exact project outputs..."
-                                />
-                              </div>
-
-                              <div className="space-y-3 pt-1">
-                                <div className="space-y-1">
-                                  <label className="text-[10px] uppercase font-bold text-slate-400">Technologies (Comma Separated)</label>
-                                  <input 
-                                    value={srvForm.technologies}
-                                    onChange={(e) => setSrvForm({ ...srvForm, technologies: e.target.value })}
-                                    placeholder="React, Next.js, Firebase, TailwindCSS"
-                                    className="w-full px-3 py-2 bg-neutral-950 border border-white/[0.08] rounded-lg text-white focus:outline-none focus:border-purple-500"
-                                  />
-                                </div>
-
-                                {/* Dynamic Features Included builder inside custom service modal */}
-                                <div className="space-y-2 p-3 bg-purple-500/5 border border-purple-500/10 rounded-xl">
-                                  <label className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
-                                    Features Included / কার্যাবলী ও সুবিধাসমূহ
-                                  </label>
-                                  
-                                  <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
-                                    {srvForm.features ? (
-                                      srvForm.features.split(',').map(f => f.trim()).filter(Boolean).map((feat, index, arr) => (
-                                        <div 
-                                          key={index} 
-                                          className="flex items-center justify-between bg-neutral-950 px-3 py-1.5 rounded-lg border border-white/[0.04] text-white"
-                                        >
-                                          <span className="font-medium text-[11px] flex items-center gap-2 text-neutral-300">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
-                                            {feat}
-                                          </span>
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              const updated = arr.filter((_, i) => i !== index);
-                                              setSrvForm({ ...srvForm, features: updated.join(', ') });
-                                            }}
-                                            className="text-red-400 hover:text-red-300 transition px-1.5 py-0.5 text-[10px] hover:bg-red-950/30 rounded cursor-pointer"
-                                            title="Delete feature"
-                                          >
-                                            ✕
-                                          </button>
-                                        </div>
-                                      ))
-                                    ) : (
-                                      <div className="text-[10px] text-neutral-500 italic p-2 text-center bg-neutral-950/20 rounded-lg">
-                                        No features added yet. Type a feature below and click Add.
-                                      </div>
-                                    )}
-                                  </div>
-
-                                  <div className="flex gap-2 pt-1.5 border-t border-white/[0.04]">
-                                    <input
-                                      type="text"
-                                      value={srvNewFeatureText}
-                                      onChange={e => setSrvNewFeatureText(e.target.value)}
-                                      onKeyDown={e => {
-                                        if (e.key === 'Enter') {
-                                          e.preventDefault();
-                                          if (srvNewFeatureText.trim()) {
-                                            const current = srvForm.features ? srvForm.features.split(',').map(f => f.trim()).filter(Boolean) : [];
-                                            if (!current.includes(srvNewFeatureText.trim())) {
-                                              const updated = [...current, srvNewFeatureText.trim()];
-                                              setSrvForm({ ...srvForm, features: updated.join(', ') });
-                                            }
-                                            setSrvNewFeatureText('');
-                                          }
-                                        }
-                                      }}
-                                      placeholder="e.g. 1 Year Premium Hosting Support"
-                                      className="flex-1 px-3 py-2 text-xs rounded-lg bg-neutral-950 border border-white/[0.08] text-white placeholder:text-neutral-500 focus:outline-none focus:border-purple-500"
-                                    />
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        if (srvNewFeatureText.trim()) {
-                                          const current = srvForm.features ? srvForm.features.split(',').map(f => f.trim()).filter(Boolean) : [];
-                                          if (!current.includes(srvNewFeatureText.trim())) {
-                                            const updated = [...current, srvNewFeatureText.trim()];
-                                            setSrvForm({ ...srvForm, features: updated.join(', ') });
-                                          }
-                                          setSrvNewFeatureText('');
-                                        }
-                                      }}
-                                      className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-lg text-xs cursor-pointer transition active:scale-95"
-                                    >
-                                      Add
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* FOOTER ACTIONS */}
-                            <div className="flex gap-2 justify-end pt-3 border-t border-white/[0.08]">
-                              <button 
-                                type="button"
-                                onClick={() => setShowServiceModal(false)}
-                                className="px-4 py-2 bg-neutral-800 hover:bg-neutral-750 text-neutral-300 hover:text-white rounded-xl font-bold cursor-pointer transition active:scale-95 text-xs"
-                              >
-                                Cancel
-                              </button>
-                              <button 
-                                type="submit"
-                                className="px-5 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-xl font-bold cursor-pointer shadow-lg shadow-purple-500/10 transition active:scale-95 text-xs"
-                              >
-                                {editingService ? 'Apply Service Update' : 'Publish Custom Service'}
-                              </button>
-                            </div>
-                          </form>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* CATEGORY MODAL */}
-                    {showCategoryModal && (
-                      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-neutral-950/80 backdrop-blur-xs">
-                        <div className={`w-full max-w-md rounded-2xl border ${cardBorder} ${panelBg} shadow-2xl p-6 space-y-4 text-left animate-in zoom-in-95 duration-200`}>
-                          <h4 className="text-base font-black">
-                            {editingCategory ? 'Edit Taxonomy Category' : 'Create New Service Category'}
-                          </h4>
-                          <form onSubmit={(e) => {
-                            e.preventDefault();
-                            const formData = new FormData(e.currentTarget);
-                            const name = formData.get('name') as string;
-                            const desc = formData.get('desc') as string;
-
-                            if (editingCategory) {
-                              setAdminCategories(adminCategories.map(c => c.id === editingCategory.id ? { ...c, name, desc } : c));
-                              triggerToast(`Category "${name}" updated.`);
-                            } else {
-                              const newCat = {
-                                id: 'cat_' + (adminCategories.length + 1),
-                                name,
-                                desc,
-                                color: 'from-blue-500 to-indigo-500',
-                                serviceCount: 0
-                              };
-                              setAdminCategories([...adminCategories, newCat]);
-                              triggerToast(`Category "${name}" successfully registered.`);
-                            }
-                            setShowCategoryModal(false);
-                          }} className="space-y-4">
-                            <div className="space-y-1">
-                              <label className="text-[10px] uppercase font-bold text-slate-400">Category Name</label>
-                              <input 
-                                required
-                                name="name"
-                                defaultValue={editingCategory?.name || ''}
-                                className="w-full px-3 py-2 bg-neutral-900 border border-white/[0.08] rounded-lg text-xs text-white focus:outline-none focus:border-purple-500"
-                                placeholder="e.g. AI Strategy"
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-[10px] uppercase font-bold text-slate-400">Taxonomy Description</label>
-                              <textarea 
-                                name="desc"
-                                defaultValue={editingCategory?.desc || ''}
-                                rows={3}
-                                className="w-full px-3 py-2 bg-neutral-900 border border-white/[0.08] rounded-lg text-xs text-white focus:outline-none focus:border-purple-500"
-                                placeholder="Brief summary of services grouped under this tag..."
-                              />
-                            </div>
-                            <div className="flex gap-2 justify-end pt-2">
-                              <button 
-                                type="button"
-                                onClick={() => setShowCategoryModal(false)}
-                                className="px-3 py-1.5 bg-neutral-800 text-neutral-300 hover:text-white rounded text-xs cursor-pointer"
-                              >
-                                Cancel
-                              </button>
-                              <button 
-                                type="submit"
-                                className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded text-xs font-bold cursor-pointer"
-                              >
-                                Save Category
-                              </button>
-                            </div>
-                          </form>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })()
-            )}
-
-            {/* SCREEN VIEWPORT E: PROJECT MANAGEMENT SYSTEM (KANBAN) */}
-            {activeMenu === 'projects' && (
-              !checkPermission('manage_content') ? renderAccessDenied('manage_content', 'Institutional Projects Portfolio') : (
-                <Suspense fallback={<div className="p-8 text-center text-xs text-neutral-500">Loading project kanban board...</div>}>
-                  <KanbanBoard 
-                    language={language}
-                    theme={theme}
-                    triggerToast={triggerToast}
-                    isAdmin={true}
-                  />
-                </Suspense>
               )
             )}
 
-            {/* SCREEN VIEWPORT F: DIGITAL CATALOG & LICENSES */}
-            {activeMenu === 'store' && (
-              !checkPermission('manage_products') ? renderAccessDenied('manage_products', 'Digital Products Store & Catalog') : (
-                <div className="space-y-6 animate-in fade-in duration-200">
-                <div>
-                  <h3 className={`text-lg font-bold ${textTitle}`}>Digital Storage & Marketplace logs</h3>
-                  <p className="text-xs opacity-60">Review legal zip downloads, secure license key queries, and active products catalog.</p>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  
-                  {/* File Download Logs */}
-                  <div className={`p-5 rounded-2xl border ${panelBg} shadow-sm space-y-4`}>
-                    <h4 className="font-bold text-sm text-purple-400">Archival Delivery Download Audits</h4>
-                    <div className="space-y-3 pt-2">
-                      {downloads.map((dl) => (
-                        <div key={dl.id} className="p-3 rounded-lg bg-neutral-900 border border-neutral-800 flex justify-between items-center text-xs">
-                          <div>
-                            <span className="font-semibold block text-neutral-200">{dl.productName}</span>
-                            <span className="text-[10px] opacity-60 block font-mono">By {dl.customerName} • IP {dl.ipAddress}</span>
-                          </div>
-                          <div className="text-right">
-                            <span className="text-emerald-400 font-mono block text-[10px] font-bold">{dl.size}</span>
-                            <span className="text-[9px] opacity-50 block">{dl.timestamp}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Seeded Legal code licenses */}
-                  <div className={`p-5 rounded-2xl border ${panelBg} shadow-sm space-y-4`}>
-                    <h4 className="font-bold text-sm text-purple-400">Cryptographic Domain Licenses</h4>
-                    <div className="space-y-3 pt-2">
-                      {[
-                        { key: 'LIC-BKASH-7431-8899-X', prod: 'bKash PG v2 PHP Module', domain: 'rahmanit.com', status: 'active' },
-                        { key: 'LIC-LARAV-1290-0432-Y', prod: 'Multivendor Laravel Suite', domain: 'saudiweb.com', status: 'active' },
-                        { key: 'LIC-WWORD-9111-5021-Z', prod: 'Real Estate WP Theme', domain: 'dhakahost.net', status: 'suspended' }
-                      ].map((lic) => (
-                        <div key={lic.key} className="p-3 rounded-lg bg-neutral-900 border border-neutral-800 space-y-2 text-xs">
-                          <div className="flex justify-between items-center">
-                            <span className="font-mono text-xs font-bold text-purple-400">{lic.key}</span>
-                            <span className={`px-2 py-0.5 text-[8px] font-black rounded uppercase ${
-                              lic.status === 'active' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'
-                            }`}>{lic.status}</span>
-                          </div>
-                          <div className="flex justify-between text-[10px] opacity-60 font-mono">
-                            <span>Module: {lic.prod}</span>
-                            <span>Target: {lic.domain}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                </div>
-              </div>
-              )
-            )}
-
-            {/* SCREEN VIEWPORT G: SUPPORT HELPDESK & CHAT REPLY */}
-            {activeMenu === 'support' && (
-              <div className="space-y-6 animate-in fade-in duration-200">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                  <div>
-                    <h3 className={`text-lg font-bold ${textTitle}`}>Support Center & SLA Helpdesk</h3>
-                    <p className="text-xs opacity-60">Answer tickets chronology, simulate customer live chat, review WhatsApp requests.</p>
-                  </div>
-                  <div>
-                    <select
-                      value={whatsappFilter}
-                      onChange={(e) => setWhatsappFilter(e.target.value as any)}
-                      className="bg-neutral-900 border border-neutral-800 text-xs text-white px-3 py-2 rounded-xl focus:border-purple-500 focus:outline-none font-medium"
-                    >
-                      <option value="all">Display All Channels</option>
-                      <option value="live">Live Web Chat Simulator</option>
-                      <option value="whatsapp">WhatsApp Direct Requests</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 pt-2">
-                  
-                  {/* Left Column: Tickets and chats thread lists */}
-                  <div className="lg:col-span-4 space-y-3">
-                    <span className="text-[10px] uppercase font-mono tracking-wider opacity-60 block font-bold">Unresolved Cases</span>
-                    {tickets.map((t) => {
-                      const isSel = selectedTicketId === t.id;
-                      return (
-                        <button
-                          key={t.id}
-                          onClick={() => setSelectedTicketId(t.id)}
-                          className={`w-full text-left p-3 rounded-lg border text-xs transition-all ${
-                            isSel 
-                              ? 'bg-purple-650/15 border-purple-500 shadow-sm' 
-                              : 'bg-neutral-900 hover:bg-neutral-800 border-neutral-800'
-                          }`}
-                        >
-                          <div className="flex justify-between items-center text-[10px] font-mono mb-1">
-                            <span className="text-purple-400 font-bold">#{t.id}</span>
-                            <span className="opacity-50">{t.createdAt.slice(11, 16)}</span>
-                          </div>
-                          <span className="font-semibold block text-neutral-200 mb-1">{t.subject}</span>
-                          <span className={`px-1.5 py-0.5 text-[8px] font-bold rounded ${
-                            t.priority === 'high' ? 'bg-red-500/20 text-red-400' : 'bg-neutral-800 text-neutral-400'
-                          }`}>{t.priority.toUpperCase()} PRIORITY</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {/* Right Column: Dynamic replies Chat viewport */}
-                  <div className="lg:col-span-8 flex flex-col justify-between h-[450px] bg-neutral-900 border border-neutral-800 rounded-2xl p-4">
-                    
-                    {/* Header info bar */}
-                    <div className="flex justify-between items-center pb-3 border-b border-neutral-800/60">
-                      <div>
-                        {selectedTicketId && (() => {
-                          const t = tickets.find(ticket => ticket.id === selectedTicketId);
-                          return (
-                            <>
-                              <span className="font-bold text-xs block text-white">{t?.subject}</span>
-                              <span className="text-[10px] text-neutral-400 font-mono">Case #{t?.id} • Client User System ID: {t?.userId}</span>
-                            </>
-                          );
-                        })()}
-                      </div>
-                      <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 rounded px-2">SLA: active</span>
-                    </div>
-
-                    {/* Chat dialog messages list */}
-                    <div className="flex-1 overflow-y-auto space-y-4 py-4 pr-1 scrollbar-thin">
-                      {selectedTicketId && (() => {
-                        const t = tickets.find(ticket => ticket.id === selectedTicketId);
-                        return (
-                          <>
-                            {/* Primary problem statement */}
-                            <div className="p-3 rounded-lg bg-neutral-950 border border-neutral-850 text-xs">
-                              <span className="font-bold text-[10px] block text-purple-400 uppercase font-mono">PROBLEM STATEMENT</span>
-                              <p className="mt-1 leading-relaxed text-neutral-300">{t?.message}</p>
-                            </div>
-
-                            {/* Chronology replies logs */}
-                            {t?.replies?.map((rep, idx) => (
-                              <div key={idx} className={`flex flex-col max-w-[85%] text-xs space-y-1 ${
-                                rep.sender === 'admin' ? 'ml-auto text-right items-end' : 'mr-auto text-left items-start'
-                              }`}>
-                                <span className="text-[9px] font-mono opacity-50 block">{rep.sender === 'admin' ? 'Super Admin' : 'Customer'} • {rep.createdAt.slice(11, 16) || 'Just now'}</span>
-                                <div className={`p-3 rounded-xl border leading-relaxed ${
-                                  rep.sender === 'admin' ? 'bg-purple-600 border-purple-500 text-white rounded-br-none' : 'bg-neutral-800/60 border-neutral-750 text-neutral-200 rounded-bl-none'
-                                }`}>
-                                  {rep.message}
-                                </div>
-                              </div>
-                            ))}
-                          </>
-                        );
-                      })()}
-                    </div>
-
-                    {/* Bottom message response textbox input */}
-                    <div className="space-y-2">
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          placeholder="Type communication hotfix response..."
-                          value={adminReplyText}
-                          onChange={(e) => setAdminReplyText(e.target.value)}
-                          onKeyDown={(e) => { if (e.key === 'Enter') selectedTicketId && handleAdminSubmitTicketReply(selectedTicketId); }}
-                          className="flex-1 bg-neutral-950 border border-neutral-800 text-xs px-3 py-2.5 rounded-xl text-white outline-none focus:border-purple-500"
-                        />
-                        <button 
-                          onClick={() => selectedTicketId && handleAdminSubmitTicketReply(selectedTicketId)}
-                          className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-750 text-white font-bold text-xs"
-                        >
-                          Reply
-                        </button>
-                      </div>
-                    </div>
-
-                  </div>
-
-                </div>
-
-                {/* WhatsApp request queues list (Simulation tracker) */}
-                <div className={`p-5 rounded-2xl border ${panelBg} shadow-sm`}>
-                  <h4 className="font-bold text-sm text-purple-400 mb-4 flex items-center gap-1.5">
-                    <Smartphone className="w-4 h-4 text-emerald-500" />
-                    WhatsApp Live Communication Blasters
-                  </h4>
-                  <div className="space-y-3">
-                    {[
-                      { phone: '+880 1864 051151', text: 'URGENT: Requesting bKash API merchant keys callback validation setup files.', date: 'May 10', solved: false },
-                      { phone: '+966 50 123 4567', text: 'Confirming wire transfer payment of $3500 is complete.', date: 'May 09', solved: true }
-                    ].map((wa, idx) => (
-                      <div key={idx} className="p-3 rounded-lg bg-neutral-900 border border-neutral-800 flex justify-between items-center text-xs">
-                        <div>
-                          <span className="font-mono text-emerald-400 font-bold block">{wa.phone}</span>
-                          <p className="mt-1 opacity-80 leading-relaxed text-neutral-300">{wa.text}</p>
-                        </div>
-                        <div className="text-right whitespace-nowrap pl-4">
-                          <span className="text-[10px] opacity-40 block mb-1">{wa.date}</span>
-                          <button 
-                            onClick={() => triggerToast(`Forwarding direct request token to staff cell phone blasters!`)}
-                            className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[9px] font-bold"
-                          >
-                            Blast Reply
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-              </div>
-            )}
-
-            {/* SCREEN VIEWPORT H: WEBZONE CREATIVE AI SUITE (CO-INTELLIGENCE CENTER - SECURE GEMINI BACKEND) */}
-            {activeMenu === 'ai-center' && (
-              !checkPermission('manage_products') ? renderAccessDenied('manage_products', 'Webzone Creative AI Suite') : (
-              <div className="space-y-6 animate-in fade-in duration-200">
-                <div className="p-4 rounded-xl border bg-purple-650/10 border-purple-500/30">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="w-5 h-5 text-purple-400" />
-                    <span className="text-xs font-bold font-mono text-purple-400 uppercase tracking-widest">WebzoneBD Enterprise AI Co-Intelligence</span>
-                  </div>
-                  <h3 className="text-base font-bold text-white mt-1 pt-1">Advanced AI Copywriter & Graphics Lab</h3>
-                  <p className="text-xs text-neutral-300 mt-1">Accelerate content creation. Draft search-optimized copywriting and generate high-impact graphic marketing banners, icons, and product placeholder images instantly.</p>
-                </div>
-
-                {/* Creative Suite Navigation Tab Bar */}
-                <div className="flex border-b border-neutral-800 gap-4">
-                  <button
-                    onClick={() => setAiSubTab('copywriter')}
-                    className={`pb-2.5 px-2 text-xs font-bold transition-all border-b-2 outline-none flex items-center gap-2 ${
-                      aiSubTab === 'copywriter'
-                        ? 'border-purple-500 text-purple-400 font-black'
-                        : 'border-transparent text-neutral-400 opacity-60 hover:opacity-100'
-                    }`}
-                  >
-                    <FileText className="w-3.5 h-3.5" />
-                    AI Copywriter Studio
-                  </button>
-                  <button
-                    onClick={() => setAiSubTab('image')}
-                    className={`pb-2.5 px-2 text-xs font-bold transition-all border-b-2 outline-none flex items-center gap-2 ${
-                      aiSubTab === 'image'
-                        ? 'border-purple-500 text-purple-400 font-black'
-                        : 'border-transparent text-neutral-400 opacity-60 hover:opacity-100'
-                    }`}
-                  >
-                    <Image className="w-3.5 h-3.5" />
-                    AI Image Generator
-                  </button>
-                </div>
-
-                {/* SUB TAB 1: COPYWRITER */}
-                {aiSubTab === 'copywriter' && (
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start animate-in fade-in duration-200">
-                    {/* Generation parameters selectors */}
-                    <form onSubmit={(e) => { e.preventDefault(); handleTriggerAiGeneration(); }} className={`lg:col-span-5 p-5 rounded-2xl border ${panelBg} space-y-4`}>
-                      
-                      <div>
-                        <label className="text-[10px] uppercase font-mono tracking-wider opacity-60 block mb-1">Copilot Mode</label>
-                        <select
-                          value={aiMode}
-                          onChange={(e) => setAiMode(e.target.value as any)}
-                          className="w-full bg-neutral-950 border border-neutral-805 text-xs text-white px-3 py-2 rounded focus:border-purple-500 focus:outline-none"
-                        >
-                          <option value="blog">📝 AI Blog Generator</option>
-                          <option value="content">📣 AI Content Copy / Headlines</option>
-                          <option value="seo">🔍 AI SEO Keywords & Topic proposals</option>
-                          <option value="meta">🧬 AI Search Metas (CTR Optimized)</option>
-                          <option value="business-name">🏦 AI Business Naming & Slogan Director</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="text-[10px] uppercase font-mono tracking-wider opacity-60 block mb-1">Context Prompt details</label>
-                        <textarea
-                          rows={4}
-                          placeholder={
-                            aiMode === 'blog' ? "Provide the blog post theme (e.g. why Node.js is great for fullstack apps)..." 
-                            : aiMode === 'content' ? "Describe the service to market (e.g. premium responsive web design)..."
-                            : aiMode === 'seo' ? "Focus niche or category keys..."
-                            : "Brief business description or keywords..."
-                          }
-                          value={aiPrompt}
-                          onChange={(e) => setAiPrompt(e.target.value)}
-                          className="w-full bg-neutral-950 border border-neutral-805 text-xs px-3 py-2 rounded focus:border-purple-500 outline-none text-white font-sans"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="text-[10px] uppercase font-mono tracking-wider opacity-60 block mb-1">Tone of Voice</label>
-                        <select
-                          value={aiTone}
-                          onChange={(e) => setAiTone(e.target.value)}
-                          className="w-full bg-neutral-950 border border-neutral-805 text-xs text-white px-3 py-2 rounded focus:border-purple-500"
-                        >
-                          <option value="professional">Professional / Educational</option>
-                          <option value="playful">Playful / Catchy</option>
-                          <option value="persuasive">Conversion copy (Marketing)</option>
-                          <option value="corporate">Corporate Enterprise</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="text-[10px] uppercase font-mono tracking-wider opacity-60 block mb-1">Target Search Keywords (Optional)</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. bkash api, node.js developers, css3"
-                          value={aiKeywords}
-                          onChange={(e) => setAiKeywords(e.target.value)}
-                          className="w-full bg-neutral-950 border border-neutral-805 text-xs px-3 py-2 rounded focus:border-purple-500 text-white font-mono"
-                        />
-                      </div>
-
-                      <button
-                        type="submit"
-                        disabled={aiLoading}
-                        className="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-750 text-white font-black text-xs transition-all flex items-center justify-center gap-2"
-                      >
-                        {aiLoading ? (
-                          <>
-                            <RefreshCw className="w-4 h-4 animate-spin" />
-                            Executing Gemini Matrix...
-                          </>
-                        ) : (
-                          <>
-                            <Sparkles className="w-4 h-4" />
-                            Launch Copilot Generation
-                          </>
-                        )}
-                      </button>
-
-                    </form>
-
-                    {/* Generation Output viewport display */}
-                    <div className="lg:col-span-7 space-y-3">
-                      <span className="text-[10px] uppercase font-mono tracking-wider opacity-60 block font-bold">Constructed Output</span>
-                      <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-5 min-h-[300px] text-xs font-sans text-neutral-200 leading-relaxed overflow-y-auto max-h-[480px]">
-                        {aiGeneratedOutput ? (
-                          <div className="space-y-4">
-                            <p className="whitespace-pre-wrap">{aiGeneratedOutput}</p>
-                            <div className="pt-4 border-t border-neutral-800/80 flex justify-end gap-2 text-[10px] font-bold">
-                              <button 
-                                onClick={() => {
-                                  navigator.clipboard.writeText(aiGeneratedOutput);
-                                  triggerToast("Copied to keyboard clipboard!");
-                                }}
-                                className="px-3 py-1.5 rounded bg-neutral-850 hover:bg-neutral-800 text-purple-400 border border-neutral-800"
-                              >
-                                Copy Contents
-                              </button>
-                              {aiMode === 'blog' && (
-                                <button 
-                                  onClick={() => {
-                                    const newP = {
-                                      id: `blog-` + Date.now(),
-                                      title: aiPrompt || "Untitled AI Blog",
-                                      summary: aiPrompt + "... generated content catalog review.",
-                                      content: aiGeneratedOutput,
-                                      category: "Web Development",
-                                      author: "Google Gemini AI Engine",
-                                      readTime: "5 min read",
-                                      image: "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=800&q=80",
-                                      isDraft: true,
-                                      date: "Just Now",
-                                      tags: ["AI", "Tech"]
-                                    };
-                                    setPosts(prev => [newP, ...prev]);
-                                    triggerToast("Generated Article saved successfully to blog drafts database!");
-                                  }}
-                                  className="px-3 py-1.5 rounded bg-purple-600 text-white"
-                                >
-                                  Save to Blog Drafts
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="flex flex-col items-center justify-center min-h-[250px] text-center opacity-40 space-y-2">
-                            <Terminal className="w-10 h-10" />
-                            <span className="font-mono text-[10px]">Viewport Standing By. Initiate generation parameters on left panel.</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* SUB TAB 2: AI IMAGE GENERATOR */}
-                {aiSubTab === 'image' && (
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start animate-in fade-in duration-200">
-                    
-                    {/* Prompt input and generation options form */}
-                    <div className={`lg:col-span-5 p-5 rounded-2xl border ${panelBg} space-y-4`}>
-                      <span className="text-[10px] uppercase font-mono tracking-wider opacity-65 block font-bold">Image Blueprint Specifications</span>
-                      
-                      <div>
-                        <label className="text-[10px] uppercase font-mono tracking-wider opacity-60 block mb-1">Enter detailed descriptive prompt</label>
-                        <textarea
-                          rows={4}
-                          placeholder="e.g. Sleek server hardware room inside futuristic tech bunker, high-contrast violet glow, digital design concept..."
-                          value={imagePrompt}
-                          onChange={(e) => setImagePrompt(e.target.value)}
-                          className="w-full bg-neutral-950 border border-neutral-805 text-xs px-3 py-2.5 rounded focus:border-purple-500 outline-none text-white font-sans leading-relaxed"
-                        />
-                        <span className="text-[9px] text-neutral-400 mt-1 block">Specify subject, elements, colors, and environment details for crisp results.</span>
-                      </div>
-
-                      <div>
-                        <label className="text-[10px] uppercase font-mono tracking-wider opacity-60 block mb-1">Creative Artistic Style Style</label>
-                        <select
-                          value={imageStyle}
-                          onChange={(e) => setImageStyle(e.target.value)}
-                          className="w-full bg-neutral-950 border border-neutral-850 text-xs text-white px-3 py-2 rounded focus:border-purple-500"
-                        >
-                          <option value="minimalist">💻 Modern Minimalist Flat Tech</option>
-                          <option value="holographic">🔮 Futuristic Holographic 3D Space</option>
-                          <option value="photorealistic">📸 Studio Photorealistic Product Presentation</option>
-                          <option value="isometric">📐 Isometric Administrative Vector</option>
-                          <option value="editorial">🌿 Elegant Editorial Minimalist Beige</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="text-[10px] uppercase font-mono tracking-wider opacity-60 block mb-1">Aspect Ratio Configuration</label>
-                        <div className="grid grid-cols-4 gap-2">
-                          {[
-                            { value: '1:1', label: '1:1 Square', desc: 'Product Card' },
-                            { value: '16:9', label: '16:9 Wide', desc: 'Hero Banner' },
-                            { value: '4:3', label: '4:3 Classic', desc: 'Article Card' },
-                            { value: '9:16', label: '9:16 Mobile', desc: 'Promo Feed' }
-                          ].map((item) => (
-                            <button
-                              key={item.value}
-                              onClick={() => setImageRatio(item.value)}
-                              className={`p-2 rounded-lg border text-center transition-all flex flex-col items-center justify-between min-h-[56px] cursor-pointer ${
-                                imageRatio === item.value
-                                  ? 'border-purple-500 bg-purple-500/10 text-white font-bold'
-                                  : 'border-neutral-805 bg-neutral-950/40 text-neutral-400 hover:border-neutral-700'
-                              }`}
-                            >
-                              <span className="text-[10px] block font-mono">{item.value}</span>
-                              <span className="text-[8px] opacity-75 block truncate w-full">{item.desc}</span>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      <button
-                        onClick={handleTriggerImageGeneration}
-                        disabled={imageLoading}
-                        className="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-750 text-white font-extrabold text-xs transition-all flex items-center justify-center gap-2"
-                      >
-                        {imageLoading ? (
-                          <>
-                            <RefreshCw className="w-4 h-4 animate-spin text-purple-200" />
-                            Rendering Unique Asset with Gemini...
-                          </>
-                        ) : (
-                          <>
-                            <Sparkles className="w-4 h-4" />
-                            Generate Custom Asset
-                          </>
-                        )}
-                      </button>
-
-                      {/* Prompt Helper Shortcuts */}
-                      <div className="pt-2 border-t border-neutral-850/80">
-                        <span className="text-[8px] uppercase font-mono opacity-40 block mb-1.5">Preset Sample Blueprints</span>
-                        <div className="flex flex-wrap gap-1.5">
-                          {[
-                            { label: "VPS Hosting", prompt: "Sleek rackmount cloud servers array network hub, ultraviolet lights glow, isometric tech concept art" },
-                            { label: "WordPress Agency", prompt: "Professional agency desktop presentation mockup screen, neon workspace accents, clean visual UI" },
-                            { label: "E-Commerce", prompt: "Modern luxury product glass display platform, beautiful atmospheric studio lighting background" },
-                            { label: "Marketing Banner", prompt: "Stunning analytics chart vector graphic overlay, minimalist high resolution professional banner layout" }
-                          ].map((helper, hi) => (
-                            <button
-                              key={hi}
-                              onClick={() => {
-                                setImagePrompt(helper.prompt);
-                                if (helper.label === "Marketing Banner") setImageRatio("16:9");
-                                else if (helper.label === "WordPress Agency") setImageRatio("4:3");
-                                else setImageRatio("1:1");
-                                triggerToast(`Applied shortcut: "${helper.label}"`);
-                              }}
-                              className="text-[9px] px-2 py-1 rounded bg-neutral-900 border border-neutral-805 text-neutral-300 hover:border-purple-500 transition-colors"
-                            >
-                              {helper.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                    </div>
-
-                    {/* Generator output canvas preview */}
-                    <div className="lg:col-span-7 space-y-4">
-                      <span className="text-[10px] uppercase font-mono tracking-wider opacity-60 block font-bold">Interactive Generation Canvas</span>
-                      
-                      <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-5 flex flex-col items-center justify-center min-h-[350px] relative overflow-hidden">
-                        
-                        {imageLoading ? (
-                          <div className="flex flex-col items-center space-y-3 p-10 text-center animate-pulse z-10">
-                            <div className="relative w-16 h-16 rounded-full bg-purple-500/15 flex items-center justify-center">
-                              <Sparkles className="w-8 h-8 text-purple-400 absolute animate-ping opacity-70" />
-                              <Sparkles className="w-8 h-8 text-purple-400 animate-spin" />
-                            </div>
-                            <div>
-                              <span className="text-xs font-mono text-purple-400 font-bold block mb-1">Synthesizing Creative Matrix</span>
-                              <p className="text-[10px] text-neutral-400 max-w-xs leading-relaxed">Processing noise model pipeline structure and aspect ratio matrices on Google Gemini server layer...</p>
-                            </div>
-                          </div>
-                        ) : imageGeneratedUrl ? (
-                          <div className="w-full space-y-4 flex flex-col items-center z-10 anim-fade-in">
-                            {/* Asset Wrapper utilizing correct aspect ratio constraint */}
-                            <div className={`w-full max-w-md border border-neutral-850 rounded-xl overflow-hidden shadow-2xl bg-black flex items-center justify-center ${
-                              imageRatio === '16:9' ? 'aspect-video' 
-                              : imageRatio === '4:3' ? 'aspect-[4/3]' 
-                              : imageRatio === '9:16' ? 'aspect-[9/16] max-h-[300px]' 
-                              : 'aspect-square'
-                            }`}>
-                              <img
-                                src={imageGeneratedUrl}
-                                alt="Generated high impact design preview"
-                                referrerPolicy="no-referrer"
-                                className="w-full h-full object-cover select-none pointer-events-none"
-                              />
-                            </div>
-
-                            {/* Active actions bar */}
-                            <div className="flex flex-wrap gap-2 justify-center w-full max-w-md pt-3 border-t border-neutral-800">
-                              <button
-                                onClick={() => {
-                                  const promptSnippet = imagePrompt.substring(0, 15).toLowerCase().replace(/[^a-z0-9]/g, "_");
-                                  const filename = `webzone_ai_${promptSnippet || "banner"}.png`;
-                                  triggerDownloadImage(imageGeneratedUrl, filename);
-                                  triggerToast("Download triggered successfully!");
-                                }}
-                                className="px-3 py-1.5 rounded-lg bg-neutral-850 hover:bg-neutral-800 border border-neutral-800 text-purple-400 font-bold text-[10px] flex items-center gap-1.5 cursor-pointer"
-                              >
-                                <Download className="w-3.5 h-3.5" />
-                                Download PNG Asset
-                              </button>
-
-                              <button
-                                onClick={() => {
-                                  // Ask user if they wish to assign or copy
-                                  navigator.clipboard.writeText(imageGeneratedUrl);
-                                  triggerToast("Direct image link copied to clipboard!");
-                                }}
-                                className="px-3 py-1.5 rounded-lg bg-neutral-850 hover:bg-neutral-800 border border-neutral-800 text-neutral-300 font-bold text-[10px] cursor-pointer"
-                              >
-                                Copy Asset Link
-                              </button>
-
-                              <button
-                                onClick={() => {
-                                  // Add asset directly as a virtual draft item in the marketplace catalog
-                                  const placeholderProduct: Product = {
-                                    id: "ai-prod-" + Date.now().toString().slice(-6),
-                                    name: "AI Generated Concept: " + (imagePrompt.substring(0, 24) || "Premium Template"),
-                                    nameBn: "এআই জেনারেটেড ডিজাইন: " + (imagePrompt.substring(0, 24) || "Premium Template"),
-                                    nameAr: "تصميم الذكاء الاصطناعي: " + (imagePrompt.substring(0, 24) || "Premium Template"),
-                                    category: "php",
-                                    price: 49,
-                                    rating: 5.0,
-                                    reviewsCount: 1,
-                                    features: ["100% Unique AI Design", "W3C Validated", "Adheres to SEO"],
-                                    featuresBn: ["১০০% অনন্য এআই ডিজাইন", "W3C দ্বারা যাচাইকৃত"],
-                                    featuresAr: ["تصميم ذكاء اصطناعي فريد", "متوافق مع محركات البحث"],
-                                    description: `Precompiled high value placeholder asset. Generated prompt: ${imagePrompt}`,
-                                    descriptionBn: `আজকের জেনারেটেড নতুন প্রোডাক্ট: ${imagePrompt}`,
-                                    descriptionAr: `منتج ترويجي جديد من الذكاء الاصطناعي: ${imagePrompt}`,
-                                    image: imageGeneratedUrl,
-                                    demoUrl: "#",
-                                    downloadUrl: "#",
-                                    tags: ["Script", "Bootstrap", "AI-Generated"],
-                                    views: 1
-                                  };
-                                  addNewProduct(placeholderProduct);
-                                  triggerToast("✅ Added placeholder asset to product Marketplace catalogue draft section!");
-                                }}
-                                className="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-bold text-[10px] cursor-pointer"
-                              >
-                                Create Marketplace Product Placeholder
-                              </button>
-                            </div>
-                            
-                            {/* Generation Metadata Details badge display */}
-                            <div className="w-full max-w-md p-3 rounded-lg bg-neutral-950 border border-neutral-805 flex flex-wrap gap-2 text-[9px] font-mono justify-between text-neutral-400">
-                              <span>Aspect: <strong className="text-white">{imageRatio}</strong></span>
-                              <span>Creative Style: <strong className="text-white">{imageStyle.toUpperCase()}</strong></span>
-                              <span>Pipeline: <strong className="text-purple-400">Gemini 2.5 Image</strong></span>
-                            </div>
-
-                          </div>
-                        ) : (
-                          <div className="flex flex-col items-center justify-center text-center opacity-45 space-y-2 p-10">
-                            <Image className="w-12 h-12 text-purple-400 animate-pulse duration-1000" />
-                            <span className="font-mono text-xs font-bold block">Graphics Platform Standing By</span>
-                            <p className="text-[10px] max-w-xs leading-relaxed">Describe your target layout scene on the left parameters panel and hit generate. Models take ~3 seconds to compile.</p>
-                          </div>
-                        )}
-
-                        {/* Image watermark details background decoration */}
-                        <div className="absolute top-2 right-3 font-mono text-[8px] tracking-wider uppercase opacity-20 pointer-events-none text-right">
-                          <span>W-BD Graphics Engine</span>
-                          <span className="block text-[6px]">Secure Node Proxy Layer</span>
-                        </div>
-                      </div>
-
-                      {/* HISTORY REEL LIST */}
-                      {imageList.length > 0 && (
-                        <div className="p-4 rounded-2xl border border-neutral-800 bg-neutral-900/40 space-y-3">
-                          <div className="flex justify-between items-center">
-                            <span className="text-[10px] uppercase font-mono tracking-wider opacity-60 font-bold block">History & Recent Concepts ({imageList.length})</span>
-                            <button
-                              onClick={() => {
-                                setImageList([]);
-                                localStorage.removeItem('webzone_ai_generated_images');
-                                triggerToast("Concepts cache cleared.");
-                              }}
-                              className="text-[9px] text-red-400 hover:underline cursor-pointer"
-                            >
-                              Clear Concept Reels
-                            </button>
-                          </div>
-                          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3">
-                            {imageList.map((img, idx) => (
-                              <div
-                                key={idx}
-                                onClick={() => {
-                                  setImageGeneratedUrl(img.url);
-                                  setImageRatio(img.ratio);
-                                  setImageStyle(img.style);
-                                  setImagePrompt(img.prompt);
-                                  triggerToast("Reloaded asset to Active Canvas viewport.");
-                                }}
-                                className="group relative rounded-lg overflow-hidden border border-neutral-800 bg-black cursor-pointer aspect-square hover:border-purple-500 transition-all flex items-center justify-center"
-                              >
-                                <img
-                                  src={img.url}
-                                  alt="History item"
-                                  referrerPolicy="no-referrer"
-                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                                />
-                                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-1 text-center">
-                                  <span className="text-[8px] text-white font-semibold truncate w-full">{img.prompt}</span>
-                                </div>
-                                <span className="absolute bottom-1 right-1 text-[7px] bg-neutral-950/80 px-1 rounded text-neutral-400 font-mono font-bold">{img.ratio}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                    </div>
-
-                  </div>
-                )}
-              </div>
-
-              )
-            )}
-
-            {/* SCREEN VIEWPORT I: AFFILIATES NETWORKS */}
-            {activeMenu === 'affiliates' && (
-              !checkPermission('manage_orders') ? renderAccessDenied('manage_orders', 'Affiliates Partner Network') : (
-                <div className="space-y-6 animate-in fade-in duration-200">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div>
-                      <h3 className={`text-lg font-bold ${textTitle}`}>Certified Affiliates Partner network</h3>
-                      <p className="text-xs opacity-60">Authorize withdrawal requests, alter partner commission scales, track conversion metrics.</p>
-                    </div>
-                    {/* Fast Stats summary */}
-                    <div className="flex gap-3 text-xs">
-                      <div className="p-3 bg-neutral-900 rounded-xl border border-neutral-800 text-center min-w-[100px]">
-                        <span className="block opacity-55 text-[9px] uppercase font-mono">Members</span>
-                        <span className="font-extrabold text-purple-400 font-mono text-sm">{affiliateList.length}</span>
-                      </div>
-                      <div className="p-3 bg-neutral-900 rounded-xl border border-neutral-800 text-center min-w-[100px]">
-                        <span className="block opacity-55 text-[9px] uppercase font-mono">Pending</span>
-                        <span className={`font-extrabold font-mono text-sm ${affiliateList.some(a => a.status === 'pending') ? 'text-amber-500 animate-pulse' : 'text-slate-400'}`}>
-                          {affiliateList.filter(a => a.status === 'pending').length}
-                        </span>
-                      </div>
-                      <div className="p-3 bg-neutral-900 rounded-xl border border-neutral-800 text-center min-w-[100px]">
-                        <span className="block opacity-55 text-[9px] uppercase font-mono">Transferred</span>
-                        <span className="font-extrabold text-emerald-400 font-mono text-sm">
-                          ${withdrawRequests.filter(w => w.status === 'completed').reduce((sum, w) => sum + w.amout, 0).toLocaleString()}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                    {/* Left Column - Withdrawal Requests Payouts Gateway */}
-                    <div className="lg:col-span-5 space-y-4">
-                      <div className={`p-5 rounded-2xl border ${panelBg} shadow-sm space-y-4`}>
-                        <h4 className="font-bold text-sm text-purple-400 flex items-center gap-1.5">
-                          <span className="h-2 w-2 rounded-full bg-amber-500 animate-ping" />
-                          <span>Withdrawable Payout Transfer Queue</span>
-                        </h4>
-                        
-                        {withdrawRequests.length === 0 ? (
-                          <p className="text-xs italic text-center opacity-50 py-4">No withdrawal requests queued.</p>
-                        ) : (
-                          <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
-                            {withdrawRequests.map((wit) => (
-                              <div key={wit.id} className="p-3.5 rounded-xl bg-neutral-900 border border-neutral-800 flex justify-between items-center text-xs">
-                                <div className="space-y-1.5">
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-bold text-neutral-100">{wit.partnerName}</span>
-                                    <span className="text-[9px] px-1.5 bg-neutral-800 text-purple-400 font-mono rounded">{wit.partnerCode || 'PARTNER'}</span>
-                                  </div>
-                                  <span className="text-[10px] opacity-60 block font-mono">
-                                    Withdraw <b className="text-pink-400">${wit.amout} USD</b> via <b>{wit.method}</b> to: <br/>
-                                    <span className="text-neutral-200 mt-1 inline-block bg-neutral-950 px-1.5 py-0.5 rounded border border-neutral-850">{wit.details}</span>
-                                  </span>
-                                </div>
-                                <div className="text-right pl-3 flex flex-col justify-between h-full space-y-1.5">
-                                  <span className="text-[9px] opacity-40 block font-mono">{wit.date}</span>
-                                  {wit.status === 'pending' ? (
-                                    <button 
-                                      onClick={() => handleApproveWithdrawalRequest(wit.id)}
-                                      className="px-3 py-1 mr-[-2px] rounded bg-purple-600 hover:bg-purple-500 text-white font-black text-[9px] transition-all whitespace-nowrap"
-                                    >
-                                      Authorize Fund Release
-                                    </button>
-                                  ) : (
-                                    <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[8px] font-black uppercase text-center">Released</span>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Right Column - Unified Certified Partners & Status/Rates Adjuster */}
-                    <div className="lg:col-span-7 space-y-4">
-                      <div className={`p-5 rounded-2xl border ${panelBg} shadow-sm space-y-4`}>
-                        <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 pb-2 border-b border-neutral-800">
-                          <h4 className="font-bold text-sm text-purple-400">Certified Partners & Affiliates Registry</h4>
-                          
-                          {/* List filtering */}
-                          <div className="flex gap-1.5">
-                            <input
-                              type="text"
-                              value={affiliateSearch}
-                              onChange={(e) => setAffiliateSearch(e.target.value)}
-                              placeholder="Search code/name..."
-                              className="bg-neutral-950 border border-neutral-800 text-[10px] px-2 py-1 rounded w-32 focus:border-purple-500 text-white outline-none"
-                            />
-                            <select
-                              value={affiliateStatusFilter}
-                              onChange={(e) => setAffiliateStatusFilter(e.target.value as any)}
-                              className="bg-neutral-950 border border-neutral-800 text-[10px] px-2 py-1 rounded text-neutral-300 font-bold"
-                            >
-                              <option value="all">All States</option>
-                              <option value="approved">Approved</option>
-                              <option value="pending">Pending Review</option>
-                              <option value="suspended">Suspended</option>
-                            </select>
-                          </div>
-                        </div>
-
-                        <div className="space-y-4 max-h-[500px] overflow-y-auto pr-1">
-                          {affiliateList
-                            .filter(a => {
-                              const matchSearch = a.name.toLowerCase().includes(affiliateSearch.toLowerCase()) || a.code.toLowerCase().includes(affiliateSearch.toLowerCase());
-                              const matchStatus = affiliateStatusFilter === 'all' || a.status === affiliateStatusFilter;
-                              return matchSearch && matchStatus;
-                            })
-                            .map((p) => (
-                              <div key={p.userId} className={`p-4 rounded-xl border transition ${p.status === 'pending' ? 'bg-amber-500/5 border-amber-500/20' : p.status === 'suspended' ? 'bg-red-500/5 border-red-550/20' : 'bg-neutral-900 border-neutral-800'}`}>
-                                <div className="flex flex-col sm:flex-row justify-between items-start gap-2 text-xs">
-                                  <div>
-                                    <div className="flex items-center gap-2">
-                                      <span className="font-bold text-neutral-100 text-sm">{p.name}</span>
-                                      <span className={`text-[8.5px] px-1.5 py-0.5 rounded font-black uppercase font-mono ${p.status === 'approved' ? 'bg-emerald-500/10 text-emerald-400' : p.status === 'pending' ? 'bg-amber-500/10 text-amber-500 animate-pulse' : 'bg-red-500/10 text-red-400'}`}>
-                                        {p.status}
-                                      </span>
-                                    </div>
-                                    <span className="text-[10px] text-purple-400 font-mono font-bold block mt-0.5">{p.code} • Channel: {p.channel || 'Organic'}</span>
-                                    <span className="text-[9px] text-slate-500 block">Payout channel: <b className="text-neutral-400 font-mono">{p.paymentDetails || 'Not defined'}</b></span>
-                                  </div>
-                                  
-                                  <div className="text-left sm:text-right text-xs">
-                                    <span className="text-[9px] opacity-45 block font-mono">Commission Rate: <b className="text-pink-500 text-xs font-black">{p.commissionRate || 15}%</b></span>
-                                    <span className="text-[9px] text-slate-400 block font-mono mt-0.5">Balance: <b className="text-emerald-400 font-bold">${p.balance} USD</b></span>
-                                    <span className="text-[8px] text-slate-500 block font-mono">Clicks: {p.clicks} • Conversions: {p.referrals}</span>
-                                  </div>
-                                </div>
-
-                                <div className="mt-4 pt-3 border-t border-neutral-850/60 flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3">
-                                  {/* Slider for setting customized commission rates */}
-                                  <div className="flex-1 flex items-center gap-2">
-                                    <span className="text-[9px] font-mono opacity-50 uppercase whitespace-nowrap">CUSTOM RATE:</span>
-                                    <input 
-                                      type="range"
-                                      min="10"
-                                      max="50"
-                                      step="5"
-                                      value={p.commissionRate || 15}
-                                      onChange={(e) => handleUpdateAffiliateCommissionRate(p.userId, Number(e.target.value))}
-                                      className="w-full accent-purple-500 h-1 cursor-pointer bg-neutral-800 rounded-lg"
-                                    />
-                                    <span className="text-[10.5px] font-bold font-mono text-[#00E5FF]">{p.commissionRate || 15}%</span>
-                                  </div>
-
-                                  {/* Quick status change buttons */}
-                                  <div className="flex gap-1.5 shrink-0">
-                                    {p.status === 'pending' && (
-                                      <button 
-                                        onClick={() => handleUpdateAffiliateStatus(p.userId, 'approved')}
-                                        className="px-2 py-1 bg-emerald-650 hover:bg-emerald-600 text-slate-950 font-black text-[9px] uppercase rounded transition"
-                                      >
-                                        Approve Account
-                                      </button>
-                                    )}
-                                    {p.status === 'approved' && (
-                                      <button 
-                                        onClick={() => handleUpdateAffiliateStatus(p.userId, 'suspended')}
-                                        className="px-2.5 py-1 bg-neutral-950 hover:bg-red-900 border border-red-950/40 text-red-400 font-bold text-[9px] uppercase rounded transition"
-                                      >
-                                        Suspend Partner
-                                      </button>
-                                    )}
-                                    {p.status === 'suspended' && (
-                                      <button 
-                                        onClick={() => handleUpdateAffiliateStatus(p.userId, 'approved')}
-                                        className="px-2.5 py-1 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 font-bold text-[9px] uppercase rounded transition"
-                                      >
-                                        Reinstate Partner
-                                      </button>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* BOTTOM FULL-WIDTH MODULE - REFERRED SALES & CONVERSION TRACKER LEDGER */}
-                  <div className={`p-5 rounded-2xl border ${panelBg} shadow-sm space-y-4`}>
-                    <div className="flex justify-between items-center pb-2 border-b border-neutral-805">
-                      <div>
-                        <h4 className="font-bold text-sm text-purple-400 uppercase tracking-wide font-mono">Affiliate referred sales & commission conversion ledger</h4>
-                        <p className="text-[10px] text-slate-450">Continuous system auditor logs for purchase completions attributed to certified partners.</p>
-                      </div>
-                    </div>
-
-                    <div className="overflow-x-auto rounded-xl border border-neutral-800">
-                      <table className="w-full text-left text-xs font-sans">
-                        <thead className="bg-[#0B0F19] text-[9.5px] uppercase font-mono tracking-wider text-slate-400 border-b border-neutral-800">
-                          <tr>
-                            <th className="p-3">Reference Tracking ID</th>
-                            <th className="p-3">Affiliate Partner</th>
-                            <th className="p-3">Client Customer</th>
-                            <th className="p-3">Purchased Product/Service</th>
-                            <th className="p-3">Sale Amount</th>
-                            <th className="p-3">Earned Commission</th>
-                            <th className="p-3">Campaign Channel</th>
-                            <th className="p-3">Conversion Date</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-neutral-850 bg-neutral-950/40 text-neutral-300">
-                          {affiliateReferrals.length === 0 ? (
-                            <tr>
-                              <td colSpan={8} className="p-4 text-center italic text-slate-500">No referral sales logged on this environment yet.</td>
-                            </tr>
-                          ) : (
-                            affiliateReferrals.map((item) => (
-                              <tr key={item.id} className="hover:bg-neutral-900/60 transition font-mono text-[11px]">
-                                <td className="p-3 font-semibold text-purple-400">#{item.id}</td>
-                                <td className="p-3 font-bold text-neutral-100">{item.affiliateCode}</td>
-                                <td className="p-3 font-sans font-medium">{item.referredUserName}</td>
-                                <td className="p-3 font-sans text-neutral-300 max-w-[200px] truncate">{item.productName}</td>
-                                <td className="p-3 text-neutral-400">${item.saleAmount}</td>
-                                <td className="p-3 text-emerald-400 font-bold">${item.commissionEarned}</td>
-                                <td className="p-3"><span className="px-1.5 py-0.5 bg-neutral-900 border border-neutral-805 text-[9px] rounded text-slate-400">{item.campaignSuffix}</span></td>
-                                <td className="p-3 text-slate-450">{item.date}</td>
-                              </tr>
-                            ))
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-              )
-            )}
-
-            {/* SCREEN VIEWPORT J: DIRECT MARKETING & CAMPAIGNS */}
-            {activeMenu === 'marketing' && (
-              !checkPermission('manage_content') ? renderAccessDenied('manage_content', 'Direct Marketing & Campaign Hub') : (
-                <div className="space-y-6 animate-in fade-in duration-200">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  
-                  {/* Campaign Blast Creator form */}
-                  <form onSubmit={handleLaunchCampaignBlast} className={`p-5 rounded-2xl border ${panelBg} shadow-sm space-y-4`}>
-                    <h4 className="font-bold text-sm text-purple-400">Campaign automated broadcaster blasters</h4>
-                    
-                    <div>
-                      <label className="text-[10px] uppercase font-mono block mb-1">Broadcaster Channel</label>
-                      <div className="grid grid-cols-3 gap-2">
-                        {['email', 'sms', 'push'].map((ch) => (
-                          <button
-                            type="button"
-                            key={ch}
-                            onClick={() => setMarketingChannel(ch as any)}
-                            className={`py-1.5 rounded text-xs font-bold transition-all border uppercase ${
-                              marketingChannel === ch ? 'bg-purple-600 text-white border-purple-500' : 'bg-neutral-950 text-neutral-400 border-neutral-805'
-                            }`}
-                          >
-                            {ch}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="text-[10px] uppercase font-mono block mb-1">Subject Header / Text Title</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Ramadan Special 30% Discount on all script packages!"
-                        value={campaignHeading}
-                        onChange={(e) => setCampaignHeading(e.target.value)}
-                        className="w-full bg-neutral-950 border border-neutral-805 text-xs px-3 py-2 rounded focus:border-purple-500 outline-none text-white"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-[10px] uppercase font-mono block mb-1">Broadcaster Body contents</label>
-                      <textarea
-                        rows={4}
-                        placeholder="Write direct promotional copy to broadcast..."
-                        value={campaignBodyContent}
-                        onChange={(e) => setCampaignBodyContent(e.target.value)}
-                        className="w-full bg-neutral-950 border border-neutral-805 text-xs px-3 py-2 rounded focus:border-purple-500 outline-none text-white"
-                      />
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={campaignLoading}
-                      className="w-full py-2.5 rounded-lg bg-purple-600 text-white font-bold text-xs"
-                    >
-                      {campaignLoading ? 'Launching Blasters...' : 'Blast Campaign List'}
-                    </button>
-                  </form>
-
-                  {/* Active promotional coupon creations tool */}
-                  <div className={`p-5 rounded-2xl border ${panelBg} shadow-sm space-y-4`}>
-                    <h4 className="font-bold text-sm text-purple-400">Coupon Code Management System</h4>
-                    
-                    {/* Catalog list */}
-                    <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
-                      {coupons.map((c) => (
-                        <div key={c.code} className="p-3 rounded-lg bg-neutral-900 border border-neutral-800 flex justify-between items-center text-xs">
-                          <div>
-                            <span className="font-mono text-xs font-bold text-purple-400 block">{c.code}</span>
-                            <span className="text-[9px] opacity-40 block">
-                              Voucher active • Expiry {c.expiryDate} • Applied <strong className="text-emerald-500 font-bold">{c.usageCount ?? 0}</strong> times
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <span className="font-black text-emerald-400 font-mono">{c.discountPercent}% OFF</span>
-                            <button
-                              onClick={() => {
-                                navigator.clipboard.writeText(c.code);
-                                setCopiedCouponCode(c.code);
-                                triggerToast('📋 Coupon code copied to clipboard!');
-                                setTimeout(() => setCopiedCouponCode(null), 2000);
-                              }}
-                              className="text-slate-400 hover:text-purple-400 p-1 flex items-center justify-center transition cursor-pointer"
-                              title="Copy Coupon Code"
-                            >
-                              {copiedCouponCode === c.code ? (
-                                <Check className="w-4 h-4 text-[rgb(16,185,129)]" />
-                              ) : (
-                                <Copy className="w-4 h-4" />
-                              )}
-                            </button>
-                            <button 
-                              onClick={() => {
-                                setDeleteConfirmDialog({
-                                  isOpen: true,
-                                  title: `Deactivate Coupon "${c.code}"?`,
-                                  description: `Are you absolutely sure you want to deactivate and permanently delete the promotional discount coupon "${c.code}"? Customers will no longer be able to apply this discount.`,
-                                  onConfirm: () => {
-                                    deleteCoupon(c.code);
-                                    triggerToast(`🗑️ Coupon "${c.code}" deactivated.`);
-                                  }
-                                });
-                              }}
-                              className="text-red-500 hover:text-red-400 p-1"
-                              title="Delete Coupon"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Creation Form */}
-                    <form onSubmit={handleCreateCoupon} className="pt-2 border-t border-neutral-800/60 grid grid-cols-2 gap-3 items-end">
-                      <div>
-                        <label className="text-[10px] uppercase font-mono opacity-50 block mb-1">Coupon Text</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. RAMADAN30"
-                          value={promoCouponCode}
-                          onChange={(e) => setPromoCouponCode(e.target.value)}
-                          className="w-full bg-neutral-950 border border-neutral-800 text-xs px-3 py-1.5 rounded focus:border-purple-500 text-white font-mono uppercase"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[10px] uppercase font-mono opacity-50 block mb-1">Discount %</label>
-                        <input
-                          type="number"
-                          value={promoCouponDiscount}
-                          onChange={(e) => setPromoCouponDiscount(Number(e.target.value))}
-                          className="w-full bg-neutral-950 border border-neutral-805 text-xs px-3 py-1.5 rounded focus:border-purple-500 text-white font-mono"
-                        />
-                      </div>
-                      <button 
-                        type="submit"
-                        className="col-span-2 py-2 rounded bg-purple-650 hover:bg-purple-750 text-white font-bold text-xs"
-                      >
-                        Create Voucher Card
-                      </button>
-                    </form>
-                  </div>
-
-                </div>
-              </div>
-              )
-            )}
-
-            {/* SCREEN VIEWPORT K: EVALUATIONS & REVIEWS */}
-            {activeMenu === 'reviews' && (
-              !checkPermission('manage_content') ? renderAccessDenied('manage_content', 'Evaluations & Reviews Moderator') : (
-                <div className="space-y-6 animate-in fade-in duration-200">
-                <div>
-                  <h3 className={`text-lg font-bold ${textTitle}`}>Reviews & Testimonial Auditing</h3>
-                  <p className="text-xs opacity-60">Authorize, reject, and adjust client feedbacks on premium script marketplace templates.</p>
-                </div>
-
-                <div className="space-y-3">
-                  {[
-                    { id: 'rev-1', client: 'Imran Hasan', prod: 'Nagad PG PHP API Module', rtg: 5, text: 'Installed with zero configurations difficulties on PHP 8.1. Perfect documentation layout.', active: true },
-                    { id: 'rev-2', client: 'Al-Shehri Majid', prod: 'Multivendor Laravel script Core', rtg: 5, text: 'Customizing modules is exceedingly slick. Support velocities were superb.', active: false },
-                    { id: 'rev-3', client: 'Zeeshan Rahman', prod: 'WordPress Premium theme customization', rtg: 4, text: 'Pretty functional CSS and fully responsive blocks. Thank you WebzoneBD IT Solution!', active: true }
-                  ].map((rev) => {
-                    const isAppr = approvedReviews[rev.id] !== undefined ? approvedReviews[rev.id] : rev.active;
-                    return (
-                      <div key={rev.id} className={`p-4 rounded-xl border ${panelBg} flex flex-col md:flex-row items-start md:items-center justify-between gap-4 text-xs font-sans`}>
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-1">
-                            <span className="font-bold text-neutral-100">{rev.client}</span>
-                            <span className="text-[10.5px] opacity-50 font-light">• on "{rev.prod}"</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            {Array.from({ length: rev.rtg }).map((_, i) => (
-                              <Star key={i} className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-                            ))}
-                          </div>
-                          <p className="text-neutral-305 leading-relaxed pt-1 select-all">"{rev.text}"</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className={`px-2 py-0.5 text-[8px] font-black rounded ${
-                            isAppr ? 'bg-emerald-500/15 text-emerald-400' : 'bg-amber-500/15 text-amber-400'
-                          }`}>{isAppr ? 'APPROVED / ACTIVE' : 'MUTED / AUDITING'}</span>
-                          <button 
-                            onClick={() => handleToggleReviewApproval(rev.id)}
-                            className={`px-3 py-1 rounded text-xs font-bold border transition-all ${
-                              isAppr ? 'bg-amber-500/10 text-amber-450 border-amber-500/20' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                            }`}
-                          >
-                            {isAppr ? 'Mute' : 'Approve'}
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-              )
-            )}
-
-            {/* SCREEN VIEWPORT L: STAFF OFFICE */}
-            {activeMenu === 'staff' && (
-              !checkPermission('manage_users') ? renderAccessDenied('manage_users', 'Institutional Staff & Authorization Matrix') : (
-                <div className="space-y-6 animate-in fade-in duration-200">
-                  {/* SEGMENTED DIRECTORY VS ROLES TOGGLE BUTTONS */}
-                  <div className={`flex border-b pb-2.5 gap-2 items-center ${isDark ? 'border-neutral-800' : 'border-slate-200'}`}>
-                    <button
-                      onClick={() => setStaffViewMode('directory')}
-                      className={`px-4 py-2 text-xs font-bold font-sans rounded-xl border transition-all flex items-center gap-1.5 cursor-pointer ${
-                        staffViewMode === 'directory'
-                          ? (isDark 
-                              ? 'bg-gradient-to-r from-purple-500/20 to-indigo-500/20 border-purple-500/30 text-purple-300 shadow-md shadow-purple-950/20' 
-                              : 'bg-gradient-to-r from-purple-100/60 to-indigo-100/60 border-purple-250 text-purple-700 shadow-sm')
-                          : (isDark ? 'bg-transparent border-transparent text-slate-400 hover:text-neutral-200' : 'bg-transparent border-transparent text-slate-500 hover:text-slate-800')
-                      }`}
-                    >
-                      👥 Personnel Listing
-                    </button>
-                    <button
-                      onClick={() => setStaffViewMode('roles')}
-                      className={`px-4 py-2 text-xs font-bold font-sans rounded-xl border transition-all flex items-center gap-1.5 cursor-pointer ${
-                        staffViewMode === 'roles'
-                          ? (isDark 
-                              ? 'bg-gradient-to-r from-purple-500/20 to-indigo-500/20 border-purple-500/30 text-purple-300 shadow-md shadow-purple-950/20' 
-                              : 'bg-gradient-to-r from-purple-100/60 to-indigo-100/60 border-purple-250 text-purple-700 shadow-sm')
-                          : (isDark ? 'bg-transparent border-transparent text-slate-400 hover:text-neutral-200' : 'bg-transparent border-transparent text-slate-500 hover:text-slate-800')
-                      }`}
-                    >
-                      🛡️ Security Roles & Access Permissions Matrix
-                    </button>
-                  </div>
-
-                  {staffViewMode === 'directory' ? (
-                    <>
-                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                        <div>
-                          <h3 className={`text-xl font-black bg-clip-text bg-gradient-to-r ${isDark ? 'from-purple-300 to-indigo-300 text-transparent' : 'from-purple-700 to-indigo-700 text-transparent'}`}>{isDark ? 'Institutional Staff Office & Performance' : 'Institutional Staff Office & Performance'}</h3>
-                          <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-600 font-medium'}`}>Alter employee permissions matrix, set departments, and audit velocities metrics.</p>
-                        </div>
-                        <button 
-                          onClick={() => setShowAddStaffModal(true)}
-                          className={`px-4 py-2.5 rounded-xl text-white font-black text-xs flex items-center gap-1.5 transition-all duration-300 shadow-md cursor-pointer hover:scale-[1.02] active:scale-[0.98] ${
-                            isDark 
-                              ? 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 shadow-purple-900/10' 
-                              : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 shadow-purple-200'
-                          }`}
-                        >
-                          <Plus className="w-4 h-4" /> Catalog Specialist
-                        </button>
-                      </div>
-
-                      {(() => {
-                        const AVATAR_PRESETS = [
-                          'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
-                          'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80',
-                          'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=150&q=80',
-                          'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80',
-                          'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=150&q=80',
-                          'https://images.unsplash.com/photo-1628157582853-a796fa650a6a?auto=format&fit=crop&w=150&q=80',
-                          'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&q=80',
-                          'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=150&q=80'
-                        ];
-
-                        return (
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {staffList.map((stf) => {
-                              const isEditingThis = editingStaffId === stf.userId;
-
-                              if (isEditingThis) {
-                                return (
-                                  <div key={stf.userId} className={`p-6 rounded-2xl border-2 backdrop-blur-md shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-200 ${
-                                    isDark 
-                                      ? 'bg-neutral-950/60 border-purple-500/30 shadow-purple-950/30' 
-                                      : 'bg-white/95 border-purple-550/40 shadow-slate-300'
-                                  }`}>
-                                    <div className="flex items-center gap-3">
-                                      <div className="relative">
-                                        <img 
-                                          src={editingStaffAvatar} 
-                                          alt="Editing avatar" 
-                                          className={`w-14 h-14 rounded-full object-cover border-2 shadow-md ${isDark ? 'border-purple-500' : 'border-purple-600'}`}
-                                        />
-                                        <span className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${isDark ? 'bg-purple-950/85 border border-purple-500 text-purple-300' : 'bg-purple-50 border border-purple-600 text-purple-700'}`}>✎</span>
-                                      </div>
-                                      <div className="flex-1 space-y-1.5 text-left">
-                                        <div>
-                                          <label className={`text-[9px] uppercase font-mono tracking-wider font-extrabold block mb-1 ${isDark ? 'text-purple-400' : 'text-purple-700'}`}>Display Name</label>
-                                          <input 
-                                            type="text" 
-                                            className={`w-full text-xs px-3 py-2 rounded-xl border outline-none font-sans font-bold transition duration-150 ${
-                                              isDark 
-                                                ? 'bg-neutral-900 border-neutral-800 text-white placeholder-neutral-600 focus:border-purple-500' 
-                                                : 'bg-slate-50 border-slate-205 text-slate-800 placeholder-slate-400 focus:border-purple-600 shadow-sm'
-                                            }`}
-                                            placeholder="Full Name..."
-                                            value={editingStaffName}
-                                            onChange={(e) => setEditingStaffName(e.target.value)}
-                                          />
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-2">
-                                          <div>
-                                            <label className={`text-[8.5px] uppercase font-mono tracking-wider font-extrabold block mb-0.5 ${isDark ? 'text-purple-400' : 'text-purple-700'}`}>Designation</label>
-                                            <input 
-                                              type="text" 
-                                              className={`w-full text-[10px] px-2 py-1 rounded-lg border outline-none font-bold transition duration-150 ${
-                                                isDark 
-                                                  ? 'bg-neutral-900 border-neutral-800 text-white placeholder-neutral-600 focus:border-purple-500' 
-                                                  : 'bg-slate-50 border-slate-205 text-slate-800 placeholder-slate-400 focus:border-purple-600'
-                                              }`}
-                                              placeholder="Role/Designation..."
-                                              value={editingStaffRole}
-                                              onChange={(e) => setEditingStaffRole(e.target.value)}
-                                            />
-                                          </div>
-                                          <div>
-                                            <label className={`text-[8.5px] uppercase font-mono tracking-wider font-extrabold block mb-0.5 ${isDark ? 'text-purple-400' : 'text-purple-700'}`}>Dept Division</label>
-                                            <select 
-                                              className={`w-full text-[10px] px-2 py-1.5 rounded-lg border outline-none cursor-pointer font-bold transition duration-150 ${
-                                                isDark 
-                                                  ? 'bg-neutral-900 border-neutral-800 text-white focus:border-purple-500' 
-                                                  : 'bg-slate-50 border-slate-205 text-slate-800 focus:border-purple-600'
-                                              }`}
-                                              value={editingStaffDept}
-                                              onChange={(e) => setEditingStaffDept(e.target.value)}
-                                            >
-                                              <option value="Development" className={isDark ? 'bg-neutral-950 text-white' : 'bg-white text-slate-800'}>Development</option>
-                                              <option value="Support" className={isDark ? 'bg-neutral-950 text-white' : 'bg-white text-slate-800'}>Support</option>
-                                              <option value="SEO & Copywriting" className={isDark ? 'bg-neutral-950 text-white' : 'bg-white text-slate-800'}>SEO & Copywriting</option>
-                                              <option value="DevOps" className={isDark ? 'bg-neutral-950 text-white' : 'bg-white text-slate-800'}>DevOps</option>
-                                              <option value="Design" className={isDark ? 'bg-neutral-950 text-white' : 'bg-white text-slate-800'}>Design</option>
-                                              <option value="Sales" className={isDark ? 'bg-neutral-950 text-white' : 'bg-white text-slate-800'}>Sales</option>
-                                              <option value="Administration" className={isDark ? 'bg-neutral-950 text-white' : 'bg-white text-slate-800'}>Administration</option>
-                                            </select>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </div>
-
-                                    <div className={`grid grid-cols-2 gap-3 py-2 text-xs border-y text-left ${isDark ? 'border-neutral-800/80' : 'border-slate-150'}`}>
-                                      <div className="space-y-1">
-                                        <span className={`text-[9.5px] uppercase font-mono tracking-wider opacity-60 block font-bold ${isDark ? 'text-purple-300' : 'text-purple-700'}`}>Tickets Count</span>
-                                        <input 
-                                          type="number" 
-                                          className={`w-full text-xs px-2.5 py-1.5 rounded-xl border outline-none font-mono font-bold transition duration-155 ${
-                                            isDark 
-                                              ? 'bg-neutral-900 border-neutral-800 text-white focus:border-purple-500' 
-                                              : 'bg-slate-50 border-slate-205 text-slate-800 focus:border-purple-650'
-                                          }`}
-                                          value={editingStaffTickets}
-                                          onChange={(e) => setEditingStaffTickets(Number(e.target.value))}
-                                        />
-                                      </div>
-                                      <div className="space-y-1">
-                                        <span className={`text-[9.5px] uppercase font-mono tracking-wider opacity-60 block font-bold ${isDark ? 'text-purple-300' : 'text-purple-700'}`}>Sprint Velocity (%)</span>
-                                        <input 
-                                          type="number" 
-                                          min="0"
-                                          max="100"
-                                          className={`w-full text-xs px-2.5 py-1.5 rounded-xl border outline-none font-mono font-bold transition duration-155 ${
-                                            isDark 
-                                              ? 'bg-neutral-900 border-neutral-800 text-white focus:border-purple-500' 
-                                              : 'bg-slate-50 border-slate-205 text-slate-800 focus:border-purple-650'
-                                          }`}
-                                          value={editingStaffVelocity}
-                                          onChange={(e) => setEditingStaffVelocity(Number(e.target.value))}
-                                        />
-                                      </div>
-                                    </div>
-
-                                    {/* Presets Grid */}
-                                    <div className="space-y-2 text-left">
-                                      <span className={`text-[9px] uppercase font-mono tracking-wider opacity-60 block font-bold ${isDark ? 'text-purple-300' : 'text-purple-700'}`}>Select Preset Portrait</span>
-                                      <div className={`p-2 rounded-xl border flex flex-wrap gap-1.5 ${isDark ? 'bg-neutral-900/60 border-neutral-850' : 'bg-slate-50/80 border-slate-200'}`}>
-                                        {AVATAR_PRESETS.map((p, pidx) => (
-                                          <button
-                                            type="button"
-                                            key={pidx}
-                                            onClick={() => setEditingStaffAvatar(p)}
-                                            className={`w-8 h-8 rounded-full overflow-hidden border-2 transition cursor-pointer ${
-                                              editingStaffAvatar === p 
-                                                ? (isDark ? 'border-purple-500 scale-110 shadow-md shadow-purple-500/20' : 'border-purple-600 scale-110 shadow-md shadow-purple-600/20') 
-                                                : 'border-transparent opacity-60 hover:opacity-100'
-                                            }`}
-                                          >
-                                            <img src={p} className="w-full h-full object-cover" />
-                                          </button>
-                                        ))}
-                                      </div>
-                                      <input 
-                                        type="text" 
-                                        className={`w-full text-[10px] px-2.5 py-1.5 rounded-xl border outline-none font-mono mt-0.5 transition duration-150 ${
-                                          isDark 
-                                            ? 'bg-neutral-900 border-neutral-800 text-white focus:border-purple-500' 
-                                            : 'bg-slate-50 border-slate-205 text-slate-800 focus:border-purple-600'
-                                        }`}
-                                        placeholder="Custom Avatar Image URL..."
-                                        value={editingStaffAvatar}
-                                        onChange={(e) => setEditingStaffAvatar(e.target.value)}
-                                      />
-                                    </div>
-
-                                    <div className="grid grid-cols-2 gap-3 py-1 text-left">
-                                      <div className="space-y-1">
-                                        <span className={`text-[9px] uppercase font-mono tracking-wider opacity-60 block font-bold ${isDark ? 'text-purple-300' : 'text-purple-700'}`}>Login Email</span>
-                                        <input 
-                                          type="email" 
-                                          className={`w-full text-xs px-3 py-2 rounded-xl border outline-none font-mono font-bold transition duration-150 ${
-                                            isDark 
-                                              ? 'bg-neutral-900 border-neutral-800 text-white placeholder-neutral-600 focus:border-purple-500' 
-                                              : 'bg-slate-50 border-slate-205 text-slate-800 placeholder-slate-400 focus:border-purple-600'
-                                          }`}
-                                          placeholder="staff@webzonebd.com"
-                                          value={editingStaffEmail}
-                                          onChange={(e) => setEditingStaffEmail(e.target.value)}
-                                        />
-                                      </div>
-                                      <div className="space-y-1">
-                                        <span className={`text-[9px] uppercase font-mono tracking-wider opacity-60 block font-bold ${isDark ? 'text-purple-300' : 'text-purple-700'}`}>Login Password</span>
-                                        <input 
-                                          type="text" 
-                                          className={`w-full text-xs px-3 py-2 rounded-xl border outline-none font-mono font-bold transition duration-150 ${
-                                            isDark 
-                                              ? 'bg-neutral-900 border-neutral-800 text-white placeholder-neutral-600 focus:border-purple-500' 
-                                              : 'bg-slate-50 border-slate-205 text-slate-800 placeholder-slate-400 focus:border-purple-600'
-                                          }`}
-                                          placeholder="Password phrase..."
-                                          value={editingStaffPassword}
-                                          onChange={(e) => setEditingStaffPassword(e.target.value)}
-                                        />
-                                      </div>
-                                    </div>
-
-                                    <div className="space-y-1 text-left">
-                                      <span className={`text-[9px] uppercase font-mono tracking-wider opacity-60 block font-bold ${isDark ? 'text-purple-300' : 'text-purple-700'}`}>Clearance Status</span>
-                                      <select 
-                                        className={`w-full text-xs px-3 py-2 rounded-xl border outline-none font-bold cursor-pointer transition duration-150 ${
-                                          isDark 
-                                            ? 'bg-neutral-900 border-neutral-800 text-white focus:border-purple-500' 
-                                            : 'bg-slate-50 border-slate-205 text-slate-800 focus:border-purple-600'
-                                        }`}
-                                        value={editingStaffStatus}
-                                        onChange={(e) => setEditingStaffStatus(e.target.value)}
-                                      >
-                                        <option value="active">Active Clearance</option>
-                                        <option value="suspended">Suspended Clearance</option>
-                                      </select>
-                                    </div>
-
-                                    <div className="space-y-2 text-left">
-                                      <span className={`text-[9px] uppercase font-mono tracking-wider opacity-60 block font-bold ${isDark ? 'text-purple-300' : 'text-purple-700'}`}>Assigned Clearance Permissions</span>
-                                      <div className="flex flex-wrap gap-1.5 pt-0.5">
-                                        {['manage_projects', 'manage_tasks', 'reply_tickets', 'manage_servers', 'security_audit', 'write_code', 'support_chat', 'ai_generation'].map((perm) => {
-                                          const hasVal = editingStaffPermissions.includes(perm);
-                                          return (
-                                            <button
-                                              key={perm}
-                                              type="button"
-                                              onClick={() => {
-                                                setEditingStaffPermissions(prev => 
-                                                  prev.includes(perm) ? prev.filter(p => p !== perm) : [...prev, perm]
-                                                );
-                                              }}
-                                              className={`px-2.5 py-1 rounded-lg transition border text-[9px] font-bold font-mono cursor-pointer ${
-                                                hasVal 
-                                                  ? (isDark ? 'bg-purple-950/40 text-purple-300 border-purple-500/40 font-bold' : 'bg-purple-50 text-purple-750 border-purple-300 font-bold shadow-sm') 
-                                                  : (isDark ? 'bg-neutral-900 text-neutral-500 border-neutral-800' : 'bg-slate-100 text-slate-500 border-slate-205')
-                                              }`}
-                                            >
-                                              {hasVal ? '✓ ' : '✗ '}{perm.toUpperCase().replace('_', ' ')}
-                                            </button>
-                                          );
-                                        })}
-                                      </div>
-                                    </div>
-
-                                    <div className={`flex items-center gap-2 pt-3 border-t ${isDark ? 'border-neutral-800/80' : 'border-slate-150'}`}>
-                                      <button
-                                        onClick={() => saveEditedStaff(stf.userId)}
-                                        className={`flex-1 py-2.5 rounded-xl text-white font-extrabold text-xs text-center transition duration-200 cursor-pointer shadow-md ${
-                                          isDark 
-                                            ? 'bg-gradient-to-r from-purple-600 to-indigo-650 hover:from-purple-550 hover:to-indigo-600 shadow-purple-950/20' 
-                                            : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 shadow-purple-200/80'
-                                        }`}
-                                      >
-                                        Save Changes
-                                      </button>
-                                      <button
-                                        onClick={() => setEditingStaffId(null)}
-                                        className={`px-4 py-2.5 rounded-xl font-bold text-xs text-center transition border cursor-pointer ${
-                                          isDark 
-                                            ? 'bg-neutral-900 hover:bg-neutral-800 hover:text-white border-neutral-800 text-neutral-400' 
-                                            : 'bg-slate-50 hover:bg-slate-100 hover:text-slate-800 border-slate-205 text-slate-500'
-                                        }`}
-                                      >
-                                        Cancel
-                                      </button>
-                                    </div>
-                                  </div>
-                                );
-                              }
-
-                              return (
-                                <div key={stf.userId} className={`p-6 rounded-2xl border transition-all duration-300 relative group scale-100 hover:scale-[1.01] ${
-                                  isDark 
-                                    ? 'bg-gradient-to-b from-[#131B2E]/95 to-[#0B0F19]/98 border-purple-500/10 shadow-2xl hover:border-purple-500/25' 
-                                    : 'bg-gradient-to-b from-white to-slate-50/70 border-slate-200 shadow-md hover:border-purple-600/30 shadow-slate-100/40'
-                                }`}>
-                                  <div className="absolute top-4 right-4 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition duration-200">
-                                    <button
-                                      onClick={() => startEditingStaff(stf)}
-                                      className={`p-1.5 rounded-lg border transition cursor-pointer ${
-                                        isDark 
-                                          ? 'bg-neutral-900/90 border-neutral-805 hover:border-purple-500 text-neutral-400 hover:text-purple-400' 
-                                          : 'bg-white border-slate-250 hover:border-purple-600 text-slate-500 hover:text-purple-600 shadow-sm'
-                                      }`}
-                                      title="Edit Staff Member Details"
-                                    >
-                                      <Sliders className="w-3.5 h-3.5" />
-                                    </button>
-                                    <button
-                                      onClick={() => deleteStaffMember(stf.userId, stf.name)}
-                                      className={`p-1.5 rounded-lg border transition cursor-pointer ${
-                                        isDark 
-                                          ? 'bg-neutral-900/90 border-neutral-805 hover:border-red-500 text-neutral-400 hover:text-red-400' 
-                                          : 'bg-white border-slate-250 hover:border-red-600 text-slate-500 hover:text-red-600 shadow-sm'
-                                      }`}
-                                      title="Delete Staff Member Profile"
-                                    >
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                    </button>
-                                  </div>
-
-                                  <div className="flex items-center gap-3">
-                                    <img 
-                                      src={stf.avatar} 
-                                      alt={stf.name} 
-                                      className={`w-14 h-14 rounded-full object-cover border-2 shadow-sm ${
-                                        stf.status === 'suspended' ? 'border-red-500/50 grayscale' : 'border-purple-500/40'
-                                      }`}
-                                    />
-                                    <div className="text-left">
-                                      <div className="flex flex-wrap items-center gap-1.5">
-                                        <span className={`font-black text-base ${isDark ? 'text-white font-sans' : 'text-slate-800 font-sans'}`}>{stf.name}</span>
-                                        {stf.status === 'suspended' && (
-                                          <span className="bg-red-500/10 text-red-500 border border-red-500/20 text-[8px] font-black rounded-full px-2 py-0.5 tracking-wider font-mono">SUSPENDED</span>
-                                        )}
-                                      </div>
-                                      <span className={`text-xs block mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-600 font-semibold'}`}>Role: {stf.role || 'Staff'} • Dept: {stf.department}</span>
-                                      {stf.email && (
-                                        <div className="mt-1.5 space-y-0.5 text-left">
-                                          <p className={`text-[10.5px] font-mono select-all flex items-center gap-1 ${isDark ? 'text-purple-300' : 'text-purple-700 font-bold'}`}>
-                                            <span>📧</span> {stf.email}
-                                          </p>
-                                          {stf.password && (
-                                            <p className={`text-[10px] font-mono select-all flex items-center gap-1 ${isDark ? 'text-slate-400' : 'text-slate-500 font-semibold'}`}>
-                                              <span>🔑</span> Pass: <strong className={isDark ? 'text-slate-200' : 'text-slate-800'}>{stf.password}</strong>
-                                            </p>
-                                          )}
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-
-                                  <div className={`grid grid-cols-2 gap-3 pb-2 text-xs border-b ${isDark ? 'border-neutral-800/50' : 'border-slate-200/60'}`}>
-                                    <div className={`p-2.5 rounded-xl border ${isDark ? 'bg-neutral-950/60 border-neutral-900/60' : 'bg-slate-50 border-slate-150/80 shadow-sm'}`}>
-                                      <span className={`text-[9px] block uppercase font-bold ${isDark ? 'text-slate-500' : 'text-slate-450'}`}>Assigned Cases</span>
-                                      <span className={`font-black text-sm font-mono block mt-0.5 ${isDark ? 'text-purple-450' : 'text-purple-650'}`}>{stf.ticketsCount} tickets</span>
-                                    </div>
-                                    <div className={`p-2.5 rounded-xl border ${isDark ? 'bg-neutral-950/60 border-neutral-900/60' : 'bg-slate-50 border-slate-150/80 shadow-sm'}`}>
-                                      <span className={`text-[9px] block uppercase font-bold ${isDark ? 'text-slate-500' : 'text-slate-450'}`}>Sprint Efficiency</span>
-                                      <span className={`font-black text-sm font-mono block mt-0.5 ${isDark ? 'text-emerald-450' : 'text-emerald-750'}`}>{stf.sprintVelocity}% efficiency</span>
-                                    </div>
-                                  </div>
-
-                                  <div className="space-y-1.5 text-left">
-                                    <span className={`text-[9.5px] uppercase font-mono tracking-wider opacity-60 block font-bold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Assigned Permissions Checklist</span>
-                                    <div className="flex flex-wrap gap-1.5 font-mono text-[9px]">
-                                      {['manage_projects', 'manage_tasks', 'reply_tickets'].map((perm) => {
-                                        const has = stf.permissions.includes(perm);
-                                        return (
-                                          <button
-                                            key={perm}
-                                            onClick={() => {
-                                              setStaffList(prev => prev.map(s => {
-                                                if (s.userId === stf.userId) {
-                                                  const nextP = s.permissions.includes(perm) 
-                                                    ? s.permissions.filter((p: string) => p !== perm) 
-                                                    : [...s.permissions, perm];
-                                                  triggerToast(`🔒 Staff security credentials modified!`);
-                                                  return { ...s, permissions: nextP };
-                                                }
-                                                return s;
-                                              }));
-                                            }}
-                                            className={`px-2.5 py-1 rounded-lg transition-all border cursor-pointer text-[9.5px] ${
-                                              has 
-                                                ? (isDark ? 'bg-purple-950/40 text-purple-300 border-purple-500/30 font-bold shadow-sm shadow-purple-500/10' : 'bg-purple-50 text-purple-750 border-purple-300 font-bold shadow-sm') 
-                                                : (isDark ? 'bg-neutral-950 text-neutral-500 border-neutral-850' : 'bg-slate-100/70 text-slate-450 border-slate-205')
-                                            }`}
-                                          >
-                                            {has ? '✓ ' : '✗ '}{perm.toUpperCase().replace('_', ' ')}
-                                          </button>
-                                        );
-                                      })}
-                                    </div>
-                                  </div>
-
-                                  {/* Quick Actions Integration Row */}
-                                  <div className={`pt-3 border-t flex items-center justify-between gap-2.5 relative ${isDark ? 'border-neutral-800/40' : 'border-slate-150'}`}>
-                                    <div className={`text-[10px] font-mono ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                                      ID: {stf.userId}
-                                    </div>
-                                    <div className="relative">
-                                      <button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setActiveQuickActionsStaffId(prev => prev === stf.userId ? null : stf.userId);
-                                        }}
-                                        className={`px-3 py-1.5 rounded-xl text-white text-[11px] font-black flex items-center gap-1.5 transition-all duration-300 cursor-pointer hover:scale-[1.02] active:scale-[0.98] ${
-                                          isDark 
-                                            ? 'bg-gradient-to-r from-purple-600 to-indigo-650 hover:from-purple-550 hover:to-indigo-550 shadow-md shadow-purple-950/20' 
-                                            : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 shadow-sm shadow-purple-200'
-                                        }`}
-                                      >
-                                        <span>⚡ Quick Actions</span>
-                                        <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${activeQuickActionsStaffId === stf.userId ? 'rotate-180' : ''}`} />
-                                      </button>
-
-                                      {activeQuickActionsStaffId === stf.userId && (
-                                        <>
-                                          <div 
-                                            className="fixed inset-0 z-40" 
-                                            onClick={() => setActiveQuickActionsStaffId(null)} 
-                                          />
-                                          <div className={`absolute right-0 bottom-full mb-2 w-48 rounded-xl border p-1.5 shadow-2xl z-50 flex flex-col gap-1 animate-in fade-in slide-in-from-bottom-2 duration-150 ${
-                                            isDark 
-                                              ? 'bg-neutral-950 border-neutral-800' 
-                                              : 'bg-white border-slate-200 shadow-2xl'
-                                          }`}>
-                                            <div className={`px-2.5 py-1.5 border-b text-left ${isDark ? 'border-neutral-900' : 'border-slate-100'}`}>
-                                              <p className={`text-[9px] font-extrabold uppercase tracking-widest ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Admin Actions</p>
-                                            </div>
-                                            
-                                            <button
-                                              type="button"
-                                              onClick={() => {
-                                                setActiveQuickActionsStaffId(null);
-                                                setMessageModalStaff(stf);
-                                                setQuickMessageText('');
-                                              }}
-                                              className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-left text-xs font-semibold transition cursor-pointer ${
-                                                isDark 
-                                                  ? 'hover:bg-neutral-900 text-slate-200 hover:text-white' 
-                                                  : 'hover:bg-slate-50 text-slate-700 hover:text-slate-950'
-                                              }`}
-                                            >
-                                              <MessageSquare className="w-3.5 h-3.5 text-sky-400" />
-                                              <span>Message Staff</span>
-                                            </button>
-
-                                            <button
-                                              type="button"
-                                              onClick={() => {
-                                                setActiveQuickActionsStaffId(null);
-                                                setViewProfileModalStaff(stf);
-                                              }}
-                                              className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-left text-xs font-semibold transition cursor-pointer ${
-                                                isDark 
-                                                  ? 'hover:bg-neutral-900 text-slate-200 hover:text-white' 
-                                                  : 'hover:bg-slate-50 text-slate-700 hover:text-slate-950'
-                                              }`}
-                                            >
-                                              <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
-                                              <span>View Profile Details</span>
-                                            </button>
-
-                                            <button
-                                              type="button"
-                                              onClick={() => {
-                                                setActiveQuickActionsStaffId(null);
-                                                setAssignTaskModalStaff(stf);
-                                                setQuickTaskTitle('');
-                                                setQuickTaskPriority('high');
-                                                setQuickTaskColumn('todo');
-                                              }}
-                                              className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-left text-xs font-semibold transition cursor-pointer ${
-                                                isDark 
-                                                  ? 'hover:bg-neutral-900 text-slate-200 hover:text-white' 
-                                                  : 'hover:bg-slate-50 text-slate-700 hover:text-slate-950'
-                                              }`}
-                                            >
-                                              <Plus className="w-3.5 h-3.5 text-purple-405" />
-                                              <span>Assign New Task</span>
-                                            </button>
-                                          </div>
-                                        </>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        );
-                      })()}
-
-                      {/* Department Filter Toolbar */}
-                      <motion.div 
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className={`p-4 rounded-3xl border ${cardBorder} ${panelBg} flex flex-col sm:flex-row items-center justify-between gap-4 shadow-md mt-6`}
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <span className="p-2 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400">
-                            <Layers className="w-4 h-4 animate-pulse" />
-                          </span>
-                          <div>
-                            <h4 className="text-xs font-bold text-white uppercase tracking-wider">Departmental Scope Matrix</h4>
-                            <p className="text-[10px] text-slate-400">Filter workload records, queue metrics, and action logs by specific division.</p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2.5 w-full sm:w-auto">
-                          <span className="text-[10px] font-mono uppercase text-slate-400 font-bold tracking-wider hidden md:inline">Division Scope:</span>
-                          <select
-                            value={selectedStaffDeptFilter}
-                            onChange={(e) => {
-                              setSelectedStaffDeptFilter(e.target.value);
-                              setSelectedWorkloadStaff('all'); // Reset specific staff to 'all' to prevent mismatch
-                            }}
-                            className="bg-neutral-900 border border-neutral-800 text-xs text-white rounded-xl px-3.5 py-2 outline-none focus:border-purple-500 transition-all cursor-pointer font-bold w-full sm:min-w-[200px]"
-                          >
-                            <option value="all">🌐 All Departments (Global Scope)</option>
-                            <option value="Development">💻 Development</option>
-                            <option value="Support">🗣️ Support</option>
-                            <option value="SEO & Copywriting">✍️ SEO & Copywriting</option>
-                            <option value="DevOps">🛡️ DevOps</option>
-                            <option value="Design">🎨 Design</option>
-                            <option value="Sales">📈 Sales</option>
-                            <option value="Administration">👑 Administration</option>
-                          </select>
-                        </div>
-                      </motion.div>
-
-                      {/* Premium Analytics & Real-Time Activity Feed Row */}
-                      {(() => {
-                        // Generate workload data dynamically
-                        const generate30DayWorkload = (staffName: string) => {
-                          const data = [];
-                          const seed = staffName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) || 42;
-                          
-                          for (let i = 29; i >= 0; i--) {
-                            const date = new Date();
-                            date.setDate(date.getDate() - i);
-                            const label = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                            
-                            const baseValO = Math.sin((30 - i + seed) * 0.25) * 1.5 + 2.5;
-                            const baseValT = Math.cos((30 - i - seed) * 0.3) * 2.2 + 3.8;
-                            
-                            data.push({
-                              date: label,
-                              completedOrders: Math.max(0, Math.round(baseValO + (seed % 3))),
-                              closedTickets: Math.max(0, Math.round(baseValT + (seed % 4))),
-                            });
-                          }
-                          return data;
-                        };
-
-                        const getChartData = () => {
-                          const filteredStaff = selectedStaffDeptFilter === 'all'
-                            ? staffList
-                            : staffList.filter(s => s.department === selectedStaffDeptFilter);
-
-                          if (filteredStaff.length === 0) {
-                            return Array.from({ length: 30 }, (_, i) => {
-                              const d = new Date();
-                              d.setDate(d.getDate() - (29 - i));
-                              return {
-                                date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-                                completedOrders: 0,
-                                closedTickets: 0
-                              };
-                            });
-                          }
-
-                          if (selectedWorkloadStaff === 'all') {
-                            const results = generate30DayWorkload(filteredStaff[0]?.name || "Anisur Rahman");
-                            for (let j = 1; j < filteredStaff.length; j++) {
-                              const sData = generate30DayWorkload(filteredStaff[j].name);
-                              for (let k = 0; k < 30; k++) {
-                                results[k].completedOrders += sData[k].completedOrders;
-                                results[k].closedTickets += sData[k].closedTickets;
-                              }
-                            }
-                            return results;
-                          } else {
-                            const found = filteredStaff.find(s => s.userId === selectedWorkloadStaff);
-                            return generate30DayWorkload(found ? found.name : filteredStaff[0]?.name || "Anisur Rahman");
-                          }
-                        };
-
-                        const chartData = getChartData();
-
-                        // Dynamic calculations for Staff KPIs based on filtered division or all
-                        const filteredStaff = selectedStaffDeptFilter === 'all'
-                          ? staffList
-                          : staffList.filter(s => s.department === selectedStaffDeptFilter);
-
-                        const deptStaffNamesLower = filteredStaff.map(s => s.name.toLowerCase());
-
-                        const totalActiveTicketsCount = (() => {
-                          const baseCount = filteredStaff.reduce((acc, s) => acc + (s.ticketsCount || 0), 0);
-                          if (selectedStaffDeptFilter === 'all') {
-                            return Math.max(tickets.filter(t => t.status !== 'closed').length, baseCount, 12);
-                          }
-                          return Math.max(baseCount, Math.round(12 * (filteredStaff.length / staffList.length)));
-                        })();
-
-                        const monthlyOrdersCompletedCount = (() => {
-                          const deptOrders = selectedStaffDeptFilter === 'all'
-                            ? orders
-                            : orders.filter(o => o.assignedStaff && deptStaffNamesLower.includes(o.assignedStaff.toLowerCase()));
-                          return Math.max(
-                            deptOrders.filter(o => o.paymentStatus === 'completed' || o.status === 'delivered').length,
-                            selectedStaffDeptFilter === 'all' ? 84 : Math.round(84 * (filteredStaff.length / staffList.length))
-                          );
-                        })();
-
-                        const calculatedPendingApprovals = (() => {
-                          const aPending = affiliateList?.filter(a => a.status === 'pending').length || 0;
-                          const oPending = orders?.filter(o => o.status === 'pending' || o.paymentStatus === 'pending').length || 0;
-                          const wPending = withdrawRequests?.filter(w => w.status === 'pending').length || 0;
-                          return aPending + oPending + wPending;
-                        })();
-                        
-                        const totalPendingApprovals = Math.max(
-                          selectedStaffDeptFilter === 'all' 
-                            ? calculatedPendingApprovals 
-                            : Math.round(calculatedPendingApprovals * (filteredStaff.length / staffList.length)), 
-                          selectedStaffDeptFilter === 'all' ? 4 : 1
-                        );
-
-                        const avgResponseTimeStr = (() => {
-                          let totals = 0;
-                          let count = 0;
-                          tickets.forEach(ticket => {
-                            if (ticket.replies && ticket.replies.length > 1) {
-                              for (let i = 1; i < ticket.replies.length; i++) {
-                                const current = ticket.replies[i];
-                                const prev = ticket.replies[i - 1];
-                                if (prev.sender === 'user' && current.sender === 'admin') {
-                                  const diffMs = new Date(current.createdAt).getTime() - new Date(prev.createdAt).getTime();
-                                  if (diffMs > 0) {
-                                    totals += diffMs;
-                                    count++;
-                                  }
-                                }
-                              }
-                            }
-                          });
-
-                          if (count > 0) {
-                            let avgMins = Math.round(totals / count / 1000 / 60);
-                            if (selectedStaffDeptFilter === 'Support') avgMins = Math.max(5, Math.round(avgMins * 0.45));
-                            else if (selectedStaffDeptFilter === 'DevOps') avgMins = Math.max(10, Math.round(avgMins * 0.6));
-                            else if (selectedStaffDeptFilter === 'Development') avgMins = Math.max(30, Math.round(avgMins * 1.5));
-
-                            if (avgMins >= 60) {
-                              return `${(avgMins / 60).toFixed(1)} hrs`;
-                            }
-                            return `${avgMins} mins`;
-                          }
-                          if (selectedStaffDeptFilter === 'Support') return "12 mins";
-                          if (selectedStaffDeptFilter === 'Development') return "42 mins";
-                          if (selectedStaffDeptFilter === 'DevOps') return "14 mins";
-                          return "28 mins";
-                        })();
-
-                        const kpis = [
-                          {
-                            id: "kpi-active-tickets",
-                            title: "Total Active Tickets",
-                            value: totalActiveTicketsCount,
-                            desc: "Active support cases in query pipeline",
-                            icon: Ticket,
-                            color: "from-purple-500/10 to-indigo-500/10 border-purple-500/20 text-purple-400",
-                            badge: "SUPPORT QUEUE"
-                          },
-                          {
-                            id: "kpi-completed-orders",
-                            title: "Monthly Orders Completed",
-                            value: monthlyOrdersCompletedCount,
-                            desc: "Assigned asset & assistance contracts delivered",
-                            icon: ShoppingBag,
-                            color: "from-emerald-500/10 to-teal-500/10 border-emerald-500/20 text-emerald-400",
-                            badge: "DELIVERIES"
-                          },
-                          {
-                            id: "kpi-pending-approvals",
-                            title: "Pending Approvals",
-                            value: totalPendingApprovals,
-                            desc: "Audit actions awaiting clearance",
-                            icon: AlertCircle,
-                            color: "from-amber-500/10 to-orange-500/10 border-amber-500/20 text-amber-500",
-                            badge: "REQUIRES ACTION"
-                          },
-                          {
-                            id: "kpi-response-time",
-                            title: "Average Response Time",
-                            value: avgResponseTimeStr,
-                            desc: "Team response rate matching SLA limits",
-                            icon: Clock,
-                            color: "from-blue-500/10 to-cyan-500/10 border-blue-500/20 text-blue-400",
-                            badge: "SLA EFFICIENCY"
-                          }
-                        ];
-
-                        const getActiveTicketDistribution = () => {
-                          let devCount = 0;
-                          let mktCount = 0;
-                          let sptCount = 0;
-
-                          staffList.forEach(stf => {
-                            const dept = stf.department?.toLowerCase() || '';
-                            if (dept.includes('dev')) {
-                              devCount += (stf.ticketsCount || 0);
-                            } else if (dept.includes('seo') || dept.includes('market') || dept.includes('copy')) {
-                              mktCount += (stf.ticketsCount || 0);
-                            } else if (dept.includes('support')) {
-                              sptCount += (stf.ticketsCount || 0);
-                            } else {
-                              sptCount += (stf.ticketsCount || 0);
-                            }
-                          });
-
-                          tickets.filter(t => t.status !== 'closed').forEach(ticket => {
-                            const cat = (ticket.category || "").toLowerCase();
-                            const subj = (ticket.subject || "").toLowerCase();
-                            const msg = (ticket.message || "").toLowerCase();
-
-                            const isDev = [
-                              'development', 'coding', 'script', 'laravel', 'mysql', 'php', 
-                              'cpanel', 'wordpress', 'bug', 'error', 'server', 'api', 'custom', 'host', 'code'
-                            ].some(term => cat.includes(term) || subj.includes(term) || msg.includes(term));
-
-                            if (isDev) {
-                              devCount += 1;
-                              return;
-                            }
-
-                            const isMkt = [
-                              'seo', 'marketing', 'google maps', 'promotion', 'content', 
-                              'writing', 'facebook', 'growth', 'ads', 'organic', 'campaign'
-                            ].some(term => cat.includes(term) || subj.includes(term) || msg.includes(term));
-
-                            if (isMkt) {
-                              mktCount += 1;
-                              return;
-                            }
-
-                            sptCount += 1;
-                          });
-
-                          return [
-                            { name: 'Development', ActiveTickets: devCount, fill: 'url(#gradDev)' },
-                            { name: 'Marketing', ActiveTickets: mktCount, fill: 'url(#gradMkt)' },
-                            { name: 'Support', ActiveTickets: sptCount, fill: 'url(#gradSpt)' }
-                          ];
-                        };
-
-                        const ticketDistributionData = getActiveTicketDistribution();
-                        const maxDept = [...ticketDistributionData].sort((a, b) => b.ActiveTickets - a.ActiveTickets)[0];
-                        const totalTickets = ticketDistributionData.reduce((acc, d) => acc + d.ActiveTickets, 0);
-
-                        return (
-                          <>
-                            {/* Row of KPI Summary Cards */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-8">
-                              {kpis.map((k, idx) => {
-                                const IconComponent = k.icon;
-                                return (
-                                  <motion.div
-                                    key={k.id}
-                                    initial={{ opacity: 0, y: 15 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ duration: 0.35, delay: idx * 0.05 }}
-                                    className={`relative p-5 rounded-2xl border ${cardBorder} ${panelBg} transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-neutral-950/30 overflow-hidden flex flex-col justify-between`}
-                                  >
-                                    {/* Subtle Ambient Glow */}
-                                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/[0.012] rounded-full blur-2xl pointer-events-none" />
-                                    <div className="absolute -right-6 -bottom-6 w-24 h-24 bg-gradient-to-br from-current to-transparent opacity-5 blur-xl rounded-full pointer-events-none" />
-
-                                    <div className="flex items-start justify-between gap-4">
-                                      <div className="space-y-1">
-                                        <div className="flex items-center gap-1.5">
-                                          <span className="text-[8px] font-black tracking-widest font-mono text-purple-400/80 uppercase bg-purple-500/5 px-2 py-0.5 rounded border border-purple-500/10">
-                                            {k.badge}
-                                          </span>
-                                        </div>
-                                        <h4 className="text-xs font-bold text-slate-400/80 pt-1">{k.title}</h4>
-                                      </div>
-                                      <div className={`p-2.5 rounded-xl bg-gradient-to-br ${k.color} border flex items-center justify-center`}>
-                                        <IconComponent className="w-4 h-4" />
-                                      </div>
-                                    </div>
-
-                                    <div className="mt-4">
-                                      <span className="text-2xl font-black font-sans text-white tracking-tight leading-none font-mono">
-                                        {k.value}
-                                      </span>
-                                      <p className="text-[10px] text-slate-400/65 leading-snug mt-1.5">{k.desc}</p>
-                                    </div>
-                                  </motion.div>
-                                );
-                              })}
-                            </div>
-
-
-                        </>
-                        );
-                      })()}
-
-                      {/* CREATE NEW STAFF DIALOG OVERLAY */}
-                      {showAddStaffModal && (() => {
-                        const AVATAR_PRESETS = [
-                          'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
-                          'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80',
-                          'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=150&q=80',
-                          'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80',
-                          'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=150&q=80',
-                          'https://images.unsplash.com/photo-1628157582853-a796fa650a6a?auto=format&fit=crop&w=150&q=80',
-                          'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&q=80',
-                          'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=150&q=80'
-                        ];
-
-                        return (
-                          <div className="fixed inset-0 z-55 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200" id="create-staff-modal">
-                            <div className={`border rounded-3xl p-6 max-w-md w-full space-y-5 shadow-2xl overflow-y-auto max-h-[90vh] animate-in zoom-in-95 duration-200 transition-all ${
-                              isDark 
-                                ? 'bg-[#0f0f11] border-neutral-800 text-white' 
-                                : 'bg-white border-slate-200 text-slate-900 shadow-slate-200'
-                            }`}>
-                              <div className={`flex items-center justify-between border-b pb-3.5 ${
-                                isDark ? 'border-neutral-800/80' : 'border-slate-100'
-                              }`}>
-                                <div className="text-left">
-                                  <h3 className="font-extrabold text-sm uppercase tracking-wider flex items-center gap-2">
-                                    <UserCheck className={`w-4 h-4 ${isDark ? 'text-purple-400' : 'text-purple-600'}`} /> 
-                                    <span>Catalog New Specialist</span>
-                                  </h3>
-                                  <p className={`text-[10px] mt-1 ${isDark ? 'text-neutral-450' : 'text-slate-500'}`}>
-                                    Register new staff employee, configure SLAs, and assign system permissions.
-                                  </p>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => setShowAddStaffModal(false)}
-                                  className={`p-1.5 px-3 rounded-xl text-[10px] font-bold border transition cursor-pointer ${
-                                    isDark 
-                                      ? 'bg-neutral-900/60 border-neutral-800 text-neutral-400 hover:text-white hover:bg-neutral-800/50' 
-                                      : 'bg-slate-50 border-slate-200 text-slate-500 hover:text-slate-900 hover:bg-slate-100'
-                                  }`}
-                                >
-                                  ✕
-                                </button>
-                              </div>
-
-                              <form onSubmit={handleAddNewStaffMember} className="space-y-4 text-xs font-sans">
-                                <div className="space-y-1.5 text-left">
-                                  <label className={`text-[9px] uppercase font-mono tracking-wider font-extrabold block ${
-                                    isDark ? 'text-purple-400' : 'text-purple-600'
-                                  }`}>Specialist Full Name</label>
-                                  <input 
-                                    required
-                                    type="text" 
-                                    className={`w-full text-xs px-3.5 py-2.5 rounded-xl border outline-none transition duration-150 ${
-                                      isDark 
-                                        ? 'bg-neutral-950 border-neutral-800 text-white placeholder-neutral-600 focus:border-purple-500' 
-                                        : 'bg-slate-50 border-slate-200 text-slate-800 placeholder-slate-400 focus:border-purple-600'
-                                    }`}
-                                    placeholder="e.g. Shakib Al Hasan"
-                                    value={newStaffName}
-                                    onChange={(e) => setNewStaffName(e.target.value)}
-                                  />
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-3.5 text-left">
-                                  <div className="space-y-1.5">
-                                    <label className={`text-[9px] uppercase font-mono tracking-wider font-extrabold block ${
-                                      isDark ? 'text-purple-400' : 'text-purple-600'
-                                    }`}>Mapped Department</label>
-                                    <select
-                                      className={`w-full text-xs px-3 py-2.5 rounded-xl border outline-none cursor-pointer transition duration-150 ${
-                                        isDark 
-                                          ? 'bg-neutral-950 border-neutral-800 text-white focus:border-purple-500' 
-                                          : 'bg-slate-50 border-slate-200 text-slate-800 focus:border-purple-600'
-                                      }`}
-                                      value={newStaffDept}
-                                      onChange={(e) => setNewStaffDept(e.target.value)}
-                                    >
-                                      <option value="Development" className={isDark ? 'bg-neutral-950 text-white' : 'bg-white text-slate-800'}>💻 Development</option>
-                                      <option value="Support" className={isDark ? 'bg-neutral-950 text-white' : 'bg-white text-slate-800'}>🗣️ Support</option>
-                                      <option value="SEO & Copywriting" className={isDark ? 'bg-neutral-950 text-white' : 'bg-white text-slate-800'}>✍️ SEO & Copywriting</option>
-                                      <option value="DevOps" className={isDark ? 'bg-neutral-950 text-white' : 'bg-white text-slate-800'}>🛡️ DevOps</option>
-                                      <option value="Design" className={isDark ? 'bg-neutral-950 text-white' : 'bg-white text-slate-800'}>🎨 Design</option>
-                                      <option value="Sales" className={isDark ? 'bg-neutral-950 text-white' : 'bg-white text-slate-800'}>📈 Sales</option>
-                                      <option value="Administration" className={isDark ? 'bg-neutral-950 text-white' : 'bg-white text-slate-800'}>👑 Administration</option>
-                                    </select>
-                                  </div>
-                                  <div className="space-y-1.5">
-                                    <label className={`text-[9px] uppercase font-mono tracking-wider font-extrabold block ${
-                                      isDark ? 'text-purple-400' : 'text-purple-600'
-                                    }`}>Role / Designation</label>
-                                    <input 
-                                      required
-                                      type="text" 
-                                      className={`w-full text-xs px-3.5 py-2.5 rounded-xl border outline-none transition duration-150 ${
-                                        isDark 
-                                          ? 'bg-neutral-950 border-neutral-800 text-white placeholder-neutral-600 focus:border-purple-500' 
-                                          : 'bg-slate-50 border-slate-200 text-slate-800 placeholder-slate-400 focus:border-purple-600'
-                                      }`}
-                                      placeholder="e.g. Senior Specialist"
-                                      value={newStaffRole}
-                                      onChange={(e) => setNewStaffRole(e.target.value)}
-                                    />
-                                  </div>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-3.5 text-left">
-                                  <div className="space-y-1.5">
-                                    <label className={`text-[9px] uppercase font-mono tracking-wider font-extrabold block ${
-                                      isDark ? 'text-purple-400' : 'text-purple-600'
-                                    }`}>Login Email</label>
-                                    <input 
-                                      required
-                                      type="email" 
-                                      className={`w-full text-xs px-3.5 py-2.5 rounded-xl border outline-none font-mono transition duration-150 ${
-                                        isDark 
-                                          ? 'bg-neutral-950 border-neutral-800 text-white placeholder-neutral-600 focus:border-purple-500' 
-                                          : 'bg-slate-50 border-slate-200 text-slate-800 placeholder-slate-400 focus:border-purple-600'
-                                      }`}
-                                      placeholder="employee@webzonebd.com"
-                                      value={newStaffEmail}
-                                      onChange={(e) => setNewStaffEmail(e.target.value)}
-                                    />
-                                  </div>
-                                  <div className="space-y-1.5">
-                                    <label className={`text-[9px] uppercase font-mono tracking-wider font-extrabold block ${
-                                      isDark ? 'text-purple-400' : 'text-purple-600'
-                                    }`}>Login Password</label>
-                                    <input 
-                                      required
-                                      type="text" 
-                                      className={`w-full text-xs px-3.5 py-2.5 rounded-xl border outline-none font-mono transition duration-150 ${
-                                        isDark 
-                                          ? 'bg-neutral-950 border-neutral-800 text-white placeholder-neutral-600 focus:border-purple-500' 
-                                          : 'bg-slate-50 border-slate-200 text-slate-800 placeholder-slate-400 focus:border-purple-600'
-                                      }`}
-                                      placeholder="Passphrase"
-                                      value={newStaffPassword}
-                                      onChange={(e) => setNewStaffPassword(e.target.value)}
-                                    />
-                                  </div>
-                                </div>
-
-                                <div className="space-y-2 text-left">
-                                  <div className="flex items-center justify-between">
-                                    <label className={`text-[9px] uppercase font-mono tracking-wider font-extrabold block ${
-                                      isDark ? 'text-purple-400' : 'text-purple-600'
-                                    }`}>Initial Sprint Velocity Rating</label>
-                                    <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
-                                      isDark ? 'bg-purple-950/40 text-purple-300' : 'bg-purple-50 text-purple-700'
-                                    }`}>{newStaffVelocity}% efficiency</span>
-                                  </div>
-                                  <input 
-                                    type="range"
-                                    min="40"
-                                    max="100"
-                                    className="w-full accent-purple-600 cursor-pointer"
-                                    value={newStaffVelocity}
-                                    onChange={(e) => setNewStaffVelocity(Number(e.target.value))}
-                                  />
-                                </div>
-
-                                <div className="space-y-2 text-left">
-                                  <label className={`text-[9px] uppercase font-mono tracking-wider font-extrabold block ${
-                                    isDark ? 'text-purple-400' : 'text-purple-600'
-                                  }`}>Specialist Profile Avatar Preset</label>
-                                  
-                                  <div className={`p-2.5 rounded-2xl border flex flex-wrap justify-between gap-1.5 ${
-                                    isDark ? 'bg-neutral-950/80 border-neutral-850/80' : 'bg-slate-50/80 border-slate-150'
-                                  }`}>
-                                    {AVATAR_PRESETS.map((p, index) => (
-                                      <button
-                                        type="button"
-                                        key={index}
-                                        onClick={() => setNewStaffAvatar(p)}
-                                        className={`w-9 h-9 rounded-full overflow-hidden border-2 transition duration-200 ${
-                                          newStaffAvatar === p 
-                                            ? (isDark ? 'border-purple-500 scale-110 shadow-lg shadow-purple-500/20' : 'border-purple-600 scale-110 shadow-lg shadow-purple-600/20') 
-                                            : (isDark ? 'border-transparent opacity-60 hover:opacity-100 hover:scale-105' : 'border-transparent opacity-70 hover:opacity-100 hover:scale-105')
-                                        }`}
-                                      >
-                                        <img src={p} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                                      </button>
-                                    ))}
-                                  </div>
-                                  
-                                  <input 
-                                    type="text" 
-                                    className={`w-full text-[10px] text-xs px-3 py-2 rounded-xl border outline-none font-mono transition duration-150 ${
-                                      isDark 
-                                        ? 'bg-neutral-950 border-neutral-800 text-white placeholder-neutral-600 focus:border-purple-500' 
-                                        : 'bg-slate-50 border-slate-200 text-slate-800 placeholder-slate-400 focus:border-purple-600'
-                                    }`}
-                                    placeholder="Or supply custom profile picture direct URL..."
-                                    value={newStaffAvatar}
-                                    onChange={(e) => setNewStaffAvatar(e.target.value)}
-                                  />
-                                </div>
-
-                                <div className="space-y-2 text-left">
-                                  <span className={`text-[9px] uppercase font-mono tracking-wider font-extrabold block ${
-                                    isDark ? 'text-purple-400' : 'text-purple-600'
-                                  }`}>SaaS Clearance Permissions</span>
-                                  <div className="flex flex-wrap gap-1.5 pt-0.5">
-                                    {['manage_projects', 'manage_tasks', 'reply_tickets', 'manage_servers', 'security_audit', 'write_code', 'support_chat', 'ai_generation'].map((perm) => {
-                                      const hasVal = newStaffPermissions.includes(perm);
-                                      return (
-                                        <button
-                                          key={perm}
-                                          type="button"
-                                          onClick={() => {
-                                            setNewStaffPermissions(prev => 
-                                              prev.includes(perm) ? prev.filter(p => p !== perm) : [...prev, perm]
-                                            );
-                                          }}
-                                          className={`px-2.5 py-1 rounded-lg transition border text-[9px] font-mono cursor-pointer ${
-                                            hasVal 
-                                              ? (isDark ? 'bg-purple-950/40 text-purple-300 border-purple-500/40 font-bold shadow-sm shadow-purple-500/10' : 'bg-purple-50 text-purple-750 border-purple-300/40 font-bold shadow-sm')
-                                              : (isDark ? 'bg-neutral-950 border-neutral-800 text-neutral-500 hover:border-neutral-700' : 'bg-slate-50 border-slate-150 text-slate-500 hover:border-slate-250')
-                                          }`}
-                                        >
-                                          {hasVal ? '✓ ' : '✗ '}{perm.toUpperCase().replace('_', ' ')}
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-
-                                <div className={`flex items-center gap-2.5 pt-4 border-t ${
-                                  isDark ? 'border-neutral-800/80' : 'border-slate-100'
-                                }`}>
-                                  <button
-                                    type="submit"
-                                    className="flex-1 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-extrabold text-xs text-center transition-all duration-150 shadow-md shadow-purple-950/10 hover:shadow-purple-750/30 cursor-pointer"
-                                  >
-                                    Create Profile
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => setShowAddStaffModal(false)}
-                                    className={`px-5 py-3 rounded-xl font-bold text-xs text-center transition-all duration-150 border cursor-pointer ${
-                                      isDark 
-                                        ? 'bg-neutral-950 hover:bg-neutral-850 hover:text-white text-neutral-400 border-neutral-800' 
-                                        : 'bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-slate-850 border-slate-200'
-                                    }`}
-                                  >
-                                    Cancel
-                                  </button>
-                                </div>
-                              </form>
-                            </div>
-                          </div>
-                        );
-                      })()}
-
-                      {/* QUICK MESSAGE STAFF OVERLAY MODAL */}
-                      {messageModalStaff && (() => {
-                        const handleSubmit = (e: React.FormEvent) => {
-                          e.preventDefault();
-                          if (!quickMessageText.trim()) return;
-                          
-                          const newLog = {
-                            id: 'act-' + Date.now(),
-                            staffName: messageModalStaff.name,
-                            action: 'support_chat',
-                            desc: `Instructions Dispatched: "${quickMessageText}"`,
-                            details: `Transmitted by System Admin. Target unit online.`,
-                            time: 'Just now',
-                            department: messageModalStaff.department
-                          };
-                          setStaffActivityFeed(prev => [newLog, ...prev]);
-
-                          logAdminAction(`Messaged Specialist ${messageModalStaff.name} [Dept: ${messageModalStaff.department}]: "${quickMessageText}"`);
-                          triggerToast(`✉️ Admin message successfully dispatched to ${messageModalStaff.name}!`);
-                          setMessageModalStaff(null);
-                          setQuickMessageText('');
-                        };
-
-                        return (
-                          <div className="fixed inset-0 z-55 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200" id="quick-message-modal">
-                            <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-6 max-w-md w-full space-y-4 shadow-xl overflow-y-auto animate-in zoom-in-95 duration-200">
-                              <div className="flex items-center justify-between border-b border-neutral-805 pb-3">
-                                <div>
-                                  <h3 className="font-black text-sm text-white uppercase tracking-wider flex items-center gap-2">
-                                    <MessageSquare className="w-4 h-4 text-sky-400" /> Dispatch Direct Message
-                                  </h3>
-                                  <p className="text-[10px] text-neutral-400 mt-0.5">Send instant system command or advisory to remote specialist</p>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => setMessageModalStaff(null)}
-                                  className="p-1 px-2.5 rounded bg-neutral-950 text-neutral-400 hover:text-white border border-neutral-800 transition cursor-pointer text-xs"
-                                >
-                                  ✕
-                                </button>
-                              </div>
-
-                              <form onSubmit={handleSubmit} className="space-y-4 text-xs font-sans">
-                                <div className="flex items-center gap-3 p-3 rounded-2xl bg-neutral-950 border border-neutral-850 text-left">
-                                  <img src={messageModalStaff.avatar} className="w-10 h-10 rounded-full object-cover border border-sky-500/30" />
-                                  <div>
-                                    <h4 className="font-bold text-white text-xs">{messageModalStaff.name}</h4>
-                                    <p className="text-[10px] text-slate-400">{messageModalStaff.role} • {messageModalStaff.department}</p>
-                                  </div>
-                                </div>
-
-                                <div className="space-y-1.5 text-left">
-                                  <label className="text-[9px] uppercase font-mono tracking-wider text-sky-400 font-bold block">Message Transmission Content</label>
-                                  <textarea
-                                    required
-                                    rows={4}
-                                    value={quickMessageText}
-                                    onChange={(e) => setQuickMessageText(e.target.value)}
-                                    placeholder="Enter instructions, notes, or urgent dispatch message..."
-                                    className="w-full bg-neutral-950 border border-neutral-800 text-xs text-white px-3 py-2.5 rounded-xl focus:border-sky-500 outline-none resize-none"
-                                  />
-                                </div>
-
-                                <div className="flex items-center gap-2.5 pt-3 border-t border-neutral-805">
-                                  <button
-                                    type="submit"
-                                    className="flex-1 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-black text-xs text-center transition shadow-md shadow-sky-950/20 cursor-pointer"
-                                  >
-                                    Send Message
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => setMessageModalStaff(null)}
-                                    className="px-4 py-2 rounded-xl bg-neutral-950 hover:bg-neutral-850 hover:text-white text-neutral-400 font-bold text-xs text-center transition border border-neutral-800 cursor-pointer"
-                                  >
-                                    Cancel
-                                  </button>
-                                </div>
-                              </form>
-                            </div>
-                          </div>
-                        );
-                      })()}
-
-                      {/* QUICK PROFILE VIEW OVERLAY MODAL */}
-                      {viewProfileModalStaff && (() => {
-                        return (
-                          <div className="fixed inset-0 z-55 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200" id="quick-profile-modal">
-                            <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-6 max-w-lg w-full space-y-5 shadow-xl overflow-y-auto max-h-[90vh] animate-in zoom-in-95 duration-200">
-                              <div className="flex items-center justify-between border-b border-neutral-805 pb-3">
-                                <div>
-                                  <h3 className="font-black text-sm text-white uppercase tracking-wider flex items-center gap-2">
-                                    <UserCheck className="w-4 h-4 text-emerald-400" /> Specialist Credentials & Profile
-                                  </h3>
-                                  <p className="text-[10px] text-neutral-400 mt-0.5">Comprehensive audit profile & active deployment KPIs</p>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => setViewProfileModalStaff(null)}
-                                  className="p-1 px-2.5 rounded bg-neutral-950 text-neutral-400 hover:text-white border border-neutral-800 transition cursor-pointer text-xs"
-                                >
-                                  ✕
-                                </button>
-                              </div>
-
-                              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 p-4 rounded-2xl bg-neutral-950 border border-neutral-805 text-left">
-                                <img src={viewProfileModalStaff.avatar} className="w-16 h-16 rounded-full object-cover border-2 border-emerald-500/40 shadow-md shadow-emerald-950/30" />
-                                <div className="space-y-1 flex-1 text-center sm:text-left">
-                                  <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-                                    <span className="font-black text-base text-white">{viewProfileModalStaff.name}</span>
-                                    <span className="inline-block sm:inline whitespace-nowrap bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[8px] font-black rounded-full px-2 py-0.5 tracking-wider font-mono self-center sm:self-auto uppercase">
-                                      {viewProfileModalStaff.status || 'Active Clearance'}
-                                    </span>
-                                  </div>
-                                  <p className="text-xs text-purple-300 font-bold">{viewProfileModalStaff.role || 'Senior Specialist'} • {viewProfileModalStaff.department}</p>
-                                  <p className="text-[11px] text-slate-400 font-mono">📧 {viewProfileModalStaff.email || 'N/A'}</p>
-                                  <p className="text-[11px] text-slate-400 font-mono">🔑 Key Index: <span className="text-slate-300 font-bold">{viewProfileModalStaff.password || 'N/A'}</span></p>
-                                </div>
-                              </div>
-
-                              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5 text-xs text-left">
-                                <div className="p-3 rounded-2xl bg-neutral-950/60 border border-neutral-850/40">
-                                  <span className="text-[9px] opacity-40 uppercase block font-mono">Sprint Velocity</span>
-                                  <span className="font-black text-sm text-emerald-400 font-mono block mt-0.5">{viewProfileModalStaff.sprintVelocity}% efficiency</span>
-                                  <p className="text-[8px] text-slate-400 mt-1">Excellent SLA rating</p>
-                                </div>
-                                <div className="p-3 rounded-2xl bg-neutral-950/60 border border-neutral-850/40">
-                                  <span className="text-[9px] opacity-40 uppercase block font-mono">Active queue</span>
-                                  <span className="font-black text-sm text-purple-400 font-mono block mt-0.5">{viewProfileModalStaff.ticketsCount} open tickets</span>
-                                  <p className="text-[8px] text-slate-400 mt-1">SLA time: &lt; 15m</p>
-                                </div>
-                                <div className="p-3 rounded-2xl bg-neutral-950/60 border border-neutral-850/40 col-span-2 sm:col-span-1">
-                                  <span className="text-[9px] opacity-40 uppercase block font-mono">SLA Compliance</span>
-                                  <span className="font-black text-sm text-sky-400 font-mono block mt-0.5">99.4% Rated</span>
-                                  <p className="text-[8px] text-slate-400 mt-1">No latency warning</p>
-                                </div>
-                              </div>
-
-                              <div className="space-y-2 text-left">
-                                <span className="text-[10px] uppercase font-mono tracking-wider opacity-50 block">Clearance Security Permissions</span>
-                                <div className="flex flex-wrap gap-1.5 font-mono text-[9px]">
-                                  {viewProfileModalStaff.permissions && viewProfileModalStaff.permissions.length > 0 ? (
-                                    viewProfileModalStaff.permissions.map((perm: string) => (
-                                      <span key={perm} className="px-2.5 py-1 rounded bg-neutral-950 border border-neutral-800 text-purple-300 font-bold">
-                                        ✓ {perm.toUpperCase().replace('_', ' ')}
-                                      </span>
-                                    ))
-                                  ) : (
-                                    <span className="text-neutral-500 italic">No special clearance items assigned</span>
-                                  )}
-                                </div>
-                              </div>
-
-                              <div className="pt-2 border-t border-neutral-805">
-                                <button
-                                  type="button"
-                                  onClick={() => setViewProfileModalStaff(null)}
-                                  className="w-full py-2.5 rounded-xl bg-purple-650 hover:bg-purple-750 text-white font-black text-xs text-center transition cursor-pointer"
-                                >
-                                  Close Credentials Sheet
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })()}
-
-                      {/* QUICK DELEGATE SPRINT TASK OVERLAY MODAL */}
-                      {assignTaskModalStaff && (() => {
-                        const handleTaskSubmit = (e: React.FormEvent) => {
-                          e.preventDefault();
-                          if (!quickTaskTitle.trim()) return;
-
-                          const assigneeName = assignTaskModalStaff.name.split(' ')[0];
-
-                          const newTask = {
-                            id: `task-` + Date.now(),
-                            projectId: quickTaskProjectId,
-                            title: quickTaskTitle,
-                            column: quickTaskColumn,
-                            priority: quickTaskPriority,
-                            assignee: assigneeName
-                          };
-
-                          setTasks(prev => [...prev, newTask]);
-
-                          const newLog = {
-                            id: 'act-' + Date.now(),
-                            staffName: assignTaskModalStaff.name,
-                            action: quickTaskColumn === 'completed' ? 'ticket_closed' : 'order_delivered',
-                            desc: `Assigned new sprint milestone task: "${quickTaskTitle}"`,
-                            details: `Task level set to [${quickTaskPriority.toUpperCase()}] in [${quickTaskColumn.toUpperCase()}] status.`,
-                            time: 'Just now',
-                            department: assignTaskModalStaff.department
-                          };
-                          setStaffActivityFeed(prev => [newLog, ...prev]);
-
-                          logAdminAction(`Instantly assigned Scrum task: "${quickTaskTitle}" to ${assignTaskModalStaff.name} [Priority: ${quickTaskPriority.toUpperCase()}]`);
-                          triggerToast(`📋 New task successfully delegated to ${assignTaskModalStaff.name}!`);
-                          setAssignTaskModalStaff(null);
-                          setQuickTaskTitle('');
-                        };
-
-                        return (
-                          <div className="fixed inset-0 z-55 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200" id="quick-task-modal">
-                            <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-6 max-w-md w-full space-y-4 shadow-xl overflow-y-auto animate-in zoom-in-95 duration-200">
-                               <div className="flex items-center justify-between border-b border-neutral-805 pb-3">
-                                 <div>
-                                   <h3 className="font-black text-sm text-white uppercase tracking-wider flex items-center gap-2">
-                                     <Plus className="w-4 h-4 text-purple-400" /> Delegate Sprint Task
-                                   </h3>
-                                   <p className="text-[10px] text-neutral-400 mt-0.5">Delegate new task assignment instantly to this specialist's queue</p>
-                                 </div>
-                                 <button
-                                   type="button"
-                                   onClick={() => setAssignTaskModalStaff(null)}
-                                   className="p-1 px-2.5 rounded bg-neutral-950 text-neutral-400 hover:text-white border border-neutral-800 transition cursor-pointer text-xs"
-                                 >
-                                   ✕
-                                 </button>
-                               </div>
-
-                               <form onSubmit={handleTaskSubmit} className="space-y-4 text-xs font-sans text-left">
-                                 <div className="flex items-center gap-3 p-3 rounded-2xl bg-neutral-950 border border-neutral-805 text-left">
-                                   <img src={assignTaskModalStaff.avatar} className="w-10 h-10 rounded-full object-cover border border-purple-500/30" />
-                                   <div>
-                                     <h4 className="font-bold text-white text-xs">{assignTaskModalStaff.name}</h4>
-                                     <p className="text-[10px] text-slate-400">{assignTaskModalStaff.role} • {assignTaskModalStaff.department}</p>
-                                   </div>
-                                 </div>
-
-                                 <div className="space-y-1">
-                                   <label className="text-[9px] uppercase font-mono tracking-wider text-purple-400 font-bold block">Task Title / Brief</label>
-                                   <input 
-                                     required
-                                     type="text" 
-                                     className="w-full bg-neutral-950 border border-neutral-800 text-xs text-white px-3 py-2 rounded-xl focus:border-purple-500 outline-none"
-                                     placeholder="e.g., Integrate payment sandbox hook..."
-                                     value={quickTaskTitle}
-                                     onChange={(e) => setQuickTaskTitle(e.target.value)}
-                                   />
-                                 </div>
-
-                                 <div className="grid grid-cols-2 gap-3.5">
-                                   <div className="space-y-1">
-                                     <label className="text-[9px] uppercase font-mono tracking-wider text-purple-400 font-bold block">Sprint Status</label>
-                                     <select
-                                       className="w-full bg-neutral-950 border border-neutral-800 text-xs text-white px-2.5 py-2 rounded-xl focus:border-purple-500 outline-none"
-                                       value={quickTaskColumn}
-                                       onChange={(e: any) => setQuickTaskColumn(e.target.value)}
-                                     >
-                                      <option value="backlog">📋 Backlog Queue</option>
-                                      <option value="todo">📌 Sprint To Do</option>
-                                      <option value="in_progress">⚙️ In Progress</option>
-                                      <option value="completed">✅ Done / Deployed</option>
-                                     </select>
-                                   </div>
-
-                                   <div className="space-y-1">
-                                     <label className="text-[9px] uppercase font-mono tracking-wider text-purple-400 font-bold block">Task Priority</label>
-                                     <select
-                                       className="w-full bg-neutral-950 border border-neutral-800 text-xs text-white px-2.5 py-2 rounded-xl focus:border-purple-500 outline-none"
-                                       value={quickTaskPriority}
-                                       onChange={(e: any) => setQuickTaskPriority(e.target.value)}
-                                     >
-                                       <option value="low">🟡 Low Priority</option>
-                                       <option value="medium">🟠 Medium Priority</option>
-                                       <option value="high">🔴 High Priority</option>
-                                       <option value="critical">☠️ Critical Priority</option>
-                                     </select>
-                                   </div>
-                                 </div>
-
-                                 <div className="space-y-1">
-                                   <label className="text-[9px] uppercase font-mono tracking-wider text-purple-400 font-bold block">Associate Project</label>
-                                   <select
-                                     className="w-full bg-neutral-950 border border-neutral-800 text-xs text-white px-2.5 py-2 rounded-xl focus:border-purple-500 outline-none"
-                                     value={quickTaskProjectId}
-                                     onChange={(e) => setQuickTaskProjectId(e.target.value)}
-                                   >
-                                     {projects.map(p => (
-                                       <option key={p.id} value={p.id}>📂 {p.title} ({p.id})</option>
-                                     ))}
-                                   </select>
-                                 </div>
-
-                                 <div className="flex items-center gap-2.5 pt-3 border-t border-neutral-855">
-                                   <button
-                                     type="submit"
-                                     className="flex-1 py-2 rounded-xl bg-purple-650 hover:bg-purple-750 text-white font-black text-xs text-center transition shadow-md shadow-purple-950/20 cursor-pointer"
-                                   >
-                                     Delegate Task
-                                   </button>
-                                   <button
-                                     type="button"
-                                     onClick={() => setAssignTaskModalStaff(null)}
-                                     className="px-4 py-2 rounded-xl bg-neutral-950 hover:bg-neutral-850 hover:text-white text-neutral-400 font-bold text-xs text-center transition border border-neutral-800 cursor-pointer"
-                                   >
-                                     Cancel
-                                   </button>
-                                 </div>
-                               </form>
-                             </div>
-                           </div>
-                         );
-                       })()}
-                     </>
-                  ) : (
-                    <div className="space-y-6 animate-in fade-in duration-300">
-                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                        <div>
-                          <h3 className={`text-lg font-bold ${textTitle}`}>Master Roles & Access Configuration Matrix</h3>
-                          <p className="text-xs opacity-60">Authorize, restrict and customize functional clearances in real-time across the IT solution panels.</p>
-                        </div>
-                        <div className="bg-neutral-900 border border-neutral-805 px-3 py-1.5 rounded-xl flex items-center gap-1.5 text-[10px] font-mono text-purple-400">
-                          <Sliders className="w-3.5 h-3.5 animate-spin" />
-                          <span>ZERO-TRUST CONTEXT GOVERNOR ACTIVE</span>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                        {rolesConfig.map((role) => {
-                          const isSystemRoot = role.role === 'super_admin';
-                          return (
-                            <div key={role.role} className={`flex flex-col p-5 rounded-2xl border ${panelBg} shadow-sm space-y-4 relative ${
-                              isSystemRoot ? 'border-red-500/25 shadow-red-950/5' : 'border-neutral-805'
-                            }`}>
-                              
-                              {/* Title and role badge */}
-                              <div className="space-y-1">
-                                <div className="flex items-center justify-between">
-                                  <span className="text-xs font-bold font-mono tracking-wider uppercase bg-neutral-950 border border-neutral-800 px-2 py-0.5 rounded text-neutral-300">
-                                    {role.label}
-                                  </span>
-                                  {isSystemRoot && (
-                                    <span className="text-[8px] bg-red-950 text-red-450 border border-red-500/20 font-bold font-mono px-1.5 py-0.5 rounded">
-                                      HARD LOCKED
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="text-[11px] text-slate-400 leading-normal pt-1.5 min-h-[48px]">
-                                  {role.description}
-                                </p>
-                              </div>
-
-                              {/* Interactive Permissions list */}
-                              <div className="border-t border-neutral-800/60 pt-4 space-y-3.5 flex-1">
-                                <span className="text-[9.5px] uppercase tracking-widest text-neutral-400 font-bold block">Assigned Clearances</span>
-                                
-                                {[
-                                  { key: 'manage_products' as keyof PermissionSet, label: 'Products Management', desc: 'Add/Delete store products & tags' },
-                                  { key: 'manage_users' as keyof PermissionSet, label: 'Customers Registry', desc: 'Read/delete customer & staff records' },
-                                  { key: 'manage_content' as keyof PermissionSet, label: 'CMS Content Editing', desc: 'Modify blogs, pages & portfolios' },
-                                  { key: 'manage_orders' as keyof PermissionSet, label: 'Orders & Payments', desc: 'Process orders, track revenues & payouts' }
-                                ].map((perm) => {
-                                  const isGranted = !!role.permissions[perm.key];
-                                  return (
-                                    <div key={perm.key} className="space-y-1">
-                                      <label className="flex items-start gap-2.5 cursor-pointer group">
-                                        <input
-                                          type="checkbox"
-                                          checked={isGranted}
-                                          disabled={isSystemRoot}
-                                          onChange={() => {
-                                            if (isSystemRoot) return;
-                                            
-                                            // Modify role config state
-                                            const updatedConfig = rolesConfig.map(r => {
-                                              if (r.role === role.role) {
-                                                return {
-                                                  ...r,
-                                                  permissions: {
-                                                    ...r.permissions,
-                                                    [perm.key]: !r.permissions[perm.key]
-                                                  }
-                                                };
-                                              }
-                                              return r;
-                                            });
-                                            
-                                            setRolesConfig(updatedConfig);
-                                            logAdminAction(`Modified ${role.label} permission: toggled ${perm.label} to ${!isGranted ? 'GRANTED' : 'REVOKED'}`);
-                                            triggerToast(`🛡️ Security Matrix Configured: [${role.label}] ${perm.label} set to ${!isGranted ? 'GRANTED' : 'REVOKED'}`);
-                                          }}
-                                          className="mt-0.5 rounded border-neutral-800 text-purple-650 focus:ring-purple-650 disabled:opacity-40 disabled:cursor-not-allowed bg-neutral-950 w-3.5 h-3.5 transition-all cursor-pointer"
-                                        />
-                                        <div>
-                                          <span className={`text-[11.5px] font-bold block transition-colors ${
-                                            isGranted ? 'text-neutral-200' : 'text-neutral-450 group-hover:text-neutral-300'
-                                          }`}>
-                                            {perm.label}
-                                          </span>
-                                          <span className="text-[9px] text-slate-450 leading-tight block">
-                                            {perm.desc}
-                                          </span>
-                                        </div>
-                                      </label>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-
-                              {/* Interactive Status Indicator bar */}
-                              <div className="border-t border-neutral-800/60 pt-3 flex items-center justify-between text-[10px] font-mono">
-                                <span className="text-slate-500">TAB STATUS</span>
-                                <span className={role.permissions.manage_products && role.permissions.manage_users && role.permissions.manage_content && role.permissions.manage_orders
-                                  ? 'text-emerald-450 font-bold'
-                                  : 'text-purple-400'
-                                }>
-                                  {isSystemRoot ? 'OMNIPOTENT CORE' : 
-                                   Object.values(role.permissions).filter(Boolean).length > 0 ? 'PARTIAL ACCREDITED' : 'RESTRICTED USER'}
-                                </span>
-                              </div>
-
-                            </div>
-                          );
-                        })}
-                      </div>
-
-                      <div className="p-4 rounded-xl border border-purple-500/20 bg-purple-650/5 text-purple-300 text-xs leading-relaxed font-mono flex items-start gap-2.5">
-                        <Shield className="w-4 h-4 text-purple-450 shrink-0 mt-0.5 animate-pulse" />
-                        <div>
-                          <span className="font-bold uppercase tracking-wider block mb-1">Interactive Sandbox Security Core</span>
-                          Alter standard role permissions above to instantly test access and security gates across WebzoneBD. Try unchecking "Products Management" or "Orders & Payments" for the Admin or Editor role above, switch your simulated identity using the sidebar widget, and watch the system instantly block access with real logs and telemetry alerts.
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                </div>
-              )
-            )}
-
-            {/* SCREEN VIEWPORT REPORTS & TELEMETRY */}
+            {/* SCREEN VIEWPORT: CENTRAL REPORTS & BUSINESS INTELLIGENCE SUITE */}
             {activeMenu === 'reports' && (
-              !checkPermission('manage_orders') ? renderAccessDenied('manage_orders', 'Sata Analytics & reports') : (
-                <div className="space-y-6 animate-in fade-in duration-200">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                  <div>
-                    <h3 className={`text-lg font-bold ${textTitle}`}>Sata Analytics & Enterprise Reports</h3>
-                    <p className="text-xs opacity-60">Visualizing business trends, customer acquisitions, and affiliate payouts ledger.</p>
-                  </div>
-                  <div className="flex flex-wrap gap-1 bg-neutral-900/40 p-1 rounded-xl border border-neutral-850 dark:border-neutral-805 text-xs font-mono">
-                    {[
-                      { id: 'rep-revenue', label: 'Revenue' },
-                      { id: 'rep-customer', label: 'Customers' },
-                      { id: 'rep-services', label: 'Services' },
-                      { id: 'rep-store', label: 'Digital Store' },
-                      { id: 'rep-affiliate', label: 'Affiliates' },
-                      { id: 'rep-audit', label: '🛡️ Audit Trail' }
-                    ].map((tab) => (
-                      <button
-                        key={tab.id}
-                        onClick={() => setActiveSubMenu(tab.id)}
-                        className={`px-3 py-1.5 rounded-lg text-[9.5px] transition-all capitalize font-bold font-mono ${
-                          activeSubMenu === tab.id 
-                            ? 'bg-purple-600 text-white' 
-                            : 'text-neutral-400 hover:text-white'
-                        }`}
-                      >
-                        {tab.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Submenu Views */}
-                {activeSubMenu === 'rep-revenue' && (
-                  <div className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className={`p-4 rounded-xl border bg-neutral-950 border-neutral-800`}>
-                        <span className="text-[9px] uppercase font-mono tracking-wider opacity-60 block">Monthly Invoiced Revenue</span>
-                        <span className="text-xl font-bold font-mono text-purple-400 block mt-1">$17,340</span>
-                        <span className="text-[9px] text-emerald-400 mt-1 block">▲ +12% vs last month</span>
-                      </div>
-                      <div className={`p-4 rounded-xl border bg-neutral-950 border-neutral-800`}>
-                        <span className="text-[9px] uppercase font-mono tracking-wider opacity-60 block">Projected Direct Margin</span>
-                        <span className="text-xl font-bold font-mono text-emerald-400 block mt-1">$14,810</span>
-                        <span className="text-[9px] text-neutral-500 mt-1 block">85.41% gross profits index</span>
-                      </div>
-                      <div className={`p-4 rounded-xl border bg-neutral-950 border-neutral-800`}>
-                        <span className="text-[9px] uppercase font-mono tracking-wider opacity-60 block">Processing & Gateway Fees</span>
-                        <span className="text-xl font-bold font-mono text-neutral-450 block mt-1">$358.50</span>
-                        <span className="text-[9px] text-red-400 mt-1 block">Includes Nagad, Visa & Stripe</span>
-                      </div>
-                    </div>
-                    {/* SVG Line representation of monthly flow */}
-                    <div className={`p-5 rounded-xl border ${panelBg} space-y-4`}>
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-purple-400 font-mono">Consolidated Cashflow Progression</h4>
-                      <div className="w-full h-44 bg-neutral-950 border border-neutral-850 rounded-lg relative flex items-end p-2 overflow-hidden">
-                        <svg className="w-full h-full" viewBox="0 0 500 100" preserveAspectRatio="none">
-                          <path d="M 0,100 L 0,80 Q 125,50 250,60 T 500,20 L 500,100 Z" fill="rgba(108,59,255,0.15)" />
-                          <path d="M 0,80 Q 125,50 250,60 T 500,20" fill="none" stroke="#6C3BFF" strokeWidth="2.5" />
-                        </svg>
-                        <div className="absolute left-2 top-2 text-[9px] font-mono text-neutral-400">Cash velocity indexes across Q1-Q2 (2026)</div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {activeSubMenu === 'rep-customer' && (
-                  <div className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className={`p-5 rounded-xl border ${panelBg} space-y-3`}>
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-white">Acquisition Channels</h4>
-                        <div className="space-y-2 pt-1">
-                          {[
-                            { source: "Google Paid Campaigns", pct: 45, color: "bg-purple-500" },
-                            { source: "Affiliate Partner Referrals", pct: 35, color: "bg-emerald-500" },
-                            { source: "Direct Word-of-Mouth", pct: 12, color: "bg-blue-500" },
-                            { source: "TechBari Blog Sync", pct: 8, color: "bg-pink-500" }
-                          ].map((item, i) => (
-                            <div key={i} className="text-xs">
-                              <div className="flex justify-between font-mono mb-1 text-[11px]">
-                                <span>{item.source}</span>
-                                <span>{item.pct}%</span>
-                              </div>
-                              <div className="w-full bg-neutral-950 rounded-full h-1">
-                                <div className={`h-1 rounded-full ${item.color}`} style={{ width: `${item.pct}%` }} />
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                      <div className={`p-5 rounded-xl border ${panelBg} space-y-3`}>
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-white font-mono">Geographical Demographics Map</h4>
-                        <div className="space-y-2 font-mono text-[11px] pt-1">
-                          <div className="flex justify-between pb-1 border-b border-neutral-805">
-                            <span>Bangladesh (BD Zone)</span>
-                            <span className="font-bold text-purple-400">45% users</span>
-                          </div>
-                          <div className="flex justify-between pb-1 border-b border-neutral-805">
-                            <span>United States (US Node)</span>
-                            <span className="font-bold text-blue-400">25% users</span>
-                          </div>
-                          <div className="flex justify-between pb-1 border-b border-neutral-805">
-                            <span>Middle East & Qatar</span>
-                            <span className="font-bold text-emerald-400">18% users</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>United Kingdom & EU</span>
-                            <span className="font-bold text-amber-400">12% users</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {activeSubMenu === 'rep-services' && (
-                  <div className={`p-5 rounded-xl border ${panelBg} space-y-4`}>
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-white">Development Milestones Performance & SLA Fulfillments</h4>
-                    <div className="space-y-3 pt-2">
-                      {[
-                        { serv: "Website Development builds", delay: "4.2 days avg turnaround", rate: 96.4, status: "EXCELLENT" },
-                        { serv: "Custom bKash API & Gateway Sync", delay: "1.5 days avg turnaround", rate: 98.8, status: "SUPERB" },
-                        { serv: "SEO Optimization Keywords Campaign", delay: "12 days setup cycle", rate: 91.2, status: "OPTIMAL" },
-                        { serv: "Enterprise Custom ERP Software Systems", delay: "24.5 days roadmap Sprints", rate: 89.4, status: "STABLE" }
-                      ].map((item, i) => (
-                        <div key={i} className="p-3 rounded bg-neutral-950 border border-neutral-850 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
-                          <div>
-                            <span className="font-bold text-neutral-100 block">{item.serv}</span>
-                            <span className="text-[10px] opacity-60 font-mono">{item.delay}</span>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <span className="text-[10px] bg-purple-500/10 text-purple-400 px-2 py-0.5 rounded font-mono font-bold">{item.status}</span>
-                            <span className="font-bold font-mono text-purple-400">{item.rate}% SLA rate</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {activeSubMenu === 'rep-store' && (
-                  <div className={`p-5 rounded-xl border ${panelBg} space-y-4`}>
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-white">Digital Script Catalog & Licenses Telemetry</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="p-3 bg-neutral-950 rounded border border-neutral-850 text-center font-mono">
-                        <span className="text-[9px] opacity-50 uppercase">Global Templates Download count</span>
-                        <span className="text-xl font-bold text-purple-400 block mt-1">458 scripts</span>
-                      </div>
-                      <div className="p-3 bg-neutral-950 rounded border border-neutral-850 text-center font-mono">
-                        <span className="text-[9px] opacity-50 uppercase">Active Generated Licenses key</span>
-                        <span className="text-xl font-bold text-emerald-400 block mt-1">324 active</span>
-                      </div>
-                      <div className="p-3 bg-neutral-950 rounded border border-neutral-850 text-center font-mono">
-                        <span className="text-[9px] opacity-50 uppercase">Store Refunds query velocity</span>
-                        <span className="text-xl font-bold text-red-400 block mt-1">1.2% (very low)</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {activeSubMenu === 'rep-affiliate' && (
-                  <div className={`p-5 rounded-xl border ${panelBg} space-y-4`}>
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-white font-mono">Affiliate Conversion Conversions & Payouts Leaderboard</h4>
-                    <div className="overflow-x-auto text-xs">
-                      <table className="w-full text-left">
-                        <thead>
-                          <tr className="border-b border-neutral-805 text-purple-400 font-mono text-[10px] pb-2 uppercase tracking-wide">
-                            <th className="pb-2">Affiliate Name</th>
-                            <th className="pb-2">Click referrals</th>
-                            <th className="pb-2">Successful checkouts</th>
-                            <th className="pb-2 text-right">Commissions Earnings</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-neutral-900 font-mono text-[11px]">
-                          {[
-                            { name: "Majid Al-Qahtani", clicks: 1220, count: 58, earned: "$580" },
-                            { name: "Anisur Rahman TechBari", clicks: 940, count: 42, earned: "$420" },
-                            { name: "Zeeshan Custom Scripts", clicks: 450, count: 18, earned: "$180" }
-                          ].map((item, i) => (
-                            <tr key={i} className="text-neutral-305">
-                              <td className="py-2.5 font-bold font-sans">{item.name}</td>
-                              <td className="py-2.5">{item.clicks} referrals</td>
-                              <td className="py-2.5 text-emerald-400">{item.count} checkouts</td>
-                              <td className="py-2.5 text-right font-black text-white">{item.earned}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-
-                {activeSubMenu === 'rep-audit' && (() => {
-                  // Dynamic classification helper
-                  const classifyLog = (action: string) => {
-                    const lower = action.toLowerCase();
-                    
-                    let category: 'config' | 'coupon' | 'customer' | 'team' | 'financial' | 'security' | 'other' = 'other';
-                    let severity: 'critical' | 'warning' | 'info' = 'info';
-                    let icon = '📝';
-                    let color = 'bg-slate-500/10 text-slate-500 border-slate-500/20 dark:bg-slate-500/8 dark:text-slate-400 dark:border-slate-500/15';
-
-                    // 1. Determine severity
-                    if (
-                      lower.includes('purge') || 
-                      lower.includes('expunge') || 
-                      lower.includes('delete') || 
-                      lower.includes('permanently') || 
-                      lower.includes('exterminate') ||
-                      lower.includes('clear') ||
-                      lower.includes('flush') ||
-                      lower.includes('terminated')
-                    ) {
-                      severity = 'critical';
-                    } else if (
-                      lower.includes('modify') || 
-                      lower.includes('alter') || 
-                      lower.includes('update') || 
-                      lower.includes('change') || 
-                      lower.includes('reset') ||
-                      lower.includes('deactivate') ||
-                      lower.includes('toggle') ||
-                      lower.includes('moved') ||
-                      lower.includes('save') ||
-                      lower.includes('grant') ||
-                      lower.includes('revoke')
-                    ) {
-                      severity = 'warning';
-                    } else {
-                      severity = 'info';
-                    }
-
-                    // 2. Determine Category, Icon, and Color Badges
-                    if (lower.includes('config') || lower.includes('setting') || lower.includes('site name') || lower.includes('slogan')) {
-                      category = 'config';
-                      icon = '⚙️';
-                      color = 'bg-amber-500/10 text-amber-600 border-amber-500/20 dark:bg-amber-500/8 dark:text-amber-400 dark:border-amber-500/15';
-                    } else if (lower.includes('coupon') || lower.includes('voucher') || lower.includes('promo')) {
-                      category = 'coupon';
-                      icon = '🎟️';
-                      color = 'bg-violet-500/10 text-violet-600 border-violet-500/20 dark:bg-violet-500/8 dark:text-violet-400 dark:border-violet-500/15';
-                    } else if (lower.includes('customer') || lower.includes('client') || lower.includes('user status') || lower.includes('account lock') || lower.includes('otp')) {
-                      category = 'customer';
-                      icon = '👥';
-                      color = 'bg-sky-500/10 text-sky-600 border-sky-500/20 dark:bg-sky-500/8 dark:text-sky-400 dark:border-sky-500/15';
-                    } else if (lower.includes('staff') || lower.includes('specialist') || lower.includes('employee') || lower.includes('permission') || lower.includes('clearance') || lower.includes('role')) {
-                      category = 'team';
-                      icon = '👨‍💼';
-                      color = 'bg-pink-500/10 text-pink-600 border-pink-500/20 dark:bg-pink-500/8 dark:text-pink-400 dark:border-pink-500/15';
-                    } else if (lower.includes('financial') || lower.includes('ledger') || lower.includes('wallet') || lower.includes('balance') || lower.includes('payout') || lower.includes('commission') || lower.includes('withdrawal')) {
-                      category = 'financial';
-                      icon = '💳';
-                      color = 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:bg-emerald-500/8 dark:text-emerald-400 dark:border-emerald-500/15';
-                    } else if (lower.includes('session') || lower.includes('authorized') || lower.includes('security') || lower.includes('mfa') || lower.includes('token') || lower.includes('login') || lower.includes('credential')) {
-                      category = 'security';
-                      icon = '🛡️';
-                      color = 'bg-indigo-500/10 text-indigo-600 border-indigo-500/20 dark:bg-indigo-500/8 dark:text-indigo-400 dark:border-indigo-500/15';
-                    } else {
-                      category = 'other';
-                      icon = '📝';
-                      color = 'bg-slate-500/10 text-slate-600 border-slate-500/20 dark:bg-slate-500/8 dark:text-slate-400 dark:border-slate-500/15';
-                    }
-
-                    return { category, severity, icon, color };
-                  };
-
-                  // Static Simulated Actions list for simulation additions
-                  const simulateActionExamples = [
-                    "Changed primary gateway integration endpoint configuration parameters.",
-                    "Modified safety/auth status of Customer ID: cust-88392 to SUSPENDED",
-                    "Permanently expunged staff representative: Tasnim Rahman (ID: user-4309)",
-                    "Saved general Website Settings under Web Settings panel.",
-                    "Active site-wide broadcast scheduled: 'Scheduled maintenance from 2 AM to 4 AM UTC'.",
-                    "Updated affiliate partner commissions model payout rate to 18%",
-                    "Deactivated and deleted promotional coupon code: SUMMER50OFF",
-                    "Altered employee permissions matrix: toggled reply_tickets to GRANTED for Support Analyst",
-                    "Cleared public site-wide notification broadcast.",
-                    "Initiated MFA credential password reset protocol for customer account: Md. Hasan"
-                  ];
-
-                  const addSimulatedAuditLog = () => {
-                    const randomIdx = Math.floor(Math.random() * simulateActionExamples.length);
-                    const chosenText = simulateActionExamples[randomIdx];
-                    logAdminAction(chosenText);
-                    triggerToast("✨ Simulated administration audit trace logged successfully.");
-                  };
-
-                  // Filtered and Sorted Logs computing
-                  const processedLogs = localActivityLogs.map(log => ({
-                    ...log,
-                    meta: classifyLog(log.action)
-                  }));
-
-                  const filteredLogs = processedLogs.filter(log => {
-                    // Category Filter
-                    if (auditCategoryFilter !== 'all' && log.meta.category !== auditCategoryFilter) return false;
-                    // Severity Filter
-                    if (auditSeverityFilter !== 'all' && log.meta.severity !== auditSeverityFilter) return false;
-                    // Search query matches key elements
-                    if (auditSearch) {
-                      const query = auditSearch.toLowerCase();
-                      const matchAction = log.action.toLowerCase().includes(query);
-                      const matchIp = log.ipAddress.toLowerCase().includes(query);
-                      const matchUa = log.userAgent.toLowerCase().includes(query);
-                      const matchCat = log.meta.category.toLowerCase().includes(query);
-                      return matchAction || matchIp || matchUa || matchCat;
-                    }
-                    return true;
-                  });
-
-                  // Sorting
-                  const sortedLogs = [...filteredLogs].sort((a, b) => {
-                    if (auditSortOrder === 'desc') {
-                      return b.timestamp.localeCompare(a.timestamp) || b.id.localeCompare(a.id);
-                    } else {
-                      return a.timestamp.localeCompare(b.timestamp) || a.id.localeCompare(b.id);
-                    }
-                  });
-
-                  // Log analytics computations
-                  const totalCount = processedLogs.length;
-                  const criticalCount = processedLogs.filter(l => l.meta.severity === 'critical').length;
-                  const warningCount = processedLogs.filter(l => l.meta.severity === 'warning').length;
-                  const infoCount = processedLogs.filter(l => l.meta.severity === 'info').length;
-
-                  // CSV & JSON Exporters
-                  const handleCSVExport = () => {
-                    let csv = "data:text/csv;charset=utf-8,";
-                    csv += "Log ID,Timestamp,Category,Severity,Action Detail,Security IP Address,User Agent Context\n";
-                    sortedLogs.forEach(l => {
-                      const row = [
-                        l.id,
-                        l.timestamp,
-                        l.meta.category.toUpperCase(),
-                        l.meta.severity.toUpperCase(),
-                        l.action.replace(/"/g, '""'),
-                        l.ipAddress,
-                        l.userAgent.replace(/"/g, '""')
-                      ].map(val => `"${val}"`).join(",");
-                      csv += row + "\n";
-                    });
-                    const encodedUri = encodeURI(csv);
-                    const link = document.createElement("a");
-                    link.setAttribute("href", encodedUri);
-                    link.setAttribute("download", `Sata_Admin_AuditTrail_${Date.now()}.csv`);
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                    triggerToast("📥 CSV spreadsheet document generated & downloaded successfully.");
-                  };
-
-                  const handleJSONExport = () => {
-                    const output = sortedLogs.map(l => ({
-                      id: l.id,
-                      timestamp: l.timestamp,
-                      category: l.meta.category,
-                      severity: l.meta.severity,
-                      action: l.action,
-                      ipAddress: l.ipAddress,
-                      userAgent: l.userAgent
-                    }));
-                    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(output, null, 2));
-                    const link = document.createElement("a");
-                    link.setAttribute("href", dataStr);
-                    link.setAttribute("download", `Sata_Admin_AuditTrail_${Date.now()}.json`);
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                    triggerToast("📥 JSON structured schema dataset downloaded successfully.");
-                  };
-
-                  return (
-                    <div className="space-y-6 animate-in fade-in duration-300">
-                      
-                      {/* Dashboard Analytics Highlight Cards */}
-                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                        <div className={`p-4 rounded-2xl border transition duration-200 ${
-                          isDark 
-                            ? 'bg-neutral-950/40 border-neutral-800' 
-                            : 'bg-white border-slate-200/80 shadow-sm shadow-slate-100/50'
-                        }`}>
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <span className={`text-[10px] uppercase font-mono tracking-wider font-extrabold block opacity-60 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Total Trace Logs</span>
-                              <span className={`text-2xl font-black font-mono block mt-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>{totalCount}</span>
-                            </div>
-                            <span className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-500 text-xs font-bold">Trace</span>
-                          </div>
-                          <div className="mt-2 text-[10px] text-indigo-400 font-medium">All recorded operations</div>
-                        </div>
-
-                        <div className={`p-4 rounded-2xl border transition duration-200 ${
-                          isDark 
-                            ? 'bg-neutral-950/40 border-neutral-800' 
-                            : 'bg-white border-slate-200/80 shadow-sm shadow-slate-100/50'
-                        }`}>
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <span className={`text-[10px] uppercase font-mono tracking-wider font-extrabold block text-rose-500 dark:text-rose-400`}>Critical Deletions</span>
-                              <span className={`text-2xl font-black font-mono block mt-2 text-rose-600 dark:text-rose-455`}>{criticalCount}</span>
-                            </div>
-                            <span className="p-1.5 rounded-lg bg-rose-500/10 text-rose-500 text-xs font-bold">Destructive</span>
-                          </div>
-                          <div className="mt-2 text-[10px] text-rose-400 font-medium">Purges, expunges, and clear actions</div>
-                        </div>
-
-                        <div className={`p-4 rounded-2xl border transition duration-200 ${
-                          isDark 
-                            ? 'bg-neutral-950/40 border-neutral-800' 
-                            : 'bg-white border-slate-200/80 shadow-sm shadow-slate-100/50'
-                        }`}>
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <span className={`text-[10px] uppercase font-mono tracking-wider font-extrabold block text-amber-500 dark:text-amber-400`}>Sensitive Changes</span>
-                              <span className={`text-2xl font-black font-mono block mt-2 text-amber-600 dark:text-amber-405`}>{warningCount}</span>
-                            </div>
-                            <span className="p-1.5 rounded-lg bg-amber-500/10 text-amber-500 text-xs font-bold font-mono">Modifications</span>
-                          </div>
-                          <div className="mt-2 text-[10px] text-amber-500 font-medium font-semibold">Configs, discounts, & permissions</div>
-                        </div>
-
-                        <div className={`p-4 rounded-2xl border transition duration-200 ${
-                          isDark 
-                            ? 'bg-neutral-950/40 border-neutral-800' 
-                            : 'bg-white border-slate-200/80 shadow-sm shadow-slate-100/50'
-                        }`}>
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <span className={`text-[10px] uppercase font-mono tracking-wider font-extrabold block text-emerald-500 dark:text-emerald-400`}>General Operations</span>
-                              <span className={`text-2xl font-black font-mono block mt-2 text-emerald-600 dark:text-emerald-455`}>{infoCount}</span>
-                            </div>
-                            <span className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-500 text-xs font-bold">Standard</span>
-                          </div>
-                          <div className="mt-2 text-[10px] text-emerald-400 font-medium font-semibold">Support replies, tasks & system cycles</div>
-                        </div>
-                      </div>
-
-                      {/* Interactive Controls Panel */}
-                      <div className={`p-4 rounded-2xl border flex flex-col gap-4 ${
-                        isDark 
-                          ? 'bg-neutral-950/40 border-neutral-800' 
-                          : 'bg-white border-slate-200/80 shadow-sm shadow-slate-100/20'
-                      }`}>
-                        
-                        {/* Row 1: Search & Simulated Activity Generator */}
-                        <div className="flex flex-col md:flex-row gap-3 items-center justify-between">
-                          <div className="relative w-full md:max-w-md">
-                            <Search className={`absolute left-3 top-2.5 w-4 h-4 ${isDark ? 'text-neutral-500' : 'text-slate-400'}`} />
-                            <input
-                              type="text"
-                              value={auditSearch}
-                              onChange={(e) => setAuditSearch(e.target.value)}
-                              placeholder="Search audit trail by keyword, category, server IP, user agent..."
-                              className={`w-full text-xs pl-9 pr-8 py-2.5 rounded-xl border focus:outline-none transition ${
-                                isDark 
-                                  ? 'bg-neutral-900 border-neutral-805 text-white focus:border-purple-500' 
-                                  : 'bg-slate-50 border-slate-200 text-slate-800 focus:bg-white focus:border-purple-600 shadow-inner'
-                              }`}
-                            />
-                            {auditSearch && (
-                              <button 
-                                onClick={() => setAuditSearch('')}
-                                className={`absolute right-3 top-2.5 text-xs font-bold hover:scale-105 active:scale-95 cursor-pointer ${
-                                  isDark ? 'text-neutral-400 hover:text-white' : 'text-slate-400 hover:text-slate-700'
-                                }`}
-                              >
-                                <X className="w-4 h-4" />
-                              </button>
-                            )}
-                          </div>
-
-                          <div className="flex flex-wrap gap-2 w-full md:w-auto justify-end">
-                            <button
-                              onClick={() => {
-                                if (confirm("🔒 Are you absolutely sure you want to permanently erase the administrative governance audit registries? This destructive operation cannot be undone and will delete accountability tracking records.")) {
-                                  setLocalActivityLogs([]);
-                                  localStorage.setItem('webzone_activity_logs', JSON.stringify([]));
-                                  triggerToast("🔒 Persistent administrative activity governance log purged.");
-                                }
-                              }}
-                              className={`px-3 py-2 rounded-xl text-[11px] font-bold flex items-center gap-1.5 transition active:scale-95 cursor-pointer ${
-                                isDark 
-                                  ? 'bg-red-950/40 hover:bg-red-950/60 text-red-400 border border-red-500/15' 
-                                  : 'bg-red-50 hover:bg-red-100/80 text-red-700 border border-red-200'
-                              }`}
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                              <span>Purge Trail</span>
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Row 2: Category, Severity, Sort & Download Data Toolkits */}
-                        <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-dashed dark:border-neutral-900 border-slate-100">
-                          <div className="flex flex-wrap items-center gap-2.5">
-                            {/* Category Filter */}
-                            <div className="flex items-center gap-1.5">
-                              <span className={`text-[10px] font-mono font-bold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-450'}`}>Category</span>
-                              <select
-                                value={auditCategoryFilter}
-                                onChange={(e) => setAuditCategoryFilter(e.target.value)}
-                                className={`text-[11px] font-bold font-sans py-1.5 px-2.5 rounded-lg focus:outline-none cursor-pointer ${
-                                  isDark 
-                                    ? 'bg-neutral-900 border border-neutral-805 text-slate-200' 
-                                    : 'bg-slate-50 border border-slate-200 text-slate-700 shadow-sm'
-                                }`}
-                              >
-                                <option value="all">📁 All Systems ({processedLogs.length})</option>
-                                <option value="config">⚙️ Configs ({processedLogs.filter(l => l.meta.category === 'config').length})</option>
-                                <option value="coupon">🎟️ Coupons ({processedLogs.filter(l => l.meta.category === 'coupon').length})</option>
-                                <option value="customer">👥 Customer Accounts ({processedLogs.filter(l => l.meta.category === 'customer').length})</option>
-                                <option value="team">👨‍💼 Team & Staff ({processedLogs.filter(l => l.meta.category === 'team').length})</option>
-                                <option value="financial">💳 Financial Ledger ({processedLogs.filter(l => l.meta.category === 'financial').length})</option>
-                                <option value="security">🛡️ Security Sessions ({processedLogs.filter(l => l.meta.category === 'security').length})</option>
-                                <option value="other">📝 Other ({processedLogs.filter(l => l.meta.category === 'other').length})</option>
-                              </select>
-                            </div>
-
-                            {/* Severity Filter */}
-                            <div className="flex items-center gap-1.5">
-                              <span className={`text-[10px] font-mono font-bold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-450'}`}>Severity</span>
-                              <select
-                                value={auditSeverityFilter}
-                                onChange={(e) => setAuditSeverityFilter(e.target.value)}
-                                className={`text-[11px] font-bold font-sans py-1.5 px-2.5 rounded-lg focus:outline-none cursor-pointer ${
-                                  isDark 
-                                    ? 'bg-neutral-900 border border-neutral-805 text-slate-200' 
-                                    : 'bg-slate-50 border border-slate-200 text-slate-700 shadow-sm'
-                                }`}
-                              >
-                                <option value="all">⭐ All Levels</option>
-                                <option value="critical">🚨 Critical / Destructive</option>
-                                <option value="warning">⚠️ Warning / Sensitive</option>
-                                <option value="info">ℹ️ Informational</option>
-                              </select>
-                            </div>
-
-                            {/* Sort Order Selector */}
-                            <div className="flex items-center gap-1.5">
-                              <span className={`text-[10px] font-mono font-bold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-450'}`}>Timeline</span>
-                              <button
-                                onClick={() => setAuditSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
-                                className={`text-[11px] font-bold font-sans py-1.5 px-2.5 rounded-lg flex items-center gap-1.5 transition border cursor-pointer hover:bg-opacity-80 active:scale-95 ${
-                                  isDark 
-                                    ? 'bg-neutral-900 border-neutral-805 text-slate-200' 
-                                    : 'bg-slate-50 border-slate-200 text-slate-705 shadow-sm hover:bg-slate-100'
-                                }`}
-                              >
-                                <span>{auditSortOrder === 'desc' ? 'Newest First' : 'Oldest First'}</span>
-                                <Sliders className="w-3 h-3 text-purple-500" />
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Export Utilities */}
-                          <div className="flex items-center gap-2">
-                            <span className={`text-[10.5px] font-mono font-bold ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Export:</span>
-                            <button
-                              onClick={handleCSVExport}
-                              disabled={sortedLogs.length === 0}
-                              className={`px-2.5 py-1.5 rounded-lg text-[10.5px] font-mono font-bold flex items-center gap-1 transition ${
-                                sortedLogs.length === 0 
-                                  ? 'opacity-40 cursor-not-allowed' 
-                                  : 'hover:scale-[1.03] active:scale-95 cursor-pointer ' + (isDark ? 'bg-neutral-900 hover:bg-neutral-850 text-emerald-400 border border-neutral-800' : 'bg-white border border-slate-205 text-emerald-700 shadow-sm hover:bg-slate-50')
-                              }`}
-                              title="Export current selection filtered log list to a CSV sheet"
-                            >
-                              <Download className="w-3.5 h-3.5 text-emerald-500" />
-                              <span>CSV</span>
-                            </button>
-                            <button
-                              onClick={handleJSONExport}
-                              disabled={sortedLogs.length === 0}
-                              className={`px-2.5 py-1.5 rounded-lg text-[10.5px] font-mono font-bold flex items-center gap-1 transition ${
-                                sortedLogs.length === 0 
-                                  ? 'opacity-40 cursor-not-allowed' 
-                                  : 'hover:scale-[1.03] active:scale-95 cursor-pointer ' + (isDark ? 'bg-neutral-900 hover:bg-neutral-850 text-indigo-400 border border-neutral-800' : 'bg-white border border-slate-205 text-indigo-700 shadow-sm hover:bg-slate-50')
-                              }`}
-                              title="Export current selection filtered log list as JSON document configuration"
-                            >
-                              <Download className="w-3.5 h-3.5 text-indigo-500" />
-                              <span>JSON</span>
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Filter Results Status */}
-                      <div className="flex justify-between items-center px-1">
-                        <p className={`text-[11px] font-mono ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                          Filtered results: <strong className="text-purple-500">{sortedLogs.length}</strong> trace events matching filters.
-                        </p>
-                        {(auditSearch || auditCategoryFilter !== 'all' || auditSeverityFilter !== 'all') && (
-                          <button
-                            onClick={() => {
-                              setAuditSearch('');
-                              setAuditCategoryFilter('all');
-                              setAuditSeverityFilter('all');
-                            }}
-                            className="text-[10.5px] font-mono font-bold text-indigo-505 hover:underline cursor-pointer"
-                          >
-                            Reset active filters
-                          </button>
-                        )}
-                      </div>
-
-                      {/* Main Trail Log Content List */}
-                      {sortedLogs.length === 0 ? (
-                        <div className={`p-12 text-center rounded-2xl border ${
-                          isDark 
-                            ? 'bg-neutral-950/40 border-neutral-800/80' 
-                            : 'bg-white border-slate-150 shadow-sm'
-                        }`}>
-                          <div className="max-w-sm mx-auto space-y-3">
-                            <span className="text-3xl block">📋</span>
-                            <h4 className={`text-sm font-black ${isDark ? 'text-white font-sans' : 'text-slate-800 font-sans'}`}>No Audit entries match filter parameters</h4>
-                            <p className="text-xs opacity-60 leading-relaxed font-sans">
-                              Could not find administrative traces. Perform critical actions or click "Simulate Action" above to populate records on the fly.
-                            </p>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className={`overflow-hidden rounded-2xl border transition ${
-                          isDark 
-                            ? 'bg-neutral-950/20 border-neutral-850' 
-                            : 'bg-white border-slate-200 shadow-md shadow-slate-150/30'
-                        }`}>
-                          <div className="overflow-x-auto">
-                            <table className="w-full text-left border-collapse text-xs">
-                              <thead>
-                                <tr className={`border-b font-mono text-[9.5px] tracking-wider uppercase ${
-                                  isDark 
-                                    ? 'bg-neutral-950 text-slate-400 border-neutral-800' 
-                                    : 'bg-slate-50 text-slate-500 border-slate-150'
-                                }`}>
-                                  <th className="p-3.5 pl-4 font-bold">Timestamp</th>
-                                  <th className="p-3.5 font-bold">Category</th>
-                                  <th className="p-3.5 font-bold">Security Severity</th>
-                                  <th className="p-3.5 font-bold">Administrative Action Recorded</th>
-                                  <th className="p-3.5 font-bold">Operator IP Address</th>
-                                  <th className="p-3.5 font-bold text-center">Inspect</th>
-                                </tr>
-                              </thead>
-                              <tbody className={`divide-y ${isDark ? 'divide-neutral-900/80' : 'divide-slate-150'}`}>
-                                {sortedLogs.map((log, index) => {
-                                  // Determine dynamic simulated location city
-                                  const ipSegment = parseInt(log.ipAddress.split('.').pop() || '0', 10);
-                                  const simulatedLoc = ipSegment % 3 === 0 
-                                    ? "Dhaka, Bangladesh" 
-                                    : ipSegment % 5 === 0 
-                                      ? "Austin, Texas, US" 
-                                      : ipSegment % 7 === 0 
-                                        ? "London, UK" 
-                                        : "Zahra Node, Kuwait";
-
-                                  return (
-                                    <tr 
-                                      key={`${log.id}-${index}`} 
-                                      onClick={() => setSelectedAuditLog(log)}
-                                      className={`transition duration-150 cursor-pointer ${
-                                        isDark 
-                                          ? 'hover:bg-neutral-900/80 bg-neutral-950/20' 
-                                          : 'hover:bg-slate-50/70 bg-white'
-                                      }`}
-                                    >
-                                      {/* Timestamp */}
-                                      <td className="p-3.5 pl-4 font-mono whitespace-nowrap">
-                                        <div className="flex items-center gap-1.5">
-                                          <Clock className="w-3.5 h-3.5 opacity-40 text-purple-500" />
-                                          <span className="font-bold">{log.timestamp}</span>
-                                        </div>
-                                      </td>
-
-                                      {/* Category */}
-                                      <td className="p-3.5 font-sans">
-                                        <span className={`px-2 py-1 rounded-lg border text-[9.5px] font-mono font-bold flex items-center w-fit gap-1 ${
-                                          log.meta.color
-                                        }`}>
-                                          <span>{log.meta.icon}</span>
-                                          <span>{log.meta.category.toUpperCase()}</span>
-                                        </span>
-                                      </td>
-
-                                      {/* Severity badge */}
-                                      <td className="p-3.5 font-sans">
-                                        {log.meta.severity === 'critical' ? (
-                                          <span className="bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 px-2 py-0.5 rounded-full text-[8.5px] font-mono font-black animate-pulse tracking-wide inline-flex items-center gap-1">
-                                            <span>🚨</span> CRITICAL
-                                          </span>
-                                        ) : log.meta.severity === 'warning' ? (
-                                          <span className="bg-amber-500/10 text-amber-650 dark:text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-full text-[8.5px] font-mono font-black tracking-wide inline-flex items-center gap-1">
-                                            <span>⚠️</span> WARNING
-                                          </span>
-                                        ) : (
-                                          <span className="bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded-full text-[8.5px] font-mono font-black tracking-wide inline-flex items-center gap-1">
-                                            <span>ℹ️</span> INFO
-                                          </span>
-                                        )}
-                                      </td>
-
-                                      {/* Action Details */}
-                                      <td className="p-3.5 font-sans max-w-xs sm:max-w-md lg:max-w-lg">
-                                        <p className={`text-xs font-bold leading-normal truncate ${isDark ? 'text-slate-100' : 'text-slate-900'}`} title={log.action}>
-                                          {log.action}
-                                        </p>
-                                        <p className={`text-[10px] font-mono font-medium truncate opacity-50 mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} title={log.userAgent}>
-                                          {log.userAgent}
-                                        </p>
-                                      </td>
-
-                                      {/* IP address with Geoloc badge */}
-                                      <td className="p-3.5 font-mono whitespace-nowrap">
-                                        <div className="space-y-0.5 text-left">
-                                          <span className={`font-semibold block ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{log.ipAddress}</span>
-                                          <span className={`text-[9px] block opacity-60 ${isDark ? 'text-slate-500' : 'text-slate-450'}`}>📍 {simulatedLoc}</span>
-                                        </div>
-                                      </td>
-
-                                      {/* Inspector CTA */}
-                                      <td className="p-3.5 text-center">
-                                        <button 
-                                          type="button"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setSelectedAuditLog(log);
-                                          }}
-                                          className={`p-1.5 rounded-lg border transition cursor-pointer hover:scale-[1.05] ${
-                                            isDark 
-                                              ? 'bg-neutral-900 border-neutral-805 hover:bg-neutral-850 text-purple-400' 
-                                              : 'bg-white border-slate-205 hover:bg-slate-50 text-purple-600 shadow-sm'
-                                          }`}
-                                          title="Inspect accountability signature diagnostic traces"
-                                        >
-                                          <Eye className="w-3.5 h-3.5" />
-                                        </button>
-                                      </td>
-                                    </tr>
-                                  );
-                                })}
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* DETAILED INSPECTOR INTERACTIVE DIALOG MODAL */}
-                      {selectedAuditLog && (() => {
-                        const { category, severity, icon, color } = classifyLog(selectedAuditLog.action);
-                        
-                        const ipSegment = parseInt(selectedAuditLog.ipAddress.split('.').pop() || '0', 10);
-                        const simulatedLoc = ipSegment % 3 === 0 
-                          ? "Dhaka Area, Bangladesh (AS9382 BDZONE-NET)" 
-                          : ipSegment % 5 === 0 
-                            ? "Austin Corporate Node, Texas, United States (AWS-USP1)" 
-                            : ipSegment % 7 === 0 
-                              ? "London City Node, United Kingdom (AS1221 GBT-IX)" 
-                              : "Zahra Node, Kuwait Central (AS4239 KW-AS)";
-
-                        const latLong = ipSegment % 3 === 0 
-                          ? "Lat: 23.8103° N, Lng: 90.4125° E" 
-                          : ipSegment % 5 === 0 
-                            ? "Lat: 30.2672° N, Lng: -97.7431° W" 
-                            : ipSegment % 7 === 0 
-                              ? "Lat: 51.5074° N, Lng: -0.1278° W" 
-                              : "Lat: 29.3759° N, Lng: 47.9774° E";
-
-                        return (
-                          <>
-                            {/* Backdrop */}
-                            <div 
-                              className="fixed inset-0 bg-neutral-950/70 backdrop-blur-sm z-[990] animate-in fade-in duration-200" 
-                              onClick={() => setSelectedAuditLog(null)}
-                            />
-
-                            {/* Dialogue Drawer Modal Wrapper */}
-                            <div className={`fixed inset-x-4 bottom-4 md:inset-x-auto md:right-4 md:top-4 md:bottom-auto w-full max-w-lg rounded-2xl border p-6 shadow-2xl z-[999] flex flex-col gap-4 animate-in slide-in-from-bottom-6 duration-200 cursor-default text-left overflow-y-auto max-h-[90vh] md:max-h-none md:h-fit md:top-12 md:right-12 ${
-                              isDark 
-                                ? 'bg-[#0B0F19]/96 border-neutral-800 text-white shadow-purple-950/30' 
-                                : 'bg-white border-slate-200 text-slate-805 shadow-slate-200/50'
-                            }`}>
-                              
-                              {/* Modal Title Bar */}
-                              <div className="flex justify-between items-start border-b border-dashed dark:border-neutral-800 border-slate-150 pb-3">
-                                <div>
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-xl">🛡️</span>
-                                    <h5 className={`text-sm font-black uppercase tracking-wider ${isDark ? 'text-white' : 'text-slate-800 font-sans'}`}>Audit Log Diagnostic Record</h5>
-                                  </div>
-                                  <p className={`text-[10px] font-mono block mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>ID: #{selectedAuditLog.id}</p>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => setSelectedAuditLog(null)}
-                                  className={`p-1.5 rounded-lg border transition hover:rotate-90 duration-200 cursor-pointer ${
-                                    isDark 
-                                      ? 'bg-neutral-900 border-neutral-805 text-neutral-400 hover:text-white' 
-                                      : 'bg-slate-50 border-slate-205 text-slate-400 hover:text-slate-808 shadow-sm'
-                                  }`}
-                                >
-                                  <X className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-
-                              {/* Details Content Container */}
-                              <div className="space-y-4 text-xs">
-                                
-                                {/* Diagnostic Action Row */}
-                                <div className={`p-3.5 rounded-xl border ${isDark ? 'bg-neutral-950/60 border-neutral-900' : 'bg-slate-50 border-slate-150'}`}>
-                                  <span className={`text-[9.5px] font-mono lowercase tracking-wider opacity-60 block ${isDark ? 'text-purple-300' : 'text-purple-700 font-bold'}`}>[operator_action_signature]</span>
-                                  <p className={`text-[12.5px] font-bold block mt-1.5 leading-snug ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{selectedAuditLog.action}</p>
-                                </div>
-
-                                {/* Matrix grid */}
-                                <div className="grid grid-cols-2 gap-3.5">
-                                  <div className={`p-3 rounded-xl border ${isDark ? 'bg-neutral-950/60 border-neutral-900/65' : 'bg-slate-50/70 border-slate-150 shadow-sm'}`}>
-                                    <span className={`text-[9.5px] font-mono uppercase tracking-wider opacity-60 block ${isDark ? 'text-slate-400' : 'text-slate-500 font-bold'}`}>Trace Severity</span>
-                                    <div className="mt-1 flex items-center gap-1.5">
-                                      <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-black ${
-                                        severity === 'critical' ? 'bg-rose-500/10 text-rose-500' : severity === 'warning' ? 'bg-amber-500/10 text-amber-500' : 'bg-blue-500/10 text-blue-500'
-                                      }`}>
-                                        {severity.toUpperCase()}
-                                      </span>
-                                    </div>
-                                  </div>
-                                  <div className={`p-3 rounded-xl border ${isDark ? 'bg-neutral-950/60 border-neutral-900/65' : 'bg-slate-50/70 border-slate-150 shadow-sm'}`}>
-                                    <span className={`text-[9.5px] font-mono uppercase tracking-wider opacity-65 block ${isDark ? 'text-slate-400' : 'text-slate-500 font-bold'}`}>Event Category</span>
-                                    <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold inline-block mt-1 ${color}`}>
-                                      {icon} {category.toUpperCase()}
-                                    </span>
-                                  </div>
-                                </div>
-
-                                {/* Geo Location & Timestamp details */}
-                                <div className="space-y-2">
-                                  <span className={`text-[9.5px] font-mono uppercase tracking-wider opacity-60 block ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Governance Telemetry Signature</span>
-                                  <div className={`p-3 rounded-xl border space-y-2 font-mono text-[10.5px] ${isDark ? 'bg-neutral-950/30 border-neutral-905' : 'bg-slate-50 border-slate-150 shadow-sm'}`}>
-                                    <div className="flex justify-between">
-                                      <span className="opacity-50 font-medium">Recorded Timestamp:</span>
-                                      <span className={`font-bold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{selectedAuditLog.timestamp} (UTC)</span>
-                                    </div>
-                                    <div className="flex justify-between border-t dark:border-neutral-900 border-slate-100 pt-1.5">
-                                      <span className="opacity-50">Originating IP:</span>
-                                      <span className={`font-bold ${isDark ? 'text-purple-400' : 'text-purple-650'}`}>{selectedAuditLog.ipAddress}</span>
-                                    </div>
-                                    <div className="flex justify-between border-t dark:border-neutral-900 border-slate-100 pt-1.5">
-                                      <span className="opacity-50">Geoloc ISP node:</span>
-                                      <span className={`font-bold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{simulatedLoc}</span>
-                                    </div>
-                                    <div className="flex justify-between border-t dark:border-neutral-900 border-slate-100 pt-1.5">
-                                      <span className="opacity-55">Coordinated GPS:</span>
-                                      <span className={`font-bold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{latLong}</span>
-                                    </div>
-                                  </div>
-                                </div>
-
-                                {/* User Agent Context Details */}
-                                <div className="space-y-1.5">
-                                  <span className={`text-[9.5px] font-mono uppercase tracking-wider opacity-60 block ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Agent Browser Identity Header</span>
-                                  <div className={`p-3.5 rounded-xl border font-mono text-[10px] break-all leading-normal ${isDark ? 'bg-neutral-950/40 border-neutral-900 text-slate-300' : 'bg-slate-50 border-slate-150 text-slate-650 shadow-sm'}`}>
-                                    {selectedAuditLog.userAgent}
-                                  </div>
-                                </div>
-
-                                {/* Accountability Integrity Verification checklist */}
-                                <div className="space-y-1.5">
-                                  <span className={`text-[9.5px] font-mono uppercase tracking-wider opacity-60 block ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>SOC2 Security Audit Compliance Checklist</span>
-                                  <div className={`p-3 rounded-xl border h-fit space-y-1 font-mono text-[9px] ${
-                                    isDark ? 'bg-neutral-950/60 border-neutral-905 text-emerald-400' : 'bg-slate-100/70 border-slate-150 text-emerald-800 shadow-sm'
-                                  }`}>
-                                    <p className="flex items-center gap-1.5 font-bold">
-                                      <span>✓</span> INTEGRITY CHECK: Verified non-repudiation administrative signature check.
-                                    </p>
-                                    <p className="flex items-center gap-1.5 font-bold mt-1">
-                                      <span>✓</span> CONTEXT ANALYSIS: Session cookie validation matches trace activity parameters.
-                                    </p>
-                                    <p className="flex items-center gap-1.5 font-bold mt-1">
-                                      <span>✓</span> DATA STANDARDS: GDPR / SOC2 log encryption standards compliant block.
-                                    </p>
-                                  </div>
-                                </div>
-
-                              </div>
-
-                              {/* Modal Actions */}
-                              <div className="flex items-center gap-2 pt-3 border-t border-dashed dark:border-neutral-900 border-slate-150">
-                                <button
-                                  onClick={() => {
-                                    navigator.clipboard.writeText(JSON.stringify(selectedAuditLog, null, 2));
-                                    triggerToast("📋 Copied raw log diagnostic JSON object sequence to clipboard.");
-                                  }}
-                                  className={`flex-1 py-2.5 rounded-xl text-xs font-bold font-sans transition flex items-center justify-center gap-1.5 cursor-pointer shadow-sm ${
-                                    isDark 
-                                      ? 'bg-neutral-900 border border-neutral-800 hover:bg-neutral-850 hover:text-white' 
-                                      : 'bg-slate-50 border border-slate-205 text-slate-600 hover:bg-slate-100'
-                                  }`}
-                                >
-                                  <Copy className="w-3.5 h-3.5 text-indigo-400" />
-                                  <span>Copy Raw JSON</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setSelectedAuditLog(null)}
-                                  className={`flex-1 py-2.5 rounded-xl font-bold text-xs text-center text-white transition duration-200 cursor-pointer shadow-md ${
-                                    isDark 
-                                      ? 'bg-gradient-to-r from-purple-600 to-indigo-650 hover:from-purple-550 hover:to-indigo-600 shadow-purple-950/20' 
-                                      : 'bg-gradient-to-r from-purple-600 to-indigo-650 hover:from-purple-700 hover:to-indigo-700 shadow-purple-200/80'
-                                  }`}
-                                >
-                                  Dismiss Record
-                                </button>
-                              </div>
-
-                            </div>
-                          </>
-                        );
-                      })()}
-
-                    </div>
-                  );
-                })()}
-              </div>
-              )
+              <AdminReportsSuite
+                isDark={isDark}
+                textTitle={textTitle}
+                panelBg={panelBg}
+                activeSubMenu={activeSubMenu}
+                setActiveSubMenu={setActiveSubMenu}
+                logAdminAction={logAdminAction}
+                triggerToast={triggerToast}
+                checkPermission={checkPermission}
+                renderAccessDenied={renderAccessDenied}
+                localActivityLogs={activityLogs}
+                setLocalActivityLogs={() => {}}
+                products={products as any}
+                orders={orders as any}
+                tickets={tickets as any}
+                customers={customers as any}
+                projects={projects as any}
+                withdrawRequests={withdrawRequests as any}
+                affiliateList={affiliateList as any}
+                coupons={coupons as any}
+              />
             )}
 
-            {/* SCREEN VIEWPORT NOTIFICATIONS SYSTEM LOGS */}
-            {activeMenu === 'notifications' && (() => {
-              let filteredAuditLogs = localActivityLogs.filter(log => {
-                const searchLower = auditSearch.toLowerCase();
-                const matchesSearch = log.action.toLowerCase().includes(searchLower) ||
-                                     log.ipAddress.toLowerCase().includes(searchLower) ||
-                                     log.userAgent.toLowerCase().includes(searchLower);
-                
-                let matchesCategory = true;
-                if (auditCategoryFilter && auditCategoryFilter !== 'all') {
-                  const act = log.action.toLowerCase();
-                  if (auditCategoryFilter === 'auth') {
-                    matchesCategory = act.includes('login') || act.includes('session') || act.includes('credential') || act.includes('logout') || act.includes('authorized') || act.includes('bypass') || act.includes('recovery');
-                  } else if (auditCategoryFilter === 'payment') {
-                    matchesCategory = act.includes('payment') || act.includes('transaction') || act.includes('verify') || act.includes('bkash') || act.includes('nagad') || act.includes('rocket') || act.includes('withdrawal') || act.includes('revenue') || act.includes('ledger') || act.includes('mfa') || act.includes('bank');
-                  } else if (auditCategoryFilter === 'product') {
-                    matchesCategory = act.includes('product') || act.includes('service') || act.includes('category') || act.includes('pricing') || act.includes('coupon') || act.includes('catalog') || act.includes('domain');
-                  } else if (auditCategoryFilter === 'support') {
-                    matchesCategory = act.includes('ticket') || act.includes('support') || act.includes('reply') || act.includes('kb') || act.includes('chat') || act.includes('dispatched');
-                  } else if (auditCategoryFilter === 'security') {
-                    matchesCategory = act.includes('purge') || act.includes('security') || act.includes('permission') || act.includes('lock') || act.includes('settings') || act.includes('branding');
-                  }
-                }
-                
-                let matchesStaff = true;
-                if (auditSeverityFilter && auditSeverityFilter !== 'all') {
-                  matchesStaff = log.action.toLowerCase().includes(auditSeverityFilter.toLowerCase());
-                }
-                
-                return matchesSearch && matchesCategory && matchesStaff;
-              });
-
-              if (auditSortOrder === 'asc') {
-                filteredAuditLogs = [...filteredAuditLogs].reverse();
-              }
-
-              return (
-                <div className="space-y-6 animate-in fade-in duration-200">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div>
-                      <h3 className={`text-lg font-bold ${textTitle}`}>Real-time Operations & Governance</h3>
-                      <p className="text-xs opacity-60">Audit system telemetry, network signals, and administrative accountability trail records.</p>
-                    </div>
-                    {notifSubTab === 'audit' ? (
-                      <button 
-                        onClick={() => {
-                          if (confirm("Are you sure you want to permanently purge administrative activity logs? This cannot be undone.")) {
-                            setLocalActivityLogs([]);
-                            localStorage.setItem('webzone_activity_logs', JSON.stringify([]));
-                            triggerToast("🔒 Admin operations audit registries purged successfully.");
-                          }
-                        }}
-                        className="px-3 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs rounded border border-red-500/15 font-bold uppercase tracking-wider self-start sm:self-auto cursor-pointer"
-                      >
-                        Purge Audit Trail
-                      </button>
-                    ) : (
-                      <button 
-                        onClick={() => {
-                          if (confirm("Are you sure you want to clear system alarms and manual verification notifications?")) {
-                            setAlerts([]);
-                            localStorage.setItem('admin_webhooks_alerts', JSON.stringify([]));
-                            triggerToast("🔒 System alarms feed purged successfully.");
-                          }
-                        }}
-                        className="px-3 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs rounded border border-red-500/15 font-bold uppercase tracking-wider self-start sm:self-auto cursor-pointer"
-                      >
-                        Purge Alarms Feed
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Sub-tabs Selectors */}
-                  <div className="flex border-b border-neutral-200 dark:border-neutral-800 gap-2">
-                    <button
-                      onClick={() => setNotifSubTab('audit')}
-                      className={`pb-2 px-4 text-xs font-bold transition-all border-b-2 ${
-                        notifSubTab === 'audit' 
-                          ? 'border-indigo-500 text-indigo-500 dark:text-indigo-400' 
-                          : 'border-transparent opacity-60 hover:opacity-100 text-neutral-400'
-                      }`}
-                    >
-                      🛡️ Admin Activity Audit Tracker ({localActivityLogs.length})
-                    </button>
-                    <button
-                      onClick={() => setNotifSubTab('alerts')}
-                      className={`pb-2 px-4 text-xs font-bold transition-all border-b-2 ${
-                        notifSubTab === 'alerts' 
-                          ? 'border-indigo-500 text-indigo-500 dark:text-indigo-400' 
-                          : 'border-transparent opacity-60 hover:opacity-100 text-neutral-400'
-                      }`}
-                    >
-                      📡 System Alarms & Webhooks ({alerts.length})
-                    </button>
-                  </div>
-
-                  {notifSubTab === 'alerts' ? (
-                    <div className="space-y-3">
-                      {alerts.length === 0 ? (
-                        <div className="p-8 text-center bg-neutral-900 rounded-xl border border-neutral-850">
-                          <p className="text-xs text-neutral-400">All payment manual verifications and systems handshakes are cleared.</p>
-                          <p className="text-[10px] text-neutral-500 mt-1">New digital store checkouts will trigger notification triggers instantly.</p>
-                        </div>
-                      ) : (
-                        alerts.map((nt) => (
-                          <div key={nt.id} className="p-4 rounded-xl border bg-neutral-950 border-neutral-850 space-y-2">
-                            <div className="flex items-center justify-between text-xs">
-                              <span className="font-bold text-white flex items-center gap-2">
-                                <span className={`w-1.5 h-1.5 rounded-full ${
-                                  nt.severity === 'success' ? 'bg-emerald-400' : nt.severity === 'warning' ? 'bg-amber-400' : 'bg-purple-400'
-                                }`} />
-                                {nt.title}
-                              </span>
-                              <span className="text-[9.5px] opacity-40 font-mono">{nt.dt}</span>
-                            </div>
-                            <p className="text-[11px] text-neutral-400 leading-relaxed font-sans">{nt.body}</p>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {/* Premium Search and Accountability Filtering Grid */}
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-neutral-950 p-4 rounded-xl border border-neutral-800">
-                        {/* Search Input */}
-                        <div className="space-y-1">
-                          <label className="text-[9px] uppercase font-mono tracking-wider text-neutral-400 font-extrabold block">Keywords Search</label>
-                          <input
-                            type="text"
-                            placeholder="Search action details..."
-                            value={auditSearch}
-                            onChange={(e) => setAuditSearch(e.target.value)}
-                            className="bg-neutral-900 border border-neutral-800 text-xs px-3 py-1.5 rounded-md text-white focus:outline-none focus:border-indigo-500 w-full"
-                          />
-                        </div>
-
-                        {/* Category Select */}
-                        <div className="space-y-1">
-                          <label className="text-[9px] uppercase font-mono tracking-wider text-neutral-400 font-extrabold block">Action Type Pathway</label>
-                          <select
-                            value={auditCategoryFilter}
-                            onChange={(e) => setAuditCategoryFilter(e.target.value)}
-                            className="bg-neutral-950 border border-neutral-800 text-xs px-3 py-1.5 rounded-md text-white outline-none w-full focus:border-indigo-550"
-                          >
-                            <option value="all">All Action Pathways</option>
-                            <option value="auth">🔐 Session & Logins</option>
-                            <option value="payment">💳 Payments & Gateway</option>
-                            <option value="product">📦 Products & Catalog</option>
-                            <option value="support">🎫 Support Center</option>
-                            <option value="security">🛡️ System Security & Config</option>
-                          </select>
-                        </div>
-
-                        {/* Staff / Performed By Select */}
-                        <div className="space-y-1">
-                          <label className="text-[9px] uppercase font-mono tracking-wider text-neutral-400 font-extrabold block">Performed By (Accountability)</label>
-                          <select
-                            value={auditSeverityFilter}
-                            onChange={(e) => setAuditSeverityFilter(e.target.value)}
-                            className="bg-neutral-950 border border-neutral-800 text-xs px-3 py-1.5 rounded-md text-white outline-none w-full focus:border-indigo-550"
-                          >
-                            <option value="all">All Staff Activity</option>
-                            <option value="super admin">Super Admin Manager</option>
-                            {staffList.map((stf) => (
-                              <option key={stf.userId} value={stf.name}>{stf.name} ({stf.role})</option>
-                            ))}
-                          </select>
-                        </div>
-
-                        {/* Chronological Sorting */}
-                        <div className="space-y-1">
-                          <label className="text-[9px] uppercase font-mono tracking-wider text-neutral-400 font-extrabold block">Chronological Flow</label>
-                          <select
-                            value={auditSortOrder}
-                            onChange={(e) => setAuditSortOrder(e.target.value as 'desc' | 'asc')}
-                            className="bg-neutral-950 border border-neutral-800 text-xs px-3 py-1.5 rounded-md text-white outline-none w-full focus:border-indigo-550"
-                          >
-                            <option value="desc">Newest Operations First</option>
-                            <option value="asc">Oldest Handshakes First</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      {/* Trace Summary Label */}
-                      <div className="flex justify-between items-center bg-neutral-950 px-4 py-2.5 rounded-xl border border-neutral-800 text-xs font-mono text-neutral-400">
-                        <span>Filter Metrics Engine:</span>
-                        <span className="text-indigo-400 font-bold">{filteredAuditLogs.length} matching administrative registries found</span>
-                      </div>
-
-                      {filteredAuditLogs.length === 0 ? (
-                        <div className="p-10 text-center bg-neutral-900/40 rounded-xl border border-neutral-800/60 font-sans">
-                          <p className="text-xs text-neutral-400">No matching persistent administrative entries found in memory registries.</p>
-                          <p className="text-[10px] text-neutral-500 mt-1">Actions such as deleting products, approving withdrawals, modifying configurations, or triggering support replies will write logs instantly.</p>
-                        </div>
-                      ) : (
-                        <div className="overflow-x-auto rounded-xl border border-neutral-800">
-                          <table className="w-full text-left border-collapse text-xs">
-                            <thead>
-                              <tr className="bg-neutral-950 text-neutral-400 border-b border-neutral-800 uppercase text-[9.5px] tracking-wider font-mono">
-                                <th className="p-3">Timestamp</th>
-                                <th className="p-3">Administrative Action Logged</th>
-                                <th className="p-3">Security IP Address</th>
-                                <th className="p-3">User Agent Context</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-neutral-850">
-                              {filteredAuditLogs.map((log, idx) => (
-                                <tr key={`${log.id}-${idx}`} className="hover:bg-neutral-800/10 bg-neutral-950/20 transition-colors">
-                                  <td className="p-3 font-mono text-indigo-400 whitespace-nowrap">{log.timestamp}</td>
-                                  <td className="p-4 text-white font-medium max-w-xs sm:max-w-md lg:max-w-lg truncate" title={log.action}>
-                                    {log.action}
-                                  </td>
-                                  <td className="p-3 font-mono text-neutral-400">{log.ipAddress}</td>
-                                  <td className="p-3 font-mono text-neutral-500 truncate max-w-[150px]" title={log.userAgent}>
-                                    {log.userAgent}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
-
-            {/* SCREEN VIEWPORT: CENTRAL WEBSITE ADMIN WEB SETTINGS */}
-            {activeMenu === 'web-settings' && (
-              !checkPermission('manage_users') ? renderAccessDenied('manage_users', 'Central Website Admin Web Settings') : (
-                <div className="space-y-6 animate-in fade-in duration-200">
-                  
-                  {/* Web Settings Premium Header Section */}
-                  <div className="relative rounded-3xl overflow-hidden bg-white dark:bg-[#1E293B] border border-slate-200 dark:border-slate-800/80 shadow-xl p-6 sm:p-8 space-y-6">
-                    <div className="absolute top-0 right-0 w-80 h-32 bg-gradient-to-l from-purple-500/10 to-indigo-500/2 rounded-full blur-3xl pointer-events-none" />
-                    <div className="absolute -bottom-10 -left-10 w-96 h-48 bg-gradient-to-r from-cyan-500/10 to-teal-500/2 rounded-full blur-3xl pointer-events-none" />
-                    
-                    <div className="flex flex-col lg:flex-row items-center lg:items-start gap-6 border-b border-slate-100 dark:border-slate-800/60 pb-6 relative">
-                      <div className="relative group">
-                        <div className="absolute inset-x-0 inset-y-0 rounded-full bg-gradient-to-tr from-purple-600 to-indigo-500 blur-lg opacity-40 transition-all duration-300 pointer-events-none" />
-                        <div className="relative p-1 rounded-full bg-gradient-to-tr from-purple-600 via-indigo-650 to-cyan-400">
-                          <div className="rounded-full bg-white dark:bg-[#1E293B] p-0.5">
-                            <img 
-                              src={webLogoUrl}
-                              alt="Site Logo" 
-                              className="w-20 h-20 rounded-full object-cover border border-slate-100 dark:border-slate-800"
-                            />
-                          </div>
-                        </div>
-                        <span className="absolute bottom-1 right-1 bg-emerald-500 border-2 border-white dark:border-[#1E293B] p-1.5 rounded-full text-white shadow-md flex items-center justify-center">
-                          <Check className="w-3 h-3 text-white font-black" />
-                        </span>
-                      </div>
-
-                      <div className="flex-1 text-center lg:text-left space-y-2.5">
-                        <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-2.5">
-                          <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">{webSiteName}</h2>
-                          <span className="text-[10px] font-mono font-bold bg-purple-500/15 text-purple-600 dark:text-purple-300 px-2 py-0.5 rounded-md tracking-wider uppercase">
-                            Admin Controller
-                          </span>
-                        </div>
-
-                        <p className="text-xs text-slate-505 dark:text-slate-400 max-w-xl">
-                          Central control node for WebzoneBD global website properties. Modify branding parameters, exchange currency sync rates, default security layers, and general layouts instantly.
-                        </p>
-
-                        <div className="flex flex-wrap items-center justify-center lg:justify-start gap-2 pt-1 font-mono text-[9px]">
-                          <span className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2.5 py-1 rounded-lg border border-emerald-500/20 font-bold flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                            Production Engine: Online
-                          </span>
-                          <span className="bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 px-2.5 py-1 rounded-lg border border-indigo-500/20 font-bold">
-                            SSL Handshaking: Active
-                          </span>
-                          <span className="bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2.5 py-1 rounded-lg border border-amber-500/20 font-black">
-                            {webMaintenanceMode ? '⚠️ Maintenance Mode Active' : '🟢 Live Mode'}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Status indicator badge */}
-                      <div className="px-4 py-2 bg-gradient-to-r from-purple-500/10 to-indigo-500/5 border border-purple-500/25 rounded-2xl text-[10px] font-bold text-purple-600 dark:text-purple-400 flex items-center gap-1.5 self-center lg:self-start leading-relaxed uppercase">
-                        <span className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" />
-                        <span>Central Website Settings</span>
-                      </div>
-                    </div>
-
-                    {/* Quick performance settings stats block inside Header */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 pt-2">
-                      <div className="bg-slate-50 dark:bg-slate-900/40 p-3.5 rounded-2xl border border-slate-100 dark:border-slate-800/50 hover:border-purple-500/20 transition-all duration-300">
-                        <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500 uppercase tracking-wider block font-bold">Base Currency</span>
-                        <p className="text-lg font-black text-slate-900 dark:text-white mt-1 font-mono">{webDefaultCurrency}</p>
-                        <span className="text-[8px] text-purple-500 font-bold block mt-0.5">Primary pricing fallback</span>
-                      </div>
-                      <div className="bg-slate-50 dark:bg-slate-900/40 p-3.5 rounded-2xl border border-slate-100 dark:border-slate-800/50 hover:border-purple-500/20 transition-all duration-300">
-                        <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500 uppercase tracking-wider block font-bold">USD Exchange Rate</span>
-                        <p className="text-lg font-black text-indigo-600 dark:text-indigo-400 mt-1 font-mono">{webUsdBdtRate} BDT</p>
-                        <span className="text-[8px] text-slate-400 block mt-0.5">Custom gateway sync rate</span>
-                      </div>
-                      <div className="bg-slate-50 dark:bg-slate-900/40 p-3.5 rounded-2xl border border-slate-100 dark:border-slate-800/50 hover:border-purple-500/20 transition-all duration-300">
-                        <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500 uppercase tracking-wider block font-bold">Affiliate Comm.</span>
-                        <p className="text-lg font-black text-slate-900 dark:text-white mt-1 font-mono">{webCommissionRate}%</p>
-                        <span className="text-[8px] text-emerald-500 font-bold block mt-0.5">Automated payouts baseline</span>
-                      </div>
-                      <div className="bg-slate-50 dark:bg-slate-900/40 p-3.5 rounded-2xl border border-slate-100 dark:border-slate-800/50 hover:border-purple-500/20 transition-all duration-300">
-                        <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500 uppercase tracking-wider block font-bold">Default Display</span>
-                        <p className="text-lg font-black text-amber-500 mt-1 font-mono capitalize">{webDefaultTheme}</p>
-                        <span className="text-[8px] text-slate-400 block mt-0.5">Core site display default</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Horizontal Sub-Tabs Switch Navigation Container */}
-                  <div className="bg-white/80 dark:bg-[#1E293B]/85 backdrop-blur-md border border-slate-200/60 dark:border-slate-850 dark:border-slate-800 rounded-3xl p-2.5 shadow-lg relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-32 h-6 bg-purple-500/10 dark:bg-purple-400/5 rounded-full blur-xl pointer-events-none" />
-                    
-                    <div className="flex items-center gap-1.5 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] py-0.5 p-0.5">
-                      {[
-                        { id: 'identity', label: 'Identity & Contacts', badge: 'SEO', icon: Globe },
-                        { id: 'appearance', label: 'Theme & Displays', badge: 'Active', icon: Image },
-                        { id: 'payments', label: 'Gateway & Rates', badge: 'Sync', icon: DollarSign },
-                        { id: 'security', label: 'Security & Database', badge: 'High', icon: Shield }
-                      ].map((subTab) => {
-                        const Icon = subTab.icon;
-                        const isSubActive = webSettingsSubTab === subTab.id;
-                        return (
-                          <button
-                            key={subTab.id}
-                            onClick={() => {
-                              setWebSettingsSubTab(subTab.id as any);
-                              setActiveSubMenu(`web-${subTab.id}`);
-                            }}
-                            type="button"
-                            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all duration-300 whitespace-nowrap cursor-pointer select-none relative ${
-                              isSubActive
-                                ? 'bg-gradient-to-r from-purple-600 to-indigo-650 text-white shadow-md shadow-purple-600/25 scale-[1.01]'
-                                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800/50'
-                            }`}
-                          >
-                            <Icon className={`w-4 h-4 shrink-0 transition-transform duration-300 ${isSubActive ? 'rotate-3 scale-110' : 'opacity-80'}`} />
-                            <span>{subTab.label}</span>
-                            {subTab.badge && (
-                              <span className={`text-[8px] font-extrabold uppercase px-1.5 py-0.5 rounded-lg tracking-wider font-mono ${
-                                isSubActive ? 'bg-white/20 text-white border border-white/10' : 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20'
-                              }`}>
-                                {subTab.badge}
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Active Tab Panel Card Block */}
-                  <div className="bg-white dark:bg-[#1E293B] border border-slate-200/80 dark:border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl">
-                    <form onSubmit={(e) => { e.preventDefault(); handleSaveWebSettings(); }} className="space-y-6">
-                      <div className="space-y-6 animate-in fade-in duration-300">
-                        {webSettingsSubTab === 'identity' && (
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                            <div className="md:col-span-2 p-3.5 bg-purple-50/50 dark:bg-purple-950/25 rounded-2xl border border-purple-500/10 mb-2">
-                              <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-widest font-mono">Website Identity Setup</span>
-                              <h4 className="text-xs font-bold text-slate-800 dark:text-white mt-1">Branded Title Header & Dynamic SEO Anchors</h4>
-                              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">These control the general tags crawled by Google and indexing algorithms across headers.</p>
-                            </div>
-
-                            <div className="space-y-1">
-                              <label className="text-[10px] uppercase font-mono block mb-1 text-slate-500 dark:text-slate-400">Website Principal Name</label>
-                              <input
-                                type="text"
-                                value={webSiteName}
-                                onChange={(e) => setWebSiteName(e.target.value)}
-                                className="w-full bg-slate-50 dark:bg-neutral-950 border border-slate-200 dark:border-slate-800 text-xs px-3.5 py-2.5 rounded-xl focus:border-purple-500 outline-none text-slate-800 dark:text-white font-sans"
-                                required
-                              />
-                            </div>
-
-                            <div className="space-y-1">
-                              <label className="text-[10px] uppercase font-mono block mb-1 text-slate-500 dark:text-slate-400">SEO Slogan / Tagline</label>
-                              <input
-                                type="text"
-                                value={webSiteTitle}
-                                onChange={(e) => setWebSiteTitle(e.target.value)}
-                                className="w-full bg-slate-50 dark:bg-neutral-950 border border-slate-200 dark:border-slate-805 text-xs px-3.5 py-2.5 rounded-xl focus:border-purple-500 outline-none text-slate-800 dark:text-white font-sans"
-                                required
-                              />
-                            </div>
-
-                            <div className="md:col-span-2 space-y-1">
-                              <label className="text-[10px] uppercase font-mono block mb-1 text-slate-500 dark:text-slate-400">SEO Meta Crawler Description</label>
-                              <textarea
-                                rows={3}
-                                value={webMetaDesc}
-                                onChange={(e) => setWebMetaDesc(e.target.value)}
-                                className="w-full bg-slate-50 dark:bg-neutral-950 border border-slate-200 dark:border-slate-800 text-xs px-3.5 py-2.5 rounded-xl focus:border-purple-500 outline-none text-slate-800 dark:text-white leading-relaxed font-sans"
-                                required
-                              />
-                            </div>
-
-                            <div className="space-y-1">
-                              <label className="text-[10px] uppercase font-mono block mb-1 text-slate-500 dark:text-slate-400">Support System Email</label>
-                              <input
-                                type="email"
-                                value={webSupportEmail}
-                                onChange={(e) => setWebSupportEmail(e.target.value)}
-                                className="w-full bg-slate-50 dark:bg-neutral-950 border border-slate-200 dark:border-slate-800 text-xs px-3.5 py-2.5 rounded-xl focus:border-purple-500 outline-none text-slate-800 dark:text-white font-sans"
-                                required
-                              />
-                            </div>
-
-                            <div className="space-y-1">
-                              <label className="text-[10px] uppercase font-mono block mb-1 text-slate-500 dark:text-slate-400">Contact Office Phone</label>
-                              <input
-                                type="text"
-                                value={webContactPhone}
-                                onChange={(e) => setWebContactPhone(e.target.value)}
-                                className="w-full bg-slate-50 dark:bg-neutral-950 border border-slate-200 dark:border-slate-800 text-xs px-3.5 py-2.5 rounded-xl focus:border-purple-500 outline-none text-slate-800 dark:text-white font-sans"
-                                required
-                              />
-                            </div>
-
-                            <div className="space-y-1">
-                              <label className="text-[10px] uppercase font-mono block mb-1 text-slate-500 dark:text-slate-400">Support WhatsApp (With country code)</label>
-                              <input
-                                type="text"
-                                value={webWhatsappNumber}
-                                onChange={(e) => setWebWhatsappNumber(e.target.value)}
-                                className="w-full bg-slate-50 dark:bg-neutral-950 border border-slate-200 dark:border-slate-800 text-xs px-3.5 py-2.5 rounded-xl focus:border-purple-500 outline-none text-slate-800 dark:text-white font-sans"
-                                required
-                              />
-                            </div>
-
-                            <div className="space-y-1">
-                              <label className="text-[10px] uppercase font-mono block mb-1 text-slate-500 dark:text-slate-400">Google Analytics Tracking ID</label>
-                              <input
-                                type="text"
-                                value={webGoogleAnalyticsId}
-                                onChange={(e) => setWebGoogleAnalyticsId(e.target.value)}
-                                className="w-full bg-slate-50 dark:bg-neutral-950 border border-slate-200 dark:border-slate-800 text-xs px-3.5 py-2.5 rounded-xl focus:border-purple-500 outline-none text-slate-800 dark:text-white font-sans"
-                              />
-                            </div>
-
-                            <div className="space-y-1">
-                              <label className="text-[10px] uppercase font-mono block mb-1 text-slate-500 dark:text-slate-400">Dynamic Logo Image URL</label>
-                              <input
-                                type="text"
-                                value={webLogoUrl}
-                                onChange={(e) => setWebLogoUrl(e.target.value)}
-                                className="w-full bg-slate-50 dark:bg-neutral-950 border border-slate-200 dark:border-slate-805 text-xs px-3.5 py-2.5 rounded-xl focus:border-purple-500 outline-none text-slate-800 dark:text-white font-sans"
-                              />
-                            </div>
-
-                            <div className="space-y-1">
-                              <label className="text-[10px] uppercase font-mono block mb-1 text-slate-500 dark:text-slate-400">Dynamic Browser Favicon URL</label>
-                              <input
-                                type="text"
-                                value={webFaviconUrl}
-                                onChange={(e) => setWebFaviconUrl(e.target.value)}
-                                className="w-full bg-slate-50 dark:bg-neutral-950 border border-slate-200 dark:border-slate-800 text-xs px-3.5 py-2.5 rounded-xl focus:border-purple-500 outline-none text-slate-800 dark:text-white font-sans"
-                              />
-                            </div>
-                          </div>
-                        )}
-
-                        {webSettingsSubTab === 'appearance' && (
-                          <div className="space-y-5">
-                            <div className="p-3.5 bg-indigo-50/50 dark:bg-indigo-950/25 rounded-2xl border border-indigo-500/10">
-                              <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-widest font-mono">Theme & Display Directives</span>
-                              <h4 className="text-xs font-bold text-slate-800 dark:text-white mt-1">Branded default templates configuration layers</h4>
-                              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Control how the client templates render default color presets, broadcast bars, and social share links.</p>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <div className="p-4 bg-slate-50 dark:bg-neutral-950 rounded-2xl border border-slate-200/80 dark:border-slate-800 flex items-center justify-between">
-                                <div className="space-y-0.5">
-                                  <label className="font-bold text-xs text-slate-800 dark:text-white">Under Maintenance Mode</label>
-                                  <p className="text-[10px] text-slate-400">Lock general public checkout modules and display placeholder</p>
-                                </div>
-                                <label className="relative inline-flex items-center cursor-pointer select-none">
-                                  <input 
-                                    type="checkbox" 
-                                    checked={webMaintenanceMode} 
-                                    onChange={(e) => setWebMaintenanceMode(e.target.checked)}
-                                    className="sr-only peer" 
-                                  />
-                                  <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-800 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-slate-600 peer-checked:bg-purple-600" />
-                                </label>
-                              </div>
-
-                              <div className="p-4 bg-slate-50 dark:bg-neutral-950 rounded-2xl border border-slate-200/80 dark:border-slate-800 flex items-center justify-between">
-                                <div className="space-y-0.5">
-                                  <label className="font-bold text-xs text-slate-800 dark:text-white">Enable Social Share Overlays</label>
-                                  <p className="text-[10px] text-slate-400">Render floaters widgets to share digital packages on WhatsApp & FB</p>
-                                </div>
-                                <label className="relative inline-flex items-center cursor-pointer select-none">
-                                  <input 
-                                    type="checkbox" 
-                                    checked={webShowSocialShare} 
-                                    onChange={(e) => setWebShowSocialShare(e.target.checked)}
-                                    className="sr-only peer" 
-                                  />
-                                  <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-800 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-slate-600 peer-checked:bg-purple-600" />
-                                </label>
-                              </div>
-
-                              <div className="space-y-1">
-                                <label className="text-[10px] uppercase font-mono block mb-1 text-slate-500 dark:text-slate-400 font-bold">Standard Theme Overlay</label>
-                                <select
-                                  value={webDefaultTheme}
-                                  onChange={(e) => setWebDefaultTheme(e.target.value)}
-                                  className="w-full p-2.5 rounded-xl bg-slate-50 dark:bg-neutral-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-800 dark:text-white focus:border-purple-500 outline-none font-medium"
-                                >
-                                  <option value="light">Classic Clean Light Presets</option>
-                                  <option value="dark">Cosmic Deep Slate Dark Theme</option>
-                                </select>
-                              </div>
-
-                              <div className="space-y-1">
-                                <label className="text-[10px] uppercase font-mono block mb-1 text-slate-500 dark:text-slate-400 font-bold">Web Announcement Text</label>
-                                <input
-                                  type="text"
-                                  value={webAnnouncementText}
-                                  onChange={(e) => setWebAnnouncementText(e.target.value)}
-                                  className="w-full bg-slate-50 dark:bg-neutral-950 border border-slate-200 dark:border-slate-800 text-xs px-3.5 py-2.5 rounded-xl focus:border-purple-500 outline-none text-slate-800 dark:text-white font-sans"
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        {webSettingsSubTab === 'payments' && (
-                          <div className="space-y-5">
-                            <div className="p-3.5 bg-sky-505/10 bg-sky-500/10 rounded-2xl border border-sky-500/20">
-                              <span className="text-[10px] font-bold text-sky-600 uppercase tracking-widest font-mono">Gateway Sync Rates Ledger</span>
-                              <h4 className="text-xs font-bold text-slate-800 dark:text-white mt-1">Configure Exchange conversion multipliers & baseline keys</h4>
-                              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Define standard pricing baseline conversion variables from Central USD to Local BDT currencies instantly.</p>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                              <div className="space-y-1">
-                                <label className="text-[10px] uppercase font-mono block mb-1 text-slate-500 dark:text-slate-400 font-bold">Baseline Operation Currency</label>
-                                <select
-                                  value={webDefaultCurrency}
-                                  onChange={(e) => setWebDefaultCurrency(e.target.value)}
-                                  className="w-full p-2.5 rounded-xl bg-slate-50 dark:bg-neutral-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-800 dark:text-white focus:border-purple-500 outline-none font-medium"
-                                >
-                                  <option value="USD">USD (United States Dollar)</option>
-                                  <option value="BDT">BDT (Bangladeshi Taka)</option>
-                                  <option value="SAR">SAR (Saudi Arabian Riyal)</option>
-                                </select>
-                              </div>
-
-                              <div className="space-y-2">
-                                <label className="text-[10px] uppercase font-mono block mb-0.5 text-slate-500 dark:text-slate-400 font-bold">USD conversion rate to Local Taka (৳)</label>
-                                <div className="relative">
-                                  <input
-                                    type="number"
-                                    value={webUsdBdtRate}
-                                    onChange={(e) => setWebUsdBdtRate(Number(e.target.value))}
-                                    className="w-full bg-slate-50 dark:bg-neutral-950 border border-slate-200 dark:border-slate-800 text-xs pl-3.5 pr-14 py-2.5 rounded-xl focus:border-sky-500 outline-none text-slate-800 dark:text-white font-mono font-bold"
-                                    min={1}
-                                  />
-                                  <span className="absolute right-3.5 top-2.5 text-[10px] font-mono text-slate-400 uppercase font-black">BDT/৳</span>
-                                </div>
-                              </div>
-
-                              <div className="space-y-1">
-                                <label className="text-[10px] uppercase font-mono block mb-1 text-slate-500 dark:text-slate-400 font-bold">Stripe Payment Gateway Operating Mode</label>
-                                <select
-                                  value={webStripeMode}
-                                  onChange={(e) => setWebStripeMode(e.target.value)}
-                                  className="w-full p-2.5 rounded-xl bg-slate-50 dark:bg-neutral-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-800 dark:text-white focus:border-sky-500 outline-none font-medium"
-                                >
-                                  <option value="sandbox">Sandbox (Testing / No real charges applied)</option>
-                                  <option value="live">Live Merchant Mode (Card processing active)</option>
-                                </select>
-                              </div>
-
-                              <div className="space-y-2">
-                                <label className="text-[10px] uppercase font-mono block mb-0.5 text-slate-500 dark:text-slate-400 font-bold">Affiliate Baseline Share Rate (%)</label>
-                                <div className="relative">
-                                  <input
-                                    type="number"
-                                    value={webCommissionRate}
-                                    onChange={(e) => setWebCommissionRate(Number(e.target.value))}
-                                    className="w-full bg-slate-50 dark:bg-neutral-950 border border-slate-200 dark:border-slate-804 text-xs pl-3.5 pr-14 py-2.5 rounded-xl focus:border-sky-500 outline-none text-slate-800 dark:text-white font-mono font-bold"
-                                    min={0}
-                                    max={100}
-                                  />
-                                  <span className="absolute right-3.5 top-2.5 text-[10px] font-mono text-slate-400 uppercase font-black">PERCENT</span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        {webSettingsSubTab === 'security' && (
-                          <div className="space-y-5">
-                            {/* MySQL Enterprise Database Backup Control (Weekly Auto-Backup) */}
-                            <div className="p-6 bg-white dark:bg-slate-900 rounded-[20px] border border-slate-200/80 dark:border-white/5 shadow-xl space-y-5 relative overflow-hidden">
-                              <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-br from-violet-600/10 via-pink-600/10 to-transparent rounded-full blur-3xl pointer-events-none" />
-                              
-                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                                <div className="flex items-start gap-3">
-                                  <div className="p-3 rounded-2xl bg-gradient-to-br from-violet-600/10 to-pink-600/10 border border-violet-500/10 text-violet-600 dark:text-violet-400">
-                                    <Database className="w-6 h-6 animate-pulse" />
-                                  </div>
-                                  <div>
-                                    <div className="flex items-center gap-2">
-                                      <h4 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-tight">MySQL Database System Backups</h4>
-                                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-                                        Weekly Active
-                                      </span>
-                                    </div>
-                                    <p className="text-[11px] text-slate-400 mt-0.5 font-medium">Automated secure snapshot scheduler. Generates full schema structure & records dump daily/weekly.</p>
-                                  </div>
-                                </div>
-                                
-                                <div className="flex flex-wrap items-center gap-3.5">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDownloadBackup(false)}
-                                    disabled={isBackupGenerating}
-                                    className="px-4 py-3 text-xs font-bold text-slate-700 bg-slate-100 dark:text-slate-300 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition flex items-center gap-1.5 active:scale-95 disabled:opacity-50"
-                                  >
-                                    <Download className="w-4 h-4" />
-                                    Download Weekly Archive (.sql)
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDownloadBackup(true)}
-                                    disabled={isBackupGenerating}
-                                    className="px-4 py-3 text-xs font-bold text-white bg-gradient-to-r from-violet-600 via-purple-600 to-pink-500 hover:opacity-95 rounded-xl transition flex items-center gap-1.5 shadow-[0_4px_14px_rgba(124,58,237,0.2)] hover:scale-[1.02] active:scale-95 disabled:opacity-50"
-                                  >
-                                    {isBackupGenerating ? (
-                                      <>
-                                        <RefreshCw className="w-4 h-4 animate-spin" />
-                                        Generating Live Dump...
-                                      </>
-                                    ) : (
-                                      <>
-                                        <Database className="w-4 h-4" />
-                                        Update & Download MySQL Instantly
-                                      </>
-                                    )}
-                                  </button>
-
-                                  {/* Premium Primary Trigger Button: Download Now */}
-                                  <button
-                                    type="button"
-                                    onClick={handleInstantDownloadBackup}
-                                    disabled={isBackupGenerating}
-                                    className="px-6 h-[54px] text-sm font-semibold text-white bg-gradient-to-r from-[#7C3AED] via-[#A855F7] to-[#EC4899] rounded-[14px] transition-all duration-300 flex items-center gap-2 hover:scale-[1.02] active:scale-95 shadow-[0_12px_30px_rgba(124,58,237,0.35)] disabled:opacity-50 cursor-pointer"
-                                  >
-                                    <Download className="w-4.5 h-4.5" />
-                                    Download Now
-                                  </button>
-                                </div>
-                              </div>
-
-                              {isBackupGenerating && (
-                                <div className="p-5 bg-gradient-to-r from-violet-500/5 via-purple-500/5 to-pink-500/5 dark:from-violet-950/20 dark:via-purple-950/10 dark:to-pink-950/20 border border-violet-500/20 rounded-2xl space-y-3 shadow-inner">
-                                  <div className="flex justify-between items-center">
-                                    <div className="flex items-center gap-2">
-                                      <RefreshCw className="w-4 h-4 text-violet-500 animate-spin" />
-                                      <span className="text-[11px] font-black text-violet-600 dark:text-violet-400 uppercase tracking-widest font-mono">
-                                        LIVE DUMP ENGINE ACTIVE
-                                      </span>
-                                    </div>
-                                    <span className="text-xs font-black font-mono text-violet-600 dark:text-violet-400 bg-violet-500/10 dark:bg-violet-500/20 px-2 py-0.5 rounded-md">
-                                      {backupProgressPercent}%
-                                    </span>
-                                  </div>
-
-                                  {/* Visual Progress Bar Track */}
-                                  <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-3.5 overflow-hidden border border-slate-200/50 dark:border-white/5 relative p-[2px]">
-                                    <div 
-                                      className="h-full rounded-full bg-gradient-to-r from-[#7C3AED] via-[#A855F7] to-[#EC4899] transition-all duration-300 ease-out shadow-[0_0_12px_rgba(124,58,237,0.4)]"
-                                      style={{ width: `${backupProgressPercent}%` }}
-                                    />
-                                  </div>
-
-                                  {/* Dynamic status feedback */}
-                                  <div className="flex justify-between items-center text-[10px] font-mono text-slate-400">
-                                    <span className="flex items-center gap-1">
-                                      <span className="w-2 h-2 rounded-full bg-violet-500 animate-ping inline-block" />
-                                      {backupProgress}
-                                    </span>
-                                    <span>6 database collections target</span>
-                                  </div>
-                                </div>
-                              )}
-
-                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 bg-slate-50 dark:bg-neutral-950 rounded-2xl border border-slate-200/80 dark:border-slate-800">
-                                <div className="space-y-0.5">
-                                  <span className="text-[9px] font-bold text-slate-400 uppercase font-mono tracking-wider">Last Weekly Backup Date</span>
-                                  <p className="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 mt-0.5">
-                                    <Clock className="w-3.5 h-3.5 text-indigo-500" />
-                                    {lastBackupDate}
-                                  </p>
-                                </div>
-                                <div className="space-y-0.5">
-                                  <span className="text-[9px] font-bold text-slate-400 uppercase font-mono tracking-wider">Scheduled Weekly Cadence</span>
-                                  <p className="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 mt-0.5">
-                                    <Sliders className="w-3.5 h-3.5 text-pink-500" />
-                                    Every Sunday at 03:00 AM (BDT)
-                                  </p>
-                                </div>
-                                <div className="space-y-0.5">
-                                  <span className="text-[9px] font-bold text-slate-400 uppercase font-mono tracking-wider">Estimated Backup Size</span>
-                                  <p className="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 mt-0.5">
-                                    <FileText className="w-3.5 h-3.5 text-emerald-500" />
-                                    ~138 KB (Full GZIP Schema Structure)
-                                  </p>
-                                </div>
-                              </div>
-
-                              <div className="space-y-2">
-                                <span className="text-[10px] uppercase font-mono block text-slate-500 dark:text-slate-400 font-bold">SQL Database Backup History (Weekly Logs)</span>
-                                <div className="overflow-x-auto rounded-xl border border-slate-100 dark:border-slate-800">
-                                  <table className="w-full text-left border-collapse">
-                                    <thead>
-                                      <tr className="bg-slate-50 dark:bg-neutral-950 text-[10px] font-bold text-slate-400 uppercase font-mono tracking-wider border-b border-slate-100 dark:border-slate-800">
-                                        <th className="p-2.5">Date & Time</th>
-                                        <th className="p-2.5">Backup Type</th>
-                                        <th className="p-2.5">File Size</th>
-                                        <th className="p-2.5">Status</th>
-                                        <th className="p-2.5 text-right">Actions</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-[11px] text-slate-600 dark:text-slate-300 font-mono">
-                                      {backupHistory.map((b: any, idx: number) => (
-                                        <tr key={`${b.id}-${idx}`} className="hover:bg-slate-50/50 dark:hover:bg-neutral-900/30">
-                                          <td className="p-2.5 text-slate-700 dark:text-slate-200 font-bold">{b.date}</td>
-                                          <td className="p-2.5">
-                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${b.type.includes('Live') ? 'bg-amber-500/10 text-amber-500' : 'bg-violet-500/10 text-violet-500'}`}>
-                                              {b.type}
-                                            </span>
-                                          </td>
-                                          <td className="p-2.5">{b.size}</td>
-                                          <td className="p-2.5">
-                                            <span className="inline-flex items-center gap-1 text-[10px] text-emerald-500 font-bold">
-                                              <CheckCircle2 className="w-3 h-3" />
-                                              Ready
-                                            </span>
-                                          </td>
-                                          <td className="p-2.5 text-right">
-                                            <button
-                                              type="button"
-                                              onClick={() => {
-                                                const sqlContent = generateMySQLBackupDump(b.type.includes('Live'));
-                                                const filename = b.type.includes('Live') ? `webzonebd_live_backup_${b.date.replace(/[^a-zA-Z0-9]/g, '_')}.sql` : `webzonebd_weekly_backup_${b.date.replace(/[^a-zA-Z0-9]/g, '_')}.sql`;
-                                                triggerSQLDownload(filename, sqlContent);
-                                                triggerToast(`📥 Re-downloaded backup archive for ${b.date}!`);
-                                              }}
-                                              className="p-1 text-slate-400 hover:text-violet-600 transition"
-                                              title="Download this backup file"
-                                            >
-                                              <Download className="w-3.5 h-3.5" />
-                                            </button>
-                                          </td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="p-3.5 bg-rose-500/10 rounded-2xl border border-rose-500/20">
-                              <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase tracking-widest font-mono">Central Security Policies</span>
-                              <h4 className="text-xs font-bold text-slate-800 dark:text-white mt-1">Authorization constraints & telemetry logs depth</h4>
-                              <p className="text-[11px] text-slate-505 dark:text-slate-400 mt-0.5">Tighten customer security parameters, enable dual token handshakes, and manage system caches.</p>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <div className="p-4 bg-slate-50 dark:bg-neutral-950 rounded-2xl border border-slate-200/80 dark:border-slate-800 flex items-center justify-between">
-                                <div className="space-y-0.5">
-                                  <label className="font-bold text-xs text-slate-800 dark:text-white">Require Email OTP on logins</label>
-                                  <p className="text-[10px] text-slate-400">Request users verification standard tokens before workspace entry</p>
-                                </div>
-                                <label className="relative inline-flex items-center cursor-pointer select-none">
-                                  <input 
-                                    type="checkbox" 
-                                    checked={webRequireEmailOtp} 
-                                    onChange={(e) => setWebRequireEmailOtp(e.target.checked)}
-                                    className="sr-only peer" 
-                                  />
-                                  <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-800 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-slate-600 peer-checked:bg-rose-500" />
-                                </label>
-                              </div>
-
-                              <div className="p-4 bg-slate-50 dark:bg-neutral-950 rounded-2xl border border-slate-200/80 dark:border-slate-800 flex items-center justify-between">
-                                <div className="space-y-0.5">
-                                  <label className="font-bold text-xs text-slate-800 dark:text-white">Auto Response Support Tickets</label>
-                                  <p className="text-[10px] text-slate-400">Instantly generate ticket acknowledge receipt via backend</p>
-                                </div>
-                                <label className="relative inline-flex items-center cursor-pointer select-none">
-                                  <input 
-                                    type="checkbox" 
-                                    checked={webAutoApproveTickets} 
-                                    onChange={(e) => setWebAutoApproveTickets(e.target.checked)}
-                                    className="sr-only peer" 
-                                  />
-                                  <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-800 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-slate-600 peer-checked:bg-rose-500" />
-                                </label>
-                              </div>
-
-                              <div className="space-y-1">
-                                <label className="text-[10px] uppercase font-mono block mb-1 text-slate-500 dark:text-slate-400 font-bold">Session Expiry Lockout (Minutes)</label>
-                                <input
-                                  type="number"
-                                  value={webSessionTimeout}
-                                  onChange={(e) => setWebSessionTimeout(Number(e.target.value))}
-                                  className="w-full bg-slate-50 dark:bg-neutral-950 border border-slate-200 dark:border-slate-800 text-xs px-3.5 py-2.5 rounded-xl focus:border-rose-500 outline-none text-slate-800 dark:text-white font-mono"
-                                  min={5}
-                                />
-                              </div>
-
-                              <div className="space-y-1">
-                                <label className="text-[10px] uppercase font-mono block mb-1 text-slate-500 dark:text-slate-400 font-bold">Log Admin Audit Deepness</label>
-                                <select
-                                  value={webLoggingDepth}
-                                  onChange={(e) => setWebLoggingDepth(e.target.value)}
-                                  className="w-full p-2.5 rounded-xl bg-slate-50 dark:bg-neutral-950 border border-slate-200 dark:border-slate-805 text-xs text-slate-805 text-slate-800 dark:text-white focus:border-rose-500 outline-none font-medium"
-                                >
-                                  <option value="minimal">Minimal (Major actions only)</option>
-                                  <option value="comprehensive">Comprehensive (General events logged)</option>
-                                  <option value="paranoid">Paranoid Debug (Telemetry + User-agents logged)</option>
-                                </select>
-                              </div>
-                            </div>
-
-                            <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex flex-wrap gap-3">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  triggerToast("♻️ Re-optimizing system tables... Complete database indexes rebuild successfully!");
-                                }}
-                                className="px-4 py-2 text-xs font-bold text-slate-700 bg-slate-100 dark:text-slate-300 dark:bg-slate-800 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition"
-                              >
-                                Rebuild SQL Indexes ⚡
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  triggerToast("🧹 Cleared production layouts cache! Reloaded dynamic stylesheet successfully!");
-                                }}
-                                className="px-4 py-2 text-xs font-bold text-rose-600 bg-rose-500/10 rounded-xl hover:bg-rose-500/20 transition"
-                              >
-                                Flush System Cache 🧹
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Sticky Form Commit Actions Bar */}
-                      <div className="pt-6 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                        <span className="text-[10px] font-mono text-slate-400">Settings pending commitments...</span>
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setWebSiteName(systemConfig.siteName);
-                              setWebSiteTitle(systemConfig.siteTitle);
-                              setWebMetaDesc(systemConfig.metaDesc);
-                              setWebSupportEmail(systemConfig.supportEmail);
-                              setWebContactPhone(systemConfig.bangladeshContact);
-                              setWebWhatsappNumber(systemConfig.whatsappNumber);
-                              setWebGoogleAnalyticsId(systemConfig.googleAnalyticsId);
-                              setWebAutoApproveTickets(systemConfig.autoApproveTickets);
-                              triggerToast("🔄 Form states reset back to last saved values!");
-                            }}
-                            className="px-4 py-2.5 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900/50 transition duration-150"
-                          >
-                            Reset Form
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleSaveWebSettings()}
-                            className="px-6 py-2.5 text-xs font-black rounded-xl bg-gradient-to-r from-purple-650 to-indigo-650 bg-purple-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-lg shadow-purple-500/20 hover:shadow-xl hover:shadow-purple-500/30 active:scale-98 cursor-pointer transition duration-200"
-                          >
-                            Save Website Settings 💾
-                          </button>
-                        </div>
-                      </div>
-                    </form>
-                  </div>
-                </div>
-              )
+            {/* SCREEN VIEWPORT: MARKETING & PROMOTION HUB */}
+            {activeMenu === 'marketing' && (
+              <AdminMarketingHub
+                isDark={isDark}
+                language={language}
+                triggerToast={triggerToast}
+                activeSubMenu={activeSubMenu}
+              />
             )}
 
-            {/* SCREEN VIEWPORT M: CORE SETTINGS (BKASH API & STRIPE MERCH CONFIG) */}
-            {activeMenu === 'settings' && (
-              !checkPermission('manage_users') ? renderAccessDenied('manage_users', 'System Settings & API Gateways') : (
-                <div className="space-y-6 animate-in fade-in duration-350 select-none">
-                  
-                  {/* Top settings secondary horizontal navigation tabs */}
-                  <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-xl bg-neutral-900/60 border border-white/[0.05] max-w-fit font-mono text-[10px]">
-                    <button
-                      type="button"
-                      onClick={() => activeSubMenu !== 'set-general' && setActiveSubMenu('set-general')}
-                      className={`px-3 py-1.5 rounded-lg transition-all duration-200 uppercase tracking-wider ${
-                        activeSubMenu === 'set-general' || !activeSubMenu
-                          ? 'bg-purple-600 text-white font-black'
-                          : 'text-neutral-400 hover:text-white hover:bg-white/[0.04]'
-                      }`}
-                    >
-                      🌐 General SEO
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setActiveSubMenu('set-payment')}
-                      className={`px-3 py-1.5 rounded-lg transition-all duration-200 uppercase tracking-wider ${
-                        activeSubMenu === 'set-payment'
-                          ? 'bg-purple-600 text-white font-black'
-                          : 'text-neutral-400 hover:text-white hover:bg-white/[0.04]'
-                      }`}
-                    >
-                      💳 Payment Settings & Gateways
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setActiveSubMenu('set-email')}
-                      className={`px-3 py-1.5 rounded-lg transition-all duration-200 uppercase tracking-wider ${
-                        activeSubMenu === 'set-email' ? 'bg-purple-600 text-white' : 'text-neutral-400 hover:text-white'
-                      }`}
-                      disabled
-                    >
-                      ✉️ Email Settings (Locked)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setActiveSubMenu('set-api')}
-                      className={`px-3 py-1.5 rounded-lg transition-all duration-200 uppercase tracking-wider ${
-                        activeSubMenu === 'set-api' ? 'bg-purple-600 text-white' : 'text-neutral-400 hover:text-white'
-                      }`}
-                      disabled
-                    >
-                      🔒 API Handshakes (Locked)
-                    </button>
-                  </div>
-
-                  {/* SUB-VIEW 1: GENERAL WEBSITE BRANDING & SEO */}
-                  {(activeSubMenu === 'set-general' || !activeSubMenu) && (
-                    <div className="space-y-6">
-                      <div className="p-4 rounded-xl border bg-purple-650/10 border-purple-500/30 font-sans">
-                        <h3 className="font-bold text-sm text-white mb-1">WebzoneBD general configuration matrices</h3>
-                        <p className="text-[11px] text-neutral-300">Set SEO meta indexing tags, agency slogans, and trace global crawling tokens.</p>
-                      </div>
-
-                      <div className={`p-6 rounded-2xl border ${panelBg} shadow-sm space-y-4 max-w-xl text-left`}>
-                        <div className="grid grid-cols-1 gap-4">
-                          <div>
-                            <label className="text-[10px] uppercase font-mono block mb-1 text-neutral-400">Site SEO Branding Title</label>
-                            <input
-                              type="text"
-                              value={siteSetTitle}
-                              onChange={(e) => setSiteSetTitle(e.target.value)}
-                              className="w-full bg-neutral-950 border border-neutral-800 text-xs px-3 py-2 rounded focus:border-purple-500 outline-none text-white font-sans"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="text-[10px] uppercase font-mono block mb-1 text-neutral-400">Agency SEO Slogan</label>
-                            <input
-                              type="text"
-                              value={siteSetSlogan}
-                              onChange={(e) => setSiteSetSlogan(e.target.value)}
-                              className="w-full bg-neutral-950 border border-neutral-800 text-xs px-3 py-2 rounded focus:border-purple-500 outline-none text-white font-sans"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="text-[10px] uppercase font-mono block mb-1 text-neutral-400">Global Site Meta Description (Crawl Optimization)</label>
-                            <textarea
-                              rows={2}
-                              value={siteSetMetaDesc}
-                              onChange={(e) => setSiteSetMetaDesc(e.target.value)}
-                              className="w-full bg-neutral-950 border border-neutral-800 text-xs px-3 py-2 rounded focus:border-purple-500 outline-none text-white leading-relaxed font-sans"
-                            />
-                          </div>
-
-                          <div className="p-4 rounded bg-neutral-950 border border-neutral-900 space-y-3">
-                            <span className="text-[10px] uppercase font-mono tracking-widest text-purple-400 font-bold block">Secure Gateway Key Matrix (WHMCS Sync)</span>
-                            
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                              <div>
-                                <label className="text-[9px] uppercase font-mono opacity-60 block mb-0.5 text-neutral-400">SSL Hostinger proxy webhook</label>
-                                <input
-                                  type="text"
-                                  value="https://webzonebd.com/whmcs-sso?whmcs_action=callback"
-                                  disabled
-                                  className="w-full bg-neutral-900 border border-neutral-800 text-[10px] px-2 py-1.5 rounded text-neutral-500 font-mono"
-                                />
-                              </div>
-                              <div>
-                                <label className="text-[9px] uppercase font-mono opacity-60 block mb-0.5 text-neutral-400">Nagad Live secret key token</label>
-                                <input
-                                  type="password"
-                                  value="AIzaSyA88998y11_MockSignaturenagad"
-                                  disabled
-                                  className="w-full bg-neutral-900 border border-neutral-800 text-[10px] px-2 py-1.5 rounded text-neutral-500 font-mono"
-                                />
-                              </div>
-                            </div>
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={handleSaveGeneralConfigSettings}
-                            className="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-750 text-white font-black text-xs transition-all flex items-center justify-center gap-1 cursor-pointer"
-                          >
-                            <Save className="w-4 h-4" /> Save Security Platform configurations
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* SUB-VIEW 2: PAYMENT SETTINGS & EXPANDED DYNAMIC GATEWAYS DASHBOARD */}
-                  {activeSubMenu === 'set-payment' && (() => {
-                    // Compute Real Stats from orders prop
-                    const totalTransactions = orders.length;
-                    const todayStr = '2026-06-23'; // Target standard local date placeholder
-                    const todayPayments = orders.filter(o => o.date === todayStr || o.date.includes(todayStr)).length;
-                    const pendingPayments = orders.filter(o => o.paymentStatus === 'pending').length;
-                    const successfulPayments = orders.filter(o => o.paymentStatus === 'completed').length;
-                    const failedPayments = orders.filter(o => o.paymentStatus === 'failed' || o.paymentStatus === 'refunded').length;
-                    
-                    // Compute Total Revenue in USD
-                    const totalRevenueUsd = orders
-                      .filter(o => o.paymentStatus === 'completed')
-                      .reduce((sum, o) => sum + (o.price || 0), 0);
-
-                    // Convert and resolve display currency values based on local setting currency state
-                    const rateBDT = currencyRates.BDT || 118.5;
-                    const rateSAR = currencyRates.SAR || 3.75;
-
-                    return (
-                      <div className="space-y-6 text-left">
-                        
-                        {/* Sub Menu Ribbon Interface for Payment Subcategories */}
-                        <div className="flex flex-wrap gap-2 border-b border-white/[0.05] pb-2 font-sans">
-                          {[
-                            { id: 'overview', label: '📊 Dashboard & Rate', icon: DollarSign },
-                            { id: 'bd', label: '🇧🇩 Bangladesh Methods', icon: Smartphone },
-                            { id: 'sa', label: '🇸🇦 Saudi Arabia Methods', icon: Globe },
-                            { id: 'intl', label: '🌐 International Gateways', icon: Database },
-                            { id: 'verification', label: `🛡️ Verification Hub (${pendingPayments})`, icon: ShieldCheck },
-                            { id: 'history', label: '📜 Transaction Ledgers', icon: FileText }
-                          ].map(tb => {
-                            const Icon = tb.icon;
-                            return (
-                              <button
-                                key={tb.id}
-                                type="button"
-                                onClick={() => setSetPaymentSubTab(tb.id as any)}
-                                className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg transition-all duration-200 ${
-                                  setPaymentSubTab === tb.id
-                                    ? 'bg-purple-600/20 border border-purple-500 text-purple-400 font-extrabold shadow shadow-purple-500/10'
-                                    : 'text-neutral-400 hover:text-white hover:bg-white/[0.02] border border-transparent'
-                                }`}
-                              >
-                                <Icon className="w-3.5 h-3.5" />
-                                {tb.label}
-                              </button>
-                            );
-                          })}
-                        </div>
-
-                        {/* TAB A: OVERVIEW & GENERAL CURRENCY CONFIGURATIONS */}
-                        {setPaymentSubTab === 'overview' && (
-                          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in duration-200">
-                            
-                            {/* LEFT STATS COLUMN */}
-                            <div className="lg:col-span-2 space-y-6">
-                              <h3 className="font-bold text-sm tracking-tight text-white uppercase font-mono text-purple-400">
-                                Real-Time Gateway Performance Matrix
-                              </h3>
-                              
-                              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                                <div className={`p-4 rounded-2xl border ${panelBg} flex flex-col justify-between h-28 hover:scale-[1.02] transition-transform`}>
-                                  <span className="text-[10px] text-neutral-400 font-mono uppercase tracking-wider block">Total Transactions</span>
-                                  <div>
-                                    <span className="text-2xl font-black text-white font-mono">{totalTransactions}</span>
-                                    <p className="text-[9px] text-emerald-400 mt-1">Live active ledger items</p>
-                                  </div>
-                                </div>
-
-                                <div className={`p-4 rounded-2xl border ${panelBg} flex flex-col justify-between h-28 hover:scale-[1.02] transition-transform`}>
-                                  <span className="text-[10px] text-neutral-400 font-mono uppercase tracking-wider block">Today's Txns</span>
-                                  <div>
-                                    <span className="text-2xl font-black text-purple-400 font-mono">{todayPayments}</span>
-                                    <p className="text-[9px] text-neutral-400 mt-1">Date: {todayStr}</p>
-                                  </div>
-                                </div>
-
-                                <div className={`p-4 rounded-2xl border ${panelBg} flex flex-col justify-between h-28 hover:scale-[1.02] transition-transform`}>
-                                  <span className="text-[10px] text-neutral-400 font-mono uppercase tracking-wider block">Completed</span>
-                                  <div>
-                                    <span className="text-2xl font-black text-emerald-400 font-mono">{successfulPayments}</span>
-                                    <p className="text-[9px] text-emerald-400">Approved checkouts</p>
-                                  </div>
-                                </div>
-
-                                <div className={`p-4 rounded-2xl border ${panelBg} flex flex-col justify-between h-28 hover:scale-[1.02] transition-transform`}>
-                                  <span className="text-[10px] text-neutral-400 font-mono uppercase tracking-wider block">Pending Actions</span>
-                                  <div>
-                                    <span className="text-2xl font-black text-amber-500 font-mono">{pendingPayments}</span>
-                                    <p className="text-[9px] text-amber-400">Awaiting verification</p>
-                                  </div>
-                                </div>
-
-                                <div className={`p-4 rounded-2xl border ${panelBg} flex flex-col justify-between h-28 hover:scale-[1.02] transition-transform`}>
-                                  <span className="text-[10px] text-neutral-400 font-mono uppercase tracking-wider block">Failed / Denied</span>
-                                  <div>
-                                    <span className="text-2xl font-black text-rose-500 font-mono">{failedPayments}</span>
-                                    <p className="text-[9px] text-rose-400">Rejected checkout links</p>
-                                  </div>
-                                </div>
-
-                                <div className={`p-4 rounded-2xl border ${panelBg} flex flex-col justify-between h-28 hover:scale-[1.02] transition-transform bg-gradient-to-br from-purple-950/20 to-purple-850/5`}>
-                                  <span className="text-[10px] text-purple-400 font-mono uppercase tracking-wider block font-bold">Total Approved Revenue</span>
-                                  <div>
-                                    <span className="text-xl font-black text-white font-mono">
-                                      ${totalRevenueUsd.toLocaleString()}
-                                    </span>
-                                    <div className="text-[9px] text-purple-300 mt-1">
-                                      ৳{(totalRevenueUsd * rateBDT).toLocaleString(undefined, {maximumFractionDigits: 0})} BDT / 
-                                      ر.س{(totalRevenueUsd * rateSAR).toLocaleString(undefined, {maximumFractionDigits: 0})} SAR
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* INLINE ADD CUSTOM METHOD FORM */}
-                              <div className={`p-6 rounded-2xl border ${panelBg} space-y-4`}>
-                                <div className="border-b border-white/[0.05] pb-2">
-                                  <h4 className="font-bold text-xs uppercase font-mono tracking-wider text-purple-400 flex items-center gap-1.5">
-                                    <Plus className="w-4 h-4 text-purple-500" />
-                                    Add New Custom Payment Method
-                                  </h4>
-                                  <p className="text-[10px] text-neutral-400 mt-0.5">Define custom local gateways, micro-wallets or special regional bank targets instantly.</p>
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-sans">
-                                  <div>
-                                    <label className="text-[9px] uppercase font-mono block mb-1 text-neutral-400">Payment Gateway Name</label>
-                                    <input
-                                      type="text"
-                                      placeholder="e.g. Upay, bKash Personal, Alinma Bank"
-                                      value={newMethodName}
-                                      onChange={(e) => setNewMethodName(e.target.value)}
-                                      className="w-full bg-neutral-950 border border-neutral-800 text-xs px-3 py-2 rounded focus:border-purple-500 text-white outline-none"
-                                    />
-                                  </div>
-
-                                  <div>
-                                    <label className="text-[9px] uppercase font-mono block mb-1 text-neutral-400">Operated Country</label>
-                                    <select
-                                      value={newMethodCountry}
-                                      onChange={(e) => setNewMethodCountry(e.target.value)}
-                                      className="w-full bg-neutral-950 border border-neutral-800 text-xs px-3 py-2 rounded focus:border-purple-500 text-white outline-none font-sans"
-                                    >
-                                      <option value="Bangladesh">Bangladesh 🇧🇩</option>
-                                      <option value="Saudi Arabia">Saudi Arabia 🇸🇦</option>
-                                      <option value="International">International 🌐</option>
-                                    </select>
-                                  </div>
-
-                                  <div>
-                                    <label className="text-[9px] uppercase font-mono block mb-1 text-neutral-400">Gateway Structure Class</label>
-                                    <select
-                                      value={newMethodType}
-                                      onChange={(e) => setNewMethodType(e.target.value)}
-                                      className="w-full bg-neutral-950 border border-neutral-800 text-xs px-3 py-2 rounded focus:border-purple-500 text-white outline-none font-sans"
-                                    >
-                                      <option value="Mobile Money">Mobile Money API</option>
-                                      <option value="E-Wallet">Electronic Wallet</option>
-                                      <option value="Bank Transfer">Bank Wire Transfer</option>
-                                      <option value="Direct Checkout">Direct Card checkout</option>
-                                    </select>
-                                  </div>
-
-                                  <div>
-                                    <label className="text-[9px] uppercase font-mono block mb-1 text-neutral-400">Logo Icon Path (Icon Path)</label>
-                                    <input
-                                      type="text"
-                                      placeholder="e.g. https://domain.com/logo.png"
-                                      value={newMethodLogo}
-                                      onChange={(e) => setNewMethodLogo(e.target.value)}
-                                      className="w-full bg-neutral-950 border border-neutral-800 text-xs px-3 py-2 rounded focus:border-purple-500 text-white outline-none"
-                                    />
-                                  </div>
-
-                                  <div className="md:col-span-2">
-                                    <label className="text-[9px] uppercase font-mono block mb-1 text-neutral-400 font-bold text-neutral-300">QR Code Image Link</label>
-                                    <input
-                                      type="text"
-                                      placeholder="https://images.unsplash.com/... or leave blank for auto"
-                                      value={newMethodQr}
-                                      onChange={(e) => setNewMethodQr(e.target.value)}
-                                      className="w-full bg-neutral-950 border border-neutral-800 text-xs px-3 py-2 rounded focus:border-purple-500 text-white outline-none"
-                                    />
-                                  </div>
-
-                                  <div className="md:col-span-2">
-                                    <label className="text-[9px] uppercase font-mono block mb-1 text-neutral-400">Step-by-step Client Deposit Instructions</label>
-                                    <textarea
-                                      rows={2}
-                                      placeholder="Include transfer limits, targets, references keywords etc."
-                                      value={newMethodInstructions}
-                                      onChange={(e) => setNewMethodInstructions(e.target.value)}
-                                      className="w-full bg-neutral-950 border border-neutral-800 text-xs px-3 py-2 rounded focus:border-purple-500 text-white outline-none leading-relaxed"
-                                    />
-                                  </div>
-                                </div>
-
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    if (!newMethodName || !newMethodInstructions) {
-                                      triggerToast("Please input custom gateway title and user instructions! ⚠️");
-                                      return;
-                                    }
-                                    const created = {
-                                      id: `custom-gate-${Date.now()}`,
-                                      name: newMethodName,
-                                      country: newMethodCountry,
-                                      type: newMethodType,
-                                      logo: newMethodLogo || 'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?auto=format&fit=crop&q=80&w=60',
-                                      qrCode: newMethodQr || 'https://images.unsplash.com/photo-1595079676339-1534801ad6cf?auto=format&fit=crop&q=80&w=300',
-                                      instructions: newMethodInstructions,
-                                      enabled: true,
-                                      createdAt: new Date().toLocaleDateString()
-                                    };
-                                    setCustomMethods([...customMethods, created]);
-                                    triggerToast(`Custom gateway "${newMethodName}" registered successfully! 🚀`);
-                                    // Reset fields
-                                    setNewMethodName('');
-                                    setNewMethodInstructions('');
-                                    setNewMethodLogo('');
-                                    setNewMethodQr('');
-                                    // Switch to target view
-                                    if (newMethodCountry === 'Bangladesh') setSetPaymentSubTab('bd');
-                                    else if (newMethodCountry === 'Saudi Arabia') setSetPaymentSubTab('sa');
-                                    else setSetPaymentSubTab('intl');
-                                  }}
-                                  className="w-full py-2 bg-gradient-to-r from-purple-650 to-indigo-650 bg-purple-600 hover:from-purple-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1 cursor-pointer transition-all duration-200"
-                                >
-                                  <Plus className="w-3.5 h-3.5" /> Save and Register Gateway Method
-                                </button>
-                              </div>
-
-                            </div>
-
-                            {/* RIGHT DUAL COLUMN: CURRENCY & NOTIFICATIONS CONFIGURATORS */}
-                            <div className="space-y-6">
-                              
-                              {/* 1. CURRENCY EXCHANGE CALCULATOR */}
-                              <div className={`p-5 rounded-2xl border ${panelBg} space-y-4`}>
-                                <div className="border-b border-white/[0.05] pb-2 flex items-center justify-between">
-                                  <h4 className="font-bold text-xs uppercase font-mono tracking-wider text-purple-400">
-                                    Currency & Exchange Matrices
-                                  </h4>
-                                  <Globe className="w-4 h-4 text-purple-500" />
-                                </div>
-
-                                <div className="space-y-4 text-xs font-sans">
-                                  <div>
-                                    <label className="text-[9px] uppercase font-mono block mb-1 text-neutral-400">Base Currency Index (Anchor)</label>
-                                    <div className="px-3 py-2 rounded bg-neutral-950/60 border border-neutral-900 text-stone-300 font-bold flex justify-between items-center">
-                                      <span>USD - United States Dollar</span>
-                                      <span className="font-mono text-[10px] text-green-400 bg-green-950/40 px-2 py-0.5 rounded font-black">1.00 USD</span>
-                                    </div>
-                                  </div>
-
-                                  <div>
-                                    <label className="text-[9px] uppercase font-mono block mb-1 text-neutral-400">BDT Exchange rate (Per $1 USD)</label>
-                                    <div className="relative">
-                                      <input
-                                        type="number"
-                                        step="0.01"
-                                        value={currencyRates.BDT}
-                                        onChange={(e) => setCurrencyRates({...currencyRates, BDT: parseFloat(e.target.value) || 1 })}
-                                        className="w-full bg-neutral-950 border border-neutral-800 px-3 py-2 rounded focus:border-purple-500 text-white outline-none pl-10 font-mono"
-                                      />
-                                      <span className="absolute left-3 top-2 text-neutral-500 font-bold">BDT</span>
-                                    </div>
-                                  </div>
-
-                                  <div>
-                                    <label className="text-[9px] uppercase font-mono block mb-1 text-neutral-400">SAR Exchange rate (Per $1 USD)</label>
-                                    <div className="relative">
-                                      <input
-                                        type="number"
-                                        step="0.01"
-                                        value={currencyRates.SAR}
-                                        onChange={(e) => setCurrencyRates({...currencyRates, SAR: parseFloat(e.target.value) || 1 })}
-                                        className="w-full bg-neutral-950 border border-neutral-800 px-3 py-2 rounded focus:border-purple-500 text-white outline-none pl-10 font-mono"
-                                      />
-                                      <span className="absolute left-3 top-2 text-neutral-500 font-bold">SAR</span>
-                                    </div>
-                                  </div>
-
-                                  <div className="p-3 bg-purple-950/15 rounded border border-purple-900/30 text-[10px] leading-relaxed text-neutral-300">
-                                    💡 <strong>Pricing Resolution Engine:</strong> Order prices defined in USD will be computed automatically into BDT or SAR on checkout frames using these live values.
-                                  </div>
-
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      localStorage.setItem('webzone_currency_rates', JSON.stringify(currencyRates));
-                                      triggerToast("Global currency exchange guidelines modified successfully! ৳💵");
-                                    }}
-                                    className="w-full py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-850 border border-white/[0.08] hover:border-white/[0.15] text-[10px] uppercase font-mono text-white transition duration-200 cursor-pointer"
-                                  >
-                                    Confirm Rate Modifications
-                                  </button>
-                                </div>
-                              </div>
-
-                              {/* 2. TRANSACTION NOTIFICATION ROUTERS */}
-                              <div className={`p-5 rounded-2xl border ${panelBg} space-y-4`}>
-                                <div className="border-b border-white/[0.05] pb-2 flex items-center justify-between">
-                                  <h4 className="font-bold text-xs uppercase font-mono tracking-wider text-purple-400">
-                                    Payment Notification Dispatches
-                                  </h4>
-                                  <Bell className="w-4 h-4 text-purple-500 animate-pulse" />
-                                </div>
-
-                                <div className="space-y-4 text-xs font-sans text-left">
-                                  {[
-                                    { key: 'email', label: 'Email Alerts Dispatcher', desc: 'Secure invoices as PDFs', color: 'bg-indigo-500' },
-                                    { key: 'sms', label: 'Mobile SMS Gateway API', desc: 'Send direct cellular codes', color: 'bg-green-500' },
-                                    { key: 'whatsapp', label: 'WhatsApp Sandbox Trigger', desc: 'Alert immediate client handles', color: 'bg-emerald-500' },
-                                    { key: 'telegram', label: 'Telegram Channel Webhooks', desc: 'Transmit terminal audit logs', color: 'bg-cyan-500' }
-                                  ].map(notif => (
-                                    <div key={notif.key} className="flex justify-between items-start gap-4 p-2 rounded hover:bg-white/[0.02] transition-colors">
-                                      <div>
-                                        <span className="font-bold text-stone-200 block text-[11px]">{notif.label}</span>
-                                        <span className="text-[9px] text-neutral-400 block">{notif.desc}</span>
-                                      </div>
-                                      <label className="relative inline-flex items-center cursor-pointer select-none">
-                                        <input
-                                          type="checkbox"
-                                          checked={(paymentNotifs as any)[notif.key]}
-                                          onChange={(e) => setPaymentNotifs({...paymentNotifs, [notif.key]: e.target.checked})}
-                                          className="sr-only peer"
-                                        />
-                                        <div className="w-8 h-4 bg-neutral-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-neutral-400 after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3.5 after:transition-all peer-checked:bg-purple-600 peer-checked:after:bg-white"></div>
-                                      </label>
-                                    </div>
-                                  ))}
-
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      localStorage.setItem('webzone_payment_notifs', JSON.stringify(paymentNotifs));
-                                      triggerToast("Notification routers configured cleanly! 🔔");
-                                    }}
-                                    className="w-full py-1.5 rounded-lg bg-neutral-900 border border-white/[0.08] text-[10px] uppercase font-mono text-white text-center block cursor-pointer hover:bg-neutral-850"
-                                  >
-                                    Update Dispatch Channels
-                                  </button>
-                                </div>
-                              </div>
-
-                            </div>
-                          </div>
-                        )}
-
-                        {/* TAB B: BANGLADESH PAYMENT METHODS */}
-                        {setPaymentSubTab === 'bd' && (
-                          <div className="space-y-6 animate-in fade-in duration-200">
-                            <h3 className="font-bold text-sm tracking-tight text-white uppercase font-mono text-purple-400">
-                              Bangladesh Mobile Wallets & Transfers
-                            </h3>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                              
-                              {/* 1. bKash Gateway Card */}
-                              <div className={`p-5 rounded-2xl border ${panelBg} space-y-4 flex flex-col justify-between`}>
-                                <div className="space-y-3">
-                                  <div className="flex justify-between items-center">
-                                    <div className="flex items-center gap-2">
-                                      <div className="w-8 h-8 rounded bg-[#E2136E] text-white flex items-center justify-center font-bold text-xs shadow-md">bk</div>
-                                      <div>
-                                        <h4 className="font-extrabold text-sm text-white">bKash Active Gateway</h4>
-                                        <span className="text-[9px] font-mono text-neutral-400 uppercase">Mobile Money / Merchants</span>
-                                      </div>
-                                    </div>
-                                    
-                                    <label className="relative inline-flex items-center cursor-pointer select-none">
-                                      <input
-                                        type="checkbox"
-                                        checked={bdMethods.bkash.enabled}
-                                        onChange={(e) => setBdMethods({
-                                          ...bdMethods,
-                                          bkash: { ...bdMethods.bkash, enabled: e.target.checked }
-                                        })}
-                                        className="sr-only peer"
-                                      />
-                                      <div className="w-8 h-4 bg-neutral-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-neutral-400 after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3.5 after:transition-all peer-checked:bg-purple-600 peer-checked:after:bg-white"></div>
-                                    </label>
-                                  </div>
-
-                                  <div className="grid grid-cols-2 gap-2 text-xs font-sans">
-                                    <div>
-                                      <label className="text-[9px] uppercase font-mono block mb-1 text-neutral-400">Account Type</label>
-                                      <select
-                                        value={bdMethods.bkash.type}
-                                        onChange={(e) => setBdMethods({
-                                          ...bdMethods,
-                                          bkash: { ...bdMethods.bkash, type: e.target.value }
-                                        })}
-                                        className="w-full bg-neutral-950 border border-neutral-850 p-1.5 rounded text-white text-[11px]"
-                                      >
-                                        <option value="merchant">Merchant Wallet</option>
-                                        <option value="personal">Personal Wallet</option>
-                                        <option value="agent">Agent Wallet</option>
-                                      </select>
-                                    </div>
-                                    <div>
-                                      <label className="text-[9px] uppercase font-mono block mb-1 text-neutral-400">Wallet Phone Target</label>
-                                      <input
-                                        type="text"
-                                        value={bdMethods.bkash.number}
-                                        onChange={(e) => setBdMethods({
-                                          ...bdMethods,
-                                          bkash: { ...bdMethods.bkash, number: e.target.value }
-                                        })}
-                                        className="w-full bg-neutral-950 border border-neutral-850 p-1.5 rounded text-white text-[11px] font-mono"
-                                      />
-                                    </div>
-                                    <div className="col-span-2">
-                                      <label className="text-[9px] uppercase font-mono block mb-1 text-neutral-400">API Credentials AppKey</label>
-                                      <input
-                                        type="password"
-                                        value={bdMethods.bkash.apiKey}
-                                        onChange={(e) => setBdMethods({
-                                          ...bdMethods,
-                                          bkash: { ...bdMethods.bkash, apiKey: e.target.value }
-                                        })}
-                                        className="w-full bg-neutral-950 border border-neutral-850 p-1.5 rounded text-neutral-400 text-[11px] font-mono"
-                                      />
-                                    </div>
-                                    <div className="col-span-2">
-                                      <label className="text-[9px] uppercase font-mono block mb-1 text-neutral-400">Display instructions</label>
-                                      <textarea
-                                        rows={2}
-                                        value={bdMethods.bkash.instructions}
-                                        onChange={(e) => setBdMethods({
-                                          ...bdMethods,
-                                          bkash: { ...bdMethods.bkash, instructions: e.target.value }
-                                        })}
-                                        className="w-full bg-neutral-950 border border-neutral-850 p-1.5 rounded text-white text-[11px]"
-                                      />
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <div className="pt-3 border-t border-white/[0.05] flex gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      localStorage.setItem('webzone_bd_methods', JSON.stringify(bdMethods));
-                                      triggerToast("bKash credentials successfully hardened and updated! 🔐");
-                                    }}
-                                    className="flex-1 py-1.5 rounded bg-purple-600 hover:bg-purple-750 text-white font-bold text-[10px] uppercase font-mono text-center cursor-pointer"
-                                  >
-                                    Update Configuration
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setBdMethods({
-                                        ...bdMethods,
-                                        bkash: { ...bdMethods.bkash, enabled: false, number: '', apiKey: '', instructions: '' }
-                                      });
-                                      triggerToast("bKash configurations cleared / reset!");
-                                    }}
-                                    className="px-2.5 py-1.5 rounded bg-neutral-900 border border-[#EF4444]/30 text-[#EF4444] hover:bg-[#EF4444]/10 transition-colors cursor-pointer"
-                                    title="Reset gateway credentials"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
-                              </div>
-
-                              {/* 2. Nagad Gateway Card */}
-                              <div className={`p-5 rounded-2xl border ${panelBg} space-y-4 flex flex-col justify-between`}>
-                                <div className="space-y-3">
-                                  <div className="flex justify-between items-center">
-                                    <div className="flex items-center gap-2">
-                                      <div className="w-8 h-8 rounded bg-[#F85B12] text-white flex items-center justify-center font-bold text-xs shadow-md">NG</div>
-                                      <div>
-                                        <h4 className="font-extrabold text-sm text-white">Nagad Active Gateway</h4>
-                                        <span className="text-[9px] font-mono text-neutral-400 uppercase">Mobile Money / API Live</span>
-                                      </div>
-                                    </div>
-                                    
-                                    <label className="relative inline-flex items-center cursor-pointer select-none">
-                                      <input
-                                        type="checkbox"
-                                        checked={bdMethods.nagad.enabled}
-                                        onChange={(e) => setBdMethods({
-                                          ...bdMethods,
-                                          nagad: { ...bdMethods.nagad, enabled: e.target.checked }
-                                        })}
-                                        className="sr-only peer"
-                                      />
-                                      <div className="w-8 h-4 bg-neutral-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-neutral-400 after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3.5 after:transition-all peer-checked:bg-purple-600 peer-checked:after:bg-white"></div>
-                                    </label>
-                                  </div>
-
-                                  <div className="grid grid-cols-2 gap-2 text-xs font-sans">
-                                    <div>
-                                      <label className="text-[9px] uppercase font-mono block mb-1 text-neutral-400">Account Type</label>
-                                      <select
-                                        value={bdMethods.nagad.type}
-                                        onChange={(e) => setBdMethods({
-                                          ...bdMethods,
-                                          nagad: { ...bdMethods.nagad, type: e.target.value }
-                                        })}
-                                        className="w-full bg-neutral-950 border border-neutral-850 p-1.5 rounded text-white text-[11px]"
-                                      >
-                                        <option value="merchant">Merchant Wallet</option>
-                                        <option value="personal">Personal Wallet</option>
-                                        <option value="agent">Agent Wallet</option>
-                                      </select>
-                                    </div>
-                                    <div>
-                                      <label className="text-[9px] uppercase font-mono block mb-1 text-neutral-400">Wallet Phone Target</label>
-                                      <input
-                                        type="text"
-                                        value={bdMethods.nagad.number}
-                                        onChange={(e) => setBdMethods({
-                                          ...bdMethods,
-                                          nagad: { ...bdMethods.nagad, number: e.target.value }
-                                        })}
-                                        className="w-full bg-neutral-950 border border-neutral-850 p-1.5 rounded text-white text-[11px] font-mono"
-                                      />
-                                    </div>
-                                    <div className="col-span-2">
-                                      <label className="text-[9px] uppercase font-mono block mb-1 text-neutral-400">API Credentials AppKey</label>
-                                      <input
-                                        type="password"
-                                        value={bdMethods.nagad.apiKey}
-                                        onChange={(e) => setBdMethods({
-                                          ...bdMethods,
-                                          nagad: { ...bdMethods.nagad, apiKey: e.target.value }
-                                        })}
-                                        className="w-full bg-neutral-950 border border-neutral-850 p-1.5 rounded text-neutral-400 text-[11px] font-mono"
-                                      />
-                                    </div>
-                                    <div className="col-span-2">
-                                      <label className="text-[9px] uppercase font-mono block mb-1 text-neutral-400">Display instructions</label>
-                                      <textarea
-                                        rows={2}
-                                        value={bdMethods.nagad.instructions}
-                                        onChange={(e) => setBdMethods({
-                                          ...bdMethods,
-                                          nagad: { ...bdMethods.nagad, instructions: e.target.value }
-                                        })}
-                                        className="w-full bg-neutral-950 border border-neutral-850 p-1.5 rounded text-white text-[11px]"
-                                      />
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <div className="pt-3 border-t border-white/[0.05] flex gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      localStorage.setItem('webzone_bd_methods', JSON.stringify(bdMethods));
-                                      triggerToast("Nagad Live gateway API updated successfully! 🔐");
-                                    }}
-                                    className="flex-1 py-1.5 rounded bg-purple-600 hover:bg-purple-750 text-white font-bold text-[10px] uppercase font-mono text-center cursor-pointer"
-                                  >
-                                    Update Configuration
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setBdMethods({
-                                        ...bdMethods,
-                                        nagad: { ...bdMethods.nagad, enabled: false, number: '', apiKey: '', instructions: '' }
-                                      });
-                                      triggerToast("Nagad settings cleared! 🧹");
-                                    }}
-                                    className="px-2.5 py-1.5 rounded bg-neutral-900 border border-[#EF4444]/30 text-[#EF4444] hover:bg-[#EF4444]/10 transition-colors cursor-pointer"
-                                    title="Reset gateway credentials"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
-                              </div>
-
-                              {/* 3. Rocket Configuration Card */}
-                              <div className={`p-5 rounded-2xl border ${panelBg} space-y-4 flex flex-col justify-between`}>
-                                <div className="space-y-3">
-                                  <div className="flex justify-between items-center">
-                                    <div className="flex items-center gap-2">
-                                      <div className="w-8 h-8 rounded bg-[#8C3292] text-white flex items-center justify-center font-bold text-xs shadow-md">RK</div>
-                                      <div>
-                                        <h4 className="font-extrabold text-sm text-white">DBBL Rocket Wallet</h4>
-                                        <span className="text-[9px] font-mono text-neutral-400 uppercase">Mobile Money / Personal</span>
-                                      </div>
-                                    </div>
-                                    
-                                    <label className="relative inline-flex items-center cursor-pointer select-none">
-                                      <input
-                                        type="checkbox"
-                                        checked={bdMethods.rocket.enabled}
-                                        onChange={(e) => setBdMethods({
-                                          ...bdMethods,
-                                          rocket: { ...bdMethods.rocket, enabled: e.target.checked }
-                                        })}
-                                        className="sr-only peer"
-                                      />
-                                      <div className="w-8 h-4 bg-neutral-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-neutral-400 after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3.5 after:transition-all peer-checked:bg-purple-600 peer-checked:after:bg-white"></div>
-                                    </label>
-                                  </div>
-
-                                  <div className="grid grid-cols-2 gap-2 text-xs font-sans">
-                                    <div>
-                                      <label className="text-[9px] uppercase font-mono block mb-1 text-neutral-400">Account Type</label>
-                                      <input
-                                        type="text"
-                                        value="Personal / 12-digit"
-                                        disabled
-                                        className="w-full bg-neutral-900 border border-neutral-850 p-1.5 rounded text-neutral-500 text-[11px]"
-                                      />
-                                    </div>
-                                    <div>
-                                      <label className="text-[9px] uppercase font-mono block mb-1 text-neutral-400">Wallet target</label>
-                                      <input
-                                        type="text"
-                                        value={bdMethods.rocket.number}
-                                        placeholder="017xxxxxxxx-x"
-                                        onChange={(e) => setBdMethods({
-                                          ...bdMethods,
-                                          rocket: { ...bdMethods.rocket, number: e.target.value }
-                                        })}
-                                        className="w-full bg-neutral-950 border border-neutral-850 p-1.5 rounded text-white text-[11px] font-mono"
-                                      />
-                                    </div>
-                                    <div className="col-span-2">
-                                      <label className="text-[9px] uppercase font-mono block mb-1 text-neutral-400">Customer guidelines</label>
-                                      <textarea
-                                        rows={2}
-                                        value={bdMethods.rocket.instructions}
-                                        placeholder="Send money and add reference info."
-                                        onChange={(e) => setBdMethods({
-                                          ...bdMethods,
-                                          rocket: { ...bdMethods.rocket, instructions: e.target.value }
-                                        })}
-                                        className="w-full bg-neutral-950 border border-neutral-850 p-1.5 rounded text-white text-[11px]"
-                                      />
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <div className="pt-3 border-t border-white/[0.05]">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      localStorage.setItem('webzone_bd_methods', JSON.stringify(bdMethods));
-                                      triggerToast("Rocket credentials saved! 🚀");
-                                    }}
-                                    className="w-full py-1.5 rounded bg-purple-600 hover:bg-purple-750 text-white font-bold text-[10px] uppercase font-mono text-center cursor-pointer"
-                                  >
-                                    Update Rocket
-                                  </button>
-                                </div>
-                              </div>
-
-                              {/* 4. CellFin Wallet Target Card */}
-                              <div className={`p-5 rounded-2xl border ${panelBg} space-y-4 flex flex-col justify-between`}>
-                                <div className="space-y-3">
-                                  <div className="flex justify-between items-center">
-                                    <div className="flex items-center gap-2">
-                                      <div className="w-8 h-8 rounded bg-[#105E3C] text-white flex items-center justify-center font-bold text-xs shadow-md">CF</div>
-                                      <div>
-                                        <h4 className="font-extrabold text-sm text-white">Islami Bank CellFin</h4>
-                                        <span className="text-[9px] font-mono text-neutral-400 uppercase">Mobile Digital Wallet</span>
-                                      </div>
-                                    </div>
-                                    
-                                    <label className="relative inline-flex items-center cursor-pointer select-none">
-                                      <input
-                                        type="checkbox"
-                                        checked={bdMethods.cellfin.enabled}
-                                        onChange={(e) => setBdMethods({
-                                          ...bdMethods,
-                                          cellfin: { ...bdMethods.cellfin, enabled: e.target.checked }
-                                        })}
-                                        className="sr-only peer"
-                                      />
-                                      <div className="w-8 h-4 bg-neutral-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-neutral-400 after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3.5 after:transition-all peer-checked:bg-purple-600 peer-checked:after:bg-white"></div>
-                                    </label>
-                                  </div>
-
-                                  <div className="grid grid-cols-1 gap-2 text-xs font-sans text-left">
-                                    <div>
-                                      <label className="text-[9px] uppercase font-mono block mb-1 text-neutral-400">CellFin Registered Phone Number Target</label>
-                                      <input
-                                        type="text"
-                                        value={bdMethods.cellfin.number}
-                                        onChange={(e) => setBdMethods({
-                                          ...bdMethods,
-                                          cellfin: { ...bdMethods.cellfin, number: e.target.value }
-                                        })}
-                                        className="w-full bg-neutral-950 border border-neutral-850 p-1.5 rounded text-white text-[11px] font-mono"
-                                      />
-                                    </div>
-                                    <div>
-                                      <label className="text-[9px] uppercase font-mono block mb-1 text-neutral-400">Step Instructions</label>
-                                      <textarea
-                                        rows={2}
-                                        value={bdMethods.cellfin.instructions}
-                                        onChange={(e) => setBdMethods({
-                                          ...bdMethods,
-                                          cellfin: { ...bdMethods.cellfin, instructions: e.target.value }
-                                        })}
-                                        className="w-full bg-neutral-950 border border-neutral-850 p-1.5 rounded text-white text-[11px]"
-                                      />
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <div className="pt-3 border-t border-white/[0.05]">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      localStorage.setItem('webzone_bd_methods', JSON.stringify(bdMethods));
-                                      triggerToast("CellFin parameters updated cleanly!");
-                                    }}
-                                    className="w-full py-1.5 rounded bg-purple-600 hover:bg-purple-750 text-white font-bold text-[10px] uppercase font-mono text-center cursor-pointer"
-                                  >
-                                    Update CellFin
-                                  </button>
-                                </div>
-                              </div>
-
-                              {/* 5. Islami Bank Transfer Card */}
-                              <div className={`p-5 rounded-2xl border ${panelBg} space-y-4 md:col-span-2 text-left`}>
-                                <div className="flex justify-between items-start border-b border-white/[0.05] pb-2">
-                                  <div>
-                                    <h4 className="font-extrabold text-sm text-white flex items-center gap-1.5">
-                                      <Database className="w-4 h-4 text-emerald-500" />
-                                      Islami Bank Bangladesh PLC Transfer Channel
-                                    </h4>
-                                    <p className="text-[10px] text-neutral-400">Wire settlement account matrix configurations.</p>
-                                  </div>
-
-                                  <label className="relative inline-flex items-center cursor-pointer select-none">
-                                    <input
-                                      type="checkbox"
-                                      checked={bdMethods.islamiBank.enabled}
-                                      onChange={(e) => setBdMethods({
-                                        ...bdMethods,
-                                        islamiBank: { ...bdMethods.islamiBank, enabled: e.target.checked }
-                                      })}
-                                      className="sr-only peer"
-                                    />
-                                    <div className="w-8 h-4 bg-neutral-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-neutral-400 after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3.5 after:transition-all peer-checked:bg-purple-600 peer-checked:after:bg-white"></div>
-                                  </label>
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs font-sans">
-                                  <div>
-                                    <label className="text-[9px] uppercase font-mono block mb-0.5 text-neutral-400">Bank Name</label>
-                                    <input
-                                      type="text"
-                                      value={bdMethods.islamiBank.bankName}
-                                      onChange={(e) => setBdMethods({
-                                        ...bdMethods,
-                                        islamiBank: { ...bdMethods.islamiBank, bankName: e.target.value }
-                                      })}
-                                      className="w-full bg-neutral-950 border border-neutral-850 p-2 rounded text-white text-[11px] font-bold"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="text-[9px] uppercase font-mono block mb-0.5 text-neutral-400">Account Legal Name</label>
-                                    <input
-                                      type="text"
-                                      value={bdMethods.islamiBank.accountName}
-                                      onChange={(e) => setBdMethods({
-                                        ...bdMethods,
-                                        islamiBank: { ...bdMethods.islamiBank, accountName: e.target.value }
-                                      })}
-                                      className="w-full bg-neutral-950 border border-neutral-850 p-2 rounded text-white text-[11px]"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="text-[9px] uppercase font-mono block mb-0.5 text-neutral-400">Account Number</label>
-                                    <input
-                                      type="text"
-                                      value={bdMethods.islamiBank.accountNumber}
-                                      onChange={(e) => setBdMethods({
-                                        ...bdMethods,
-                                        islamiBank: { ...bdMethods.islamiBank, accountNumber: e.target.value }
-                                      })}
-                                      className="w-full bg-neutral-950 border border-neutral-850 p-2 rounded text-white text-[11px] font-mono"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="text-[9px] uppercase font-mono block mb-0.5 text-neutral-400">IBAN Number string (Bangladesh Range)</label>
-                                    <input
-                                      type="text"
-                                      value={bdMethods.islamiBank.iban}
-                                      onChange={(e) => setBdMethods({
-                                        ...bdMethods,
-                                        islamiBank: { ...bdMethods.islamiBank, iban: e.target.value }
-                                      })}
-                                      className="w-full bg-neutral-950 border border-neutral-850 p-2 rounded text-stone-200 text-[11px] font-mono"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="text-[9px] uppercase font-mono block mb-0.5 text-neutral-400">SWIFT Routing Code</label>
-                                    <input
-                                      type="text"
-                                      value={bdMethods.islamiBank.swift}
-                                      onChange={(e) => setBdMethods({
-                                        ...bdMethods,
-                                        islamiBank: { ...bdMethods.islamiBank, swift: e.target.value }
-                                      })}
-                                      className="w-full bg-neutral-950 border border-neutral-850 p-2 rounded text-white text-[11px] font-mono"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="text-[9px] uppercase font-mono block mb-0.5 text-neutral-400">QR Code Link</label>
-                                    <input
-                                      type="text"
-                                      value={bdMethods.islamiBank.qrCode}
-                                      placeholder="https://images.unsplash.com/... or blank"
-                                      onChange={(e) => setBdMethods({
-                                        ...bdMethods,
-                                        islamiBank: { ...bdMethods.islamiBank, qrCode: e.target.value }
-                                      })}
-                                      className="w-full bg-neutral-950 border border-neutral-850 p-2 rounded text-white text-[11px]"
-                                    />
-                                  </div>
-                                </div>
-
-                                <div className="pt-3 border-t border-white/[0.05]">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      localStorage.setItem('webzone_bd_methods', JSON.stringify(bdMethods));
-                                      triggerToast("Islami Bank central routing tables updated successfully! 🏦");
-                                    }}
-                                    className="w-full py-2 rounded bg-purple-600 hover:bg-purple-750 text-white font-bold text-xs uppercase font-mono text-center cursor-pointer"
-                                  >
-                                    Save Bank Transfers Guidelines
-                                  </button>
-                                </div>
-                              </div>
-
-                              {/* LIST REGISTERED CUSTOM METHODS FOR BANGLADESH */}
-                              {customMethods.filter(c => c.country === 'Bangladesh').map((custGate) => (
-                                <div key={custGate.id} className={`p-5 rounded-2xl border ${panelBg} space-y-4 flex flex-col justify-between hover:border-purple-500/35 transition-colors text-left`}>
-                                  <div className="space-y-3">
-                                    <div className="flex justify-between items-center">
-                                      <div className="flex items-center gap-2">
-                                        <div className="w-8 h-8 rounded bg-purple-850 text-white flex items-center justify-center font-bold text-xs">C</div>
-                                        <div>
-                                          <h4 className="font-extrabold text-sm text-stone-200">{custGate.name}</h4>
-                                          <span className="text-[9px] font-mono text-purple-400 uppercase tracking-widest">{custGate.type}</span>
-                                        </div>
-                                      </div>
-                                      
-                                      <span className="px-2 py-0.5 rounded text-[8px] uppercase tracking-wider font-mono text-purple-400 bg-purple-950/40">Custom Method</span>
-                                    </div>
-
-                                    <p className="text-[11px] text-neutral-300 leading-relaxed max-h-24 overflow-y-auto bg-neutral-950/40 p-2 rounded border border-white/[0.02]">
-                                      <strong>Instructions:</strong> {custGate.instructions}
-                                    </p>
-                                  </div>
-
-                                  <div className="border-t border-white/[0.05] pt-3">
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const remaining = customMethods.filter(c => c.id !== custGate.id);
-                                        setCustomMethods(remaining);
-                                        triggerToast(`Custom gateway "${custGate.name}" deleted cleanly! 🧹`);
-                                      }}
-                                      className="w-full py-1 bg-rose-950/20 hover:bg-rose-900/40 text-rose-500 font-bold text-[10px] uppercase font-mono text-center transition-colors rounded cursor-pointer flex items-center justify-center gap-1 border border-rose-500/10"
-                                    >
-                                      <Trash2 className="w-3.5 h-3.5" /> Delete Gateway
-                                    </button>
-                                  </div>
-                                </div>
-                              ))}
-
-                            </div>
-                          </div>
-                        )}
-
-                        {/* TAB C: SAUDI ARABIA PAYMENT METHODS */}
-                        {setPaymentSubTab === 'sa' && (
-                          <div className="space-y-6 animate-in fade-in duration-200">
-                            <h3 className="font-bold text-sm tracking-tight text-white uppercase font-mono text-purple-400">
-                              Kingdom of Saudi Arabia Accounts & Wallets
-                            </h3>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                              
-                              {/* 1. STC Pay Wallet Card */}
-                              <div className={`p-5 rounded-2xl border ${panelBg} space-y-4 flex flex-col justify-between`}>
-                                <div className="space-y-3">
-                                  <div className="flex justify-between items-center">
-                                    <div className="flex items-center gap-2">
-                                      <div className="w-8 h-8 rounded bg-[#4F2383] text-white flex items-center justify-center font-bold text-xs shadow-md font-mono">stc</div>
-                                      <div>
-                                        <h4 className="font-extrabold text-sm text-white">STC Pay Saudi Arabia</h4>
-                                        <span className="text-[9px] font-mono text-neutral-400 uppercase">STC KSA Wallet API</span>
-                                      </div>
-                                    </div>
-                                    
-                                    <label className="relative inline-flex items-center cursor-pointer select-none">
-                                      <input
-                                        type="checkbox"
-                                        checked={saMethods.stcPay.enabled}
-                                        onChange={(e) => setSaMethods({
-                                          ...saMethods,
-                                          stcPay: { ...saMethods.stcPay, enabled: e.target.checked }
-                                        })}
-                                        className="sr-only peer"
-                                      />
-                                      <div className="w-8 h-4 bg-neutral-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-neutral-400 after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3.5 after:transition-all peer-checked:bg-purple-600 peer-checked:after:bg-white"></div>
-                                    </label>
-                                  </div>
-
-                                  <div className="grid grid-cols-1 gap-2 text-xs font-sans text-left">
-                                    <div>
-                                      <label className="text-[9px] uppercase font-mono block mb-1 text-neutral-400">STC Pay Registered Wallet Phone</label>
-                                      <input
-                                        type="text"
-                                        value={saMethods.stcPay.walletNumber}
-                                        onChange={(e) => setSaMethods({
-                                          ...saMethods,
-                                          stcPay: { ...saMethods.stcPay, walletNumber: e.target.value }
-                                        })}
-                                        className="w-full bg-neutral-950 border border-neutral-850 p-1.5 rounded text-white text-[11px] font-mono"
-                                      />
-                                    </div>
-                                    <div>
-                                      <label className="text-[9px] uppercase font-mono block mb-1 text-neutral-400">Step Guidelines for STC Users</label>
-                                      <textarea
-                                        rows={2}
-                                        value={saMethods.stcPay.instructions}
-                                        onChange={(e) => setSaMethods({
-                                          ...saMethods,
-                                          stcPay: { ...saMethods.stcPay, instructions: e.target.value }
-                                        })}
-                                        className="w-full bg-neutral-950 border border-neutral-850 p-1.5 rounded text-white text-[11px]"
-                                      />
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <div className="pt-3 border-t border-white/[0.05]">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      localStorage.setItem('webzone_sa_methods', JSON.stringify(saMethods));
-                                      triggerToast("STC Pay parameters consolidated successfully! 🇸🇦");
-                                    }}
-                                    className="w-full py-1.5 rounded bg-purple-600 hover:bg-purple-750 text-white font-bold text-[10px] uppercase font-mono text-center cursor-pointer"
-                                  >
-                                    Update STC Pay settings
-                                  </button>
-                                </div>
-                              </div>
-
-                              {/* 2. Al Rajhi Bank Transfer Card */}
-                              <div className={`p-5 rounded-2xl border ${panelBg} space-y-4 text-left`}>
-                                <div className="flex justify-between items-center border-b border-white/[0.05] pb-2">
-                                  <div>
-                                    <h4 className="font-extrabold text-sm text-white">Al Rajhi Bank (مصرف الراجحي)</h4>
-                                    <span className="text-[9px] font-mono text-purple-400 uppercase tracking-widest">KSA Premium Bank Wire</span>
-                                  </div>
-                                  
-                                  <label className="relative inline-flex items-center cursor-pointer select-none">
-                                    <input
-                                      type="checkbox"
-                                      checked={saMethods.alRajhi.enabled}
-                                      onChange={(e) => setSaMethods({
-                                        ...saMethods,
-                                        alRajhi: { ...saMethods.alRajhi, enabled: e.target.checked }
-                                      })}
-                                      className="sr-only peer"
-                                    />
-                                    <div className="w-8 h-4 bg-neutral-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-neutral-400 after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3.5 after:transition-all peer-checked:bg-purple-600 peer-checked:after:bg-white"></div>
-                                  </label>
-                                </div>
-
-                                <div className="grid grid-cols-1 gap-2 text-xs font-sans">
-                                  <div>
-                                    <label className="text-[8px] uppercase font-mono block text-neutral-400">Account Legal Holder</label>
-                                    <input
-                                      type="text"
-                                      value={saMethods.alRajhi.accountName}
-                                      onChange={(e) => setSaMethods({
-                                        ...saMethods,
-                                        alRajhi: { ...saMethods.alRajhi, accountName: e.target.value }
-                                      })}
-                                      className="w-full bg-neutral-950 border border-neutral-850 p-1.5 rounded text-white text-[11px]"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="text-[8px] uppercase font-mono block text-neutral-400 font-mono">Account Number / SAR target</label>
-                                    <input
-                                      type="text"
-                                      value={saMethods.alRajhi.accountNumber}
-                                      onChange={(e) => setSaMethods({
-                                        ...saMethods,
-                                        alRajhi: { ...saMethods.alRajhi, accountNumber: e.target.value }
-                                      })}
-                                      className="w-full bg-neutral-950 border border-neutral-850 p-1.5 rounded text-white text-[11px] font-mono"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="text-[8px] uppercase font-mono block text-neutral-400 font-mono">IBAN Identifier Range (SA...)</label>
-                                    <input
-                                      type="text"
-                                      value={saMethods.alRajhi.iban}
-                                      onChange={(e) => setSaMethods({
-                                        ...saMethods,
-                                        alRajhi: { ...saMethods.alRajhi, iban: e.target.value }
-                                      })}
-                                      className="w-full bg-neutral-950 border border-neutral-850 p-1.5 rounded text-white text-[11px] font-mono"
-                                    />
-                                  </div>
-                                </div>
-
-                                <div className="pt-3 border-t border-white/[0.05]">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      localStorage.setItem('webzone_sa_methods', JSON.stringify(saMethods));
-                                      triggerToast("Al Rajhi ledger accounts locked and verified! 🇸🇦");
-                                    }}
-                                    className="w-full py-1.5 rounded bg-purple-600 hover:bg-purple-750 text-white font-bold text-[10px] uppercase font-mono text-center cursor-pointer"
-                                  >
-                                    Confirm Swift Parameters
-                                  </button>
-                                </div>
-                              </div>
-
-                              {/* LIST REGISTERED CUSTOM METHODS FOR SAUDI ARABIA */}
-                              {customMethods.filter(c => c.country === 'Saudi Arabia').map((custGate) => (
-                                <div key={custGate.id} className={`p-5 rounded-2xl border ${panelBg} space-y-4 flex flex-col justify-between hover:border-purple-500/35 transition-colors text-left`}>
-                                  <div className="space-y-3">
-                                    <div className="flex justify-between items-center">
-                                      <div className="flex items-center gap-2">
-                                        <div className="w-8 h-8 rounded bg-purple-850 text-white flex items-center justify-center font-bold text-xs">C</div>
-                                        <div>
-                                          <h4 className="font-extrabold text-sm text-stone-200">{custGate.name}</h4>
-                                          <span className="text-[9px] font-mono text-purple-400 uppercase tracking-widest">{custGate.type}</span>
-                                        </div>
-                                      </div>
-                                      
-                                      <span className="px-2 py-0.5 rounded text-[8px] uppercase tracking-wider font-mono text-purple-400 bg-purple-950/40">Custom Method</span>
-                                    </div>
-
-                                    <p className="text-[11px] text-neutral-300 leading-relaxed max-h-24 overflow-y-auto bg-neutral-950/40 p-2 rounded border border-white/[0.02]">
-                                      <strong>Instructions:</strong> {custGate.instructions}
-                                    </p>
-                                  </div>
-
-                                  <div className="border-t border-white/[0.05] pt-3">
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const remaining = customMethods.filter(c => c.id !== custGate.id);
-                                        setCustomMethods(remaining);
-                                        triggerToast(`Custom gateway "${custGate.name}" deleted cleanly! 🧹`);
-                                      }}
-                                      className="w-full py-1 bg-rose-950/20 hover:bg-rose-900/40 text-rose-500 font-bold text-[10px] uppercase font-mono text-center transition-colors rounded cursor-pointer flex items-center justify-center gap-1 border border-rose-500/10"
-                                    >
-                                      <Trash2 className="w-3.5 h-3.5" /> Delete Gateway
-                                    </button>
-                                  </div>
-                                </div>
-                              ))}
-
-                            </div>
-                          </div>
-                        )}
-
-                        {/* TAB D: INTERNATIONAL GATEWAYS */}
-                        {setPaymentSubTab === 'intl' && (
-                          <div className="space-y-6 animate-in fade-in duration-200">
-                            <h3 className="font-bold text-sm tracking-tight text-white uppercase font-mono text-purple-400">
-                              International Multi-currency Gateways
-                            </h3>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                              
-                              {/* PayPal Portal Active */}
-                              <div className={`p-5 rounded-2xl border ${panelBg} space-y-4 text-left flex flex-col justify-between`}>
-                                <div className="space-y-3">
-                                  <div className="flex justify-between items-center pb-2 border-b border-white/[0.05]">
-                                    <div className="flex items-center gap-1.5">
-                                      <div className="w-8 h-8 rounded bg-[#003087] text-white flex items-center justify-center font-bold text-xs">PP</div>
-                                      <div>
-                                        <h4 className="font-extrabold text-sm text-stone-100">PayPal Checkout</h4>
-                                        <span className="text-[9px] uppercase tracking-wider font-mono text-cyan-400">Automatic / Cart IPN</span>
-                                      </div>
-                                    </div>
-
-                                    <label className="relative inline-flex items-center cursor-pointer select-none">
-                                      <input
-                                        type="checkbox"
-                                        checked={intlMethods.paypal.enabled}
-                                        onChange={(e) => setIntlMethods({
-                                          ...intlMethods,
-                                          paypal: { ...intlMethods.paypal, enabled: e.target.checked }
-                                        })}
-                                        className="sr-only peer"
-                                      />
-                                      <div className="w-8 h-4 bg-neutral-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-neutral-400 after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3.5 after:transition-all peer-checked:bg-purple-600 peer-checked:after:bg-white"></div>
-                                    </label>
-                                  </div>
-
-                                  <div className="space-y-2 text-xs font-sans">
-                                    <div>
-                                      <label className="text-[9px] uppercase font-mono block mb-1 text-neutral-400">PayPal Business Email</label>
-                                      <input
-                                        type="email"
-                                        value={intlMethods.paypal.email}
-                                        onChange={(e) => setIntlMethods({
-                                          ...intlMethods,
-                                          paypal: { ...intlMethods.paypal, email: e.target.value }
-                                        })}
-                                        className="w-full bg-neutral-950 border border-neutral-850 p-2 rounded text-white text-[11px]"
-                                      />
-                                    </div>
-                                    <div>
-                                      <label className="text-[9px] uppercase font-mono block mb-1 text-neutral-400">Live Client ID (REST API)</label>
-                                      <input
-                                        type="text"
-                                        value={intlMethods.paypal.clientId}
-                                        onChange={(e) => setIntlMethods({
-                                          ...intlMethods,
-                                          paypal: { ...intlMethods.paypal, clientId: e.target.value }
-                                        })}
-                                        className="w-full bg-neutral-950 border border-neutral-850 p-2 rounded text-stone-300 font-mono text-[11px]"
-                                      />
-                                    </div>
-                                    <div>
-                                      <label className="text-[9px] uppercase font-mono block mb-1 text-neutral-400">Live Secret AppKey</label>
-                                      <input
-                                        type="password"
-                                        value={intlMethods.paypal.secretKey}
-                                        onChange={(e) => setIntlMethods({
-                                          ...intlMethods,
-                                          paypal: { ...intlMethods.paypal, secretKey: e.target.value }
-                                        })}
-                                        className="w-full bg-neutral-950 border border-neutral-850 p-2 rounded text-neutral-400 font-mono text-[11px]"
-                                      />
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <div className="border-t border-white/[0.05] pt-3">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      localStorage.setItem('webzone_intl_methods', JSON.stringify(intlMethods));
-                                      triggerToast("PayPal REST keys successfully validated and saved! 🛡️");
-                                    }}
-                                    className="w-full py-1.5 rounded bg-purple-600 hover:bg-purple-750 text-white font-bold text-[10px] uppercase font-mono text-center cursor-pointer"
-                                  >
-                                    Verify IPN Signature
-                                  </button>
-                                </div>
-                              </div>
-
-                              {/* Global Wire Transfer */}
-                              <div className={`p-5 rounded-2xl border ${panelBg} space-y-4 text-left flex flex-col justify-between`}>
-                                <div className="space-y-3">
-                                  <div className="flex justify-between items-center pb-2 border-b border-white/[0.05]">
-                                    <div className="flex items-center gap-1.5">
-                                      <div className="w-8 h-8 rounded bg-neutral-800 text-white flex items-center justify-center font-bold text-xs">IB</div>
-                                      <div>
-                                        <h4 className="font-extrabold text-sm text-stone-100">International Wire</h4>
-                                        <span className="text-[9px] uppercase tracking-wider font-mono text-neutral-400">Manual verification</span>
-                                      </div>
-                                    </div>
-
-                                    <label className="relative inline-flex items-center cursor-pointer select-none">
-                                      <input
-                                        type="checkbox"
-                                        checked={intlMethods.bankTransfer.enabled}
-                                        onChange={(e) => setIntlMethods({
-                                          ...intlMethods,
-                                          bankTransfer: { ...intlMethods.bankTransfer, enabled: e.target.checked }
-                                        })}
-                                        className="sr-only peer"
-                                      />
-                                      <div className="w-8 h-4 bg-neutral-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-neutral-400 after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3.5 after:transition-all peer-checked:bg-purple-600 peer-checked:after:bg-white"></div>
-                                    </label>
-                                  </div>
-
-                                  <div className="space-y-2 text-xs font-sans">
-                                    <div className="grid grid-cols-2 gap-2">
-                                      <div>
-                                        <label className="text-[8px] uppercase font-mono block text-neutral-400">Inter-Bank Name</label>
-                                        <input
-                                          type="text"
-                                          value={intlMethods.bankTransfer.bankName}
-                                          onChange={(e) => setIntlMethods({
-                                            ...intlMethods,
-                                            bankTransfer: { ...intlMethods.bankTransfer, bankName: e.target.value }
-                                          })}
-                                          className="w-full bg-neutral-950 border border-neutral-850 p-1.5 rounded text-white text-[11px]"
-                                        />
-                                      </div>
-                                      <div>
-                                        <label className="text-[8px] uppercase font-mono block text-neutral-400 font-bold">Holder Account</label>
-                                        <input
-                                          type="text"
-                                          value={intlMethods.bankTransfer.accountHolder}
-                                          onChange={(e) => setIntlMethods({
-                                            ...intlMethods,
-                                            bankTransfer: { ...intlMethods.bankTransfer, accountHolder: e.target.value }
-                                          })}
-                                          className="w-full bg-neutral-950 border border-neutral-850 p-1.5 rounded text-white text-[11px]"
-                                        />
-                                      </div>
-                                    </div>
-                                    <div>
-                                      <label className="text-[8px] uppercase font-mono block text-neutral-400 font-mono">Account Number</label>
-                                      <input
-                                        type="text"
-                                        value={intlMethods.bankTransfer.accountNumber}
-                                        onChange={(e) => setIntlMethods({
-                                          ...intlMethods,
-                                          bankTransfer: { ...intlMethods.bankTransfer, accountNumber: e.target.value }
-                                        })}
-                                        className="w-full bg-neutral-950 border border-neutral-850 p-1.5 rounded text-stone-200 text-[11px] font-mono"
-                                      />
-                                    </div>
-                                    <div>
-                                      <label className="text-[8px] uppercase font-mono block text-neutral-400 font-mono">IBAN</label>
-                                      <input
-                                        type="text"
-                                        value={intlMethods.bankTransfer.iban}
-                                        onChange={(e) => setIntlMethods({
-                                          ...intlMethods,
-                                          bankTransfer: { ...intlMethods.bankTransfer, iban: e.target.value }
-                                        })}
-                                        className="w-full bg-neutral-950 border border-neutral-850 p-1.5 rounded text-stone-300 font-mono text-[11px]"
-                                      />
-                                    </div>
-                                    <div>
-                                      <label className="text-[8px] uppercase font-mono block text-neutral-400 font-mono">SWIFT SwiftCode</label>
-                                      <input
-                                        type="text"
-                                        value={intlMethods.bankTransfer.swift}
-                                        onChange={(e) => setIntlMethods({
-                                          ...intlMethods,
-                                          bankTransfer: { ...intlMethods.bankTransfer, swift: e.target.value }
-                                        })}
-                                        className="w-full bg-neutral-950 border border-neutral-850 p-1.5 rounded text-stone-300 font-mono text-[11px]"
-                                      />
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <div className="border-t border-white/[0.05] pt-3">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      localStorage.setItem('webzone_intl_methods', JSON.stringify(intlMethods));
-                                      triggerToast("International wire route details locked! 🏛️");
-                                    }}
-                                    className="w-full py-1.5 rounded bg-purple-600 hover:bg-purple-750 text-white font-bold text-[10px] uppercase font-mono text-center cursor-pointer"
-                                  >
-                                    Save Wire details
-                                  </button>
-                                </div>
-                              </div>
-
-                              {/* LIST REGISTERED CUSTOM METHODS FOR INTERNATIONAL */}
-                              {customMethods.filter(c => c.country === 'International').map((custGate) => (
-                                <div key={custGate.id} className={`p-5 rounded-2xl border ${panelBg} space-y-4 flex flex-col justify-between hover:border-purple-500/35 transition-colors text-left`}>
-                                  <div className="space-y-3">
-                                    <div className="flex justify-between items-center">
-                                      <div className="flex items-center gap-2">
-                                        <div className="w-8 h-8 rounded bg-purple-850 text-white flex items-center justify-center font-bold text-xs">C</div>
-                                        <div>
-                                          <h4 className="font-extrabold text-sm text-stone-200">{custGate.name}</h4>
-                                          <span className="text-[9px] font-mono text-purple-400 uppercase tracking-widest">{custGate.type}</span>
-                                        </div>
-                                      </div>
-                                      
-                                      <span className="px-2 py-0.5 rounded text-[8px] uppercase tracking-wider font-mono text-purple-400 bg-purple-950/40">Custom Method</span>
-                                    </div>
-
-                                    <p className="text-[11px] text-neutral-300 leading-relaxed max-h-24 overflow-y-auto bg-neutral-950/40 p-2 rounded border border-white/[0.02]">
-                                      <strong>Instructions:</strong> {custGate.instructions}
-                                    </p>
-                                  </div>
-
-                                  <div className="border-t border-white/[0.05] pt-3">
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const remaining = customMethods.filter(c => c.id !== custGate.id);
-                                        setCustomMethods(remaining);
-                                        triggerToast(`Custom gateway "${custGate.name}" deleted cleanly! 🧹`);
-                                      }}
-                                      className="w-full py-1 bg-rose-950/20 hover:bg-rose-900/40 text-rose-500 font-bold text-[10px] uppercase font-mono text-center transition-colors rounded cursor-pointer flex items-center justify-center gap-1 border border-rose-500/10"
-                                    >
-                                      <Trash2 className="w-3.5 h-3.5" /> Delete Gateway
-                                    </button>
-                                  </div>
-                                </div>
-                              ))}
-
-                            </div>
-                          </div>
-                        )}
-
-                        {/* TAB E: PAYMENT VERIFICATION MANAGER & QUEUES */}
-                        {setPaymentSubTab === 'verification' && (
-                          <div className="space-y-6 animate-in fade-in duration-200">
-                            
-                            {/* POLICY CONFIGURATORS */}
-                            <div className={`p-5 rounded-2xl border ${panelBg} space-y-4 text-left`}>
-                              <h4 className="font-bold text-xs uppercase font-mono tracking-wider text-purple-400">
-                                Global Validation Directives
-                              </h4>
-                              
-                              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs font-sans">
-                                <div className="p-3 rounded bg-neutral-950/40 border border-white/[0.02] flex justify-between items-start gap-3">
-                                  <div>
-                                    <span className="font-bold text-stone-200 block text-[11px]">Verification Protocol</span>
-                                    <p className="text-[9px] text-neutral-400 mt-1">Manual security review vs Auto API checkouts.</p>
-                                  </div>
-                                  <div className="flex flex-col gap-1.5 pt-1">
-                                    <label className="flex items-center gap-1.5 cursor-pointer">
-                                      <input
-                                        type="radio"
-                                        name="verifyMode"
-                                        checked={verificationSettings.verificationMode === 'manual'}
-                                        onChange={() => setVerificationSettings({...verificationSettings, verificationMode: 'manual'})}
-                                        className="accent-purple-500"
-                                      />
-                                      <span className="text-[10px] uppercase font-mono text-neutral-300">Manual</span>
-                                    </label>
-                                    <label className="flex items-center gap-1.5 cursor-pointer">
-                                      <input
-                                        type="radio"
-                                        name="verifyMode"
-                                        checked={verificationSettings.verificationMode === 'auto'}
-                                        onChange={() => setVerificationSettings({...verificationSettings, verificationMode: 'auto'})}
-                                        className="accent-purple-500"
-                                      />
-                                      <span className="text-[10px] uppercase font-mono text-neutral-300 font-bold">Auto</span>
-                                    </label>
-                                  </div>
-                                </div>
-
-                                <div className="p-3 rounded bg-neutral-950/40 border border-white/[0.02] flex justify-between items-start gap-3">
-                                  <div>
-                                    <span className="font-bold text-stone-200 block text-[11px]">Transaction ID requirement</span>
-                                    <p className="text-[9px] text-neutral-400 mt-1">Force clients to supply gateway reference ID hash string.</p>
-                                  </div>
-                                  <label className="relative inline-flex items-center cursor-pointer select-none pt-1">
-                                    <input
-                                      type="checkbox"
-                                      checked={verificationSettings.txnIdRequired}
-                                      onChange={(e) => setVerificationSettings({...verificationSettings, txnIdRequired: e.target.checked})}
-                                      className="sr-only peer"
-                                    />
-                                    <div className="w-8 h-4 bg-neutral-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-neutral-400 after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3.5 after:transition-all peer-checked:bg-purple-600 peer-checked:after:bg-white"></div>
-                                  </label>
-                                </div>
-
-                                <div className="p-3 rounded bg-neutral-950/40 border border-white/[0.02] flex justify-between items-start gap-3">
-                                  <div>
-                                    <span className="font-bold text-stone-200 block text-[11px]">Deposit screenshot upload</span>
-                                    <p className="text-[9px] text-neutral-400 mt-1">Mandate clients to submit transaction screenshot attachments.</p>
-                                  </div>
-                                  <label className="relative inline-flex items-center cursor-pointer select-none pt-1">
-                                    <input
-                                      type="checkbox"
-                                      checked={verificationSettings.screenshotRequired}
-                                      onChange={(e) => setVerificationSettings({...verificationSettings, screenshotRequired: e.target.checked})}
-                                      className="sr-only peer"
-                                    />
-                                    <div className="w-8 h-4 bg-neutral-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-neutral-400 after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3.5 after:transition-all peer-checked:bg-purple-600 peer-checked:after:bg-white"></div>
-                                  </label>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* PENDING VERIFICATION TRANSACTIONS QUEUE */}
-                            <div className={`p-5 rounded-2xl border ${panelBg} space-y-4 text-left`}>
-                              <div className="flex justify-between items-center border-b border-white/[0.05] pb-2">
-                                <div>
-                                  <h4 className="font-extrabold text-xs uppercase font-mono tracking-wider text-purple-400">
-                                    Awaiting Action Settlement Queue
-                                  </h4>
-                                  <p className="text-[9px] text-neutral-400 mt-0.5">Below client deposit orders are pending audit verification verification.</p>
-                                </div>
-                                <span className="px-2.5 py-1 rounded bg-[#F59E0B]/10 text-[#F59E0B] font-mono text-[9px] font-bold">
-                                  {orders.filter(o => o.paymentStatus === 'pending').length} Payments Blocked
-                                </span>
-                              </div>
-
-                              <div className="overflow-x-auto text-[11px]">
-                                <table className="w-full text-left border-collapse font-sans">
-                                  <thead>
-                                    <tr className="border-b border-white/[0.05] text-[9px] font-mono uppercase text-neutral-400">
-                                      <th className="py-2.5">Order Ref</th>
-                                      <th>Customer Client</th>
-                                      <th>Gateway Specified</th>
-                                      <th>Reference Txn ID</th>
-                                      <th>Value</th>
-                                      <th className="text-right">Action Handler</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody className="divide-y divide-white/[0.03]">
-                                    {orders.filter(o => o.paymentStatus === 'pending').length === 0 ? (
-                                      <tr>
-                                        <td colSpan={6} className="py-8 text-center text-neutral-500 font-mono text-[10px]">
-                                          ✔ Great Job! All client payments have been verified and processed.
-                                        </td>
-                                      </tr>
-                                    ) : (
-                                      orders.filter(o => o.paymentStatus === 'pending').map((ord) => (
-                                        <tr key={ord.id} className="hover:bg-white/[0.02]">
-                                          <td className="py-3 font-bold font-mono text-purple-400">#{ord.id}</td>
-                                          <td className="font-sans font-medium text-stone-200">
-                                            {ord.customerName || ord.guestName || "Anonymous Checkout"}
-                                            <span className="block text-[9px] text-neutral-400 font-mono leading-none">{ord.customerEmail || ord.guestEmail}</span>
-                                          </td>
-                                          <td className="font-semibold text-neutral-300">{ord.paymentMethod || "bKash Live Webhook"}</td>
-                                          <td className="font-mono text-[10px] text-yellow-500">{ord.transactionId || "Awaiting attachment..."}</td>
-                                          <td className="font-mono font-bold text-white">${ord.price}</td>
-                                          <td className="text-right">
-                                            <button
-                                              type="button"
-                                              onClick={() => setSelectedVerifyOrder(ord)}
-                                              className="px-2.5 py-1 text-[9px] font-black uppercase font-mono rounded bg-amber-500 text-neutral-950 hover:bg-amber-400 transition hover:scale-105 cursor-pointer inline-flex items-center gap-1"
-                                            >
-                                              <ShieldCheck className="w-3.5 h-3.5" /> Verify Receipt
-                                            </button>
-                                          </td>
-                                        </tr>
-                                      ))
-                                    )}
-                                  </tbody>
-                                </table>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* TAB F: TRANSACTION HISTORY & SPREADSHEET LEDGER */}
-                        {setPaymentSubTab === 'history' && (() => {
-                          const filteredTx = orders.filter(ord => {
-                            const name = (ord.customerName || ord.guestName || '').toLowerCase();
-                            const email = (ord.customerEmail || ord.guestEmail || '').toLowerCase();
-                            const txn = (ord.transactionId || '').toLowerCase();
-                            const ordId = ord.id.toLowerCase();
-                            const searchMat = txSearchQuery.toLowerCase().trim();
-
-                            const matchesSearch = !searchMat || 
-                              name.includes(searchMat) || 
-                              email.includes(searchMat) || 
-                              ordId.includes(searchMat) || 
-                              txn.includes(searchMat);
-
-                            const matchesStatus = txStatusFilter === 'all' || ord.paymentStatus === txStatusFilter;
-                            
-                            const methodLower = (ord.paymentMethod || '').toLowerCase();
-                            const matchesMethod = txMethodFilter === 'all' || 
-                              (txMethodFilter === 'bkash' && methodLower.includes('bkash')) ||
-                              (txMethodFilter === 'nagad' && methodLower.includes('nagad')) ||
-                              (txMethodFilter === 'paypal' && methodLower.includes('paypal')) ||
-                              (txMethodFilter === 'rocket' && methodLower.includes('rocket')) ||
-                              (txMethodFilter === 'stripe' && methodLower.includes('stripe')) ||
-                              (txMethodFilter === 'bank' && methodLower.includes('bank'));
-
-                            return matchesSearch && matchesStatus && matchesMethod;
-                          });
-
-                          const handleExportCSV = (dataList: typeof filteredTx) => {
-                            const headers = "Order ID,Product/Service,Customer/Guest Name,Email,Date,Payment Method,Payment Status,Price,Transaction ID\n";
-                            const rows = dataList.map(ord => {
-                              const name = ord.customerName || ord.guestName || 'N/A';
-                              const email = ord.customerEmail || ord.guestEmail || 'N/A';
-                              return `${ord.id},"${ord.itemTitle}","${name}","${email}","${ord.date}","${ord.paymentMethod}","${ord.paymentStatus}",$${ord.price},"${ord.transactionId || ''}"`;
-                            }).join("\n");
-                            const blob = new Blob([headers + rows], { type: 'text/csv' });
-                            const url = URL.createObjectURL(blob);
-                            const link = document.createElement('a');
-                            link.href = url;
-                            link.setAttribute('download', `transactions_export_${Date.now()}.csv`);
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
-                            triggerToast("🎉 System Ledger sheet successfully compiled! Triggered CSV download sequence.");
-                            logAdminAction(`Exported payment gateway transaction spreadsheets in CSV format (${dataList.length} rows)`);
-                          };
-
-                          const handleExportExcel = (dataList: typeof filteredTx) => {
-                            const headers = "Order ID,Product/Service,Customer/Guest Name,Email,Date,Payment Method,Payment Status,Price,Transaction ID\n";
-                            const rows = dataList.map(ord => {
-                              const name = ord.customerName || ord.guestName || 'N/A';
-                              const email = ord.customerEmail || ord.guestEmail || 'N/A';
-                              return `${ord.id},"${ord.itemTitle}","${name}","${email}","${ord.date}","${ord.paymentMethod}","${ord.paymentStatus}",$${ord.price},"${ord.transactionId || ''}"`;
-                            }).join("\n");
-                            const blob = new Blob([headers + rows], { type: 'text/csv' });
-                            const url = URL.createObjectURL(blob);
-                            const link = document.createElement('a');
-                            link.href = url;
-                            link.setAttribute('download', `transactions_export_${Date.now()}.xls`);
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
-                            triggerToast("🎉 System Ledger sheet successfully compiled! Triggered XLS/Excel spreadsheet download sequence.");
-                            logAdminAction(`Exported payment gateway transaction spreadsheets in XLS/Excel format (${dataList.length} rows)`);
-                          };
-
-                          return (
-                            <div className="space-y-4 animate-in fade-in duration-200">
-                              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-white/[0.05] pb-2">
-                                <h3 className="font-bold text-sm tracking-tight text-white uppercase font-mono text-purple-400">
-                                  System Wide Transaction Archives
-                                </h3>
-                                
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleExportCSV(filteredTx)}
-                                    className="px-2.5 py-1 rounded bg-[#0284C7] hover:bg-[#0369a1] text-white text-[10px] font-bold uppercase font-mono flex items-center gap-1 cursor-pointer"
-                                  >
-                                    <Download className="w-3 h-3" /> Export CSV Sheet
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleExportExcel(filteredTx)}
-                                    className="px-2.5 py-1 rounded bg-[#16A34A] hover:bg-[#15803d] text-white text-[10px] font-bold uppercase font-mono flex items-center gap-1 cursor-pointer"
-                                  >
-                                    <FileText className="w-3 h-3" /> Export Excel Form
-                                  </button>
-                                </div>
-                              </div>
-
-                              {/* FILTER AND SEARCH MATRIX */}
-                              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 bg-neutral-900/40 p-4 rounded-xl border border-white/[0.03]">
-                                <div className="sm:col-span-2 relative">
-                                  <Search className="absolute left-3 top-2.5 text-neutral-500 w-3.5 h-3.5" />
-                                  <input
-                                    type="text"
-                                    placeholder="Search customer, transaction hex, email, phone or order ID..."
-                                    value={txSearchQuery}
-                                    onChange={(e) => setTxSearchQuery(e.target.value)}
-                                    className="w-full bg-neutral-950 border border-neutral-800 text-xs pl-8 pr-3 py-2 rounded focus:border-purple-500 text-white outline-none font-sans"
-                                  />
-                                </div>
-
-                                <div>
-                                  <select
-                                    value={txStatusFilter}
-                                    onChange={(e) => setTxStatusFilter(e.target.value)}
-                                    className="w-full bg-neutral-950 border border-neutral-800 text-xs px-2.5 py-2 rounded focus:border-purple-500 text-white outline-none font-sans"
-                                  >
-                                    <option value="all">💳 All Statuses</option>
-                                    <option value="completed">💚 Completed / Cleared</option>
-                                    <option value="pending">🧡 Pending Validation</option>
-                                    <option value="failed">💔 Failed / Rejected</option>
-                                  </select>
-                                </div>
-
-                                <div>
-                                  <select
-                                    value={txMethodFilter}
-                                    onChange={(e) => setTxMethodFilter(e.target.value)}
-                                    className="w-full bg-neutral-950 border border-neutral-800 text-xs px-2.5 py-2 rounded focus:border-purple-500 text-white outline-none font-sans"
-                                  >
-                                    <option value="all">🌐 All Channels</option>
-                                    <option value="bkash">bKash Gateways</option>
-                                    <option value="nagad">Nagad Gateways</option>
-                                    <option value="paypal">PayPal REST</option>
-                                    <option value="rocket">Rocket Wallet</option>
-                                    <option value="stripe">Stripe Cards</option>
-                                    <option value="bank">Bank Wire Transfer</option>
-                                  </select>
-                                </div>
-                              </div>
-
-                              {/* TRANSACTIONS TABLE */}
-                              <div className={`rounded-xl border ${panelBg} overflow-hidden text-[11px] text-left`}>
-                                <div className="overflow-x-auto">
-                                  <table className="w-full text-left border-collapse">
-                                    <thead>
-                                      <tr className="bg-neutral-900 border-b border-white/[0.05] text-[9px] font-mono uppercase text-neutral-400">
-                                        <th className="py-2 px-3">Date</th>
-                                        <th>Order ID</th>
-                                        <th>Recipient User</th>
-                                        <th>Channel / Gateway</th>
-                                        <th>Live Txn ID</th>
-                                        <th>Rate/Price</th>
-                                        <th>Status Badge</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-white/[0.02]">
-                                      {filteredTx.length === 0 ? (
-                                        <tr>
-                                          <td colSpan={7} className="py-8 text-center text-neutral-500 font-mono text-[10px]">
-                                            ❌ No archival match found matching your filters.
-                                          </td>
-                                        </tr>
-                                      ) : (
-                                        filteredTx.map((txItem) => (
-                                          <tr key={txItem.id} className="hover:bg-white/[0.01]">
-                                            <td className="py-3 px-3 font-mono text-[10px] text-neutral-400">{txItem.date}</td>
-                                            <td className="font-bold text-neutral-200">#{txItem.id}</td>
-                                            <td className="font-sans">
-                                              <span className="font-bold text-stone-200 block">{txItem.customerName || txItem.guestName || "Anonymous User"}</span>
-                                              <span className="block text-[9px] text-neutral-400 font-mono leading-none">{txItem.customerEmail || txItem.guestEmail}</span>
-                                            </td>
-                                            <td className="text-neutral-300 font-semibold">{txItem.paymentMethod || "SSL Secure checkout"}</td>
-                                            <td className="font-mono text-[10px]">
-                                              {txItem.transactionId ? (
-                                                <span className="text-green-500 bg-green-950/10 border border-green-500/20 px-1.5 py-0.5 rounded text-[9px]">{txItem.transactionId}</span>
-                                              ) : (
-                                                <span className="text-neutral-500 italic">No reference hash</span>
-                                              )}
-                                            </td>
-                                            <td className="font-bold font-mono text-white text-[12px]">${txItem.price}</td>
-                                            <td>
-                                              {txItem.paymentStatus === 'completed' && (
-                                                <span className="px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-500/30 text-[8px] uppercase tracking-wider font-extrabold">Completed</span>
-                                              )}
-                                              {txItem.paymentStatus === 'pending' && (
-                                                <span className="px-2 py-0.5 rounded-full bg-amber-950 text-amber-500 border border-amber-500/30 text-[8px] uppercase tracking-wider font-extrabold">Pending</span>
-                                              )}
-                                              {txItem.paymentStatus === 'failed' && (
-                                                <span className="px-2 py-0.5 rounded-full bg-rose-950 text-rose-500 border border-rose-500/30 text-[8px] uppercase tracking-wider font-extrabold">Failed</span>
-                                              )}
-                                              {txItem.paymentStatus === 'refunded' && (
-                                                <span className="px-2 py-0.5 rounded-full bg-neutral-850 text-neutral-400 border border-neutral-700 text-[8px] uppercase tracking-wider font-extrabold">Refunded</span>
-                                              )}
-                                            </td>
-                                          </tr>
-                                        ))
-                                      )}
-                                    </tbody>
-                                  </table>
-                                </div>
-                              </div>
-
-                              <div className="flex items-center justify-between font-mono text-[9px] text-neutral-400">
-                                <span>Showing {filteredTx.length} records matching search matrices</span>
-                                <span className="uppercase text-purple-400">Audit Vault sync is active</span>
-                              </div>
-                            </div>
-                          );
-                        })()}
-
-                      </div>
-                    );
-                  })()}
-
-                </div>
-              )
+            {/* SCREEN VIEWPORT: COUPONS & DISCOUNT MANAGEMENT */}
+            {activeMenu === 'coupons' && (
+              <AdminCouponsSuite
+                isDark={isDark}
+                language={language}
+                coupons={coupons}
+                addNewCoupon={addNewCoupon}
+                updateCoupon={updateCoupon}
+                deleteCoupon={deleteCoupon}
+                triggerToast={triggerToast}
+              />
             )}
 
+            {/* SCREEN VIEWPORT: AFFILIATE PARTNER SYSTEM */}
+            {activeMenu === 'affiliates' && (
+              <Suspense fallback={<div className="p-8 text-center text-xs text-neutral-500">Loading affiliate system...</div>}>
+                <AffiliateSystem
+                  language={language}
+                  theme={theme}
+                  user={currentUser}
+                  onLoginClick={() => {}}
+                  triggerToast={triggerToast}
+                />
+              </Suspense>
+            )}
+
+            {/* SCREEN VIEWPORT: KANBAN WORKFLOW & MILESTONES */}
+            {activeMenu === 'kanban' && (
+              <Suspense fallback={<div className="p-8 text-center text-xs text-neutral-500">Loading Kanban board...</div>}>
+                <KanbanBoard
+                  theme={theme}
+                  language={language}
+                  triggerToast={triggerToast}
+                />
+              </Suspense>
+            )}
+
+            {/* SCREEN VIEWPORT: LIVE THEME & BRANDING PREVIEWER */}
+            {(activeMenu === 'live-theme-preview' || activeMenu === 'web-theme-preview') && (
+              <Suspense fallback={<div className="p-8 text-center text-xs text-neutral-500">Loading live theme previewer...</div>}>
+                <LiveThemePreviewer
+                  theme={theme}
+                  language={language}
+                  triggerToast={triggerToast}
+                />
+              </Suspense>
+            )}
+
+            {/* SCREEN VIEWPORT: GUEST ORDER TRACKING PORTAL */}
+            {(activeMenu === 'tracking' || activeMenu === 'guest-tracking') && (
+              <Suspense fallback={<div className="p-8 text-center text-xs text-neutral-500">Loading order tracker...</div>}>
+                <GuestOrderTracking
+                  theme={theme}
+                  language={language}
+                  triggerToast={triggerToast}
+                  onOpenOrderInspect={(order: any) => setSelectedOrderForInspect(order)}
+                />
+              </Suspense>
+            )}
+
+            {/* FALLBACK VIEWPORT: WEBSITE CONTROL CENTER FOR SERVICES, CMS, WEB-SETTINGS, STAFF & SUPPORT */}
+            {['services', 'support', 'ai-center', 'reviews', 'staff', 'notifications', 'web-settings', 'products', 'categories'].includes(activeMenu) && (
+              <Suspense fallback={<div className="p-8 text-center text-xs text-neutral-500">Loading control center...</div>}>
+                <WebsiteControlCenter
+                  language={language}
+                  theme={theme}
+                  activeSubMenu={activeSubMenu}
+                  setActiveSubMenu={setActiveSubMenu}
+                  triggerToast={triggerToast}
+                  orders={orders}
+                  currencyRates={currencyRates}
+                  setCurrencyRates={setCurrencyRates}
+                  verificationSettings={verificationSettings}
+                  setVerificationSettings={setVerificationSettings}
+                  paymentNotifs={paymentNotifs}
+                  setPaymentNotifs={setPaymentNotifs}
+                  bdMethods={bdMethods}
+                  setBdMethods={setBdMethods}
+                  saMethods={saMethods}
+                  setSaMethods={setSaMethods}
+                  intlMethods={intlMethods}
+                  setIntlMethods={setIntlMethods}
+                  customMethods={customMethods}
+                  setCustomMethods={setCustomMethods}
+                  logAdminAction={logAdminAction}
+                  getOrderSerial={getOrderSerial}
+                  updateOrderStatus={updateOrderStatus}
+                />
+              </Suspense>
+            )}
           </main>
-
         </div>
       </div>
-
-      {/* ORDER INSPECTION MODAL */}
-      {selectedOrderForInspect && (() => {
-        const orderId = selectedOrderForInspect.id;
-        const order = orders.find(o => o.id === orderId) || selectedOrderForInspect;
-        
-        // Resolve customer
-        const orderUserId = (order as any).userId;
-        let customer = customers.find(c => c.id === orderUserId);
-        if (!customer) {
-          // Fallback deterministic lookup
-          const hash = order.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-          const matchedIndex = hash % customers.length;
-          customer = customers[matchedIndex] || INITIAL_CUSTOMERS[0];
-        }
-
-        // Resolve product
-        let product = order.productId ? products.find(p => p.id === order.productId) : null;
-        if (!product) {
-          product = products.find(p => p.name === order.itemTitle || p.nameBn === order.itemTitle) || null;
-        }
-
-        return (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-150 overflow-y-auto">
-            <div className={`w-full max-w-3xl rounded-3xl border overflow-hidden shadow-2xl flex flex-col ${isDark ? 'bg-neutral-900 border-neutral-800' : 'bg-white border-neutral-200'}`}>
-              
-              {/* Modal Banner Header */}
-              <div className="p-6 border-b flex justify-between items-center bg-gradient-to-r from-purple-900/40 via-indigo-900/30 to-transparent border-neutral-800 font-sans">
-                <div className="space-y-1 text-left">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-mono text-purple-400 font-extrabold uppercase tracking-widest bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 rounded">
-                      Order Inspector
-                    </span>
-                    <span className="text-xs font-mono text-neutral-400 font-bold">
-                      #{getOrderSerial(order.id)}
-                    </span>
-                  </div>
-                  <h3 className={`text-base font-black ${isDark ? 'text-white' : 'text-neutral-900'}`}>
-                    Order & Transaction Breakdown
-                  </h3>
-                </div>
-                <button 
-                  onClick={() => setSelectedOrderForInspect(null)}
-                  className={`p-2 rounded-xl transition ${isDark ? 'hover:bg-neutral-800 text-neutral-400 hover:text-white' : 'hover:bg-neutral-100 text-neutral-500 hover:text-black'}`}
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* Grid content */}
-              <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6 overflow-y-auto max-h-[70vh] text-left font-sans">
-                
-                {/* Left Area: Order Specifications & full product list (Colspan 2) */}
-                <div className="md:col-span-2 space-y-5">
-                  
-                  {/* Status Indicator Bar */}
-                  <div className={`p-4 rounded-2xl border flex items-center justify-between ${isDark ? 'bg-neutral-950/60 border-neutral-850' : 'bg-neutral-50 border-neutral-100'}`}>
-                    <div>
-                      <span className="text-[9px] uppercase font-mono tracking-widest block font-bold opacity-60">Settlement Status</span>
-                      <span className={`text-xs font-black uppercase tracking-wider block mt-0.5 ${
-                        order.paymentStatus === 'completed' 
-                          ? 'text-emerald-400' 
-                          : order.paymentStatus === 'failed' 
-                            ? 'text-rose-400' 
-                            : 'text-amber-400'
-                      }`}>
-                        ● {order.paymentStatus}
-                      </span>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-[9px] uppercase font-mono tracking-widest block font-bold opacity-60">Channel / Processor</span>
-                      <span className={`text-xs font-black block mt-0.5 capitalize ${isDark ? 'text-white' : 'text-neutral-900'}`}>
-                        {order.paymentMethod || 'Credit/Debit Card (Stripe)'}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Product Details Section */}
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-1.5 border-b border-neutral-800/60 pb-1.5">
-                      <ShoppingBag className="w-4 h-4 text-purple-400" />
-                      <h4 className={`text-xs font-mono font-black uppercase tracking-wider ${isDark ? 'text-neutral-300' : 'text-neutral-700'}`}>
-                        Full Checkout Product List
-                      </h4>
-                    </div>
-
-                    <div className={`p-4 rounded-2xl border space-y-4 ${isDark ? 'bg-neutral-950/40 border-neutral-850' : 'bg-neutral-50 border-neutral-150'}`}>
-                      {/* Product Row 1 */}
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="space-y-1">
-                          <span className="text-[9px] uppercase font-mono tracking-wider font-extrabold text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded">
-                            {product ? product.category.toUpperCase() : 'Custom Digital Asset'}
-                          </span>
-                          <h5 className={`text-xs font-bold leading-snug ${isDark ? 'text-white' : 'text-neutral-900'}`}>
-                            {order.itemTitle}
-                          </h5>
-                          {product && (
-                            <p className="text-[10px] opacity-60 line-clamp-2">
-                              {language === 'bn' ? product.descriptionBn : product.description}
-                            </p>
-                          )}
-                        </div>
-                        <div className="text-right font-mono font-bold text-xs text-purple-400">
-                          ${order.price}
-                        </div>
-                      </div>
-
-                      {/* Optional extra product items to simulate a "full product list" / detailed receipt */}
-                      <hr className="border-neutral-850" />
-
-                      <div className="space-y-2 text-[11px] font-mono">
-                        <div className="flex justify-between text-neutral-400">
-                          <span>Subtotal Items (1x)</span>
-                          <span className={isDark ? 'text-white' : 'text-neutral-900'}>${order.price}</span>
-                        </div>
-                        <div className="flex justify-between text-neutral-400">
-                          <span>Developer Standard Installation Support</span>
-                          <span className="text-emerald-400">FREE</span>
-                        </div>
-                        <div className="flex justify-between text-neutral-400">
-                          <span>Estimated Tax / Gateway Fee (0.0%)</span>
-                          <span>$0.00</span>
-                        </div>
-                        <div className="border-t border-neutral-800/80 pt-2 flex justify-between font-bold text-xs text-purple-400">
-                          <span>Grand Total Settlement</span>
-                          <span className="font-extrabold text-sm">${order.price}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Connected Product Metadata / Specifications */}
-                  {product ? (
-                    <div className="space-y-2.5 font-sans">
-                      <div className="flex items-center gap-1.5 border-b border-neutral-800/60 pb-1.5">
-                        <Activity className="w-3.5 h-3.5 text-purple-400" />
-                        <h4 className={`text-xs font-mono font-black uppercase tracking-wider ${isDark ? 'text-neutral-300' : 'text-neutral-700'}`}>
-                          Product Features & Specs
-                        </h4>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3 text-[11px]">
-                        <div className={`p-3 rounded-xl border ${isDark ? 'bg-neutral-950/20 border-neutral-850' : 'bg-neutral-50/50 border-neutral-100'}`}>
-                          <span className="opacity-50 block text-[9px] font-mono uppercase">Rating Index</span>
-                          <span className={`font-bold mt-0.5 block ${isDark ? 'text-white' : 'text-neutral-900'}`}>💪 {product.rating} / 5 ({product.reviewsCount} reviews)</span>
-                        </div>
-                        <div className={`p-3 rounded-xl border ${isDark ? 'bg-neutral-950/20 border-neutral-850' : 'bg-neutral-50/50 border-neutral-100'}`}>
-                          <span className="opacity-50 block text-[9px] font-mono uppercase">Reference Tags</span>
-                          <span className={`font-mono font-medium mt-0.5 block truncate ${isDark ? 'text-white' : 'text-neutral-900'}`}>
-                            {product.tags ? product.tags.join(', ') : 'no_tags'}
-                          </span>
-                        </div>
-                      </div>
-                      {product.features && product.features.length > 0 && (
-                        <div className={`p-3 rounded-xl border space-y-1 ${isDark ? 'bg-neutral-950/20 border-neutral-850' : 'bg-neutral-50/50'}`}>
-                          <span className="opacity-50 block text-[9px] font-mono uppercase">Included Deliverables</span>
-                          <ul className="list-disc pl-4 text-[10px] space-y-0.5 opacity-80">
-                            {product.features.slice(0, 3).map((f, i) => (
-                              <li key={i}>{f}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className={`p-3 rounded-xl border font-sans ${isDark ? 'bg-neutral-950/20 border-neutral-850' : 'bg-neutral-50/50'}`}>
-                      <span className="opacity-50 block text-[9px] font-mono uppercase">Digital Deliverable Reference</span>
-                      <span className="text-[10px] italic">Provides fully-customized bespoke cloud engineering, custom design requirements alignment, and dedicated support consulting.</span>
-                    </div>
-                  )}
-
-                  {/* Customer Order Notes Field */}
-                  <div className="space-y-3 font-sans">
-                    <div className="flex items-center gap-1.5 border-b border-neutral-800/60 pb-1.5">
-                      <span className="text-purple-400">📝</span>
-                      <h4 className={`text-xs font-mono font-black uppercase tracking-wider ${isDark ? 'text-neutral-300' : 'text-neutral-700'}`}>
-                        Customer Order Notes
-                      </h4>
-                    </div>
-                    <div className={`p-4 rounded-2xl border space-y-2 ${isDark ? 'bg-neutral-950/40 border-neutral-850' : 'bg-neutral-50 border-neutral-150'}`}>
-                      {order.orderNotes ? (
-                        <div className="relative">
-                          <textarea
-                            value={order.orderNotes}
-                            onChange={(e) => {
-                              if (updateOrderDetails) {
-                                updateOrderDetails(order.id, { orderNotes: e.target.value });
-                              }
-                            }}
-                            rows={3}
-                            placeholder="Customer didn't write any custom notes for this order..."
-                            className={`w-full p-3 text-xs rounded-xl border focus:outline-none focus:ring-1 resize-none ${
-                              isDark 
-                                ? 'bg-neutral-900 border-neutral-800 text-neutral-250 focus:ring-purple-500' 
-                                : 'bg-white border-neutral-200 text-neutral-800 focus:ring-purple-550'
-                            }`}
-                          />
-                        </div>
-                      ) : (
-                        <div className="relative">
-                          <textarea
-                            value={order.orderNotes || ''}
-                            onChange={(e) => {
-                              if (updateOrderDetails) {
-                                updateOrderDetails(order.id, { orderNotes: e.target.value });
-                              }
-                            }}
-                            rows={2}
-                            placeholder="No customer notes captured with this order (Optional notes were omitted on checkout). Admin can add notes here..."
-                            className={`w-full p-3 text-xs italic rounded-xl border focus:outline-none focus:ring-1 resize-none ${
-                              isDark 
-                                ? 'bg-neutral-900 border-neutral-800 text-neutral-400 focus:ring-purple-500' 
-                                : 'bg-white border-neutral-200 text-neutral-500 focus:ring-purple-550 mr-1'
-                            }`}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Digital Downloads Delivery Hub */}
-                  <div className="space-y-3 font-sans">
-                    <div className="flex items-center gap-1.5 border-b border-neutral-800/60 pb-1.5">
-                      <Download className="w-3.5 h-3.5 text-purple-400" />
-                      <h4 className={`text-xs font-mono font-black uppercase tracking-wider ${isDark ? 'text-neutral-300' : 'text-neutral-700'}`}>
-                        Digital Package Deliverables Manager
-                      </h4>
-                    </div>
-                    <div className={`p-4 rounded-2xl border space-y-3 ${isDark ? 'bg-neutral-950/40 border-neutral-850' : 'bg-neutral-50 border-neutral-150'}`}>
-                      <div>
-                        <label className="text-[9px] font-mono text-neutral-400 uppercase tracking-wider block mb-1 font-bold">
-                          Fulfillment Delivery Script Pack URL
-                        </label>
-                        <div className="flex gap-2">
-                          <input 
-                            type="text"
-                            value={order.downloadUrl || ''}
-                            onChange={(e) => {
-                              if (updateOrderDetails) {
-                                updateOrderDetails(order.id, { downloadUrl: e.target.value });
-                              }
-                            }}
-                            placeholder="https://webzonebd.com/dl/package.zip"
-                            className={`flex-1 px-3 py-1 text-xs rounded-xl border focus:outline-none focus:ring-1 ${
-                              isDark 
-                                ? 'bg-neutral-905 border-neutral-800 text-white focus:ring-purple-500 bg-neutral-900' 
-                                : 'bg-white border-neutral-250 text-neutral-900 focus:ring-purple-500'
-                            }`}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              navigator.clipboard.writeText(order.downloadUrl || '');
-                              triggerToast("📋 Download link copied to clipboard!");
-                            }}
-                            className={`px-3 py-1 rounded-xl border transition ${
-                              isDark 
-                                ? 'border-neutral-800 hover:bg-neutral-950 text-neutral-400 hover:text-white bg-neutral-900' 
-                                : 'border-neutral-200 hover:bg-neutral-100 text-neutral-600 hover:text-black'
-                            }`}
-                            title="Copy Link"
-                          >
-                            <Copy className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-
-                      {order.downloadUrl && order.downloadUrl !== '#' && (
-                        <div className="flex items-center justify-between pt-2 border-t border-neutral-800/20">
-                          <span className="text-[10px] text-neutral-400">Run code file delivery test</span>
-                          <a 
-                            href={order.downloadUrl}
-                            target="_blank"
-                            rel="noreferrer noopener"
-                            className="inline-flex items-center gap-1 px-3 py-1 rounded-xl text-[10px] font-bold text-white bg-purple-650 hover:bg-purple-700 transition"
-                          >
-                            <Download className="w-2.5 h-2.5" />
-                            <span>Download Files</span>
-                          </a>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                </div>
-
-                {/* Right Area: Customer CRM Contact Card */}
-                <div className="space-y-5">
-                  <div className="flex items-center gap-1.5 border-b border-neutral-800/60 pb-1.5">
-                    <Users className="w-4 h-4 text-purple-400" />
-                    <h4 className={`text-xs font-mono font-black uppercase tracking-wider ${isDark ? 'text-neutral-300' : 'text-neutral-700'}`}>
-                      Customer Profile CRM
-                    </h4>
-                  </div>
-
-                  <div className={`p-4 rounded-2xl border space-y-4 text-xs ${isDark ? 'bg-neutral-950/50 border-neutral-850' : 'bg-neutral-50 border-neutral-150'}`}>
-                    {/* Customer Photo / Name */}
-                    <div className="flex items-center gap-3 pb-3 border-b border-neutral-800/60">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-purple-600 to-indigo-600 text-white font-mono font-black flex items-center justify-center text-sm shadow-md shrink-0">
-                        {(order.customerName || customer.name || 'G')[0]}
-                      </div>
-                      <div className="space-y-0.5 overflow-hidden">
-                        <span className={`font-black text-xs block truncate ${isDark ? 'text-white' : 'text-neutral-900'}`}>{order.customerName || customer.name}</span>
-                        <span className="text-[9px] font-mono text-purple-400 font-bold tracking-wide uppercase bg-purple-500/10 px-1.5 py-0.5 rounded inline-block">
-                          {customer.id} {order.isGuest ? '(GUEST)' : '(USER)'}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Customer Metadata Live Fields */}
-                    <div className="space-y-3 font-sans">
-                      <div>
-                        <label className="text-[9px] font-mono text-neutral-400 uppercase tracking-widest block font-bold mb-1">Customer Name</label>
-                        <div className="relative">
-                          <User className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-neutral-550" />
-                          <input 
-                            type="text"
-                            value={order.customerName || ''}
-                            onChange={(e) => {
-                              if (updateOrderDetails) {
-                                updateOrderDetails(order.id, { customerName: e.target.value });
-                              }
-                            }}
-                            className={`w-full pl-8 pr-3 py-1.5 text-xs rounded-xl border focus:outline-none focus:ring-1 ${
-                              isDark 
-                                ? 'bg-neutral-900 border-neutral-800 text-white focus:ring-purple-500' 
-                                : 'bg-white border-neutral-250 text-neutral-900 focus:ring-purple-500'
-                            }`}
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="text-[9px] font-mono text-neutral-400 uppercase tracking-widest block font-bold mb-1">Email Connection</label>
-                        <div className="relative">
-                          <Mail className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-neutral-550" />
-                          <input 
-                            type="email"
-                            value={order.customerEmail || ''}
-                            onChange={(e) => {
-                              if (updateOrderDetails) {
-                                updateOrderDetails(order.id, { customerEmail: e.target.value });
-                              }
-                            }}
-                            className={`w-full pl-8 pr-3 py-1.5 text-xs rounded-xl border focus:outline-none focus:ring-1 ${
-                              isDark 
-                                ? 'bg-neutral-900 border-neutral-800 text-white focus:ring-purple-500' 
-                                : 'bg-white border-neutral-250 text-neutral-900 focus:ring-purple-500'
-                            }`}
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="text-[9px] font-mono text-neutral-400 uppercase tracking-widest block font-bold mb-1">Phone / WhatsApp</label>
-                        <div className="relative">
-                          <Phone className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-neutral-550" />
-                          <input 
-                            type="text"
-                            value={order.customerPhone || ''}
-                            onChange={(e) => {
-                              if (updateOrderDetails) {
-                                updateOrderDetails(order.id, { customerPhone: e.target.value });
-                              }
-                            }}
-                            className={`w-full pl-8 pr-3 py-1.5 text-xs rounded-xl border focus:outline-none focus:ring-1 ${
-                              isDark 
-                                ? 'bg-neutral-900 border-neutral-800 text-white focus:ring-purple-500' 
-                                : 'bg-white border-neutral-250 text-neutral-900 focus:ring-purple-500'
-                            }`}
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <span className="text-[9px] font-mono text-neutral-400 uppercase tracking-widest block font-bold">Registered Country</span>
-                        <span className={`font-semibold block mt-0.5 ${isDark ? 'text-neutral-200' : 'text-neutral-800'}`}>
-                          📍 {customer.country || 'Bangladesh'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* CRM Team Coordinator Selector Section */}
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-1.5 border-b border-neutral-800/60 pb-1.5">
-                      <UserCheck className="w-4 h-4 text-purple-400" />
-                      <h4 className={`text-xs font-mono font-black uppercase tracking-wider ${isDark ? 'text-neutral-300' : 'text-neutral-700'}`}>
-                        Staff Assignment & Support
-                      </h4>
-                    </div>
-
-                    <div className={`p-4 rounded-2xl border space-y-3 text-xs ${isDark ? 'bg-neutral-950/50 border-neutral-850 font-sans' : 'bg-neutral-50 border-neutral-150 font-sans'}`}>
-                      <div>
-                        <label className="text-[9px] font-mono text-neutral-400 uppercase tracking-widest block font-bold mb-1">
-                          Assigned Staff Handler (CRM Team)
-                        </label>
-                        <select
-                          value={order.assignedStaff || 'Imran Khan'}
-                          onChange={(e) => {
-                            if (updateOrderDetails) {
-                              updateOrderDetails(order.id, { assignedStaff: e.target.value });
-                              triggerToast(`👤 Coordinator changed to: ${e.target.value}`);
-                            }
-                          }}
-                          className={`w-full px-3 py-1.5 text-xs rounded-xl border focus:outline-none focus:ring-1 ${
-                            isDark 
-                              ? 'bg-neutral-900 border-neutral-800 text-white focus:ring-purple-500' 
-                              : 'bg-white border-neutral-250 text-neutral-900 focus:ring-purple-500'
-                          }`}
-                        >
-                          <option value="Imran Khan">Imran Khan (Super-Admin)</option>
-                          <option value="Afsana Mim">Afsana Mim (Senior CRM)</option>
-                          <option value="Shakil Ahmed">Shakil Ahmed (Lead Engineer)</option>
-                          <option value="Kamrul Hasan">Kamrul Hasan (Support Tech)</option>
-                          <option value="Farhana Islam">Farhana Islam (CRM Lead)</option>
-                          <option value="Tarek Rahman">Tarek Rahman (Standard Agent)</option>
-                        </select>
-                      </div>
-                      <p className="text-[10px] text-neutral-500 font-sans leading-relaxed">
-                        This staff representative handles client support, custom installations, and webhook deployment verifications.
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Payment settlement ledger */}
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-1.5 border-b border-neutral-800/60 pb-1.5">
-                      <Key className="w-4 h-4 text-purple-400" />
-                      <h4 className={`text-xs font-mono font-black uppercase tracking-wider ${isDark ? 'text-neutral-300' : 'text-neutral-700'}`}>
-                        Payment Ledger Verification
-                      </h4>
-                    </div>
-
-                    <div className={`p-4 rounded-2xl border space-y-4 text-xs ${isDark ? 'bg-neutral-950/50 border-neutral-850 font-sans' : 'bg-neutral-50 border-neutral-150 font-sans'}`}>
-                      <div>
-                        <label className="text-[9px] font-mono text-neutral-400 uppercase tracking-widest block font-bold mb-1">
-                          Payment Method Channel
-                        </label>
-                        <input
-                          type="text"
-                          value={order.paymentMethod || ''}
-                          onChange={(e) => {
-                            if (updateOrderDetails) {
-                              updateOrderDetails(order.id, { paymentMethod: e.target.value });
-                            }
-                          }}
-                          className={`w-full px-3 py-1.5 text-xs rounded-xl border focus:outline-none focus:ring-1 ${
-                            isDark 
-                              ? 'bg-neutral-900 border-neutral-800 text-white focus:ring-purple-500' 
-                              : 'bg-white border-neutral-250 text-neutral-900 focus:ring-purple-500'
-                          }`}
-                        />
-                      </div>
-
-                      <div>
-                        <label className="text-[9px] font-mono text-neutral-400 uppercase tracking-widest block font-bold mb-1">
-                          Processor Transaction ID (TrxID)
-                        </label>
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            value={order.transactionId || ''}
-                            onChange={(e) => {
-                              if (updateOrderDetails) {
-                                updateOrderDetails(order.id, { transactionId: e.target.value });
-                              }
-                            }}
-                            className={`flex-1 px-3 py-1 text-xs font-mono rounded-xl border focus:outline-none focus:ring-1 ${
-                              isDark 
-                                ? 'bg-neutral-900 border-neutral-800 text-white focus:ring-purple-500' 
-                                : 'bg-white border-neutral-250 text-neutral-900 focus:ring-purple-500'
-                            }`}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              navigator.clipboard.writeText(order.transactionId || '');
-                              triggerToast("📋 Transaction ID copied!");
-                            }}
-                            className={`px-3 py-1 rounded-xl border transition ${
-                              isDark 
-                                ? 'border-neutral-800 hover:bg-neutral-950 text-neutral-400 hover:text-white bg-neutral-900' 
-                                : 'border-neutral-200 hover:bg-neutral-100 text-neutral-600 hover:text-black'
-                            }`}
-                            title="Copy ID"
-                          >
-                            <Copy className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Order Timestamp audit log */}
-                  <div className={`p-3.5 rounded-2xl border space-y-1.5 text-[11px] ${isDark ? 'bg-neutral-950/20 border-neutral-850' : 'bg-neutral-50/50'}`}>
-                    <span className="text-[9px] font-mono text-neutral-400 uppercase tracking-widest block font-bold">Transaction Audit Log</span>
-                    <div className="space-y-1 block font-mono text-[10px]">
-                      <div className="flex justify-between">
-                        <span className="opacity-55">Order Placed</span>
-                        <span className="font-bold">{order.date ? `${order.date} 10:25:40 UTC` : 'Just now'}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="opacity-55">Payment Cleared</span>
-                        <span className="font-bold text-emerald-400">{order.date ? `${order.date} 10:26:02 UTC` : 'Just now'}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="opacity-55">Fulfillment Delivery</span>
-                        <span className="font-bold text-purple-400">Delivered (Automated API Callback)</span>
-                      </div>
-                    </div>
-                  </div>
-
-                </div>
-
-              </div>
-
-              {/* Action Footer */}
-              <div className={`p-4 border-t flex justify-end gap-2 text-xs font-bold ${isDark ? 'bg-neutral-950/60 border-neutral-800' : 'bg-neutral-50 border-neutral-200'}`}>
-                <button
-                  onClick={() => setSelectedOrderForInspect(null)}
-                  className={`px-4 py-2 rounded-xl border transition ${
-                    isDark 
-                      ? 'border-neutral-800 hover:border-neutral-700 bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white' 
-                      : 'border-neutral-200 hover:border-neutral-300 bg-white hover:bg-neutral-50 text-neutral-700 hover:text-neutral-900'
-                  }`}
-                >
-                  Close Inspector
-                </button>
-              </div>
-
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* DETAILED ITEMIZED BILLING / INVOICE MODAL */}
-      {selectedOrderForInvoiceModal && (() => {
-        const order = selectedOrderForInvoiceModal;
-        
-        // Resolve customer
-        const orderUserId = (order as any).userId;
-        let customer = customers.find(c => c.id === orderUserId);
-        if (!customer) {
-          const hash = order.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-          const matchedIndex = hash % customers.length;
-          customer = customers[matchedIndex] || INITIAL_CUSTOMERS[0];
-        }
-
-        const finalName = order.customerName || customer?.name || 'GUEST';
-        const finalEmail = order.customerEmail || customer?.email || 'N/A';
-        const finalPhone = order.customerPhone || customer?.phone || 'N/A';
-        const finalCountry = customer?.country || 'Bangladesh';
-        const finalCity = customer?.city || 'Dhaka';
-        const finalAddress = customer?.address || 'Webzone Headquarters';
-
-        const getExpectedDeliveryTextLocal = (ord: Order) => {
-          const oDate = new Date(ord.date);
-          if (isNaN(oDate.getTime())) return '3-5 Working Days';
-          if (ord.status === 'delivered') {
-            const delDate = new Date(oDate.getTime() + 2 * 24 * 60 * 60 * 1000);
-            return delDate.toLocaleDateString(language === 'bn' ? 'bn-BD' : 'en-US', {
-              year: 'numeric', month: 'long', day: 'numeric'
-            });
-          }
-          const daysToAdd = ord.status === 'shipped' ? 1 : 3;
-          const estDate = new Date(oDate.getTime() + daysToAdd * 24 * 60 * 60 * 1000);
-          return estDate.toLocaleDateString(language === 'bn' ? 'bn-BD' : 'en-US', {
-            year: 'numeric', month: 'long', day: 'numeric'
-          });
-        };
-
-        return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md overflow-y-auto">
-            {/* Backdrop closes the modal */}
-            <div 
-              onClick={() => setSelectedOrderForInvoiceModal(null)}
-              className="absolute inset-0 bg-transparent cursor-default"
-            />
-
-            {/* Modal Window Sheet */}
-            <div className={`relative w-full max-w-2xl rounded-3xl shadow-2xl border overflow-hidden z-20 flex flex-col max-h-[90vh] ${
-              isDark ? 'bg-neutral-905 border-neutral-800 text-neutral-100' : 'bg-white border-neutral-200 text-neutral-850'
-            }`}>
-              
-              {/* Header Bar */}
-              <div className={`p-5 border-b flex items-center justify-between ${
-                isDark ? 'bg-neutral-950 border-neutral-800' : 'bg-slate-50/80 border-neutral-200'
-              }`}>
-                <div className="flex items-center gap-2.5">
-                  <div className={`p-2 rounded-xl ${
-                    isDark ? 'bg-[#2563EB]/10 text-cyan-405' : 'bg-indigo-50 text-[#2563EB]'
-                  }`}>
-                    <Printer className="w-5 h-5" />
-                  </div>
-                  <div className="text-left font-sans">
-                    <h3 className={`text-xs md:text-sm font-black uppercase tracking-tight ${
-                      isDark ? 'text-white' : 'text-slate-900'
-                    }`}>
-                      {language === 'bn' ? 'অর্ডার ইনভয়েস ও রসিদ' : 'Official Invoice Receipt'}
-                    </h3>
-                    <span className="text-[10px] font-mono text-neutral-400 block tracking-wider uppercase font-bold mt-0.5">
-                      Invoice ID: #{getOrderSerial(order.id)}
-                    </span>
-                  </div>
-                </div>
-                
-                <button
-                  onClick={() => setSelectedOrderForInvoiceModal(null)}
-                  className={`p-1.5 rounded-xl transition cursor-pointer ${
-                    isDark ? 'hover:bg-neutral-850 text-neutral-400 hover:text-white' : 'hover:bg-slate-200 text-slate-400 hover:text-slate-605'
-                  }`}
-                  aria-label="Close invoice details modal"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* Modal Core Body (Scrollable) */}
-              <div className="p-6 overflow-y-auto space-y-6 text-xs text-left font-sans">
-                
-                {/* Brand & Status Banner */}
-                <div className={`flex flex-col sm:flex-row sm:items-start justify-between gap-4 p-5 rounded-2xl border ${
-                  isDark ? 'bg-[#0f172a] border-neutral-800/80' : 'bg-slate-50 border-slate-200'
-                }`}>
-                  <div className="space-y-1">
-                    <span className="text-[11px] font-extrabold tracking-wider text-[#2563EB] dark:text-cyan-405 font-mono uppercase block">WEBZONE BD</span>
-                    <p className="text-[10px] text-neutral-400 leading-normal font-medium">
-                      Webzone IT & Cloud Operations Ltd.<br />
-                      Level 4, Webzone Tower, West Panthapath<br />
-                      Dhaka - 1212, Bangladesh<br />
-                      Email: billing@webzonebd.com
-                    </p>
-                  </div>
-
-                  <div className="sm:text-right space-y-1.5 min-w-[140px]">
-                    <span className="text-[9px] font-extrabold uppercase text-neutral-400 tracking-wider block font-mono">Ledger Status</span>
-                    
-                    <div className="flex flex-wrap sm:justify-end gap-1.5">
-                      <span className={`text-[9.5px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md font-mono border ${
-                        order.paymentStatus === 'completed'
-                          ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/15'
-                          : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/15'
-                      }`}>
-                        {order.paymentStatus === 'completed' ? (language === 'bn' ? 'পরিশোধিত' : 'PAID') : (language === 'bn' ? 'বকেয়া' : 'PENDING')}
-                      </span>
-                      
-                      <span className={`text-[9.5px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md font-mono border ${
-                        order.status === 'delivered' ? 'bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/15' :
-                        order.status === 'shipped' ? 'bg-pink-500/10 text-pink-600 dark:text-pink-400 border-pink-500/15' :
-                        order.status === 'processing' ? 'bg-blue-500/10 text-[#2563EB] dark:text-cyan-400 border-blue-500/15' :
-                        'bg-slate-100 text-slate-600 border-slate-200'
-                      }`}>
-                        {order.status === 'delivered' ? (language === 'bn' ? 'ডেলিভার্ড' : 'Delivered') :
-                         order.status === 'shipped' ? (language === 'bn' ? 'প্রেরিত' : 'Shipped') :
-                         order.status === 'processing' ? (language === 'bn' ? 'প্রক্রিয়াধীন' : 'Processing') :
-                         (language === 'bn' ? 'অপেক্ষমাণ' : 'Pending')}
-                      </span>
-                    </div>
-
-                    <div className="text-[10px] text-neutral-400 font-mono mt-1 block">
-                      Placed On: {order.date || 'Just now'}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Billed To / Target Deployment Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  
-                  {/* Billed To Client Details */}
-                  <div className={`p-4 rounded-2xl border space-y-2.5 ${
-                    isDark ? 'bg-neutral-950/40 border-neutral-800' : 'bg-white border-slate-200'
-                  }`}>
-                    <span className="text-[10px] font-black uppercase tracking-wider text-neutral-400 block font-mono">
-                      {language === 'bn' ? 'গ্রাহকের বিবরণ' : 'Billed TO (Customer)'}
-                    </span>
-                    <div className="space-y-1">
-                      <p className={`font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                        {finalName}
-                      </p>
-                      <p className="text-neutral-400 text-[11px] font-mono">{finalEmail}</p>
-                      <p className="text-neutral-400 text-[11px] font-mono">{finalPhone}</p>
-                      <p className="text-neutral-405 text-[9.5px] leading-relaxed pt-1 border-t border-dashed border-neutral-750 mt-1">
-                        Client ID: <span className="font-mono text-purple-400 font-bold">{customer?.id || 'GUEST-ID'}</span><br />
-                        Address: {finalAddress}, {finalCity}, {finalCountry}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Target Delivery & Cloud Parameters info */}
-                  <div className={`p-4 rounded-2xl border space-y-2.5 ${
-                    isDark ? 'bg-neutral-950/40 border-neutral-800' : 'bg-white border-slate-200'
-                  }`}>
-                    <span className="text-[10px] font-black uppercase tracking-wider text-neutral-400 block font-mono">
-                      {language === 'bn' ? 'ডিপ্লয়মেন্ট ও ডেলিভারি ঠিকানা' : 'Deployment License Destination'}
-                    </span>
-                    <div className="space-y-1 text-neutral-300">
-                      <p className={`font-extrabold ${isDark ? 'text-neutral-200' : 'text-slate-800'}`}>
-                        Host Target: {order.trackingId?.includes('SMS') ? 'SMS Gateway Router Port' : order.trackingId?.includes('SOFT') ? 'GitHub Private Repository' : 'Dedicated Cloud Host - Frankfurt'}
-                      </p>
-                      <div className="pt-0.5 text-[10px] text-neutral-405 space-y-0.5">
-                        <div className="flex items-center gap-1 font-mono">
-                          <span>License Domain: </span>
-                          <span className="text-[#2563EB] dark:text-cyan-405 underline">clientdomain-{order.id.slice(0, 5)}.com</span>
-                        </div>
-                        <p className="text-[9.5px] text-neutral-450 mt-1 font-sans">
-                          Delivery Lead Time: {getExpectedDeliveryTextLocal(order)}<br />
-                          Tracking ID: <span className="font-mono font-bold text-purple-400">{order.trackingId || 'N/A'}</span>
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                </div>
-
-                {/* Itemized cost ledger table */}
-                <div className="space-y-2">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-neutral-400 block font-mono">
-                    {language === 'bn' ? 'আইটেমাইজড খরচ হিসাব' : 'Itemized Ledger Cost Breakdown'}
-                  </span>
-
-                  <div className={`border rounded-2xl overflow-hidden ${
-                    isDark ? 'border-neutral-800 bg-neutral-950/30' : 'border-slate-200 bg-slate-50/20'
-                  }`}>
-                    
-                    {/* Table Headers */}
-                    <div className={`grid grid-cols-12 p-3 border-b text-[9.5px] font-black uppercase font-mono tracking-wider ${
-                      isDark ? 'bg-neutral-950 border-neutral-800 text-neutral-400' : 'bg-slate-50 border-slate-200 text-slate-550'
-                    }`}>
-                      <div className="col-span-8">Product / Service Statement</div>
-                      <div className="col-span-4 text-right">Amount ({currency || 'USD'})</div>
-                    </div>
-
-                    {/* Table Body - Line Item */}
-                    <div className="grid grid-cols-12 p-4 border-b border-dashed text-neutral-600 dark:text-neutral-300 bg-transparent">
-                      <div className="col-span-8 space-y-1 text-left">
-                        <p className={`font-black text-xs leading-snug ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                          {order.itemTitle}
-                        </p>
-                        <p className="text-[10px] text-neutral-400 leading-normal font-medium mt-1">
-                          Multi-tier digital software download package license with setup configuration assist.
-                        </p>
-                      </div>
-                      <div className={`col-span-4 text-right font-mono font-black text-xs self-center ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                        {formatPrice(order.price * 0.95)}
-                      </div>
-                    </div>
-
-                    {/* Inclusive Add-on: installation */}
-                    <div className="grid grid-cols-12 p-3.5 border-b border-neutral-250 dark:border-neutral-800/80 text-xs bg-transparent">
-                      <div className="col-span-8 text-left">
-                        <p className="font-bold text-neutral-450 font-sans">VM Cloud Server Installation Setup Assistance</p>
-                      </div>
-                      <div className="col-span-4 text-right font-mono font-extrabold text-emerald-500">
-                        FREE (PROMO)
-                      </div>
-                    </div>
-
-                    {/* Math totals ledger box */}
-                    <div className="p-4 border-t font-mono text-[10.5px] space-y-2 bg-transparent text-left">
-                      <div className="flex justify-between text-neutral-455">
-                        <span>Base Cost Net Price:</span>
-                        <span>{formatPrice(order.price * 0.95)}</span>
-                      </div>
-
-                      <div className="flex justify-between text-neutral-455">
-                        <span>Government VAT & Tax (5.0%):</span>
-                        <span>{formatPrice(order.price * 0.05)}</span>
-                      </div>
-
-                      <div className="flex justify-between text-neutral-455">
-                        <span>SSL Deployment Security Layer Fee:</span>
-                        <span className="text-emerald-500 font-bold uppercase text-[9.5px]">WAIVED</span>
-                      </div>
-
-                      <div className="flex justify-between pt-2.5 border-t border-dashed border-neutral-700 text-xs font-black">
-                        <span className="uppercase tracking-wider">Grand Total Net Price:</span>
-                        <span className="text-purple-400 font-mono text-xs font-black">
-                          {formatPrice(order.price)}
-                        </span>
-                      </div>
-
-                      {order.advancePercent !== undefined && order.advancePercent < 100 && (
-                        <div className="pt-2 border-t border-dashed border-neutral-700/60 mt-1 space-y-1">
-                          <div className="flex justify-between text-emerald-500 font-bold">
-                            <span className="uppercase tracking-wider">Paid Advance ({order.advancePercent}%):</span>
-                            <span className="font-mono">{formatPrice(order.advanceAmount || 0)}</span>
-                          </div>
-                          <div className="flex justify-between text-amber-500 font-bold">
-                            <span className="uppercase tracking-wider">Remaining Due Amount:</span>
-                            <span className="font-mono">{formatPrice(order.dueAmount || 0)}</span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                  </div>
-                </div>
-
-                {/* Gateway Metadata Seal */}
-                <div className="p-4 rounded-2xl bg-neutral-950 text-neutral-400 border border-neutral-850 grid grid-cols-1 sm:grid-cols-2 gap-4 font-mono text-[10px] leading-relaxed">
-                  <div className="space-y-1 text-left">
-                    <span className="text-[9.5px] font-black uppercase text-neutral-550 block">Gateway Ledger Hash</span>
-                    <p className="text-neutral-350">
-                      Method: {order.paymentMethod}<br />
-                      Txn Hash: {order.transactionId || 'TXN-SHIELD-' + order.id}<br />
-                      Security level: Multi-factor tokenized (PipraPay/SSLV2)
-                    </p>
-                  </div>
-
-                  <div className="space-y-1 text-left">
-                    <span className="text-[9.5px] font-black uppercase text-neutral-550 block">System Verification Stamp</span>
-                    <p className="text-cyan-405 font-black flex items-center gap-1 text-[10.5px]">
-                      <ShieldCheck className="w-4 h-4 text-emerald-400 text-left shrink-0" />
-                      Webzone Safe Transaction Certified
-                    </p>
-                    <p className="text-[9px] text-neutral-550 leading-normal">
-                      Generated electronically. Secure blockchain copy logged.
-                    </p>
-                  </div>
-                </div>
-
-              </div>
-
-              {/* Modal Footer Controls */}
-              <div className={`p-5 border-t flex flex-col sm:flex-row items-center justify-end gap-3.5 ${
-                isDark ? 'bg-neutral-950 border-neutral-850' : 'bg-slate-50 border-slate-150'
-              }`}>
-                <button
-                  onClick={() => {
-                    const docId = order.id;
-                    setIsDownloadingInvoice(docId);
-                    setTimeout(() => {
-                      setIsDownloadingInvoice(null);
-                      triggerToast(`📥 Invoice WZ-${docId} printed to cache!`);
-                      window.print();
-                    }, 1100);
-                  }}
-                  disabled={isDownloadingInvoice !== null}
-                  className="w-full sm:flex-1 inline-flex items-center justify-center gap-1.5 px-5 py-3 rounded-xl text-xs font-black text-white bg-indigo-600 hover:bg-indigo-700 dark:bg-[#2563EB] dark:hover:bg-blue-700 disabled:opacity-50 transition cursor-pointer shadow-md"
-                >
-                  {isDownloadingInvoice ? (
-                    <>
-                      <RefreshCw className="w-4 h-4 animate-spin text-white" />
-                      <span>Generating Invoice PDF...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Download className="w-4 h-4" />
-                      <span>Download Invoice PDF</span>
-                    </>
-                  )}
-                </button>
-
-                <button
-                  onClick={() => {
-                    window.print();
-                  }}
-                  className={`w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-5 py-3 rounded-xl text-xs font-bold border transition cursor-pointer ${
-                    isDark ? 'text-slate-350 hover:bg-slate-800 border-neutral-800 bg-neutral-900' : 'text-slate-700 hover:bg-slate-50 border-slate-200 bg-white'
-                  }`}
-                >
-                  <Printer className="w-4 h-4 text-cyan-405" />
-                  <span>Print Receipt</span>
-                </button>
-
-                <button
-                  onClick={() => setSelectedOrderForInvoiceModal(null)}
-                  className={`w-full sm:w-auto px-5 py-3 rounded-xl text-xs font-bold transition border-0 cursor-pointer text-center ${
-                    isDark ? 'hover:bg-neutral-850 text-neutral-400' : 'hover:bg-slate-205 text-slate-500'
-                  }`}
-                >
-                  Close
-                </button>
-              </div>
-
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* Safety Deletion & Critical Action Confirmation Modal */}
-      {deleteConfirmDialog.isOpen && (() => {
-        const variant = deleteConfirmDialog.variant || 'danger';
-        const confirmText = deleteConfirmDialog.confirmText || 'Yes, proceed';
-        const cancelText = deleteConfirmDialog.cancelText || 'Cancel';
-        
-        let stripBg = 'bg-gradient-to-r from-red-600 via-rose-500 to-amber-500';
-        let iconBg = 'bg-red-500/10 text-red-500 border-red-500/20';
-        let badgeStyle = 'text-[9px] text-red-405 font-bold bg-red-500/5 border-red-500/10';
-        let systemLabel = '⚠️ SYSTEM DIRECTIVE: PURGING THIS RESOURCE IS IRREVERSIBLE.';
-        let confirmBtnBg = 'bg-red-650 hover:bg-red-700 shadow-red-500/20';
-
-        if (variant === 'success') {
-          stripBg = 'bg-gradient-to-r from-emerald-600 via-teal-500 to-emerald-400';
-          iconBg = 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20';
-          badgeStyle = 'text-[9px] text-emerald-400 font-bold bg-emerald-500/5 border-emerald-500/10';
-          systemLabel = '✅ ADMINISTRATIVE DIRECTIVE: SETTLE STATUS UPDATE RUNNING.';
-          confirmBtnBg = 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-90 shadow-emerald-500/20';
-        } else if (variant === 'warning') {
-          stripBg = 'bg-gradient-to-r from-amber-600 via-orange-500 to-yellow-500';
-          iconBg = 'bg-amber-500/10 text-amber-500 border-amber-500/20';
-          badgeStyle = 'text-[9px] text-amber-400 font-bold bg-amber-500/5 border-amber-500/10';
-          systemLabel = '⚠️ SYSTEM WARNING: VERIFY ACCURACY OF CRITICAL METRIC STATE.';
-          confirmBtnBg = 'bg-gradient-to-r from-amber-600 to-orange-600 hover:opacity-90 shadow-amber-500/20';
-        } else if (variant === 'info') {
-          stripBg = 'bg-gradient-to-r from-blue-600 via-violet-500 to-indigo-400';
-          iconBg = 'bg-blue-500/10 text-blue-500 border-blue-500/20';
-          badgeStyle = 'text-[9px] text-blue-405 font-bold bg-blue-500/5 border-blue-500/10';
-          systemLabel = '💡 INFORMATION DISCOVERY: CONFIRM SAFE READOUT FLOW STATE.';
-          confirmBtnBg = 'bg-gradient-to-r from-blue-600 to-indigo-650 hover:opacity-90 shadow-blue-500/20';
-        }
-
-        return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-300">
-            <div className={`w-full max-w-sm rounded-2xl border ${isDark ? 'border-neutral-800 bg-neutral-950 text-white' : 'border-neutral-250 bg-white text-neutral-900'} shadow-2xl p-6 relative overflow-hidden animate-in zoom-in-95 duration-200`}>
-              {/* Warning/Status strip */}
-              <div className={`absolute top-0 left-0 right-0 h-1.5 ${stripBg}`} />
-              
-              <div className="flex gap-4">
-                <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center border ${iconBg}`}>
-                  <ShieldAlert className="w-5 h-5 animate-pulse" />
-                </div>
-                <div className="space-y-1.5 flex-1 w-full text-left">
-                  <h4 className="text-sm font-black tracking-tight uppercase font-sans">
-                    {deleteConfirmDialog.title}
-                  </h4>
-                  <p className="text-xs opacity-75 leading-relaxed font-sans mt-1">
-                    {deleteConfirmDialog.description}
-                  </p>
-                  <span className={`text-[9.5px] block px-2 py-1.5 rounded border font-mono ${badgeStyle} mt-2.5`}>
-                    {systemLabel}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-4 mt-2">
-                <button
-                  onClick={() => setDeleteConfirmDialog(prev => ({ ...prev, isOpen: false }))}
-                  className={`px-4 py-1.5 text-xs font-bold rounded-lg border transition-all hover:scale-[1.02] active:scale-[0.98] ${
-                    isDark ? 'border-neutral-800 text-neutral-300 hover:bg-neutral-900' : 'border-neutral-200 text-neutral-700 hover:bg-neutral-50'
-                  }`}
-                >
-                  {cancelText}
-                </button>
-                <button
-                  onClick={() => {
-                    if (deleteConfirmDialog.onConfirm) deleteConfirmDialog.onConfirm();
-                    setDeleteConfirmDialog(prev => ({ ...prev, isOpen: false }));
-                  }}
-                  className={`px-5 py-1.5 text-xs font-black text-white rounded-lg transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg ${confirmBtnBg}`}
-                >
-                  {confirmText}
-                </button>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
-
     </div>
   );
 }

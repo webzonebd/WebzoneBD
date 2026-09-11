@@ -3,7 +3,7 @@ import { Palette, Sun, Moon, Laptop, Languages, Compass, LayoutGrid, Maximize2, 
 
 interface AppearancePreferencesTabProps {
   theme: 'light' | 'dark';
-  setTheme: (t: 'light' | 'dark') => void;
+  setTheme: (t: 'light' | 'dark', event?: React.MouseEvent) => void;
   language: 'en' | 'bn' | 'ar';
   setLanguage: (l: 'en' | 'bn' | 'ar') => void;
   triggerToast: (msg: string) => void;
@@ -54,8 +54,8 @@ export default function AppearancePreferencesTab({
           
           <button
             type="button"
-            onClick={() => {
-              setTheme('light');
+            onClick={(e) => {
+              setTheme('light', e);
               triggerToast("☀️ Light Canvas Theme active!");
             }}
             className={`p-4 rounded-2xl border text-left flex items-start gap-3 transition cursor-pointer ${theme === 'light' ? 'bg-indigo-50/10 dark:bg-indigo-950/20 border-indigo-650 text-indigo-600 dark:text-indigo-400 font-extrabold shadow-md shadow-indigo-500/5' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300'}`}
@@ -69,8 +69,8 @@ export default function AppearancePreferencesTab({
 
           <button
             type="button"
-            onClick={() => {
-              setTheme('dark');
+            onClick={(e) => {
+              setTheme('dark', e);
               triggerToast("🌙 Slate Dark Canvas Theme active!");
             }}
             className={`p-4 rounded-2xl border text-left flex items-start gap-3 transition cursor-pointer ${theme === 'dark' ? 'bg-indigo-50/10 dark:bg-indigo-950/20 border-indigo-650 text-indigo-600 dark:text-indigo-400 font-extrabold shadow-md shadow-indigo-505/5' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300'}`}

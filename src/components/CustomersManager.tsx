@@ -154,6 +154,27 @@ export default function CustomersManager({
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [activeRowMenuId, setActiveRowMenuId] = useState<string | null>(null);
 
+  // CRM Detailed Portfolio Modal States
+  const [crmModalCustomer, setCrmModalCustomer] = useState<any | null>(null);
+  const [crmModalNotes, setCrmModalNotes] = useState<string>('');
+
+  React.useEffect(() => {
+    if (crmModalCustomer) {
+      setCrmModalNotes(crmModalCustomer.notes || '');
+    } else {
+      setCrmModalNotes('');
+    }
+  }, [crmModalCustomer]);
+
+  const handleSaveCrmModalNotes = () => {
+    if (!crmModalCustomer) return;
+    const cId = getCustId(crmModalCustomer);
+    setCustomers(prev => prev.map(item => getCustId(item) === cId ? { ...item, notes: crmModalNotes } : item));
+    setCrmModalCustomer(prev => prev ? { ...prev, notes: crmModalNotes } : null);
+    triggerToast('✓ CRM Personalized Notes saved successfully and registry synced.');
+    logAdminAction(`Updated CRM notes for customer ${getCustName(crmModalCustomer)}`);
+  };
+
   // CRM Local Edit States for details view
   const [editName, setEditName] = useState<string>('');
   const [editCompanyName, setEditCompanyName] = useState<string>('');
@@ -203,7 +224,7 @@ export default function CustomersManager({
           supportTickets: true,
           digitalStore: true,
           downloads: true,
-          affiliateSystem: true,
+          affiliateSystem: false,
           wallet: true,
           aiTools: true,
           notifications: true
@@ -518,7 +539,7 @@ export default function CustomersManager({
                     supportTickets: true,
                     digitalStore: true,
                     downloads: true,
-                    affiliateSystem: true,
+                    affiliateSystem: false,
                     wallet: true,
                     aiTools: true,
                     notifications: true
@@ -1054,6 +1075,19 @@ export default function CustomersManager({
                               <Eye className="w-3.5 h-3.5" />
                             </button>
 
+                            {/* CRM Detailed Portfolio Modal */}
+                            <button
+                              onClick={() => setCrmModalCustomer(cust)}
+                              className={`p-1.5 rounded-lg border transition-all duration-200 cursor-pointer active:scale-95 ${
+                                isDark 
+                                  ? 'bg-[#7C3AED]/10 border-[#7C3AED]/30 text-[#A855F7] hover:bg-[#7C3AED]/25 hover:text-white' 
+                                  : 'bg-indigo-50 border-indigo-200 text-[#7C3AED] hover:bg-indigo-100 hover:text-[#7C3AED]/90 shadow-3xs'
+                              }`}
+                              title="💼 Open CRM Detailed Portfolio Modal"
+                            >
+                              <Sparkles className="w-3.5 h-3.5" />
+                            </button>
+
                             {/* Edit Customer Profile */}
                             <button
                               onClick={() => {
@@ -1081,7 +1115,7 @@ export default function CustomersManager({
                                     supportTickets: true,
                                     digitalStore: true,
                                     downloads: true,
-                                    affiliateSystem: true,
+                                    affiliateSystem: false,
                                     wallet: true,
                                     aiTools: true,
                                     notifications: true
@@ -1152,7 +1186,7 @@ export default function CustomersManager({
                                           supportTickets: true,
                                           digitalStore: true,
                                           downloads: true,
-                                          affiliateSystem: true,
+                                          affiliateSystem: false,
                                           wallet: true,
                                           aiTools: true,
                                           notifications: true
@@ -1778,8 +1812,8 @@ export default function CustomersManager({
                             { id: 'supportTickets', label: 'Ticket SLAs' },
                             { id: 'digitalStore', label: 'SaaS Store' },
                             { id: 'downloads', label: 'Software Hub' },
-                            { id: 'affiliateSystem', label: 'Promoter Hub' },
-                            { id: 'wallet', label: 'Balance Ledger' }
+                            { id: 'affiliateSystem', label: 'Affiliate program' },
+                            { id: 'wallet', label: 'Balance add' }
                           ].map(gate => {
                             const isEnabled = !!editWorkspaceFeatures[gate.id];
                             return (
@@ -2091,10 +2125,12 @@ export default function CustomersManager({
                           { id: 'supportTickets', label: 'Ticket SLAs' },
                           { id: 'digitalStore', label: 'SaaS Storefront' },
                           { id: 'downloads', label: 'Software Area' },
-                          { id: 'affiliateSystem', label: 'Promoter Hub' },
-                          { id: 'wallet', label: 'Balance Ledger' }
+                          { id: 'affiliateSystem', label: 'Affiliate program' },
+                          { id: 'wallet', label: 'Balance add' }
                         ].map(gate => {
-                          const hasFeature = cust.workspaceFeatures ? !!cust.workspaceFeatures[gate.id] : true;
+                          const hasFeature = cust.workspaceFeatures 
+                            ? (cust.workspaceFeatures[gate.id] !== undefined ? !!cust.workspaceFeatures[gate.id] : (gate.id === 'affiliateSystem' ? false : true)) 
+                            : (gate.id === 'affiliateSystem' ? false : true);
                           return (
                             <button
                               key={gate.id}
@@ -2104,7 +2140,7 @@ export default function CustomersManager({
                                   supportTickets: true,
                                   digitalStore: true,
                                   downloads: true,
-                                  affiliateSystem: true,
+                                  affiliateSystem: false,
                                   wallet: true
                                 };
                                 const updatedFeats = {
@@ -2137,6 +2173,332 @@ export default function CustomersManager({
           );
         })()
       )}
+
+      {/* ========================================================
+         CRM PORTFOLIO DETAILED VIEW & PERSISTENT NOTES MODAL
+         ======================================================== */}
+      {crmModalCustomer && (() => {
+        const cId = getCustId(crmModalCustomer);
+        const cName = getCustName(crmModalCustomer);
+        const cEmail = getCustEmail(crmModalCustomer);
+        const cPhone = getCustPhone(crmModalCustomer);
+        const cStatus = getCustStatus(crmModalCustomer);
+        const cType = getCustType(crmModalCustomer);
+        const cCountry = getCustCountry(crmModalCustomer);
+        const cCity = getCustCity(crmModalCustomer);
+        const cJoined = getCustJoinedAt(crmModalCustomer);
+        const cSpent = getCustTotalSpent(crmModalCustomer);
+        const cWallet = getCustWallet(crmModalCustomer);
+
+        // Filter orders and tickets matching this specific customer
+        const clientOrders = orders.filter(o => o.id === cId || o.itemTitle?.includes(cName) || o.customerName === cName || o.customerEmail === cEmail);
+        const clientTickets = tickets.filter(t => t.userId === cId || t.userEmail === cEmail || t.subject?.toLowerCase().includes(cName.toLowerCase()));
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-300">
+            <div 
+              style={{ 
+                borderRadius: '24px', 
+                boxShadow: '0 20px 50px rgba(0,0,0,0.12)', 
+                backdropFilter: 'blur(20px)',
+                border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.06)'
+              }}
+              className={`w-full max-w-5xl max-h-[90vh] overflow-y-auto ${isDark ? 'bg-[#0F172A]' : 'bg-[#FFFFFF]'} p-6 md:p-8 space-y-6 animate-in zoom-in-95 duration-300 relative text-left`}
+            >
+              
+              {/* Background decorative gradient glow */}
+              <div className="absolute top-0 right-0 w-80 h-80 bg-gradient-to-br from-[#7C3AED]/10 via-[#A855F7]/10 to-[#EC4899]/10 rounded-full blur-3xl opacity-60 pointer-events-none" />
+
+              {/* Modal Header */}
+              <div className="flex items-start justify-between border-b border-slate-200/60 dark:border-white/[0.08] pb-4 relative z-10">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-[18px] bg-gradient-to-tr from-[#7C3AED] via-[#A855F7] to-[#EC4899] flex items-center justify-center font-black text-xl text-white border border-white/20 shadow-lg">
+                    {cName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className={`text-lg font-black tracking-tight ${isDark ? 'text-white' : 'text-[#0F172A]'}`}>
+                        {cName}
+                      </h4>
+                      <span className={`px-2.5 py-0.5 text-[9px] font-mono font-bold rounded-full border ${
+                        cStatus === 'active' ? 'bg-[#22C55E]/10 text-[#22C55E] border-[#22C55E]/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                      }`}>
+                        {cStatus.toUpperCase()}
+                      </span>
+                      <span className="px-2 py-0.5 bg-gradient-to-r from-[#7C3AED] to-[#A855F7] text-white text-[9px] font-mono font-bold rounded-md uppercase">
+                        {cType}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 dark:text-slate-500 font-semibold mt-1">
+                      {crmModalCustomer.companyName || 'Private Account'} • Mapped ID: <span className="font-mono text-[#7C3AED] font-bold">{cId}</span>
+                    </p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setCrmModalCustomer(null)} 
+                  className={`p-2 rounded-xl border transition cursor-pointer active:scale-95 ${
+                    isDark 
+                      ? 'bg-neutral-900 border-neutral-800 text-slate-400 hover:text-white' 
+                      : 'bg-slate-100 border-slate-250 text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* CRM quick metrics row */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 relative z-10">
+                {[
+                  { label: "Total Spent", value: `$${cSpent.toLocaleString()}`, color: "text-[#22C55E]", desc: "LTV spent ledger" },
+                  { label: "Wallet Balance", value: `$${cWallet.toLocaleString()}`, color: "text-[#7C3AED]", desc: "Available credits" },
+                  { label: "Total Purchases", value: `${clientOrders.length} orders`, color: "text-[#A855F7]", desc: "Invoiced accounts" },
+                  { label: "Support Tickets", value: `${clientTickets.length} cases`, color: "text-[#EC4899]", desc: "SLA status tracking" }
+                ].map((m, idx) => (
+                  <div 
+                    key={idx} 
+                    className={`p-4 rounded-[16px] border ${isDark ? 'bg-neutral-950/60 border-white/[0.04]' : 'bg-slate-50 border-slate-200/80'} text-center`}
+                  >
+                    <p className="text-[9px] font-mono font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">{m.label}</p>
+                    <p className={`text-xl font-mono font-black mt-1 ${m.color}`}>{m.value}</p>
+                    <p className="text-[8px] text-slate-400 mt-1 font-mono">{m.desc}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Body Layout Grid */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 relative z-10">
+                
+                {/* Left Column: CRM notes, contact details (5 cols) */}
+                <div className="lg:col-span-5 space-y-6">
+                  
+                  {/* Contact cards */}
+                  <div 
+                    style={{ borderRadius: '20px' }} 
+                    className={`p-5 border ${isDark ? 'bg-neutral-950/40 border-white/[0.04]' : 'bg-slate-50 border-slate-200/80'} space-y-3.5`}
+                  >
+                    <div className="flex items-center gap-2 border-b border-slate-200/60 dark:border-white/[0.04] pb-2.5">
+                      <Users className="w-4 h-4 text-[#7C3AED]" />
+                      <h5 className={`text-xs font-mono font-black uppercase tracking-wider ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                        CRM Contacts Dossier
+                      </h5>
+                    </div>
+
+                    <div className="space-y-2.5 font-mono text-xs">
+                      <div>
+                        <span className="text-[10px] text-slate-400 block mb-0.5">Secure Email Address</span>
+                        <span className={`font-semibold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{cEmail || 'No Email Record'}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 block mb-0.5">Cellular Contact Number</span>
+                        <span className={`font-semibold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{cPhone || 'No Phone Record'}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 block mb-0.5">Physical Registered Office</span>
+                        <span className={`font-semibold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{cCity}, {cCountry}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 block mb-0.5">Customer Register Date</span>
+                        <span className={`font-semibold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{cJoined || 'January 2026'}</span>
+                      </div>
+                      {crmModalCustomer.websiteUrl && (
+                        <div>
+                          <span className="text-[10px] text-slate-400 block mb-0.5">Corporate Domain URL</span>
+                          <a 
+                            href={crmModalCustomer.websiteUrl.startsWith('http') ? crmModalCustomer.websiteUrl : `https://${crmModalCustomer.websiteUrl}`} 
+                            target="_blank" 
+                            rel="noreferrer" 
+                            className="text-[#06B6D4] font-semibold hover:underline"
+                          >
+                            {crmModalCustomer.websiteUrl}
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Personalized Notes Area */}
+                  <div 
+                    style={{ borderRadius: '20px' }} 
+                    className={`p-5 border ${isDark ? 'bg-neutral-950/40 border-white/[0.04]' : 'bg-slate-50 border-slate-200/80'} space-y-4`}
+                  >
+                    <div className="flex items-center gap-2 border-b border-slate-200/60 dark:border-white/[0.04] pb-2.5">
+                      <FileText className="w-4 h-4 text-[#A855F7]" />
+                      <h5 className={`text-xs font-mono font-black uppercase tracking-wider ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                        CRM Personalized Notes
+                      </h5>
+                    </div>
+
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      Add private operational logs, customer behavioral traits, custom SLA parameters, or custom notes regarding this contact.
+                    </p>
+
+                    <div>
+                      <textarea
+                        style={{ 
+                          minHeight: '140px',
+                          borderRadius: '14px',
+                          transition: '300ms'
+                        }}
+                        className={`w-full text-xs font-mono p-3 focus:outline-none resize-none border ${
+                          isDark 
+                            ? 'bg-[#111827] border-[#374151] text-white focus:border-[#7C3AED] focus:ring-[4px] focus:ring-[#7C3AED]/18' 
+                            : 'bg-[#F8FAFC] border-[#E2E8F0] text-[#0F172A] focus:border-[#7C3AED] focus:ring-[4px] focus:ring-[#7C3AED]/18'
+                        }`}
+                        placeholder="Type customer notes and private insights here..."
+                        value={crmModalNotes}
+                        onChange={(e) => setCrmModalNotes(e.target.value)}
+                      />
+                    </div>
+
+                    <button
+                      onClick={handleSaveCrmModalNotes}
+                      style={{
+                        height: '46px',
+                        borderRadius: '12px',
+                        fontWeight: 600,
+                        transition: '300ms'
+                      }}
+                      className="w-full bg-gradient-to-r from-[#7C3AED] via-[#A855F7] to-[#EC4899] hover:scale-[1.02] text-white text-xs shadow-md shadow-[#7C3AED]/20 hover:shadow-lg hover:shadow-[#7C3AED]/30 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <Save className="w-4 h-4" /> Save CRM Notes
+                    </button>
+                  </div>
+
+                </div>
+
+                {/* Right Column: History pane (orders, tickets) (7 cols) */}
+                <div className="lg:col-span-7 space-y-6">
+                  
+                  {/* Tab A: Past Orders */}
+                  <div 
+                    style={{ borderRadius: '20px' }} 
+                    className={`p-5 border ${isDark ? 'bg-neutral-950/40 border-white/[0.04]' : 'bg-slate-50 border-slate-200/80'} space-y-3`}
+                  >
+                    <div className="flex items-center justify-between border-b border-slate-200/60 dark:border-white/[0.04] pb-2.5">
+                      <div className="flex items-center gap-2">
+                        <ShoppingBag className="w-4 h-4 text-[#22C55E]" />
+                        <h5 className={`text-xs font-mono font-black uppercase tracking-wider ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                          Order & Transaction History ({clientOrders.length})
+                        </h5>
+                      </div>
+                      <span className="text-[10px] font-mono text-slate-400">Past Orders Mapped</span>
+                    </div>
+
+                    {clientOrders.length === 0 ? (
+                      <div className="py-8 text-center text-xs text-slate-500 font-mono">
+                        No purchases recorded under this customer identity.
+                      </div>
+                    ) : (
+                      <div className="max-h-[180px] overflow-y-auto pr-1 space-y-2 font-mono">
+                        {clientOrders.map((o: any, oIdx: number) => (
+                          <div 
+                            key={o.id || oIdx} 
+                            className={`p-3 rounded-xl border ${
+                              isDark ? 'bg-neutral-950 border-neutral-900/60' : 'bg-white border-slate-200'
+                            } flex items-center justify-between text-xs`}
+                          >
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-[#7C3AED]">{o.id}</span>
+                                <span className="text-slate-400">•</span>
+                                <span className={`font-semibold ${isDark ? 'text-slate-200' : 'text-slate-800'} truncate max-w-[180px]`} title={o.itemTitle}>
+                                  {o.itemTitle || 'Custom Services'}
+                                </span>
+                              </div>
+                              <div className="text-[10px] text-slate-400 flex items-center gap-2">
+                                <span>📅 {o.date}</span>
+                                <span>•</span>
+                                <span>💰 ৳{Math.round(o.price * (usdBdtRate || 118.5)).toLocaleString()} (${o.price})</span>
+                              </div>
+                            </div>
+
+                            <span className={`px-2 py-0.5 rounded text-[8px] font-black border ${
+                              o.paymentStatus === 'completed' || o.paymentStatus === 'paid'
+                                ? 'bg-[#22C55E]/10 text-[#22C55E] border-[#22C55E]/20'
+                                : o.paymentStatus === 'failed'
+                                ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                                : 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
+                            }`}>
+                              {o.paymentStatus?.toUpperCase() || 'PAID'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Tab B: Active Tickets */}
+                  <div 
+                    style={{ borderRadius: '20px' }} 
+                    className={`p-5 border ${isDark ? 'bg-neutral-950/40 border-white/[0.04]' : 'bg-slate-50 border-slate-200/80'} space-y-3`}
+                  >
+                    <div className="flex items-center justify-between border-b border-slate-200/60 dark:border-white/[0.04] pb-2.5">
+                      <div className="flex items-center gap-2">
+                        <HelpCircle className="w-4 h-4 text-[#A855F7]" />
+                        <h5 className={`text-xs font-mono font-black uppercase tracking-wider ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                          Active Helpdesk & Ticket SLAs ({clientTickets.length})
+                        </h5>
+                      </div>
+                      <span className="text-[10px] font-mono text-slate-400">Assigned SLA Cases</span>
+                    </div>
+
+                    {clientTickets.length === 0 ? (
+                      <div className="py-8 text-center text-xs text-slate-500 font-mono">
+                        No active or historical support cases found for this account.
+                      </div>
+                    ) : (
+                      <div className="max-h-[180px] overflow-y-auto pr-1 space-y-2 font-mono">
+                        {clientTickets.map((t: any, tIdx: number) => (
+                          <div 
+                            key={t.id || tIdx} 
+                            className={`p-3 rounded-xl border ${
+                              isDark ? 'bg-neutral-950 border-neutral-900/60' : 'bg-white border-slate-200'
+                            } flex flex-col md:flex-row md:items-center justify-between gap-2 text-xs`}
+                          >
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-[#A855F7]">#{t.id}</span>
+                                <span className="text-slate-400">•</span>
+                                <span className={`font-semibold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
+                                  {t.subject}
+                                </span>
+                              </div>
+                              <div className="text-[10px] text-slate-400 flex flex-wrap items-center gap-2">
+                                <span>🏢 {t.department || 'Technical Desk'}</span>
+                                <span>•</span>
+                                <span>📅 {t.createdAt || 'June 12'}</span>
+                                <span>•</span>
+                                <span className={`px-1 rounded text-[8px] font-bold ${
+                                  t.priority === 'critical' || t.priority === 'high' ? 'bg-rose-500/10 text-rose-400' : 'bg-neutral-800 text-slate-300'
+                                }`}>
+                                  {t.priority?.toUpperCase()}
+                                </span>
+                              </div>
+                            </div>
+
+                            <span className={`self-start md:self-auto px-2 py-0.5 rounded text-[8px] font-black border ${
+                              t.status === 'closed'
+                                ? 'bg-neutral-800 text-slate-400 border-neutral-700'
+                                : t.status === 'answered'
+                                ? 'bg-[#22C55E]/10 text-[#22C55E] border-[#22C55E]/20'
+                                : 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
+                            }`}>
+                              {t.status?.toUpperCase() || 'OPEN'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                </div>
+
+              </div>
+
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ========================================================
          5. MODAL WINDOWS / DIALOG POPUPS (UPGRADED FORM CARDS GLASSMORPHISM)

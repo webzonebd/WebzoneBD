@@ -1,9 +1,42 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Percent, Coins, Users, Target, TrendingUp, Wallet, ShieldCheck, 
-  Check, ArrowRight, Share2, Facebook, MessageCircle, Send, Mail, Link, Award, Phone, HelpCircle
+  Check, ArrowRight, Share2, Facebook, MessageCircle, Send, Mail, Link, Award, Phone, HelpCircle,
+  Zap, Settings, Sliders, Bell, RefreshCw, AlertTriangle, CheckCircle2, Clock, DollarSign, Activity,
+  Play, ShieldAlert, Sparkles, Filter, ChevronRight
 } from 'lucide-react';
 import { Language, Theme, UserSession } from '../types';
+
+interface SystemSettings {
+  payoutThreshold: number; // in USD
+  autoTriggerEnabled: boolean;
+  payoutGateway: string;
+  autoNotification: boolean;
+}
+
+interface AffiliateAccount {
+  id: string;
+  name: string;
+  email: string;
+  code: string;
+  balance: number;
+  totalEarned: number;
+  referrals: number;
+  payoutMethod: string;
+  payoutDetails: string;
+  status: 'active' | 'flagged_for_payout' | 'payout_processing' | 'paid_out';
+  flaggedAt?: string;
+  triggerReason?: string;
+}
+
+interface TriggerAuditLog {
+  id: string;
+  timestamp: string;
+  type: 'AUTOTRIGGER' | 'SETTINGS' | 'COMMISSION' | 'PAYOUT' | 'MANUAL_SCAN';
+  message: string;
+  accountName?: string;
+  amount?: number;
+}
 
 interface AffiliateSystemProps {
   language: Language;
@@ -28,6 +61,283 @@ export default function AffiliateSystem({
   // Custom QR Code Text simulation state
   const [qrCampaignText, setQrCampaignText] = useState('hosting_campaign');
   const [qrGenerated, setQrGenerated] = useState(false);
+
+  // Automated Payout Trigger & System Settings State
+  const [systemSettings, setSystemSettings] = useState<SystemSettings>({
+    payoutThreshold: 50, // Default $50 USD threshold
+    autoTriggerEnabled: true,
+    payoutGateway: 'bKash / Nagad / Bank Wire',
+    autoNotification: true,
+  });
+
+  const [affiliateAccounts, setAffiliateAccounts] = useState<AffiliateAccount[]>([
+    {
+      id: 'aff-user',
+      name: user ? user.name : 'Your Partner Account',
+      email: user ? user.email : 'partner@webzonebd.com',
+      code: 'MY_PARTNER_88',
+      balance: 85.00, // Exceeds $50 threshold initially
+      totalEarned: 420.00,
+      referrals: 29,
+      payoutMethod: 'bKash Wallet',
+      payoutDetails: '01711-000000 (Personal)',
+      status: 'active',
+    },
+    {
+      id: 'aff-01',
+      name: 'Rashed Ahmed',
+      email: 'rashed.dhaka@gmail.com',
+      code: 'RASHED_DHAKA',
+      balance: 120.00,
+      totalEarned: 890.00,
+      referrals: 52,
+      payoutMethod: 'bKash Personal',
+      payoutDetails: '01812-998877',
+      status: 'active',
+    },
+    {
+      id: 'aff-02',
+      name: 'Mubarak Al-Dosari',
+      email: 'mubarak@dosari-saudi.sa',
+      code: 'MUBARAK_SA',
+      balance: 42.50,
+      totalEarned: 1450.00,
+      referrals: 88,
+      payoutMethod: 'Bank Wire (Saudi Fransi)',
+      payoutDetails: 'SA8920100000001234567890',
+      status: 'active',
+    },
+    {
+      id: 'aff-03',
+      name: 'Tanvir Hossain',
+      email: 'tanvir@itbd.net',
+      code: 'TANVIR_DEV',
+      balance: 65.00,
+      totalEarned: 320.00,
+      referrals: 19,
+      payoutMethod: 'Nagad Wallet',
+      payoutDetails: '01922-334455',
+      status: 'active',
+    },
+    {
+      id: 'aff-04',
+      name: 'Elena Rostova',
+      email: 'elena@digitalaff.org',
+      code: 'ELENA_GLOBAL',
+      balance: 28.00,
+      totalEarned: 610.00,
+      referrals: 24,
+      payoutMethod: 'PayPal / Wise',
+      payoutDetails: 'elena@paypal.me',
+      status: 'active',
+    },
+  ]);
+
+  const [auditLogs, setAuditLogs] = useState<TriggerAuditLog[]>([
+    {
+      id: 'log-init',
+      timestamp: new Date().toLocaleTimeString(),
+      type: 'SETTINGS',
+      message: '⚙️ System Settings initialized: Payout Threshold set to $50.00 USD. Automated trigger monitoring ONLINE.',
+    }
+  ]);
+
+  const [accountFilter, setAccountFilter] = useState<'all' | 'flagged' | 'active' | 'paid'>('all');
+
+  // Automated Trigger Evaluation Engine
+  const runAutomatedTrigger = useCallback((
+    accountsToEvaluate: AffiliateAccount[],
+    threshold: number,
+    enabled: boolean
+  ) => {
+    if (!enabled) return;
+
+    let flaggedCount = 0;
+    const newLogs: TriggerAuditLog[] = [];
+
+    const updated = accountsToEvaluate.map((acc) => {
+      // Check if account balance exceeds or meets defined threshold and is currently active
+      if (acc.status === 'active' && acc.balance >= threshold) {
+        flaggedCount++;
+        const timeNow = new Date().toLocaleTimeString();
+        const reason = `Automated Trigger: Balance ($${acc.balance.toFixed(2)}) exceeded system threshold ($${threshold.toFixed(2)})`;
+
+        newLogs.push({
+          id: `log-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          timestamp: timeNow,
+          type: 'AUTOTRIGGER',
+          message: `⚡ AUTOMATED TRIGGER FLAGGED: Account [${acc.name}] (${acc.code}) with balance $${acc.balance.toFixed(2)} crossed threshold $${threshold.toFixed(2)}. FLAGGED FOR PAYOUT!`,
+          accountName: acc.name,
+          amount: acc.balance,
+        });
+
+        triggerToast(`⚡ Automated Trigger: Account ${acc.name} ($${acc.balance.toFixed(2)}) exceeded threshold ($${threshold.toFixed(2)}) & was FLAGGED FOR PAYOUT!`);
+
+        return {
+          ...acc,
+          status: 'flagged_for_payout' as const,
+          flaggedAt: new Date().toLocaleString(),
+          triggerReason: reason,
+        };
+      }
+      return acc;
+    });
+
+    if (flaggedCount > 0) {
+      setAffiliateAccounts(updated);
+      setAuditLogs(prev => [...newLogs, ...prev].slice(0, 40));
+    }
+  }, [triggerToast]);
+
+  // Automated Trigger useEffect: evaluates balance threshold whenever settings or accounts update
+  useEffect(() => {
+    if (systemSettings.autoTriggerEnabled) {
+      runAutomatedTrigger(affiliateAccounts, systemSettings.payoutThreshold, systemSettings.autoTriggerEnabled);
+    }
+  }, [systemSettings.payoutThreshold, systemSettings.autoTriggerEnabled, affiliateAccounts, runAutomatedTrigger]);
+
+  const handleThresholdChange = (newThreshold: number) => {
+    setSystemSettings(prev => ({ ...prev, payoutThreshold: newThreshold }));
+    const timeNow = new Date().toLocaleTimeString();
+    setAuditLogs(l => [{
+      id: `log-${Date.now()}`,
+      timestamp: timeNow,
+      type: 'SETTINGS',
+      message: `⚙️ SYSTEM SETTINGS UPDATED: Payout threshold modified to $${newThreshold.toFixed(2)} USD (৳${Math.round(newThreshold * 118.5)} BDT).`,
+    }, ...l].slice(0, 40));
+    triggerToast(`⚙️ System Settings: Updated payout threshold to $${newThreshold.toFixed(2)} USD`);
+  };
+
+  const handleSimulateCommissionAdd = (id: string, amount: number) => {
+    setAffiliateAccounts(prev => prev.map(acc => {
+      if (acc.id === id) {
+        const newBal = Math.round((acc.balance + amount) * 100) / 100;
+        const timeNow = new Date().toLocaleTimeString();
+        setAuditLogs(l => [{
+          id: `log-${Date.now()}`,
+          timestamp: timeNow,
+          type: 'COMMISSION',
+          message: `💰 Commission +$${amount.toFixed(2)} added to [${acc.name}]. New Balance: $${newBal.toFixed(2)} USD`,
+          accountName: acc.name,
+          amount: newBal,
+        }, ...l].slice(0, 40));
+
+        // Re-activate if paid_out so trigger evaluates
+        const newStatus = acc.status === 'paid_out' ? 'active' : acc.status;
+        return { ...acc, balance: newBal, status: newStatus };
+      }
+      return acc;
+    }));
+    triggerToast(`💰 Added +$${amount.toFixed(2)} referral commission!`);
+  };
+
+  const handleProcessPayout = (id: string) => {
+    setAffiliateAccounts(prev => prev.map(acc => {
+      if (acc.id === id) {
+        const paidAmount = acc.balance;
+        const timeNow = new Date().toLocaleTimeString();
+        setAuditLogs(l => [{
+          id: `log-${Date.now()}`,
+          timestamp: timeNow,
+          type: 'PAYOUT',
+          message: `💸 PAYOUT SETTLED: $${paidAmount.toFixed(2)} transferred to ${acc.name} via ${acc.payoutMethod} (${acc.payoutDetails}).`,
+          accountName: acc.name,
+          amount: paidAmount,
+        }, ...l].slice(0, 40));
+
+        triggerToast(`💸 Settled payout transfer of $${paidAmount.toFixed(2)} for ${acc.name}!`);
+
+        return {
+          ...acc,
+          totalEarned: Math.round((acc.totalEarned + paidAmount) * 100) / 100,
+          balance: 0,
+          status: 'paid_out',
+          triggerReason: undefined,
+          flaggedAt: undefined,
+        };
+      }
+      return acc;
+    }));
+  };
+
+  const handleManualScan = () => {
+    const timeNow = new Date().toLocaleTimeString();
+    setAuditLogs(l => [{
+      id: `log-${Date.now()}`,
+      timestamp: timeNow,
+      type: 'MANUAL_SCAN',
+      message: `🔍 Manual trigger scan initiated across ${affiliateAccounts.length} accounts with threshold $${systemSettings.payoutThreshold.toFixed(2)}.`,
+    }, ...l].slice(0, 40));
+
+    runAutomatedTrigger(affiliateAccounts, systemSettings.payoutThreshold, true);
+    triggerToast(`🔍 Completed manual payout trigger scan across all accounts!`);
+  };
+
+  const handleResetAccounts = () => {
+    setAffiliateAccounts([
+      {
+        id: 'aff-user',
+        name: user ? user.name : 'Your Partner Account',
+        email: user ? user.email : 'partner@webzonebd.com',
+        code: 'MY_PARTNER_88',
+        balance: 85.00,
+        totalEarned: 420.00,
+        referrals: 29,
+        payoutMethod: 'bKash Wallet',
+        payoutDetails: '01711-000000',
+        status: 'active',
+      },
+      {
+        id: 'aff-01',
+        name: 'Rashed Ahmed',
+        email: 'rashed.dhaka@gmail.com',
+        code: 'RASHED_DHAKA',
+        balance: 120.00,
+        totalEarned: 890.00,
+        referrals: 52,
+        payoutMethod: 'bKash Personal',
+        payoutDetails: '01812-998877',
+        status: 'active',
+      },
+      {
+        id: 'aff-02',
+        name: 'Mubarak Al-Dosari',
+        email: 'mubarak@dosari-saudi.sa',
+        code: 'MUBARAK_SA',
+        balance: 42.50,
+        totalEarned: 1450.00,
+        referrals: 88,
+        payoutMethod: 'Bank Wire (Saudi Fransi)',
+        payoutDetails: 'SA8920100000001234567890',
+        status: 'active',
+      },
+      {
+        id: 'aff-03',
+        name: 'Tanvir Hossain',
+        email: 'tanvir@itbd.net',
+        code: 'TANVIR_DEV',
+        balance: 65.00,
+        totalEarned: 320.00,
+        referrals: 19,
+        payoutMethod: 'Nagad Wallet',
+        payoutDetails: '01922-334455',
+        status: 'active',
+      },
+      {
+        id: 'aff-04',
+        name: 'Elena Rostova',
+        email: 'elena@digitalaff.org',
+        code: 'ELENA_GLOBAL',
+        balance: 28.00,
+        totalEarned: 610.00,
+        referrals: 24,
+        payoutMethod: 'PayPal / Wise',
+        payoutDetails: 'elena@paypal.me',
+        status: 'active',
+      },
+    ]);
+    triggerToast("🔄 Reset demo affiliate accounts & balances!");
+  };
 
   // Calculate simulated monthly payouts
   const calculatedCommissions = Math.round(estConversions * estAvgValue * 0.15 * 100) / 100;
@@ -300,6 +610,387 @@ export default function AffiliateSystem({
 
           <div className="text-left text-[10px] text-neutral-450 leading-relaxed font-sans mt-2">
             *Calculation assumes a standard baseline commission of <b>15%</b>. Actual rates range from 10% up to 40% based on referred hosting and software types.
+          </div>
+        </div>
+      </div>
+
+      {/* 2.5 AUTOMATED PAYOUT TRIGGER & SYSTEM SETTINGS ENGINE */}
+      <div className={`border p-6 sm:p-8 rounded-3xl ${bgCard} max-w-5xl mx-auto space-y-8`}>
+        {/* Header Title & System Status Banner */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-200/60 dark:border-neutral-800 pb-5">
+          <div className="space-y-1">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 rounded-full text-[10px] font-extrabold uppercase font-mono tracking-wider">
+              <Zap className="w-3.5 h-3.5 text-purple-500 animate-bounce" />
+              <span>System Settings Automated Payout Trigger</span>
+            </div>
+            <h2 className="text-xl sm:text-2xl font-black text-neutral-900 dark:text-white flex items-center gap-2">
+              <span>{language === 'bn' ? 'অটোমেটেড পেআউট ট্রিগার ও সিস্টেম সেটিংস' : language === 'ar' ? 'المشغل التلقائي للسحب وإعدادات النظام' : 'Automated Payout Trigger Engine'}</span>
+            </h2>
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 font-sans max-w-2xl">
+              {language === 'bn' 
+                ? 'সিস্টেম সেটিংসে সেটককৃত নির্দিষ্ট ব্যালেন্স থ্রেশহোল্ড অতিক্রম করলেই অ্যাফিলিয়েট অ্যাকাউন্টগুলো স্বয়ংক্রিয়ভাবে পেআউটের জন্য ফ্ল্যাগ হয়।'
+                : language === 'ar'
+                ? 'نظام التتبع الذكي الذي يقوم بتحديد حسابات التسويق بالعمولة تلقائياً فور تجاوز رصيدها الحد الأدنى المحدد في إعدادات النظام.'
+                : 'Automated trigger monitors affiliate balances in real time and flags accounts for payout settlements once earnings cross the system threshold.'}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3 shrink-0">
+            <button
+              onClick={handleManualScan}
+              className="px-3.5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer"
+              title="Execute Manual Trigger Check"
+            >
+              <RefreshCw className="w-3.5 h-3.5 animate-spin-slow" />
+              <span>Run Trigger Scan</span>
+            </button>
+            <button
+              onClick={handleResetAccounts}
+              className="px-3 py-2 bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-300 rounded-xl text-xs font-bold transition cursor-pointer"
+              title="Reset Demo Balances"
+            >
+              Reset Demo
+            </button>
+          </div>
+        </div>
+
+        {/* System Settings & Threshold Config Panel */}
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 bg-gradient-to-br from-purple-500/5 via-pink-500/5 to-indigo-500/5 p-5 sm:p-6 rounded-2xl border border-purple-500/15">
+          {/* Left Column: Threshold Slider & Presets */}
+          <div className="md:col-span-7 space-y-4">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-extrabold uppercase font-mono tracking-wider text-purple-600 dark:text-purple-400 flex items-center gap-1.5">
+                <Sliders className="w-4 h-4 text-purple-500" />
+                <span>System Settings: Payout Balance Threshold</span>
+              </label>
+              <span className="px-2.5 py-0.5 bg-purple-500/20 text-purple-700 dark:text-purple-300 font-mono font-black text-xs rounded-lg border border-purple-500/30">
+                ${systemSettings.payoutThreshold.toFixed(2)} USD
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              <input
+                type="range"
+                min="10"
+                max="300"
+                step="5"
+                value={systemSettings.payoutThreshold}
+                onChange={(e) => handleThresholdChange(Number(e.target.value))}
+                className="w-full accent-purple-600 cursor-pointer h-2 bg-neutral-200 dark:bg-neutral-800 rounded-lg"
+              />
+              <div className="flex justify-between items-center text-[10px] text-neutral-400 font-mono font-bold">
+                <span>Min: $10.00</span>
+                <span>৳{Math.round(systemSettings.payoutThreshold * 118.5)} BDT</span>
+                <span>﷼{Math.round(systemSettings.payoutThreshold * 3.75)} SAR</span>
+                <span>Max: $300.00</span>
+              </div>
+            </div>
+
+            {/* Quick Threshold Preset Buttons */}
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Presets:</span>
+              {[25, 50, 75, 100, 150, 200].map((preset) => (
+                <button
+                  key={preset}
+                  onClick={() => handleThresholdChange(preset)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition cursor-pointer ${
+                    systemSettings.payoutThreshold === preset
+                      ? 'bg-purple-600 text-white shadow-xs'
+                      : 'bg-white dark:bg-neutral-900 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-neutral-800 hover:border-purple-400'
+                  }`}
+                >
+                  ${preset}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Right Column: Automated Trigger System Controls */}
+          <div className="md:col-span-5 flex flex-col justify-between space-y-3 bg-white/60 dark:bg-neutral-900/60 p-4 rounded-xl border border-purple-500/10">
+            <div className="flex items-center justify-between pb-2 border-b border-neutral-200/50 dark:border-neutral-800">
+              <div className="flex items-center gap-2">
+                <Settings className="w-4 h-4 text-purple-500" />
+                <span className="text-xs font-bold text-neutral-900 dark:text-white">Auto-Trigger Status</span>
+              </div>
+              <button
+                onClick={() => {
+                  const updated = !systemSettings.autoTriggerEnabled;
+                  setSystemSettings(s => ({ ...s, autoTriggerEnabled: updated }));
+                  triggerToast(updated ? '⚡ Auto-Trigger Engine ENABLED' : '⏸️ Auto-Trigger Engine PAUSED');
+                }}
+                className={`px-3 py-1 rounded-full text-[10px] font-black font-mono tracking-wider uppercase transition cursor-pointer flex items-center gap-1.5 ${
+                  systemSettings.autoTriggerEnabled
+                    ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
+                    : 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30'
+                }`}
+              >
+                <span className={`w-2 h-2 rounded-full ${systemSettings.autoTriggerEnabled ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+                <span>{systemSettings.autoTriggerEnabled ? 'ONLINE ACTIVE' : 'PAUSED'}</span>
+              </button>
+            </div>
+
+            <div className="space-y-1.5 text-xs">
+              <div className="flex justify-between items-center">
+                <span className="text-neutral-500 dark:text-neutral-400 text-[11px]">Flagged Accounts:</span>
+                <span className="font-mono font-black text-rose-500">
+                  {affiliateAccounts.filter(a => a.status === 'flagged_for_payout').length} Accounts
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-neutral-500 dark:text-neutral-400 text-[11px]">Total Flagged Payout Volume:</span>
+                <span className="font-mono font-black text-purple-600 dark:text-purple-400">
+                  ${affiliateAccounts.filter(a => a.status === 'flagged_for_payout').reduce((s, a) => s + a.balance, 0).toFixed(2)} USD
+                </span>
+              </div>
+            </div>
+
+            <div className="pt-2 text-[10px] text-neutral-400 leading-tight border-t border-neutral-200/50 dark:border-neutral-800">
+              ⚡ When an account balance crosses ${systemSettings.payoutThreshold.toFixed(2)}, the automated trigger instantly flags it for payout settlement.
+            </div>
+          </div>
+        </div>
+
+        {/* Affiliate Accounts & Threshold Trigger Ledger */}
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <h3 className="text-sm font-extrabold text-neutral-900 dark:text-white uppercase font-mono tracking-wider flex items-center gap-2">
+              <Users className="w-4 h-4 text-purple-500" />
+              <span>Affiliate Accounts & Payout Threshold Progress</span>
+            </h3>
+
+            {/* Filter Tabs */}
+            <div className="flex items-center gap-1 bg-neutral-100 dark:bg-neutral-900 p-1 rounded-xl border border-neutral-200 dark:border-neutral-800 text-[11px] font-bold">
+              <button
+                onClick={() => setAccountFilter('all')}
+                className={`px-3 py-1 rounded-lg transition cursor-pointer ${
+                  accountFilter === 'all'
+                    ? 'bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-xs'
+                    : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'
+                }`}
+              >
+                All ({affiliateAccounts.length})
+              </button>
+              <button
+                onClick={() => setAccountFilter('flagged')}
+                className={`px-3 py-1 rounded-lg transition cursor-pointer flex items-center gap-1 ${
+                  accountFilter === 'flagged'
+                    ? 'bg-rose-500 text-white shadow-xs'
+                    : 'text-rose-500 hover:text-rose-600'
+                }`}
+              >
+                <Zap className="w-3 h-3" />
+                <span>Flagged ({affiliateAccounts.filter(a => a.status === 'flagged_for_payout').length})</span>
+              </button>
+              <button
+                onClick={() => setAccountFilter('active')}
+                className={`px-3 py-1 rounded-lg transition cursor-pointer ${
+                  accountFilter === 'active'
+                    ? 'bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-xs'
+                    : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'
+                }`}
+              >
+                Active
+              </button>
+              <button
+                onClick={() => setAccountFilter('paid')}
+                className={`px-3 py-1 rounded-lg transition cursor-pointer ${
+                  accountFilter === 'paid'
+                    ? 'bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-xs'
+                    : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'
+                }`}
+              >
+                Paid
+              </button>
+            </div>
+          </div>
+
+          {/* Accounts Ledger Table */}
+          <div className="border border-neutral-200/80 dark:border-neutral-800 rounded-2xl overflow-hidden bg-white/50 dark:bg-neutral-900/50">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left font-sans text-xs">
+                <thead className="bg-neutral-100/70 dark:bg-neutral-900 font-mono text-[10px] uppercase tracking-wider text-neutral-500 border-b border-neutral-200 dark:border-neutral-800">
+                  <tr>
+                    <th className="p-3.5">Affiliate Partner</th>
+                    <th className="p-3.5">Current Balance</th>
+                    <th className="p-3.5 min-w-[180px]">Threshold Progress</th>
+                    <th className="p-3.5">Payout Method</th>
+                    <th className="p-3.5">Automated Status</th>
+                    <th className="p-3.5 text-right">Actions / Testing</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800/60 text-neutral-700 dark:text-neutral-300">
+                  {affiliateAccounts
+                    .filter(acc => {
+                      if (accountFilter === 'flagged') return acc.status === 'flagged_for_payout';
+                      if (accountFilter === 'active') return acc.status === 'active';
+                      if (accountFilter === 'paid') return acc.status === 'paid_out';
+                      return true;
+                    })
+                    .map((acc) => {
+                      const isFlagged = acc.status === 'flagged_for_payout';
+                      const isExceeded = acc.balance >= systemSettings.payoutThreshold;
+                      const progressPct = Math.min(200, Math.round((acc.balance / systemSettings.payoutThreshold) * 100));
+
+                      return (
+                        <tr 
+                          key={acc.id} 
+                          className={`transition ${
+                            isFlagged 
+                              ? 'bg-rose-500/10 dark:bg-rose-950/20 hover:bg-rose-500/15' 
+                              : 'hover:bg-neutral-50/50 dark:hover:bg-neutral-900/40'
+                          }`}
+                        >
+                          {/* Account Info */}
+                          <td className="p-3.5">
+                            <div className="font-extrabold text-neutral-900 dark:text-white flex items-center gap-1.5">
+                              <span>{acc.name}</span>
+                              {acc.id === 'aff-user' && (
+                                <span className="px-1.5 py-0.2 bg-purple-500/20 text-purple-600 dark:text-purple-300 text-[9px] font-mono rounded">You</span>
+                              )}
+                            </div>
+                            <div className="text-[10px] text-neutral-400 font-mono">
+                              {acc.email} • <span className="text-purple-500 font-bold">{acc.code}</span>
+                            </div>
+                          </td>
+
+                          {/* Balance */}
+                          <td className="p-3.5 whitespace-nowrap">
+                            <div className="font-mono font-black text-sm text-neutral-900 dark:text-white">
+                              ${acc.balance.toFixed(2)} <span className="text-[9px] font-bold text-neutral-400">USD</span>
+                            </div>
+                            <div className="text-[10px] font-mono text-neutral-400">
+                              ৳{Math.round(acc.balance * 118.5).toLocaleString()} BDT
+                            </div>
+                          </td>
+
+                          {/* Progress Bar toward System Threshold */}
+                          <td className="p-3.5">
+                            <div className="space-y-1">
+                              <div className="flex justify-between items-center text-[10px] font-mono font-bold">
+                                <span className={isExceeded ? 'text-rose-500' : 'text-neutral-400'}>
+                                  {progressPct}% of threshold (${systemSettings.payoutThreshold})
+                                </span>
+                                {isExceeded && (
+                                  <span className="px-1.5 py-0.2 bg-rose-500 text-white rounded text-[8px] font-black uppercase tracking-wider animate-pulse">
+                                    EXCEEDED
+                                  </span>
+                                )}
+                              </div>
+                              <div className="w-full bg-neutral-200 dark:bg-neutral-800 h-2 rounded-full overflow-hidden">
+                                <div
+                                  className={`h-full transition-all duration-500 rounded-full ${
+                                    isFlagged || isExceeded
+                                      ? 'bg-gradient-to-r from-rose-500 via-pink-500 to-purple-500'
+                                      : 'bg-gradient-to-r from-purple-500 to-indigo-500'
+                                  }`}
+                                  style={{ width: `${Math.min(100, progressPct)}%` }}
+                                />
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Payout Method */}
+                          <td className="p-3.5 whitespace-nowrap">
+                            <div className="text-xs font-bold text-neutral-800 dark:text-neutral-200">
+                              {acc.payoutMethod}
+                            </div>
+                            <div className="text-[10px] font-mono text-neutral-400">
+                              {acc.payoutDetails}
+                            </div>
+                          </td>
+
+                          {/* Status Badge */}
+                          <td className="p-3.5 whitespace-nowrap">
+                            {isFlagged ? (
+                              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-rose-500/20 border border-rose-500/40 text-rose-600 dark:text-rose-400 text-[10px] font-black uppercase font-mono rounded-xl animate-pulse">
+                                <Zap className="w-3 h-3 text-rose-500" />
+                                <span>FLAGGED FOR PAYOUT</span>
+                              </div>
+                            ) : acc.status === 'paid_out' ? (
+                              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/20 border border-emerald-500/40 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold font-mono rounded-xl">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                                <span>SETTLED & PAID</span>
+                              </div>
+                            ) : (
+                              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-400 text-[10px] font-bold font-mono rounded-xl">
+                                <Clock className="w-3 h-3" />
+                                <span>Active (Monitoring)</span>
+                              </div>
+                            )}
+                          </td>
+
+                          {/* Action Buttons */}
+                          <td className="p-3.5 text-right whitespace-nowrap">
+                            <div className="flex items-center justify-end gap-1.5">
+                              {isFlagged ? (
+                                <button
+                                  onClick={() => handleProcessPayout(acc.id)}
+                                  className="px-3 py-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:opacity-95 text-white text-[10px] font-black uppercase tracking-wider rounded-lg transition shadow-xs cursor-pointer flex items-center gap-1"
+                                >
+                                  <Wallet className="w-3 h-3" />
+                                  <span>Process Payout</span>
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => handleSimulateCommissionAdd(acc.id, 25)}
+                                  className="px-2.5 py-1 bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-300 border border-purple-500/20 text-[10px] font-bold rounded-lg transition cursor-pointer flex items-center gap-1"
+                                  title="Add $25 commission to test trigger threshold crossing"
+                                >
+                                  <span>+$25 Sale</span>
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        {/* Real-Time Automated Trigger Console / Terminal Audit Log */}
+        <div className="space-y-3 bg-neutral-950 text-neutral-100 p-4 sm:p-5 rounded-2xl border border-neutral-800 font-mono">
+          <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
+            <div className="flex items-center gap-2">
+              <Activity className="w-4 h-4 text-purple-400 animate-pulse" />
+              <span className="text-xs font-bold text-neutral-200 tracking-wider uppercase">
+                Automated Trigger Live Audit Log Terminal
+              </span>
+            </div>
+            <button
+              onClick={() => setAuditLogs([])}
+              className="text-[10px] text-neutral-500 hover:text-neutral-300 transition cursor-pointer"
+            >
+              Clear Terminal
+            </button>
+          </div>
+
+          <div className="max-h-48 overflow-y-auto space-y-1.5 text-[11px] leading-relaxed pr-2">
+            {auditLogs.length === 0 ? (
+              <p className="text-neutral-600 italic text-[10px]">No recent trigger events recorded.</p>
+            ) : (
+              auditLogs.map((log) => (
+                <div key={log.id} className="flex items-start gap-2 border-b border-neutral-900/80 pb-1">
+                  <span className="text-neutral-500 shrink-0">[{log.timestamp}]</span>
+                  <span className={`shrink-0 font-bold px-1 rounded text-[9px] ${
+                    log.type === 'AUTOTRIGGER'
+                      ? 'bg-rose-500/30 text-rose-300 border border-rose-500/40'
+                      : log.type === 'PAYOUT'
+                      ? 'bg-emerald-500/30 text-emerald-300'
+                      : log.type === 'COMMISSION'
+                      ? 'bg-purple-500/30 text-purple-300'
+                      : 'bg-neutral-800 text-neutral-400'
+                  }`}>
+                    {log.type}
+                  </span>
+                  <span className={log.type === 'AUTOTRIGGER' ? 'text-rose-300 font-bold' : 'text-neutral-300'}>
+                    {log.message}
+                  </span>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>

@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   Sparkles, CheckCircle, Globe, Terminal, Star, Clock, 
   ShoppingCart, MessageSquare, ArrowRight, MessageCircle, 
   PhoneCall, ShieldCheck, Zap, Laptop, Award, Gift, ChevronDown, 
-  ChevronUp, Bell, Calendar, Mail, Check, X, Flame
+  ChevronUp, Bell, Calendar, Mail, Check, X, Flame,
+  ChevronLeft, ChevronRight, Play, Pause, Sliders, Table, LayoutGrid,
+  Smartphone
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Language, Theme, Currency } from '../types';
@@ -67,6 +69,123 @@ export default function DigitalWebDevelopment({
     const timer = setTimeout(() => setIsPricingLoading(false), 800);
     return () => clearTimeout(timer);
   }, []);
+
+  // Slideshow & Smooth Scroll state for Pricing Packages on Mobile
+  const [activePkgIndex, setActivePkgIndex] = useState(0);
+  const [isAutoSlidePlaying, setIsAutoSlidePlaying] = useState(true);
+  const packagesContainerRef = useRef<HTMLDivElement>(null);
+  const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  // Mobile & Desktop Pricing View Mode: 'cards' or 'table'
+  const [pricingViewMode, setPricingViewMode] = useState<'cards' | 'table'>('cards');
+  // Mobile Comparison Package Selection: 'fields' | 'all' | 'pkg-boost' | 'pkg-corp' | 'pkg-shop'
+  const [mobileComparisonPackage, setMobileComparisonPackage] = useState<'fields' | 'all' | 'pkg-boost' | 'pkg-corp' | 'pkg-shop'>('fields');
+  // Expandable features state on mobile cards
+  const [expandedFeatures, setExpandedFeatures] = useState<Record<string, boolean>>({});
+
+  // Helper to render responsive comparison table field badges
+  const renderFieldBadge = (val: string, isPrice?: boolean, isRegularPrice?: boolean, pkgColor?: string) => {
+    if (isPrice) {
+      return (
+        <span className="font-black font-mono text-xs sm:text-sm px-2 py-0.5 rounded-md bg-neutral-100 dark:bg-slate-800 text-neutral-900 dark:text-white">
+          {val}
+        </span>
+      );
+    }
+    if (isRegularPrice) {
+      return (
+        <span className="line-through text-neutral-400 dark:text-neutral-500 font-mono text-[10.5px] sm:text-xs">
+          {val}
+        </span>
+      );
+    }
+    if (val.startsWith('✔')) {
+      const text = val.replace('✔', '').trim();
+      return (
+        <span className="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold text-[10px] sm:text-xs leading-tight">
+          <Check className="w-3 h-3 shrink-0" />
+          <span>{text || (language === 'bn' ? 'যুক্ত' : 'Yes')}</span>
+        </span>
+      );
+    }
+    if (val === '✗') {
+      return (
+        <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-rose-500/10 text-rose-500 font-black text-xs">
+          <X className="w-3 h-3" />
+        </span>
+      );
+    }
+    return (
+      <span className="font-medium text-[10.5px] sm:text-xs text-neutral-700 dark:text-slate-300 leading-tight">
+        {val}
+      </span>
+    );
+  };
+
+  const toggleExpandFeatures = (pkgId: string) => {
+    setExpandedFeatures(prev => ({
+      ...prev,
+      [pkgId]: !prev[pkgId]
+    }));
+  };
+
+  // Function to smoothly scroll to a specific package card
+  const scrollToPackage = useCallback((index: number) => {
+    setActivePkgIndex(index);
+    if (packagesContainerRef.current && cardRefs.current[index]) {
+      const container = packagesContainerRef.current;
+      const card = cardRefs.current[index];
+      if (card) {
+        const cardLeft = card.offsetLeft;
+        const containerWidth = container.clientWidth;
+        const cardWidth = card.clientWidth;
+        const targetScroll = cardLeft - (containerWidth - cardWidth) / 2;
+        container.scrollTo({
+          left: Math.max(0, targetScroll),
+          behavior: 'smooth'
+        });
+      }
+    }
+  }, []);
+
+  // Handle scroll events on container to update activePkgIndex based on swipe position
+  const handleContainerScroll = () => {
+    if (!packagesContainerRef.current || cardRefs.current.length === 0) return;
+    const container = packagesContainerRef.current;
+    const scrollPosition = container.scrollLeft + container.clientWidth / 2;
+    
+    let closestIndex = 0;
+    let minDistance = Infinity;
+
+    cardRefs.current.forEach((card, idx) => {
+      if (card) {
+        const cardCenter = card.offsetLeft + card.clientWidth / 2;
+        const distance = Math.abs(scrollPosition - cardCenter);
+        if (distance < minDistance) {
+          minDistance = distance;
+          closestIndex = idx;
+        }
+      }
+    });
+
+    if (closestIndex !== activePkgIndex) {
+      setActivePkgIndex(closestIndex);
+    }
+  };
+
+  // Auto slideshow timer
+  useEffect(() => {
+    if (!isAutoSlidePlaying || isPricingLoading) return;
+    const timer = setInterval(() => {
+      setActivePkgIndex(prev => {
+        const nextIndex = (prev + 1) % 3;
+        scrollToPackage(nextIndex);
+        return nextIndex;
+      });
+    }, 4500);
+
+    return () => clearInterval(timer);
+  }, [isAutoSlidePlaying, isPricingLoading, scrollToPackage]);
 
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
   const [newsletterOpen, setNewsletterOpen] = useState(false);
@@ -228,18 +347,83 @@ export default function DigitalWebDevelopment({
     }
   ];
 
-  // Table rows structure for 3 packages
+  // Table rows structure for 3 packages comparison
   const comparisonRows = [
-    { feature: language === 'bn' ? 'সার্ভিস প্রাইস' : 'Starting Price', p1: '৳3,999', p2: '৳7,499', p3: '৳12,999' },
-    { feature: language === 'bn' ? 'ফ্রি ডোমেইন (১ বছর)' : 'Free Domain (1 Yr)', p1: '✔', p2: '✔', p3: '✔' },
-    { feature: language === 'bn' ? 'SSD ক্লাউড হোস্টিং' : 'Cloud Hosting (1 Yr)', p1: '✔ NVMe SSD', p2: '✔ BDiX', p3: '✔ Premium BDiX' },
-    { feature: language === 'bn' ? 'পণ্য আপলোড সুবিধা' : 'Product Upload', p1: '1 Landing Page', p2: 'Up to 5 Pages', p3: 'Unlimited (15 by us)' },
-    { feature: language === 'bn' ? 'পেমেন্ট মেথড সাপোর্ট' : 'Payment Methods', p1: 'COD Form', p2: 'Contact Form', p3: 'bKash/Nagad/Rocket' },
-    { feature: language === 'bn' ? 'পিক্সেল ও কনভার্সন এপিআই' : 'Pixel & Conversion API', p1: '✔ Premium', p2: '✗', p3: '✔ Custom' },
-    { feature: language === 'bn' ? 'গুগল ম্যাপস ইন্টিগ্রেশন' : 'Google Maps Integration', p1: '✗', p2: '✔ Standard', p3: '✔ Embed' },
-    { feature: language === 'bn' ? 'ইনভয়েস ও ড্যাশবোর্ড' : 'Invoice & Dashboard', p1: '✗', p2: '✗', p3: '✔ Client Portal' },
-    { feature: language === 'bn' ? 'ফ্রি টেকনিক্যাল সাপোর্ট' : 'Free Technical Support', p1: '7 Days', p2: '1 Month', p3: '1 Month + Training' },
-    { feature: language === 'bn' ? 'ডেলিভারি সময়সীমা' : 'Delivery Timeline', p1: '3-5 Days', p2: '5-7 Days', p3: '5-7 Days' }
+    { 
+      feature: language === 'bn' ? 'অফার প্রাইস (৫০% ছাড়)' : 'Promo Price (50% Off)', 
+      p1: translatePrice(3999), 
+      p2: translatePrice(7499), 
+      p3: translatePrice(12999),
+      isPrice: true
+    },
+    { 
+      feature: language === 'bn' ? 'রেগুলার প্রাইস' : 'Regular Price', 
+      p1: translatePrice(5000), 
+      p2: translatePrice(10000), 
+      p3: translatePrice(16000),
+      isRegularPrice: true
+    },
+    { 
+      feature: language === 'bn' ? 'ফ্রি .COM ডোমেইন (১ বছর)' : 'Free .COM Domain (1 Yr)', 
+      p1: language === 'bn' ? '✔ অন্তর্ভুক্ত' : '✔ Included', 
+      p2: language === 'bn' ? '✔ অন্তর্ভুক্ত' : '✔ Included', 
+      p3: language === 'bn' ? '✔ অন্তর্ভুক্ত' : '✔ Included',
+      highlight: true
+    },
+    { 
+      feature: language === 'bn' ? 'SSD ক্লাউড হোস্টিং' : 'Cloud Hosting (1 Yr)', 
+      p1: '✔ NVMe SSD', 
+      p2: '✔ BDiX High Speed', 
+      p3: '✔ Premium BDiX Ultra' 
+    },
+    { 
+      feature: language === 'bn' ? 'পণ্য ও পেজ সংখ্যা' : 'Product / Page Limit', 
+      p1: language === 'bn' ? '১টি ল্যান্ডিং পেজ' : '1 Landing Page', 
+      p2: language === 'bn' ? '৫টি পেজ পর্যন্ত' : 'Up to 5 Pages', 
+      p3: language === 'bn' ? 'আনলিমিটেড (১৫টি ফ্রি)' : 'Unlimited (15 by us)' 
+    },
+    { 
+      feature: language === 'bn' ? 'পেমেন্ট মেথড সাপোর্ট' : 'Payment Methods', 
+      p1: language === 'bn' ? '১-ক্লিক ক্যাশ অন ডেলিভারি' : '1-Click COD Order Form', 
+      p2: language === 'bn' ? 'কন্টাক্ট / লিড ফর্ম' : 'Contact & Lead Forms', 
+      p3: language === 'bn' ? 'বিকাশ, নগদ, রকেট + COD' : 'bKash, Nagad, Rocket + COD' 
+    },
+    { 
+      feature: language === 'bn' ? 'পিক্সেল ও কনভার্সন এপিআই' : 'Pixel & Conversion API', 
+      p1: language === 'bn' ? '✔ প্রিমিয়াম পিক্সেল' : '✔ Premium Pixel', 
+      p2: language === 'bn' ? 'ঐচ্ছিক অ্যাড-অন' : 'Optional Add-on', 
+      p3: language === 'bn' ? '✔ কাস্টম পিক্সেল ও CAPI' : '✔ Custom Pixel & CAPI' 
+    },
+    { 
+      feature: language === 'bn' ? 'গুগল ম্যাপস ইন্টিগ্রেশন' : 'Google Maps Integration', 
+      p1: '✗', 
+      p2: language === 'bn' ? '✔ স্ট্যান্ডার্ড ম্যাপ' : '✔ Standard Map', 
+      p3: language === 'bn' ? '✔ ফুল ম্যাপ সেটআপ' : '✔ Full Map Embed' 
+    },
+    { 
+      feature: language === 'bn' ? 'ইনভয়েস ও ড্যাশবোর্ড' : 'Invoice & Dashboard', 
+      p1: '✗', 
+      p2: '✗', 
+      p3: language === 'bn' ? '✔ ক্লায়েন্ট পোর্টাল' : '✔ Client Portal & Invoice' 
+    },
+    { 
+      feature: language === 'bn' ? 'ফ্রি টেকনিক্যাল সাপোর্ট' : 'Free Technical Support', 
+      p1: language === 'bn' ? '৭ দিন ভিআইপি সাপোর্ট' : '7 Days VIP', 
+      p2: language === 'bn' ? '১ মাস ডেডিকেটেড' : '1 Month Dedicated', 
+      p3: language === 'bn' ? '১ মাস + ট্রেনিং' : '1 Month + Training' 
+    },
+    { 
+      feature: language === 'bn' ? 'ডেলিভারি সময়সীমা' : 'Delivery Timeline', 
+      p1: language === 'bn' ? '৩-৫ কার্যদিবস' : '3-5 Working Days', 
+      p2: language === 'bn' ? '৫-৭ কার্যদিবস' : '5-7 Working Days', 
+      p3: language === 'bn' ? '৫-৭ কার্যদিবস' : '5-7 Working Days' 
+    },
+    { 
+      feature: language === 'bn' ? 'বাৎসরিক রিনিউয়াল ফি' : 'Yearly Renewal Fee', 
+      p1: `${translatePrice(2500)} / ${language === 'bn' ? 'বছর' : 'Yr'}`, 
+      p2: `${translatePrice(3000)} / ${language === 'bn' ? 'বছর' : 'Yr'}`, 
+      p3: `${translatePrice(3200)} / ${language === 'bn' ? 'বছর' : 'Yr'}` 
+    }
   ];
 
   // Review sliding carousel data
@@ -559,167 +743,859 @@ export default function DigitalWebDevelopment({
               ))}
             </div>
           ) : (
-            /* RESPONSIVE LAYOUT CONTAINER: Desktop grid / Tablet grid / Mobile Horizontal Slider */
-            <div className="flex overflow-x-auto snap-x snap-mandatory md:grid md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 pt-4 pb-6 px-4 md:px-0 -mx-4 md:mx-0 scrollbar-none scrollbar-hide">
-              {packagesList.map((pkg, index) => {
-                const glowHex = pkg.id === 'pkg-boost' ? 'rgba(0,229,255,0.4)' : pkg.id === 'pkg-corp' ? 'rgba(124,58,237,0.4)' : 'rgba(16,185,129,0.4)';
+            <div className="space-y-4 pt-2">
+              {/* Mode Toggle: Cards View vs Comparison Table View */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white/60 dark:bg-slate-900/60 backdrop-blur-md p-2 rounded-2xl border border-neutral-200/80 dark:border-slate-800 shadow-xs">
                 
-                return (
-                  <motion.div 
-                    key={pkg.id}
-                    initial={{ opacity: 0, y: 30 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.6, delay: index * 0.15 }}
-                    style={{
-                      '--neon-glow': glowHex
-                    } as any}
-                    className="min-w-[290px] w-[82vw] md:w-auto snap-center shrink-0 group relative flex flex-col justify-between rounded-[24px] p-0.5 bg-gradient-to-br from-white/30 via-white/10 to-transparent dark:from-white/10 dark:via-white/5 dark:to-transparent hover:bg-gradient-to-br hover:from-white/80 dark:hover:from-white/20 hover:to-transparent shadow-lg hover:shadow-2xl transition-all duration-500 cursor-pointer border border-white/40 dark:border-white/5"
+                {/* View Mode Selector Tabs */}
+                <div className="flex items-center gap-1.5 p-1 bg-neutral-100 dark:bg-slate-950/80 rounded-xl w-full sm:w-auto">
+                  <button
+                    type="button"
+                    onClick={() => setPricingViewMode('cards')}
+                    className={`flex-1 sm:flex-initial px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                      pricingViewMode === 'cards'
+                        ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-cyan-400 shadow-xs font-extrabold'
+                        : 'text-neutral-600 dark:text-slate-400 hover:text-neutral-900 dark:hover:text-white'
+                    }`}
                   >
-                    
-                    {/* Animated Neon Shadow Border Backdrop on Card Hover */}
-                    <div className={`absolute inset-[-1px] rounded-[24px] bg-gradient-to-br ${pkg.color} opacity-0 group-hover:opacity-10 dark:group-hover:opacity-20 transition duration-700 blur-[8px] -z-10`} />
+                    <LayoutGrid className="w-3.5 h-3.5" />
+                    <span>{language === 'bn' ? 'কার্ড ভিউ' : 'Cards View'}</span>
+                  </button>
 
-                    {/* Display Animated floating badge on Top Right Corner - positioned inside the boundaries to prevent overflow clipping on mobile slider and desktop */}
-                    <div className="absolute top-2.5 right-2.5 bg-gradient-to-r from-red-600 via-pink-500 to-orange-500 text-white text-[9.5px] sm:text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full z-30 shadow-md border border-white/30 dark:border-white/10 select-none pointer-events-none animate-bounce">
-                      {language === 'bn' ? '⚡ ফ্রি ডোমেইন ও হোস্টিং' : '🚀 FREE DOMAIN & HOSTING'}
+                  <button
+                    type="button"
+                    onClick={() => setPricingViewMode('table')}
+                    className={`flex-1 sm:flex-initial px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                      pricingViewMode === 'table'
+                        ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-cyan-400 shadow-xs font-extrabold'
+                        : 'text-neutral-600 dark:text-slate-400 hover:text-neutral-900 dark:hover:text-white'
+                    }`}
+                  >
+                    <Table className="w-3.5 h-3.5" />
+                    <span>{language === 'bn' ? 'ফিচার তুলনা টেবিল' : 'Comparison Table'}</span>
+                    <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 font-mono font-black">
+                      NEW
+                    </span>
+                  </button>
+                </div>
+
+                {/* Scannable Status Tip */}
+                <div className="text-[11px] font-medium text-neutral-500 dark:text-slate-400 flex items-center gap-1.5 px-2">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                  <span>
+                    {pricingViewMode === 'cards'
+                      ? (language === 'bn' ? 'কার্ড সোয়াইপ করুন অথবা সরাসরি অর্ডার বুক করুন' : 'Swipe cards or tap to book directly')
+                      : (language === 'bn' ? 'সব প্যাকেজের ফিচার ফিল্ড মোবাইল ফ্রেন্ডলি টেবিলে তুলনা করুন' : 'Compare all package specs in mobile-friendly table')}
+                  </span>
+                </div>
+              </div>
+
+              {/* VIEW 1: CARDS VIEW */}
+              {pricingViewMode === 'cards' && (
+                <div className="space-y-4">
+                  {/* Mobile & Responsive Animated Slideshow Navigation Controls Bar */}
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white/40 dark:bg-slate-900/40 backdrop-blur-md p-2.5 rounded-2xl border border-neutral-200/60 dark:border-slate-800/60 shadow-xs">
+                    
+                    {/* Package Quick Selector Tabs */}
+                    <div className="flex items-center gap-1.5 max-w-full overflow-x-auto scrollbar-none p-0.5 w-full sm:w-auto">
+                      {packagesList.map((pkg, idx) => {
+                        const isActive = activePkgIndex === idx;
+                        return (
+                          <button
+                            key={pkg.id}
+                            onClick={() => {
+                              scrollToPackage(idx);
+                              setIsAutoSlidePlaying(false);
+                            }}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all duration-300 flex items-center gap-1.5 whitespace-nowrap cursor-pointer shrink-0 ${
+                              isActive
+                                ? `bg-gradient-to-r ${pkg.color} text-white shadow-md scale-102`
+                                : 'text-neutral-600 dark:text-slate-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-200/50 dark:hover:bg-slate-800/50'
+                            }`}
+                          >
+                            <span className="text-sm">{pkg.icon}</span>
+                            <span>{pkg.title.split(' ')[0]}</span>
+                            <span className="text-[10px] opacity-85 font-mono font-bold">
+                              ({translatePrice(pkg.price)})
+                            </span>
+                          </button>
+                        );
+                      })}
                     </div>
 
-                    {/* Premium Card Surface Glassmorphism Container with Background Blur */}
-                    <div className="h-full flex flex-col justify-between p-6 sm:p-8 bg-white/60 dark:bg-[#090D1A]/85 backdrop-blur-xl rounded-[23px] relative overflow-hidden z-20 transition-colors duration-500 min-h-[540px] md:min-h-[620px]">
+                    {/* Slideshow Control Buttons: Prev / Play-Pause / Next */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => {
+                          setIsAutoSlidePlaying(false);
+                          const prevIdx = (activePkgIndex - 1 + 3) % 3;
+                          scrollToPackage(prevIdx);
+                        }}
+                        className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 text-neutral-700 dark:text-slate-300 hover:bg-neutral-100 dark:hover:bg-slate-800 transition active:scale-95 shadow-xs cursor-pointer"
+                        title={language === 'bn' ? 'পূর্ববর্তী প্যাকেজ' : 'Previous Package'}
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </button>
+
+                      <button
+                        onClick={() => setIsAutoSlidePlaying(!isAutoSlidePlaying)}
+                        className={`px-2.5 py-1.5 rounded-xl border transition active:scale-95 shadow-xs flex items-center gap-1 text-xs font-bold cursor-pointer ${
+                          isAutoSlidePlaying 
+                            ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-600 dark:text-cyan-400' 
+                            : 'bg-white dark:bg-slate-900 border-neutral-200 dark:border-slate-800 text-neutral-600 dark:text-slate-400'
+                        }`}
+                        title={isAutoSlidePlaying ? "Pause Auto-Slide" : "Play Auto-Slide"}
+                      >
+                        {isAutoSlidePlaying ? <Pause className="w-3.5 h-3.5 text-cyan-500 animate-pulse" /> : <Play className="w-3.5 h-3.5" />}
+                        <span className="text-[10px] uppercase font-mono font-bold">
+                          {isAutoSlidePlaying ? (language === 'bn' ? 'অটো' : 'AUTO') : (language === 'bn' ? 'পজড' : 'PAUSED')}
+                        </span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setIsAutoSlidePlaying(false);
+                          const nextIdx = (activePkgIndex + 1) % 3;
+                          scrollToPackage(nextIdx);
+                        }}
+                        className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-neutral-200 dark:border-slate-800 text-neutral-700 dark:text-slate-300 hover:bg-neutral-100 dark:hover:bg-slate-800 transition active:scale-95 shadow-xs cursor-pointer"
+                        title={language === 'bn' ? 'পরবর্তী প্যাকেজ' : 'Next Package'}
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* RESPONSIVE LAYOUT CONTAINER: Desktop grid / Mobile & Tablet Horizontal Smooth-Scroll Slider */}
+                  <div 
+                    ref={packagesContainerRef}
+                    onScroll={handleContainerScroll}
+                    onMouseEnter={() => setIsAutoSlidePlaying(false)}
+                    onTouchStart={() => setIsAutoSlidePlaying(false)}
+                    className="flex overflow-x-auto snap-x snap-mandatory lg:grid lg:grid-cols-3 gap-5 sm:gap-7 pt-2 pb-4 px-1 lg:px-0 scroll-smooth scrollbar-none scrollbar-hide"
+                  >
+                    {packagesList.map((pkg, index) => {
+                      const glowHex = pkg.id === 'pkg-boost' ? 'rgba(0,229,255,0.4)' : pkg.id === 'pkg-corp' ? 'rgba(124,58,237,0.4)' : 'rgba(16,185,129,0.4)';
+                      const isFocused = activePkgIndex === index;
+                      const isExpanded = !!expandedFeatures[pkg.id];
                       
-                      {/* Shine Effect Overlay swipe animation */}
-                      <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-in-out bg-gradient-to-r from-transparent via-white/15 dark:via-white/5 to-transparent pointer-events-none" />
-
-                      {/* Accent Bubble */}
-                      <div className={`absolute -top-10 -right-10 w-32 h-32 bg-gradient-to-br ${pkg.color} opacity-10 dark:opacity-[0.12] rounded-full blur-2xl group-hover:scale-130 transition duration-500`} />
-
-                      <div className="space-y-6">
-                        
-                        {/* Header Box / Badge & Floating Icon layout */}
-                        <div className="flex items-center justify-between">
-                          <span className={`text-[10.5px] font-extrabold tracking-widest text-white uppercase px-3 py-1 bg-gradient-to-r ${pkg.color} rounded-full z-15 shadow-sm`}>
-                            {pkg.badge}
-                          </span>
+                      return (
+                        <motion.div 
+                          key={pkg.id}
+                          ref={(el) => (cardRefs.current[index] = el)}
+                          initial={{ opacity: 0, y: 30 }}
+                          whileInView={{ opacity: 1, y: 0 }}
+                          viewport={{ once: true }}
+                          transition={{ duration: 0.6, delay: index * 0.15 }}
+                          style={{
+                            '--neon-glow': glowHex
+                          } as any}
+                          className={`min-w-[280px] sm:min-w-[340px] md:min-w-[400px] w-[88vw] sm:w-[85vw] md:w-[75vw] lg:w-auto snap-center shrink-0 lg:shrink group relative flex flex-col justify-between rounded-[24px] p-0.5 bg-gradient-to-br from-white/30 via-white/10 to-transparent dark:from-white/10 dark:via-white/5 dark:to-transparent hover:bg-gradient-to-br hover:from-white/80 dark:hover:from-white/20 hover:to-transparent shadow-lg hover:shadow-2xl transition-all duration-500 cursor-pointer border ${
+                            isFocused
+                              ? 'border-cyan-400 dark:border-cyan-400 ring-2 ring-cyan-400/40 dark:ring-cyan-500/30 shadow-cyan-500/20 scale-[1.01]'
+                              : 'border-white/40 dark:border-white/5 opacity-95 lg:opacity-100'
+                          }`}
+                        >
                           
-                          {/* Floating Icon Frame with standard animation loop */}
-                          <motion.div 
-                            animate={{ y: [0, -6, 0] }}
-                            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut", delay: index * 0.3 }}
-                            className="p-3 sm:p-3.5 bg-neutral-100/60 dark:bg-[#131B2F] text-2xl rounded-xl z-15 shrink-0 border border-neutral-200/40 dark:border-slate-800"
-                          >
-                            {pkg.icon}
-                          </motion.div>
-                        </div>
+                          {/* Animated Neon Shadow Border Backdrop on Card Hover */}
+                          <div className={`absolute inset-[-1px] rounded-[24px] bg-gradient-to-br ${pkg.color} ${isFocused ? 'opacity-20 dark:opacity-30' : 'opacity-0'} group-hover:opacity-10 dark:group-hover:opacity-20 transition duration-700 blur-[8px] -z-10`} />
 
-                        {/* Title and Description */}
-                        <div className="space-y-2">
-                          <h3 className={`text-xl sm:text-2xl font-black text-neutral-900 dark:text-white leading-tight group-hover:bg-gradient-to-r group-hover:${pkg.color} group-hover:bg-clip-text group-hover:text-transparent transition-all duration-300`}>
-                            {pkg.title}
+                          {/* Premium Card Surface Glassmorphism Container with Background Blur */}
+                          <div className="h-full flex flex-col justify-between p-4 sm:p-6 lg:p-7 bg-white/70 dark:bg-[#090D1A]/90 backdrop-blur-xl rounded-[23px] relative overflow-hidden z-20 transition-colors duration-500">
+                            
+                            {/* Shine Effect Overlay swipe animation */}
+                            <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-in-out bg-gradient-to-r from-transparent via-white/15 dark:via-white/5 to-transparent pointer-events-none" />
+
+                            {/* Accent Bubble */}
+                            <div className={`absolute -top-10 -right-10 w-32 h-32 bg-gradient-to-br ${pkg.color} opacity-10 dark:opacity-[0.12] rounded-full blur-2xl group-hover:scale-130 transition duration-500`} />
+
+                            <div className="space-y-4 sm:space-y-5">
+                              
+                              {/* Header Box / Badge & Floating Icon layout - Fully responsive without collision */}
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="space-y-1.5">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className={`text-[10px] sm:text-[10.5px] font-extrabold tracking-wider text-white uppercase px-2.5 py-1 bg-gradient-to-r ${pkg.color} rounded-full shadow-sm`}>
+                                      {pkg.badge}
+                                    </span>
+                                    <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30">
+                                      <span>⚡</span> {language === 'bn' ? 'ফ্রি ডোমেইন ও হোস্টিং' : 'FREE DOMAIN & HOSTING'}
+                                    </span>
+                                  </div>
+                                </div>
+                                
+                                {/* Floating Icon Frame */}
+                                <motion.div 
+                                  animate={{ y: [0, -4, 0] }}
+                                  transition={{ duration: 3, repeat: Infinity, ease: "easeInOut", delay: index * 0.3 }}
+                                  className="p-2.5 sm:p-3 bg-neutral-100/80 dark:bg-[#131B2F] text-xl sm:text-2xl rounded-xl shrink-0 border border-neutral-200/40 dark:border-slate-800"
+                                >
+                                  {pkg.icon}
+                                </motion.div>
+                              </div>
+
+                              {/* Title and Description */}
+                              <div className="space-y-1 sm:space-y-1.5">
+                                <h3 className={`text-lg sm:text-xl md:text-2xl font-black text-neutral-900 dark:text-white leading-tight group-hover:bg-gradient-to-r group-hover:${pkg.color} group-hover:bg-clip-text group-hover:text-transparent transition-all duration-300`}>
+                                  {pkg.title}
+                                </h3>
+                                <p className="text-xs sm:text-[13px] text-neutral-500 dark:text-slate-400 font-medium leading-relaxed">
+                                  {pkg.desc}
+                                </p>
+                              </div>
+
+                              {/* Highlighted Promo Price with Beautiful UI Gradient Design */}
+                              <div className="p-3 sm:p-4 rounded-2xl bg-gradient-to-r from-neutral-50/90 to-neutral-100/40 dark:from-slate-900/60 dark:to-[#0c1222] border border-neutral-200/50 dark:border-[#1E293B]/80 text-left relative overflow-hidden group/price shadow-xs z-10">
+                                <div className={`absolute top-0 right-0 w-24 h-24 bg-gradient-to-br ${pkg.color} opacity-[0.12] rounded-full blur-xl pointer-events-none`} />
+                                
+                                <div className="flex items-center justify-between relative z-10">
+                                  <div className="space-y-0.5">
+                                    <span className={`text-[9px] sm:text-[9.5px] uppercase font-black tracking-widest bg-gradient-to-r ${pkg.color} bg-clip-text text-transparent block`}>
+                                      {language === 'bn' ? 'অফার প্রাইস' : 'PROMO PRICE'}
+                                    </span>
+                                    <div className="flex items-baseline">
+                                      <span className={`text-2xl sm:text-3xl font-extrabold bg-gradient-to-r ${pkg.color} bg-clip-text text-transparent font-mono tracking-tight`}>
+                                        <AnimatedPrice targetPrice={pkg.price} currency={currency} translatePrice={translatePrice} />
+                                      </span>
+                                    </div>
+                                  </div>
+                                  
+                                  <div className="text-right space-y-1">
+                                    <span className="text-[11px] text-neutral-400 block tracking-wide line-through font-medium">
+                                      {translatePrice(pkg.regularPrice)}
+                                    </span>
+                                    <span className="inline-block text-[9px] font-bold text-red-500 bg-red-50 dark:bg-red-500/10 px-2 py-0.5 rounded-full uppercase leading-none border border-red-200/40 dark:border-none animate-pulse">
+                                      {language === 'bn' ? '৫০% ছাড়' : '50% OFF'}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Specific Delivery Timeline & Future Renewal Cost Indicators */}
+                              <div className="grid grid-cols-2 gap-2 p-2.5 sm:p-3 rounded-xl bg-neutral-50/80 dark:bg-[#070B16] border border-neutral-200/60 dark:border-white/5 text-[10px] sm:text-[10.5px]">
+                                <div>
+                                  <span className="text-neutral-400 dark:text-slate-400 uppercase tracking-wider font-semibold block text-[9px]">
+                                    {language === 'bn' ? '🕒 ডেলিভারি সময়' : '🕒 DELIVERY'}
+                                  </span>
+                                  <span className="font-extrabold text-neutral-800 dark:text-neutral-200 block truncate mt-0.5">
+                                    {language === 'bn' ? pkg.deliveryBn : pkg.delivery}
+                                  </span>
+                                </div>
+                                <div className="text-right border-l border-neutral-200/60 dark:border-slate-800 pl-2">
+                                  <span className="text-neutral-400 dark:text-slate-400 uppercase tracking-wider font-semibold block text-[9px]">
+                                    {language === 'bn' ? '♻ রিনিউয়াল ফি' : '♻ RENEWAL'}
+                                  </span>
+                                  <span className="font-extrabold text-emerald-600 dark:text-emerald-400 font-mono block truncate mt-0.5">
+                                    {translatePrice(pkg.renewal)} / {language === 'bn' ? 'বছর' : 'Yr'}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Features Included list layout with smooth mobile expander */}
+                              <div className="space-y-2.5 border-t border-neutral-100 dark:border-[#1E293B]/60 pt-4 relative">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[10px] font-mono tracking-widest text-neutral-400 dark:text-neutral-500 font-black uppercase">
+                                    {language === 'bn' ? 'যা যা থাকছে প্যাকেজে:' : 'FEATURES INCLUDED:'}
+                                  </span>
+                                  <span className="text-[10px] font-bold text-neutral-500 font-mono">
+                                    {pkg.features.length} {language === 'bn' ? 'টি ফিচার' : 'Items'}
+                                  </span>
+                                </div>
+                                
+                                <ul className="space-y-2">
+                                  {(isExpanded ? pkg.features : pkg.features.slice(0, 5)).map((feat, fIdx) => (
+                                    <li key={fIdx} className="flex items-start gap-2 text-[11px] sm:text-[11.5px] text-neutral-700 dark:text-neutral-300 leading-tight">
+                                      <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
+                                      <span>{feat}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+
+                                {pkg.features.length > 5 && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      toggleExpandFeatures(pkg.id);
+                                    }}
+                                    className="w-full py-1.5 px-2.5 rounded-lg bg-neutral-100/80 hover:bg-neutral-200/80 dark:bg-slate-900 dark:hover:bg-slate-800 text-[10.5px] font-bold text-blue-600 dark:text-cyan-400 transition flex items-center justify-center gap-1 cursor-pointer"
+                                  >
+                                    <span>
+                                      {isExpanded
+                                        ? (language === 'bn' ? 'কম দেখুন' : 'Show Less')
+                                        : (language === 'bn' ? `+ আরো ${pkg.features.length - 5}টি ফিচার দেখুন` : `+ ${pkg.features.length - 5} More Features`)}
+                                    </span>
+                                    {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                                  </button>
+                                )}
+                              </div>
+
+                            </div>
+
+                            {/* Call-to-action Order buttons layout bottom */}
+                            <div className="pt-4 border-t border-neutral-100 dark:border-[#1E293B]/60 space-y-2 mt-4">
+                              
+                              {/* Direct order button */}
+                              <motion.button 
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOrderNowClick(pkg);
+                                }}
+                                className={`w-full py-3 bg-gradient-to-r ${pkg.color} text-white font-black text-xs rounded-xl shadow-md hover:opacity-95 transition flex items-center justify-center gap-1.5 cursor-pointer min-h-[44px]`}
+                              >
+                                <ShoppingCart className="w-4 h-4" />
+                                <span>
+                                  {language === 'bn' 
+                                    ? `অনলাইন ক্রয় করুন - ${translatePrice(pkg.price)}` 
+                                    : `Order Now - ${translatePrice(pkg.price)}`}
+                                </span>
+                              </motion.button>
+
+                              <div className="grid grid-cols-2 gap-2">
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedPackForOrder(pkg);
+                                    setConsultModalOpen(true);
+                                  }}
+                                  className="w-full py-2.5 bg-neutral-100/80 hover:bg-neutral-200 dark:bg-[#131B2F]/80 dark:hover:bg-[#1B2541]/90 text-neutral-700 dark:text-slate-300 font-bold text-[11px] rounded-xl transition border border-neutral-200/60 dark:border-slate-800/80 flex items-center justify-center gap-1 cursor-pointer"
+                                >
+                                  <span>{language === 'bn' ? 'পরামর্শ নিন' : 'Consult Us'}</span>
+                                </button>
+
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setPricingViewMode('table');
+                                    setMobileComparisonPackage(pkg.id as any);
+                                  }}
+                                  className="w-full py-2.5 bg-cyan-50/80 dark:bg-cyan-950/30 text-cyan-700 dark:text-cyan-400 font-bold text-[11px] rounded-xl transition border border-cyan-200/50 dark:border-cyan-800/50 flex items-center justify-center gap-1 cursor-pointer"
+                                >
+                                  <Table className="w-3 h-3" />
+                                  <span>{language === 'bn' ? 'টেবিলে দেখুন' : 'View in Table'}</span>
+                                </button>
+                              </div>
+
+                            </div>
+
+                          </div>
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Mobile & Tablet Slide Pagination Dots Indicator */}
+                  <div className="flex lg:hidden items-center justify-center gap-2 pt-1 pb-2">
+                    {packagesList.map((pkg, pIdx) => {
+                      const isCurrent = activePkgIndex === pIdx;
+                      return (
+                        <button
+                          key={pkg.id}
+                          onClick={() => {
+                            scrollToPackage(pIdx);
+                            setIsAutoSlidePlaying(false);
+                          }}
+                          className={`transition-all duration-300 rounded-full flex items-center justify-center cursor-pointer ${
+                            isCurrent
+                              ? `w-8 h-2.5 bg-gradient-to-r ${pkg.color} shadow-sm`
+                              : 'w-2.5 h-2.5 bg-neutral-300 dark:bg-slate-800 hover:bg-neutral-400 dark:hover:bg-slate-700'
+                          }`}
+                          aria-label={`Go to ${pkg.title}`}
+                        />
+                      );
+                    })}
+                  </div>
+
+                  {/* Callout Banner to Switch to Table View */}
+                  <div className="p-3 sm:p-4 rounded-2xl bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-slate-900/80 dark:to-cyan-950/30 border border-blue-200/70 dark:border-cyan-800/40 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
+                    <div className="space-y-0.5">
+                      <h4 className="text-xs sm:text-sm font-black text-neutral-900 dark:text-white flex items-center justify-center sm:justify-start gap-1.5">
+                        <Table className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
+                        <span>{language === 'bn' ? '৩টি প্যাকেজের সম্পূর্ণ ফিচার তুলনা টেবিল দেখতে চান?' : 'Want to compare all 3 packages side-by-side?'}</span>
+                      </h4>
+                      <p className="text-[11px] text-neutral-500 dark:text-slate-400">
+                        {language === 'bn' ? 'ডোমেন, হোস্টিং, প্রোডাক্ট লিমিট এবং পেমেন্ট গেটওয়ে এক নজরে যাচাই করুন।' : 'Review domains, SSD hosting, page limits, and payment methods in our responsive comparison table.'}
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setPricingViewMode('table')}
+                      className="px-4 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 text-white font-bold text-xs rounded-xl shadow-sm hover:shadow-md transition flex items-center gap-1.5 cursor-pointer shrink-0"
+                    >
+                      <span>{language === 'bn' ? 'তুলনা টেবিল খুলুন' : 'Open Comparison Table'}</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* VIEW 2: FULL MOBILE-FRIENDLY FEATURE COMPARISON TABLE VIEW */}
+              {pricingViewMode === 'table' && (
+                <div className="space-y-4">
+                  {/* Mobile Navigation Toolbar for Table Fields */}
+                  <div className="p-3 bg-white/70 dark:bg-[#0B1020]/80 backdrop-blur-md rounded-2xl border border-neutral-200/80 dark:border-slate-800 shadow-xs space-y-2.5">
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
+                          <Table className="w-4 h-4" />
+                        </span>
+                        <div>
+                          <h3 className="text-xs sm:text-sm font-black text-neutral-900 dark:text-white">
+                            {language === 'bn' ? 'প্যাকেজ ফিল্ড ও স্পেসিফিকেশন তুলনা টেবিল' : 'Package Fields & Feature Comparison Matrix'}
                           </h3>
-                          <p className="text-[12.5px] sm:text-[13px] text-neutral-500 dark:text-slate-400 font-medium leading-relaxed">
-                            {pkg.desc}
+                          <p className="text-[10.5px] text-neutral-500 dark:text-slate-400">
+                            {language === 'bn' ? 'মোবাইলে সহজে দেখতে যেকোনো প্যাকেজ ট্যাপ করুন অথবা সম্পূর্ণ টেবিল সোয়াইপ করুন' : 'Tap any package tab or swipe horizontally on mobile'}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Switch back button */}
+                      <button
+                        type="button"
+                        onClick={() => setPricingViewMode('cards')}
+                        className="px-3 py-1.5 rounded-xl text-xs font-bold bg-neutral-100 hover:bg-neutral-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-neutral-700 dark:text-slate-300 transition flex items-center gap-1.5 cursor-pointer shrink-0"
+                      >
+                        <LayoutGrid className="w-3.5 h-3.5" />
+                        <span>{language === 'bn' ? 'কার্ড ভিউ' : 'Card View'}</span>
+                      </button>
+                    </div>
+
+                    {/* Mobile Package Filter Tabs */}
+                    <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pt-1">
+                      <span className="text-[10px] uppercase font-bold text-neutral-400 dark:text-slate-500 tracking-wider shrink-0 mr-1 hidden sm:inline-block">
+                        {language === 'bn' ? 'ভিউ মুড:' : 'View Mode:'}
+                      </span>
+
+                      {/* View 1: Mobile Field-by-Field Spec Cards (Zero horizontal scrolling!) */}
+                      <button
+                        type="button"
+                        onClick={() => setMobileComparisonPackage('fields')}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                          mobileComparisonPackage === 'fields'
+                            ? 'bg-blue-600 dark:bg-cyan-500 text-white shadow-xs'
+                            : 'bg-neutral-100 dark:bg-slate-900 text-neutral-600 dark:text-slate-400 hover:bg-neutral-200 dark:hover:bg-slate-800'
+                        }`}
+                      >
+                        <Smartphone className="w-3.5 h-3.5" />
+                        <span>{language === 'bn' ? '📱 ফিল্ড কার্ড (মোবাইল)' : '📱 Field Cards (Mobile)'}</span>
+                      </button>
+
+                      {/* View 2: Full Matrix Table (Horizontal swipe with sticky headers) */}
+                      <button
+                        type="button"
+                        onClick={() => setMobileComparisonPackage('all')}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                          mobileComparisonPackage === 'all'
+                            ? 'bg-blue-600 dark:bg-cyan-500 text-white shadow-xs'
+                            : 'bg-neutral-100 dark:bg-slate-900 text-neutral-600 dark:text-slate-400 hover:bg-neutral-200 dark:hover:bg-slate-800'
+                        }`}
+                      >
+                        <Table className="w-3.5 h-3.5" />
+                        <span>{language === 'bn' ? '📊 পূর্ণ সোয়াইপ টেবিল' : '📊 Full Swipe Table'}</span>
+                      </button>
+
+                      {packagesList.map((p) => {
+                        const isSelected = mobileComparisonPackage === (p.id as any);
+                        return (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => setMobileComparisonPackage(p.id as any)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                              isSelected
+                                ? `bg-gradient-to-r ${p.color} text-white shadow-xs`
+                                : 'bg-neutral-100 dark:bg-slate-900 text-neutral-600 dark:text-slate-400 hover:bg-neutral-200 dark:hover:bg-slate-800'
+                            }`}
+                          >
+                            <span>{p.icon}</span>
+                            <span>{p.title.split(' ')[0]}</span>
+                            <span className="text-[10px] opacity-80 font-mono">
+                              ({translatePrice(p.price)})
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* OPTION 1: MOBILE FIELD-BY-FIELD COMPARISON CARDS (100% Mobile Friendly, Zero Horizontal Scroll!) */}
+                  {mobileComparisonPackage === 'fields' && (
+                    <div className="space-y-3">
+                      {/* Helpful notice */}
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 rounded-2xl bg-cyan-50/60 dark:bg-cyan-950/20 border border-cyan-200/50 dark:border-cyan-800/40 text-[11px] text-cyan-800 dark:text-cyan-300 gap-2">
+                        <div className="flex items-center gap-2">
+                          <Smartphone className="w-4 h-4 text-cyan-600 dark:text-cyan-400 shrink-0" />
+                          <span className="font-semibold">
+                            {language === 'bn' 
+                              ? 'মোবাইল ফ্রেন্ডলি ফিল্ড ভিউ: স্ক্রিন সোয়াইপ ছাড়াই ৩টি প্যাকেজের প্রতিটি সুবিধা সহজে তুলনা করুন।' 
+                              : 'Mobile-Friendly Field View: Compare every specification side-by-side without horizontal scrolling.'}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setMobileComparisonPackage('all')}
+                          className="text-[11px] font-bold text-blue-600 dark:text-cyan-400 hover:underline flex items-center gap-1 shrink-0 cursor-pointer"
+                        >
+                          <Table className="w-3.5 h-3.5" />
+                          <span>{language === 'bn' ? 'সোয়াইপ টেবিল মোড' : 'Swipe Table Mode'}</span>
+                        </button>
+                      </div>
+
+                      {/* Quick Package Action Header Bar (Sticky on mobile for fast booking) */}
+                      <div className="grid grid-cols-3 gap-2 p-2.5 rounded-2xl bg-white/80 dark:bg-[#090D1A]/80 backdrop-blur-md border border-neutral-200/80 dark:border-slate-800 shadow-sm sticky top-16 z-20">
+                        {packagesList.map((pkg) => (
+                          <div key={pkg.id} className="flex flex-col items-center justify-between text-center p-2 rounded-xl bg-neutral-50/90 dark:bg-slate-900/80 border border-neutral-200/40 dark:border-slate-800/60">
+                            <span className="text-base sm:text-xl">{pkg.icon}</span>
+                            <span className="text-[10px] sm:text-xs font-black text-neutral-900 dark:text-white truncate max-w-full mt-0.5">
+                              {pkg.title.split(' ')[0]}
+                            </span>
+                            <span className={`text-[11px] sm:text-xs font-black font-mono bg-gradient-to-r ${pkg.color} bg-clip-text text-transparent`}>
+                              {translatePrice(pkg.price)}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleOrderNowClick(pkg)}
+                              className={`w-full mt-1.5 py-1 px-1 rounded-lg bg-gradient-to-r ${pkg.color} text-white text-[9.5px] sm:text-[10.5px] font-bold shadow-xs hover:opacity-95 transition flex items-center justify-center gap-1 cursor-pointer`}
+                            >
+                              <ShoppingCart className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                              <span>{language === 'bn' ? 'অর্ডার' : 'Order'}</span>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* 12 Mobile Specification Field Cards */}
+                      <div className="space-y-2.5 pt-1">
+                        {comparisonRows.map((row, rIdx) => {
+                          return (
+                            <div 
+                              key={rIdx} 
+                              className={`p-3 sm:p-4 rounded-2xl border transition-all duration-300 ${
+                                row.highlight 
+                                  ? 'bg-gradient-to-r from-amber-500/5 via-transparent to-amber-500/5 border-amber-300/60 dark:border-amber-500/30 shadow-xs' 
+                                  : 'bg-white dark:bg-[#090D1A] border-neutral-200/80 dark:border-slate-800/80 shadow-xs'
+                              }`}
+                            >
+                              {/* Field Title & Highlight Badge */}
+                              <div className="flex items-center justify-between gap-2 pb-2 mb-2 border-b border-neutral-100 dark:border-slate-800/80">
+                                <div className="flex items-center gap-1.5">
+                                  {row.highlight ? (
+                                    <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                                  ) : (
+                                    <CheckCircle className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400 shrink-0" />
+                                  )}
+                                  <span className="font-bold text-xs sm:text-sm text-neutral-900 dark:text-white">
+                                    {row.feature}
+                                  </span>
+                                </div>
+                                {row.highlight && (
+                                  <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 font-mono shrink-0">
+                                    {language === 'bn' ? 'স্পেশাল' : 'Featured'}
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* 3 Columns Comparison */}
+                              <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
+                                {/* Boost */}
+                                <div className="p-2 sm:p-2.5 rounded-xl bg-cyan-50/40 dark:bg-cyan-950/20 border border-cyan-200/40 dark:border-cyan-800/30 flex flex-col justify-between text-center min-h-[54px]">
+                                  <span className="text-[9.5px] font-extrabold uppercase tracking-wide text-cyan-700 dark:text-cyan-400 truncate">
+                                    🚀 {packagesList[0].title.split(' ')[0]}
+                                  </span>
+                                  <div className="mt-1 flex items-center justify-center">
+                                    {renderFieldBadge(row.p1, row.isPrice, row.isRegularPrice, packagesList[0].color)}
+                                  </div>
+                                </div>
+
+                                {/* Corporate */}
+                                <div className="p-2 sm:p-2.5 rounded-xl bg-purple-50/40 dark:bg-purple-950/20 border border-purple-200/40 dark:border-purple-800/30 flex flex-col justify-between text-center min-h-[54px]">
+                                  <span className="text-[9.5px] font-extrabold uppercase tracking-wide text-purple-700 dark:text-purple-400 truncate">
+                                    🏢 {packagesList[1].title.split(' ')[0]}
+                                  </span>
+                                  <div className="mt-1 flex items-center justify-center">
+                                    {renderFieldBadge(row.p2, row.isPrice, row.isRegularPrice, packagesList[1].color)}
+                                  </div>
+                                </div>
+
+                                {/* E-Commerce */}
+                                <div className="p-2 sm:p-2.5 rounded-xl bg-emerald-50/40 dark:bg-emerald-950/20 border border-emerald-200/40 dark:border-emerald-800/30 flex flex-col justify-between text-center min-h-[54px]">
+                                  <span className="text-[9.5px] font-extrabold uppercase tracking-wide text-emerald-700 dark:text-emerald-400 truncate">
+                                    🛍️ {packagesList[2].title.split(' ')[0]}
+                                  </span>
+                                  <div className="mt-1 flex items-center justify-center">
+                                    {renderFieldBadge(row.p3, row.isPrice, row.isRegularPrice, packagesList[2].color)}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Bottom Direct Booking Action Section */}
+                      <div className="p-4 rounded-2xl bg-gradient-to-r from-neutral-50 to-neutral-100 dark:from-[#0B1020] dark:to-[#0F172A] border border-neutral-200 dark:border-slate-800 shadow-sm space-y-3 mt-4">
+                        <div className="text-center space-y-1">
+                          <h4 className="text-xs sm:text-sm font-black text-neutral-900 dark:text-white">
+                            {language === 'bn' ? 'পছন্দের প্যাকেজটি সরাসরি বুক করুন' : 'Book Your Preferred Package Instantly'}
+                          </h4>
+                          <p className="text-[11px] text-neutral-500 dark:text-slate-400">
+                            {language === 'bn' ? '৫০% ছাড়ের অফারসহ ফ্রি ডোমেইন এবং ক্লাউড হোস্টিং অন্তর্ভুক্ত' : '50% Discount with free domain and cloud hosting included'}
                           </p>
                         </div>
 
-                        {/* Highlighted Promo Price with Beautiful UI Gradient Design */}
-                        <div className="p-4 rounded-2xl bg-gradient-to-r from-neutral-50/90 to-neutral-100/40 dark:from-slate-900/60 dark:to-[#0c1222] border border-neutral-200/50 dark:border-[#1E293B]/80 text-left relative overflow-hidden group/price shadow-xs z-10">
-                          {/* Soft radial glow internally */}
-                          <div className={`absolute top-0 right-0 w-24 h-24 bg-gradient-to-br ${pkg.color} opacity-[0.12] rounded-full blur-xl pointer-events-none`} />
-                          
-                          <div className="flex items-center justify-between relative z-10">
-                            <div className="space-y-0.5">
-                              <span className={`text-[9.5px] uppercase font-black tracking-widest bg-gradient-to-r ${pkg.color} bg-clip-text text-transparent block`}>
-                                {language === 'bn' ? 'অফার প্রাইস' : 'PROMO PRICE'}
-                              </span>
-                              <div className="flex items-baseline">
-                                <span className={`text-2xl sm:text-3.5xl font-extrabold bg-gradient-to-r ${pkg.color} bg-clip-text text-transparent font-mono tracking-tight`}>
-                                  <AnimatedPrice targetPrice={pkg.price} currency={currency} translatePrice={translatePrice} />
-                                </span>
-                              </div>
-                            </div>
-                            
-                            <div className="text-right space-y-1">
-                              <span className="text-[11px] text-neutral-400 block tracking-wide line-through font-medium">
-                                {translatePrice(pkg.regularPrice)}
-                              </span>
-                              <span className="inline-block text-[9.5px] font-bold text-red-500 bg-red-50 dark:bg-red-500/10 px-2 py-0.5 rounded-full uppercase leading-none border border-red-200/40 dark:border-none animate-pulse">
-                                {language === 'bn' ? '৫০% ছাড়' : '50% OFF'}
-                              </span>
-                            </div>
-                          </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          {packagesList.map(pkg => (
+                            <button
+                              key={pkg.id}
+                              type="button"
+                              onClick={() => handleOrderNowClick(pkg)}
+                              className={`w-full py-2.5 px-3 rounded-xl bg-gradient-to-r ${pkg.color} text-white font-bold text-xs shadow-md hover:opacity-95 transition flex items-center justify-center gap-1.5 cursor-pointer min-h-[44px]`}
+                            >
+                              <ShoppingCart className="w-3.5 h-3.5" />
+                              <span>{pkg.title.split(' ')[0]} - {translatePrice(pkg.price)}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* OPTION 2: FULL COMPARISON MATRIX TABLE (With Sticky Header & Column for Mobile) */}
+                  {mobileComparisonPackage === 'all' && (
+                    <div className="space-y-2">
+                      {/* Mobile Swipe Hint */}
+                      <div className="flex items-center justify-between px-2 py-1 text-[11px] text-neutral-500 dark:text-slate-400">
+                        <span className="flex items-center gap-1.5">
+                          <span className="animate-pulse">👉</span>
+                          <span>{language === 'bn' ? 'ডানে সোয়াইপ করে সম্পূর্ণ প্যাকেজ টেবিল দেখুন' : 'Swipe horizontally to view all package columns'}</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setMobileComparisonPackage('fields')}
+                          className="text-[10px] sm:text-[11px] font-bold text-blue-600 dark:text-cyan-400 hover:underline flex items-center gap-1 cursor-pointer"
+                        >
+                          <Smartphone className="w-3 h-3" />
+                          <span>{language === 'bn' ? 'ফিল্ড কার্ড ভিউ' : 'Field Cards View'}</span>
+                        </button>
+                      </div>
+
+                      <div className="overflow-x-auto rounded-2xl border border-neutral-200 dark:border-slate-800 bg-white dark:bg-[#090D1A] shadow-xl relative scrollbar-thin scrollbar-thumb-neutral-300 dark:scrollbar-thumb-slate-800 max-h-[75vh]">
+                        <table className="w-full text-left border-collapse min-w-[480px] sm:min-w-[700px]">
+                          <thead className="sticky top-0 z-30 bg-neutral-50/95 dark:bg-[#0F172A]/95 backdrop-blur-md shadow-xs">
+                            <tr className="border-b border-neutral-200 dark:border-slate-800">
+                              {/* Sticky Feature Column Header (both top and left sticky!) */}
+                              <th className="sticky left-0 top-0 z-40 bg-neutral-100 dark:bg-[#0B1020] p-2.5 sm:p-4 text-[11px] sm:text-xs font-black uppercase tracking-wider text-neutral-600 dark:text-slate-400 border-r border-neutral-200 dark:border-slate-800 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.06)] w-[115px] min-w-[115px] sm:min-w-[180px]">
+                                {language === 'bn' ? 'ফিচার ফিল্ড / সুবিধা' : 'Package Specification'}
+                              </th>
+
+                              {/* Package Columns Headers */}
+                              {packagesList.map((pkg) => (
+                                <th key={pkg.id} className="p-2.5 sm:p-4 text-left align-top min-w-[120px] sm:min-w-[180px] border-r border-neutral-100 dark:border-slate-800/80 last:border-r-0">
+                                  <div className="space-y-1.5 sm:space-y-2">
+                                    <div className="flex items-center justify-between gap-1">
+                                      <span className="text-lg sm:text-xl">{pkg.icon}</span>
+                                      <span className={`text-[8.5px] sm:text-[9px] font-extrabold px-1.5 sm:px-2 py-0.5 rounded-full text-white bg-gradient-to-r ${pkg.color} uppercase`}>
+                                        {pkg.badge}
+                                      </span>
+                                    </div>
+                                    <div>
+                                      <h4 className="text-xs sm:text-sm font-black text-neutral-900 dark:text-white leading-tight">
+                                        {pkg.title}
+                                      </h4>
+                                      <div className="flex items-baseline gap-1 mt-0.5">
+                                        <span className={`text-sm sm:text-lg font-black bg-gradient-to-r ${pkg.color} bg-clip-text text-transparent font-mono`}>
+                                          {translatePrice(pkg.price)}
+                                        </span>
+                                        <span className="text-[9px] sm:text-[10px] text-neutral-400 line-through">
+                                          {translatePrice(pkg.regularPrice)}
+                                        </span>
+                                      </div>
+                                    </div>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOrderNowClick(pkg)}
+                                      className={`w-full py-1.5 px-2 bg-gradient-to-r ${pkg.color} text-white font-bold text-[10px] sm:text-[11px] rounded-lg shadow-sm hover:opacity-95 transition flex items-center justify-center gap-1 cursor-pointer min-h-[36px]`}
+                                    >
+                                      <ShoppingCart className="w-3 h-3" />
+                                      <span>{language === 'bn' ? 'অর্ডার' : 'Order'}</span>
+                                    </button>
+                                  </div>
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+
+                          <tbody className="divide-y divide-neutral-100 dark:divide-slate-800/80 text-xs">
+                            {comparisonRows.map((row, rIdx) => {
+                              const isZebra = rIdx % 2 === 1;
+                              return (
+                                <tr 
+                                  key={rIdx} 
+                                  className={`transition-colors ${
+                                    isZebra 
+                                      ? 'bg-neutral-50/40 dark:bg-slate-900/30' 
+                                      : 'bg-white dark:bg-[#090D1A]'
+                                  } hover:bg-cyan-50/40 dark:hover:bg-cyan-950/20`}
+                                >
+                                  {/* Sticky Feature Name Cell */}
+                                  <td className={`sticky left-0 z-10 p-2.5 sm:p-3.5 font-bold text-neutral-800 dark:text-slate-200 border-r border-neutral-200 dark:border-slate-800 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.06)] text-[10.5px] sm:text-xs w-[115px] min-w-[115px] sm:min-w-[180px] leading-tight ${
+                                    isZebra 
+                                      ? 'bg-neutral-50/95 dark:bg-[#0B1020]/95' 
+                                      : 'bg-white/95 dark:bg-[#090D1A]/95'
+                                  }`}>
+                                    <div className="flex items-center gap-1 sm:gap-1.5">
+                                      {row.highlight && <Sparkles className="w-3 h-3 text-amber-500 shrink-0" />}
+                                      <span>{row.feature}</span>
+                                    </div>
+                                  </td>
+
+                                  {/* Package 1 Spec Cell */}
+                                  <td className="p-2.5 sm:p-3.5 text-neutral-700 dark:text-slate-300 border-r border-neutral-100 dark:border-slate-800/80 text-[10.5px] sm:text-xs">
+                                    {renderFieldBadge(row.p1, row.isPrice, row.isRegularPrice, packagesList[0].color)}
+                                  </td>
+
+                                  {/* Package 2 Spec Cell */}
+                                  <td className="p-2.5 sm:p-3.5 text-neutral-700 dark:text-slate-300 border-r border-neutral-100 dark:border-slate-800/80 text-[10.5px] sm:text-xs">
+                                    {renderFieldBadge(row.p2, row.isPrice, row.isRegularPrice, packagesList[1].color)}
+                                  </td>
+
+                                  {/* Package 3 Spec Cell */}
+                                  <td className="p-2.5 sm:p-3.5 text-neutral-700 dark:text-slate-300 text-[10.5px] sm:text-xs">
+                                    {renderFieldBadge(row.p3, row.isPrice, row.isRegularPrice, packagesList[2].color)}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+
+                          {/* Table Bottom Action Footer (sticky bottom!) */}
+                          <tfoot className="sticky bottom-0 z-30 bg-neutral-50/95 dark:bg-[#0F172A]/95 backdrop-blur-md shadow-xs border-t border-neutral-200 dark:border-slate-800">
+                            <tr>
+                              <td className="sticky left-0 bottom-0 z-40 bg-neutral-100 dark:bg-[#0B1020] p-2.5 sm:p-4 font-black text-neutral-900 dark:text-white border-r border-neutral-200 dark:border-slate-800 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.06)] text-[10.5px] sm:text-xs w-[115px] min-w-[115px] sm:min-w-[180px]">
+                                {language === 'bn' ? 'সরাসরি বুকিং:' : 'Booking:'}
+                              </td>
+
+                              {packagesList.map((pkg) => (
+                                <td key={pkg.id} className="p-2 sm:p-4 border-r border-neutral-100 dark:border-slate-800/80 last:border-r-0">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOrderNowClick(pkg)}
+                                    className={`w-full py-1.5 sm:py-2 px-2 sm:px-3 bg-gradient-to-r ${pkg.color} text-white font-bold text-[10.5px] sm:text-xs rounded-xl shadow-md hover:opacity-95 transition flex items-center justify-center gap-1 cursor-pointer min-h-[38px]`}
+                                  >
+                                    <ShoppingCart className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                                    <span className="truncate">{translatePrice(pkg.price)} - {language === 'bn' ? 'বুকিং' : 'Book'}</span>
+                                  </button>
+                                </td>
+                              ))}
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* OPTION 3: SINGLE-PACKAGE MOBILE SPEC SHEET (Zero horizontal scrolling required) */}
+                  {mobileComparisonPackage !== 'all' && mobileComparisonPackage !== 'fields' && (() => {
+                    const selectedPkg = packagesList.find(p => p.id === mobileComparisonPackage) || packagesList[0];
+                    const pKey = selectedPkg.id === 'pkg-boost' ? 'p1' : selectedPkg.id === 'pkg-corp' ? 'p2' : 'p3';
+
+                    return (
+                      <div className="rounded-2xl border border-neutral-200 dark:border-slate-800 bg-white dark:bg-[#090D1A] p-4 sm:p-6 shadow-xl space-y-4">
+                        {/* Quick Package Switcher Pills right inside the card */}
+                        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-2 border-b border-neutral-100 dark:border-slate-800/80">
+                          <span className="text-[10px] uppercase font-bold text-neutral-400 shrink-0 mr-1">
+                            {language === 'bn' ? 'প্যাকেজ সুইচ:' : 'Switch:'}
+                          </span>
+                          {packagesList.map(p => (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() => setMobileComparisonPackage(p.id as any)}
+                              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 shrink-0 cursor-pointer ${
+                                p.id === selectedPkg.id
+                                  ? `bg-gradient-to-r ${p.color} text-white shadow-xs`
+                                  : 'bg-neutral-100 dark:bg-slate-900 text-neutral-600 dark:text-slate-400'
+                              }`}
+                            >
+                              <span>{p.icon}</span>
+                              <span>{p.title.split(' ')[0]}</span>
+                            </button>
+                          ))}
                         </div>
 
-                        {/* Specific Delivery Timeline & Future Renewal Cost Indicators */}
-                        <div className="grid grid-cols-2 gap-2.5 p-3 rounded-xl bg-neutral-50/70 dark:bg-[#070B16] border border-neutral-100/50 dark:border-white/5 text-[10.5px]">
-                          <div>
-                            <span className="text-neutral-400 uppercase tracking-wider font-semibold block">{language === 'bn' ? '🕒 ডেলিভারি সময়' : '🕒 DELIVERY'}</span>
-                            <span className="font-extrabold text-neutral-700 dark:text-neutral-200">{language === 'bn' ? pkg.deliveryBn : pkg.delivery}</span>
+                        {/* Package Header Bar */}
+                        <div className="flex items-start justify-between gap-3 pb-3 border-b border-neutral-100 dark:border-slate-800">
+                          <div className="space-y-1">
+                            <span className={`text-[9.5px] font-black uppercase px-2.5 py-0.5 rounded-full text-white bg-gradient-to-r ${selectedPkg.color}`}>
+                              {selectedPkg.badge}
+                            </span>
+                            <h4 className="text-base sm:text-lg font-black text-neutral-900 dark:text-white">
+                              {selectedPkg.title}
+                            </h4>
+                            <p className="text-xs text-neutral-500 dark:text-slate-400">
+                              {selectedPkg.desc}
+                            </p>
                           </div>
-                          <div className="text-right border-l border-neutral-200/45 dark:border-slate-800/80 pl-2">
-                            <span className="text-neutral-400 uppercase tracking-wider font-semibold block">{language === 'bn' ? '♻ রিনিউয়াল ফি' : '♻ RENEWAL'}</span>
-                            <span className="font-extrabold text-emerald-600 dark:text-emerald-400 font-mono">
-                              {translatePrice(pkg.renewal)} / {language === 'bn' ? 'বছর' : 'Yr'}
+
+                          <div className="text-right shrink-0">
+                            <span className={`text-xl font-black font-mono bg-gradient-to-r ${selectedPkg.color} bg-clip-text text-transparent block`}>
+                              {translatePrice(selectedPkg.price)}
+                            </span>
+                            <span className="text-[11px] text-neutral-400 line-through">
+                              {translatePrice(selectedPkg.regularPrice)}
                             </span>
                           </div>
                         </div>
 
-                        {/* Features Included list bullet layout */}
-                        <div className="space-y-3 border-t border-neutral-100 dark:border-[#1E293B]/60 pt-5 relative">
-                          <span className="text-[10px] font-mono tracking-widest text-neutral-400 dark:text-neutral-500 font-black uppercase block">
-                            {language === 'bn' ? 'যা যা থাকছে প্যাকেজে:' : 'FEATURES INCLUDED:'}
-                          </span>
-                          
-                          <ul className="space-y-2 min-h-[220px] max-h-[260px] overflow-y-auto scrollbar-thin scrollbar-thumb-neutral-200 dark:scrollbar-thumb-slate-800 pr-1">
-                            {pkg.features.map((feat, fIdx) => (
-                              <li key={fIdx} className="flex items-start gap-1.5 text-[11.5px] text-neutral-700 dark:text-neutral-300 leading-tight">
-                                <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
-                                <span>{feat}</span>
-                              </li>
-                            ))}
-                          </ul>
+                        {/* Mobile Vertical Table Fields */}
+                        <div className="divide-y divide-neutral-100 dark:divide-slate-800/80 rounded-xl border border-neutral-200/70 dark:border-slate-800 overflow-hidden text-xs">
+                          {comparisonRows.map((row, fIdx) => {
+                            const val = (row as any)[pKey];
+                            const isZebra = fIdx % 2 === 1;
+
+                            return (
+                              <div 
+                                key={fIdx} 
+                                className={`flex items-center justify-between p-3 gap-2 ${
+                                  isZebra ? 'bg-neutral-50/60 dark:bg-slate-900/40' : 'bg-white dark:bg-[#090D1A]'
+                                }`}
+                              >
+                                <span className="font-bold text-neutral-700 dark:text-slate-300 text-[11.5px] flex items-center gap-1.5">
+                                  {row.highlight && <Sparkles className="w-3 h-3 text-amber-500 shrink-0" />}
+                                  <span>{row.feature}</span>
+                                </span>
+
+                                <div className="text-right">
+                                  {renderFieldBadge(val, row.isPrice, row.isRegularPrice, selectedPkg.color)}
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
 
-                      </div>
-
-                      {/* Call-to-action Order buttons layout bottom */}
-                      <div className="pt-5 border-t border-neutral-100 dark:border-[#1E293B]/60 space-y-2.5 mt-5">
-                        
-                        {/* Direct order button with dynamic pulsing outline effect */}
-                        <motion.button 
-                          whileHover={{ scale: 1.02 }}
+                        {/* Direct Order Button in Mobile Card */}
+                        <motion.button
+                          whileHover={{ scale: 1.01 }}
                           whileTap={{ scale: 0.98 }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleOrderNowClick(pkg);
-                          }}
-                          className={`w-full py-2.5 bg-gradient-to-r ${pkg.color} text-white font-black text-xs rounded-xl shadow-md hover:opacity-95 transition flex items-center justify-center gap-1.5 cursor-pointer`}
+                          onClick={() => handleOrderNowClick(selectedPkg)}
+                          className={`w-full py-3.5 bg-gradient-to-r ${selectedPkg.color} text-white font-black text-xs rounded-xl shadow-lg hover:opacity-95 transition flex items-center justify-center gap-2 cursor-pointer min-h-[44px]`}
                         >
                           <ShoppingCart className="w-4 h-4" />
                           <span>
                             {language === 'bn' 
-                              ? `অনলাইন ক্রয় করুন - ${translatePrice(pkg.price)}` 
-                              : `Order Now - ${translatePrice(pkg.price)}`}
+                              ? `এই প্যাকেজটি অর্ডার করুন - ${translatePrice(selectedPkg.price)}` 
+                              : `Book This Package - ${translatePrice(selectedPkg.price)}`}
                           </span>
                         </motion.button>
-
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedPackForOrder(pkg);
-                            setConsultModalOpen(true);
-                          }}
-                          className="w-full py-2.5 bg-neutral-100/80 hover:bg-neutral-200 dark:bg-[#131B2F]/80 dark:hover:bg-[#1B2541]/90 text-neutral-700 dark:text-slate-300 font-bold text-xs rounded-xl transition border border-neutral-200/60 dark:border-slate-800/80 flex items-center justify-center gap-1 cursor-pointer"
-                        >
-                          <span>{language === 'bn' ? 'বিস্তারিত তথ্য জানুন' : 'View Details'}</span>
-                        </button>
-
                       </div>
-
-                    </div>
-                  </motion.div>
-                );
-              })}
+                    );
+                  })()}
+                </div>
+              )}
             </div>
           )}
         </section>

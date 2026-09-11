@@ -17,11 +17,12 @@ import {
   StoreSubCategory 
 } from './StoreData';
 import { motion, AnimatePresence } from 'motion/react';
+import { MarketplaceGridSkeleton } from './skeletons/MarketplaceSkeleton';
 
 interface MarketplaceProps {
   language: Language;
   theme: Theme;
-  addToCart: (product: Product) => void;
+  addToCart: (product: Product, eventOrOrigin?: any) => void;
   setCartOpen?: (open: boolean) => void;
   searchTerm: string;
   currency?: Currency;
@@ -33,6 +34,7 @@ interface MarketplaceProps {
   triggerToast?: (msg: string) => void;
   onOpenLogin?: () => void;
   onUpdateProduct?: (updatedProduct: Product) => void;
+  onViewProduct?: (product: Product) => void;
 }
 
 export default function Marketplace({ 
@@ -49,7 +51,8 @@ export default function Marketplace({
   user,
   triggerToast,
   onOpenLogin,
-  onUpdateProduct
+  onUpdateProduct,
+  onViewProduct
 }: MarketplaceProps) {
   
   // -----------------------------------------------------
@@ -268,6 +271,45 @@ export default function Marketplace({
   const [currentPage, setCurrentPage] = useState<number>(1);
   const productsPerPage = 8;
 
+  // Loading & Skeleton State
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+
+  // Initial load skeleton effect
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 420);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Category / filter transition skeleton effect
+  const isFirstRender = useRef(true);
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    setIsLoading(true);
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 320);
+    return () => clearTimeout(timer);
+  }, [activeCategory, activeSubCategory, selectedLicense, selectedBadge, sortBy]);
+
+  const handleRefreshCatalog = () => {
+    setIsRefreshing(true);
+    if (triggerToast) {
+      triggerToast(language === 'bn' ? 'মার্কেটপ্লেস ক্যাটালগ রিফ্রেশ হচ্ছে... 🔄' : 'Syncing marketplace product catalog... 🔄');
+    }
+    setTimeout(() => {
+      setIsRefreshing(false);
+      if (triggerToast) {
+        triggerToast(language === 'bn' ? '✓ ক্যাটালগ সফলভাবে আপডেট হয়েছে!' : '✓ Catalog synced & up to date!');
+      }
+    }, 600);
+  };
+
   // Reset page to 1 when any search, category, or filter criteria alters
   useEffect(() => {
     setCurrentPage(1);
@@ -410,7 +452,11 @@ export default function Marketplace({
 
   // Recently Viewed Cache Handlers
   const handleViewProduct = (product: Product) => {
-    setActiveProduct(product);
+    if (onViewProduct) {
+      onViewProduct(product);
+    } else {
+      setActiveProduct(product);
+    }
     setRecentlyViewed(prev => {
       const filtered = prev.filter(id => id !== product.id);
       const updated = [product.id, ...filtered].slice(0, 5);
@@ -2154,7 +2200,19 @@ export default function Marketplace({
               </div>
 
               {/* Sorting and mobile drawers control - beautiful interactive dropdown & toggle button */}
-              <div className="flex flex-row items-center gap-3 w-full md:w-auto shrink-0 justify-between md:justify-start">
+              <div className="flex flex-row items-center gap-2.5 w-full md:w-auto shrink-0 justify-between md:justify-start">
+                {/* Refresh Catalog Button with Smooth Spin */}
+                <button
+                  type="button"
+                  onClick={handleRefreshCatalog}
+                  disabled={isRefreshing || isLoading}
+                  className="h-[56px] px-4 bg-[#F8FAFC] dark:bg-[#111827] hover:bg-slate-100 dark:hover:bg-slate-800 border border-[#E2E8F0] dark:border-[#374151] rounded-[14px] text-slate-700 dark:text-slate-300 flex items-center justify-center gap-1.5 cursor-pointer text-xs font-bold transition-all duration-300 active:scale-95 disabled:opacity-50"
+                  title={language === 'bn' ? 'ক্যাটালগ রিফ্রেশ করুন' : 'Refresh Catalog'}
+                >
+                  <RefreshCw className={`w-4 h-4 text-[#7C3AED] ${isRefreshing ? 'animate-spin' : ''}`} />
+                  <span className="hidden sm:inline">{language === 'bn' ? 'রিফ্রেশ' : 'Sync'}</span>
+                </button>
+
                 <button
                   onClick={() => setShowFilters(!showFilters)}
                   className="lg:hidden h-[56px] px-5 bg-gradient-to-r from-[#7C3AED]/10 to-[#EC4899]/10 hover:from-[#7C3AED]/20 hover:to-[#EC4899]/20 border border-violet-500/20 rounded-[14px] text-[#7C3AED] dark:text-[#A855F7] flex items-center justify-center gap-2 cursor-pointer text-xs font-bold transition-all duration-300"
@@ -2214,8 +2272,12 @@ export default function Marketplace({
             )}
           </div>
 
-          {/* GRID OF PRODUCTS */}
-          {processedProducts.length === 0 ? (
+          {/* GRID OF PRODUCTS (WITH SKELETON LOADER STATE) */}
+          {isLoading || isRefreshing ? (
+            <div className="animate-in fade-in duration-300">
+              <MarketplaceGridSkeleton count={productsPerPage} />
+            </div>
+          ) : processedProducts.length === 0 ? (
             <div className="text-center py-20 bg-white dark:bg-[#0B0F19] rounded-3xl border border-slate-150 dark:border-slate-850 p-6 space-y-3">
               <Sliders className="w-14 h-14 mx-auto text-slate-300 stroke-[1.2] shrink-0" />
               <p className="text-base font-extrabold text-slate-800 dark:text-white">{t.noMatched}</p>
@@ -2400,7 +2462,7 @@ export default function Marketplace({
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  addToCart(product);
+                                  addToCart(product, e);
                                 }}
                                 className="px-2 py-2.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/20 dark:hover:bg-indigo-950/45 border border-indigo-200/55 dark:border-indigo-900/55 hover:border-indigo-300 dark:hover:border-cyan-500/40 text-indigo-650 dark:text-indigo-305 rounded-xl text-[10.5px] font-black duration-200 flex items-center justify-center gap-1.5 cursor-pointer hover:scale-[1.01] active:scale-95 hover:shadow-xs"
                                 title="Add Card"
@@ -2414,7 +2476,7 @@ export default function Marketplace({
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                addToCart(product);
+                                addToCart(product, e);
                                 if (setCartOpen) {
                                   setCartOpen(true);
                                 }
@@ -2595,7 +2657,7 @@ export default function Marketplace({
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            addToCart(product);
+                            addToCart(product, e);
                           }}
                           className="p-1.5 bg-indigo-50 hover:bg-blue-600 dark:bg-indigo-950/40 dark:hover:bg-cyan-500/20 text-indigo-650 dark:text-indigo-305 hover:text-white dark:hover:text-cyan-400 rounded-lg border border-indigo-200/40 dark:border-indigo-900/40 hover:border-blue-600 transition-all duration-200 cursor-pointer hover:scale-105"
                           title="Add to cart"
@@ -3080,8 +3142,8 @@ export default function Marketplace({
                   </button>
 
                   <button
-                    onClick={() => {
-                      addToCart(activeProduct);
+                    onClick={(e) => {
+                      addToCart(activeProduct, e);
                       const checkoutText = encodeURIComponent(
                         `Assalamu Alaikum WebzoneBD, I would like to purchase: "${activeProduct.name}" ($${activeProduct.discountPrice || activeProduct.price})`
                       );

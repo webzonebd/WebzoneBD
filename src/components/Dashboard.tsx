@@ -9,14 +9,16 @@ import {
   ChevronRight, Lock, Shield, CreditCard, ExternalLink, Cpu, Check, AlertCircle,
   Search, Calendar, ArrowUpDown, Filter, Clock, Loader2, Tag, Bell,
   ChevronUp, ChevronDown, Folder, Globe, Languages, Truck, Inbox,
-  Printer, MoreHorizontal, ShoppingCart
+  Printer, MoreHorizontal, ShoppingCart, X
 } from 'lucide-react';
 import { Order, SupportTicket, Language, Theme, UserSession, Currency, ActivityLog, Product } from '../types';
+import { motion } from 'motion/react';
 import ProfileSettingsCenter from './ProfileSettingsCenter';
 import Sidebar from './Sidebar';
 import { DashboardWidgets } from './DashboardWidgets';
 import UserOrderHistory from './UserOrderHistory';
 import CompanyRevenueDashboard from './CompanyRevenueDashboard';
+import OrderProjectChat from './OrderProjectChat';
 
 interface DashboardProps {
   language: Language;
@@ -39,7 +41,7 @@ interface DashboardProps {
   onUpdateProductRating?: (idOrName: string, rating: number, comment: string) => void;
   currencySettings?: any;
   setLanguage?: (lang: Language) => void;
-  setTheme?: (theme: Theme) => void;
+  setTheme?: (theme: Theme, event?: React.MouseEvent) => void;
   onUpdateOrders?: (orders: Order[]) => void;
   deleteOrder?: (id: string) => void;
 }
@@ -358,9 +360,15 @@ export default function Dashboard({
 
   const [notifications, setNotifications] = useState<any[]>(() => {
     const saved = localStorage.getItem(`webzone_notifications_${user?.id || 'guest'}`);
-    return saved ? JSON.parse(saved) : [
+    const parsed = saved ? JSON.parse(saved) : [
       { id: 'not-welcome', title: '👋 Welcome to WebzoneBD!', message: 'Explore ready-made IT services, customize parameters, and build a digital footprint.', type: 'system', date: 'Just now', read: false }
     ];
+    const seen = new Set();
+    return parsed.filter((item: any) => {
+      if (!item || !item.id || seen.has(item.id)) return false;
+      seen.add(item.id);
+      return true;
+    });
   });
 
   // Real-time tracking of order updates to alert the customer
@@ -411,8 +419,10 @@ export default function Dashboard({
     const liveLinkText = localStorage.getItem('site_wide_broadcast_link_text') || 'Claim Offer';
     const bId = localStorage.getItem('site_wide_broadcast_id') || 'site-wide-offer-promo';
 
-    const alreadyExists = notifications.some(n => n.id === bId || (n.type === 'offer' && n.message === liveMsg));
-    if (!alreadyExists) {
+    setNotifications(prev => {
+      const alreadyExists = prev.some(n => n.id === bId || (n.type === 'offer' && n.message === liveMsg));
+      if (alreadyExists) return prev;
+
       const bNotif = {
         id: bId,
         title: language === 'bn' ? '🎁 বিশেষ অফার ঘোষণা করা হয়েছে!' : '🎁 Special Site-wide Offer Announced!',
@@ -423,13 +433,12 @@ export default function Dashboard({
         date: 'Just now',
         read: false
       };
-      setNotifications(prev => {
-        const updated = [bNotif, ...prev];
-        localStorage.setItem(`webzone_notifications_${user?.id || 'guest'}`, JSON.stringify(updated));
-        return updated;
-      });
-    }
-  }, [language, user?.id, notifications]);
+      const filtered = prev.filter(n => n.id !== bId);
+      const updated = [bNotif, ...filtered];
+      localStorage.setItem(`webzone_notifications_${user?.id || 'guest'}`, JSON.stringify(updated));
+      return updated;
+    });
+  }, [language, user?.id]);
 
   const [businessStats, setBusinessStats] = useState({
     seoScore: 88,
@@ -483,6 +492,8 @@ export default function Dashboard({
   const [activeTicketForChat, setActiveTicketForChat] = useState<SupportTicket | null>(null);
   const [chatMessage, setChatMessage] = useState('');
   const [selectedInvoice, setSelectedInvoice] = useState<Order | null>(null);
+  const [orderModalActiveTab, setOrderModalActiveTab] = useState<'invoice' | 'chat'>('invoice');
+  const [activeChatOrder, setActiveChatOrder] = useState<Order | null>(null);
 
   // Affiliate Dashboard states
   const [withdrawAmt, setWithdrawAmt] = useState('25');
@@ -1446,6 +1457,29 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
     subMenus?: SubMenuItem[];
   }
 
+  // Get active workspace features for logged-in user
+  const getLoggedCustomerFeatures = () => {
+    if (!user) return { affiliateSystem: false, wallet: true };
+    try {
+      const saved = localStorage.getItem('webzone_admin_customers');
+      if (saved) {
+        const customers = JSON.parse(saved);
+        const match = customers.find((c: any) => (c.customer_id || c.id) === user.id || (c.customer_email || c.email)?.toLowerCase() === user.email?.toLowerCase());
+        if (match) {
+          return match.workspaceFeatures || { affiliateSystem: false, wallet: true };
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return { affiliateSystem: false, wallet: true };
+  };
+
+  const loggedFeatures = getLoggedCustomerFeatures();
+  const isAffiliateEnabledByAdmin = !!loggedFeatures.affiliateSystem;
+  const hasAppliedForAffiliate = affiliateStatus !== 'unregistered';
+  const shouldShowAffiliateMenu = isAffiliateEnabledByAdmin || hasAppliedForAffiliate;
+
   // Sidebar Menu Layout listing hierarchical mapping
   const clientMenus: MenuItem[] = [
     { id: 'dashboard', label: '🏠 Dashboard', labelBn: '🏠 ড্যাশবোর্ড' },
@@ -1455,26 +1489,22 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
       labelBn: '📦 আমার অর্ডার'
     },
     {
-      id: 'downloads',
-      label: '⬇️ Download Center',
-      labelBn: '⬇️ ডাউনলোডস সেন্টার'
-    },
-    {
       id: 'wishlist',
       label: '❤️ Saved Wishlist',
       labelBn: '❤️ আমার উইশলিস্ট'
     },
-
     {
       id: 'billing',
       label: '🧾 Billing & Invoices',
       labelBn: '🧾 বিলিং ও ইনভয়েস'
     },
-    {
-      id: 'affiliate-program',
-      label: '🤝 Affiliate Program',
-      labelBn: '🤝 এফিলিয়েট প্রোগ্রাম'
-    },
+    ...(shouldShowAffiliateMenu ? [
+      {
+        id: 'affiliate-program',
+        label: '🤝 Affiliate Program',
+        labelBn: '🤝 এফিলিয়েট প্রোগ্রাম'
+      }
+    ] : []),
     {
       id: 'profile',
       label: '⚙️ Account Settings',
@@ -2337,18 +2367,33 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
                         <span className="text-[8px] text-neutral-400 block mt-1 font-mono hover:underline cursor-pointer" onClick={() => setActiveTab('billing')}>Currency: Dynamic USD/SAR/BDT</span>
                       </div>
 
-                      {/* 7. Affiliate earnings */}
-                      <div onClick={() => setActiveTab('affiliate-program')} className="bg-white dark:bg-[#0F172A] border border-neutral-150 dark:border-slate-800 rounded-3xl p-5 shadow-sm text-left hover:-translate-y-1 hover:shadow-lg transition-all cursor-pointer group">
-                        <div className="flex justify-between items-center text-slate-400 dark:text-slate-500">
-                          <span className="text-[10px] uppercase font-bold tracking-wider">Affiliate Commissions</span>
-                          <div className="p-2.5 bg-lime-50 dark:bg-slate-900 text-lime-600 rounded-xl group-hover:scale-105 transition-transform"><Users className="w-5 h-5" /></div>
+                      {/* 7. Affiliate earnings or signup */}
+                      {shouldShowAffiliateMenu ? (
+                        <div onClick={() => setActiveTab('affiliate-program')} className="bg-white dark:bg-[#0F172A] border border-neutral-150 dark:border-slate-800 rounded-3xl p-5 shadow-sm text-left hover:-translate-y-1 hover:shadow-lg transition-all cursor-pointer group animate-once">
+                          <div className="flex justify-between items-center text-slate-400 dark:text-slate-500">
+                            <span className="text-[10px] uppercase font-bold tracking-wider">Affiliate Commissions</span>
+                            <div className="p-2.5 bg-lime-50 dark:bg-slate-900 text-lime-600 rounded-xl group-hover:scale-105 transition-transform"><Users className="w-5 h-5" /></div>
+                          </div>
+                          <p className="text-2xl font-black font-mono text-slate-900 dark:text-white mt-1">$230.50 Approved</p>
+                          <div className="text-[10px] text-slate-450 dark:text-slate-405 mt-2 font-mono flex items-center justify-between">
+                            <span>Clicks: 1,450 API</span>
+                            <span className="bg-indigo-500 text-slate-950 font-black px-1.5 py-0.5 rounded text-[8px] uppercase">RANK: PRO</span>
+                          </div>
                         </div>
-                        <p className="text-2xl font-black font-mono text-slate-900 dark:text-white mt-1">$230.50 Approved</p>
-                        <div className="text-[10px] text-slate-450 dark:text-slate-405 mt-2 font-mono flex items-center justify-between">
-                          <span>Clicks: 1,450 API</span>
-                          <span className="bg-indigo-500 text-slate-950 font-black px-1.5 py-0.5 rounded text-[8px] uppercase">RANK: PRO</span>
+                      ) : (
+                        <div onClick={() => setActiveTab('affiliate-program')} className="bg-white dark:bg-[#0F172A] border border-neutral-150 dark:border-slate-800 rounded-3xl p-5 shadow-sm text-left hover:-translate-y-1 hover:shadow-lg transition-all cursor-pointer group animate-once bg-gradient-to-tr from-indigo-500/[0.02] to-pink-500/[0.02]">
+                          <div className="flex justify-between items-center text-slate-400 dark:text-slate-500">
+                            <span className="text-[10px] uppercase font-bold tracking-wider">Affiliate Partner Program</span>
+                            <div className="p-2.5 bg-indigo-50 dark:bg-slate-900 text-[#7C3AED] rounded-xl group-hover:scale-105 transition-transform"><Users className="w-5 h-5" /></div>
+                          </div>
+                          <p className="text-xs font-bold text-slate-800 dark:text-slate-205 mt-2 leading-relaxed">
+                            {language === 'bn' ? '🤝 এফিলিয়েট প্রোগ্রামে যোগ দিয়ে ২৫% পর্যন্ত কমিশন আয় করুন!' : '🤝 Earn up to 25% commissions by joining our Affiliate Program!'}
+                          </p>
+                          <div className="text-[10px] text-[#7C3AED] dark:text-[#A855F7] font-black mt-3 flex items-center justify-between">
+                            <span>{language === 'bn' ? 'আবেদন করতে এখানে ক্লিক করুন →' : 'Click here to apply now →'}</span>
+                          </div>
                         </div>
-                      </div>
+                      )}
 
                       {/* 8. Wishlist Items */}
                       <div onClick={() => setActiveTab('wishlist')} className="bg-white dark:bg-[#0F172A] border border-neutral-150 dark:border-slate-800 rounded-3xl p-5 shadow-sm text-left hover:-translate-y-1 hover:shadow-lg transition-all cursor-pointer group">
@@ -2496,9 +2541,16 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
                               </div>
                             ))}
 
-                            {/* Render Orders/Purchases (from orders prop) */}
-                            {orders.map(ord => (
-                              <div key={ord.id} className="p-4 rounded-2xl bg-[#10B981]/5 border border-[#10B981]/15 flex flex-col justify-between gap-3 hover:border-[#10B981]/40 transition-all duration-200">
+                            {/* Render Orders/Purchases (from orders prop) with subtle entrance animations */}
+                            {orders.map((ord, idx) => (
+                              <motion.div 
+                                key={ord.id}
+                                initial={{ opacity: 0, y: 14, scale: 0.98 }}
+                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                transition={{ duration: 0.35, delay: Math.min(idx * 0.05, 0.3), ease: [0.21, 0.47, 0.32, 0.98] }}
+                                whileHover={{ y: -2, transition: { duration: 0.2 } }}
+                                className="p-4 rounded-2xl bg-[#10B981]/5 border border-[#10B981]/15 flex flex-col justify-between gap-3 hover:border-[#10B981]/40 transition-colors duration-200"
+                              >
                                 <div className="space-y-1.5">
                                   <div className="flex items-center justify-between">
                                     <span className="p-1 px-2 border border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-405 rounded text-[9px] font-mono uppercase font-bold">
@@ -2528,7 +2580,7 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
                                     ⚡ Download
                                   </button>
                                 </div>
-                              </div>
+                              </motion.div>
                             ))}
 
                           </div>
@@ -3073,53 +3125,81 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
                                     }
                                     return (
                                       <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold font-sans ${style}`}>
-                                        {ord.paymentStatus === 'completed' ? 'Paid' : ord.paymentStatus.toUpperCase()}
+                                        {ord.paymentStatus === 'completed' ? 'Paid' : (ord.paymentStatus || 'pending').toUpperCase()}
                                       </span>
                                     );
                                   })()}
                                 </td>
                                 <td className="py-3.5 px-4 text-right">
-                                  <div className="relative inline-block text-left" onClick={(e) => e.stopPropagation()}>
+                                  <div className="flex items-center justify-end gap-1.5">
+                                    {/* Direct Quick Staff Chat Button */}
                                     <button
                                       type="button"
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        setOpenActionDropdownId(openActionDropdownId === ord.id ? null : ord.id);
+                                        setActiveChatOrder(ord);
                                       }}
-                                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-neutral-55 hover:bg-neutral-100 dark:bg-slate-800 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-300 border border-neutral-210 dark:border-slate-700 rounded-lg text-xs font-bold transition-all duration-150 cursor-pointer shadow-sm"
+                                      title={language === 'bn' ? 'স্টাফের সাথে রিয়েল-টাইম রিকোয়ারমেন্টস চ্যাট' : 'Direct Project Requirements & Staff Chat'}
+                                      className="p-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/50 dark:hover:bg-indigo-900/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 transition cursor-pointer shadow-sm hover:scale-105 active:scale-95"
                                     >
-                                      <span>{language === 'bn' ? 'অ্যাকশন' : 'Actions'}</span>
-                                      <ChevronDown className="w-3 h-3 transition-transform duration-200" style={{ transform: openActionDropdownId === ord.id ? 'rotate(180deg)' : 'none' }} />
+                                      <MessageSquare className="w-3.5 h-3.5" />
                                     </button>
 
-                                    {openActionDropdownId === ord.id && (
-                                      <>
-                                        {/* Invisible overlay for click-outside closure */}
-                                        <div 
-                                          className="fixed inset-0 z-30 bg-transparent cursor-default" 
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setOpenActionDropdownId(null);
-                                          }}
-                                        />
-                                        <div className="absolute right-0 mt-1.5 w-44 bg-white dark:bg-[#1E293B] border border-neutral-200 dark:border-slate-800 rounded-xl shadow-xl z-40 py-1 px-1.5 animate-in fade-in slide-in-from-top-1 duration-150 text-left">
-                                          {/* Track */}
-                                          <button
-                                            type="button"
+                                    <div className="relative inline-block text-left" onClick={(e) => e.stopPropagation()}>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setOpenActionDropdownId(openActionDropdownId === ord.id ? null : ord.id);
+                                        }}
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-neutral-55 hover:bg-neutral-100 dark:bg-slate-800 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-300 border border-neutral-210 dark:border-slate-700 rounded-lg text-xs font-bold transition-all duration-150 cursor-pointer shadow-sm"
+                                      >
+                                        <span>{language === 'bn' ? 'অ্যাকশন' : 'Actions'}</span>
+                                        <ChevronDown className="w-3 h-3 transition-transform duration-200" style={{ transform: openActionDropdownId === ord.id ? 'rotate(180deg)' : 'none' }} />
+                                      </button>
+
+                                      {openActionDropdownId === ord.id && (
+                                        <>
+                                          {/* Invisible overlay for click-outside closure */}
+                                          <div 
+                                            className="fixed inset-0 z-30 bg-transparent cursor-default" 
                                             onClick={(e) => {
                                               e.stopPropagation();
-                                              setExpandedOrderId(expandedOrderId === ord.id ? null : ord.id);
                                               setOpenActionDropdownId(null);
                                             }}
-                                            className={`w-full flex items-center px-2.5 py-2 text-[11px] font-extrabold transition duration-150 rounded-lg cursor-pointer ${
-                                              expandedOrderId === ord.id 
-                                                ? 'bg-purple-600 text-white' 
-                                                : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60'
-                                            }`}
-                                          >
-                                            <Truck className={`w-3.5 h-3.5 mr-2 shrink-0 ${expandedOrderId === ord.id ? 'text-white' : 'text-purple-500'}`} />
-                                            <span>{language === 'bn' ? 'ট্র্যাক করুন 🚚' : 'Track 🚚'}</span>
-                                          </button>
+                                          />
+                                          <div className="absolute right-0 mt-1.5 w-48 bg-white dark:bg-[#1E293B] border border-neutral-200 dark:border-slate-800 rounded-xl shadow-xl z-40 py-1 px-1.5 animate-in fade-in slide-in-from-top-1 duration-150 text-left">
+                                            {/* Chat with Assigned Staff */}
+                                            <button
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                setActiveChatOrder(ord);
+                                                setOpenActionDropdownId(null);
+                                              }}
+                                              className="w-full flex items-center px-2.5 py-2 text-[11px] font-extrabold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition duration-150 rounded-lg cursor-pointer"
+                                            >
+                                              <MessageSquare className="w-3.5 h-3.5 mr-2 text-indigo-500 shrink-0" />
+                                              <span>{language === 'bn' ? 'স্টাফ চ্যাট 💬' : 'Requirements Chat 💬'}</span>
+                                            </button>
+
+                                            {/* Track */}
+                                            <button
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                setExpandedOrderId(expandedOrderId === ord.id ? null : ord.id);
+                                                setOpenActionDropdownId(null);
+                                              }}
+                                              className={`w-full flex items-center px-2.5 py-2 text-[11px] font-extrabold transition duration-150 rounded-lg cursor-pointer ${
+                                                expandedOrderId === ord.id 
+                                                  ? 'bg-purple-600 text-white' 
+                                                  : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60'
+                                              }`}
+                                            >
+                                              <Truck className={`w-3.5 h-3.5 mr-2 shrink-0 ${expandedOrderId === ord.id ? 'text-white' : 'text-purple-500'}`} />
+                                              <span>{language === 'bn' ? 'ট্র্যাক করুন 🚚' : 'Track 🚚'}</span>
+                                            </button>
 
                                           {/* Download File Link */}
                                           {ord.paymentStatus === 'completed' ? (
@@ -3198,6 +3278,7 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
                                       </>
                                     )}
                                   </div>
+                                </div>
                                 </td>
                               </tr>
 
@@ -3359,6 +3440,42 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
                                                  : (language === 'bn' ? 'লেনদেনে গেটওয়ে ত্রুটির কারণে পেমেন্ট প্রসেসিং ব্যর্থ হয়েছে। পুনরায় চেষ্টা করার জন্য মেথড বা ফান্ডস চেক করে বিলিং পেজে যান অথবা ২৪/৭ সাপোর্ট টিকেটে হেল্প নিন।' : 'Transaction decline recorded at standard routing filters. To bypass checkout block, confirm credentials and retry checkout or contact support via tickets.')}
                                            </p>
                                          </div>
+                                       </div>
+
+                                       {/* Direct Live Project Requirements & Staff Communication Card */}
+                                       <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-indigo-50/90 via-blue-50/40 to-slate-50/90 dark:from-indigo-950/30 dark:via-slate-900/50 dark:to-slate-900/80 border border-indigo-200/80 dark:border-indigo-900/50 text-left flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                         <div className="flex items-start gap-3.5">
+                                           <div className="p-2.5 rounded-2xl bg-gradient-to-br from-indigo-600 to-[#2563EB] text-white shadow-md shrink-0">
+                                             <MessageSquare className="w-5 h-5" />
+                                           </div>
+                                           <div>
+                                             <div className="flex items-center gap-2 flex-wrap">
+                                               <h5 className="font-extrabold text-xs sm:text-sm text-slate-900 dark:text-white">
+                                                 {language === 'bn' ? 'স্টাফের সাথে রিয়েল-টাইম রিকোয়ারমেন্টস চ্যাট' : 'Real-Time Project Requirements & Staff Chat'}
+                                               </h5>
+                                               <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                                                 ● Online
+                                               </span>
+                                             </div>
+                                             <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">
+                                               {language === 'bn'
+                                                 ? `দায়িত্বপ্রাপ্ত টেকনিক্যাল লিড (${ord.assignedStaff || 'Anisur Rahman'})-এর সাথে সরাসরি ফিচার স্পেক, ব্র্যান্ড অ্যাসেট ও মাইলস্টোন নিয়ে আলোচনা করুন।`
+                                                 : `Communicate directly with assigned lead (${ord.assignedStaff || 'Anisur Rahman'}) on custom requirements, API credentials, and milestone handovers.`}
+                                             </p>
+                                           </div>
+                                         </div>
+
+                                         <button
+                                           type="button"
+                                           onClick={(e) => {
+                                             e.stopPropagation();
+                                             setActiveChatOrder(ord);
+                                           }}
+                                           className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#2563EB] to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-xs shadow-md transition duration-150 flex items-center justify-center gap-2 shrink-0 cursor-pointer active:scale-95"
+                                         >
+                                           <MessageSquare className="w-4 h-4" />
+                                           <span>{language === 'bn' ? 'চ্যাট ওপেন করুন 💬' : 'Open Requirements Chat 💬'}</span>
+                                         </button>
                                        </div>
 
                                      </div>
@@ -4157,8 +4274,15 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {orders.map((ord) => (
-                      <div key={ord.id} className="p-5 rounded-2xl border border-neutral-150 dark:border-slate-800 bg-[#F8FAFC] dark:bg-[#111827]/30 flex flex-col justify-between gap-4">
+                    {orders.map((ord, idx) => (
+                      <motion.div 
+                        key={ord.id}
+                        initial={{ opacity: 0, y: 14, scale: 0.98 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        transition={{ duration: 0.35, delay: Math.min(idx * 0.05, 0.3), ease: [0.21, 0.47, 0.32, 0.98] }}
+                        whileHover={{ y: -2, transition: { duration: 0.2 } }}
+                        className="p-5 rounded-2xl border border-neutral-150 dark:border-slate-800 bg-[#F8FAFC] dark:bg-[#111827]/30 flex flex-col justify-between gap-4 transition-colors duration-200"
+                      >
                         <div className="space-y-1">
                           <span className="p-1 px-2.5 bg-[#2563EB]/10 text-[#2563EB] font-mono text-[9px] font-bold rounded uppercase">ZIP package</span>
                           <h4 className="text-sm font-black text-neutral-900 dark:text-white mt-2">{ord.itemTitle}</h4>
@@ -4174,7 +4298,7 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
                             <Download className="w-3.5 h-3.5" /> Descend Code ZIP
                           </button>
                         </div>
-                      </div>
+                      </motion.div>
                     ))}
                   </div>
                 )}
@@ -5288,7 +5412,7 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
                 </div>
 
                 <div className="space-y-3 font-sans">
-                  {notifications.map(not => {
+                  {notifications.map((not, idx) => {
                     const badgeClass = not.type === 'domain' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' : 
                                       not.type === 'hosting' ? 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20' : 
                                       not.type === 'affiliate' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 
@@ -5296,7 +5420,7 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
                                       'bg-blue-500/10 text-blue-500 border-blue-500/20';
 
                     return (
-                      <div key={not.id} className={`p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition duration-150 ${not.read ? 'bg-slate-50/50 dark:bg-slate-900/40 border-slate-100 dark:border-slate-850 opacity-85' : 'bg-blue-500/5 dark:bg-blue-500/5 border-blue-500/15'}`}>
+                      <div key={not.id ? `${not.id}-${idx}` : idx} className={`p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition duration-150 ${not.read ? 'bg-slate-50/50 dark:bg-slate-900/40 border-slate-100 dark:border-slate-850 opacity-85' : 'bg-blue-500/5 dark:bg-blue-500/5 border-blue-500/15'}`}>
                         <div className="space-y-1 text-left min-w-0 flex-1">
                           <div className="flex items-center gap-2">
                             <span className={`p-0.5 px-2 rounded text-[9px] font-mono font-bold uppercase border ${badgeClass}`}>{not.type}</span>
@@ -6364,13 +6488,71 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
 
       {/* 🧾 Spectacular Invoice Modal overlay view */}
       {selectedInvoice && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <div id="print-area-invoice" className="bg-white text-neutral-900 dark:bg-[#111827] dark:text-neutral-100 max-w-2xl w-full rounded-3xl border border-neutral-200 dark:border-slate-850 shadow-2xl p-6 sm:p-8 relative overflow-hidden transition-all max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white text-neutral-900 dark:bg-[#111827] dark:text-neutral-100 max-w-3xl w-full rounded-3xl border border-neutral-200 dark:border-slate-850 shadow-2xl p-5 sm:p-8 relative overflow-hidden transition-all max-h-[92vh] flex flex-col">
             
-            {/* Ambient accent background glow */}
-            <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-[#2563EB]/10 to-teal-500/5 rounded-full blur-3xl pointer-events-none" />
+            {/* Top Modal Navigation Tabs & Close */}
+            <div className="flex items-center justify-between gap-3 border-b border-neutral-150 dark:border-slate-800 pb-4 mb-5 shrink-0 no-print">
+              <div className="flex items-center gap-2 overflow-x-auto">
+                <button
+                  type="button"
+                  onClick={() => setOrderModalActiveTab('invoice')}
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+                    orderModalActiveTab === 'invoice'
+                      ? 'bg-[#2563EB] text-white shadow-sm'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  <CreditCard className="w-3.5 h-3.5" />
+                  <span>{language === 'bn' ? 'ইনভয়েস ও রসিদ 🧾' : 'Invoice & Billing 🧾'}</span>
+                </button>
 
-            <div>
+                <button
+                  type="button"
+                  onClick={() => setOrderModalActiveTab('chat')}
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+                    orderModalActiveTab === 'chat'
+                      ? 'bg-indigo-600 text-white shadow-sm'
+                      : 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 border border-indigo-200/80 dark:border-indigo-800/80'
+                  }`}
+                >
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  <span>{language === 'bn' ? 'স্টাফের সাথে রিকোয়ারমেন্টস চ্যাট 💬' : 'Project Requirements Chat 💬'}</span>
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedInvoice(null);
+                  setOrderModalActiveTab('invoice');
+                }}
+                className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition cursor-pointer shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {orderModalActiveTab === 'chat' ? (
+              <div className="flex-1 overflow-hidden flex flex-col">
+                <OrderProjectChat
+                  order={selectedInvoice}
+                  user={user}
+                  language={language}
+                  isCompact={true}
+                  onClose={() => {
+                    setSelectedInvoice(null);
+                    setOrderModalActiveTab('invoice');
+                  }}
+                />
+              </div>
+            ) : (
+              <div id="print-area-invoice" className="overflow-y-auto pr-1">
+                {/* Ambient accent background glow */}
+                <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-[#2563EB]/10 to-teal-500/5 rounded-full blur-3xl pointer-events-none" />
+
+                <div>
               {/* Header / Brand details */}
               <div className="flex flex-col sm:flex-row justify-between items-start gap-4 border-b border-neutral-150 dark:border-slate-800 pb-6 mb-6">
                 <div>
@@ -6516,8 +6698,8 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
 
                     {/* Subtotal after discount */}
                     <div className="flex justify-between font-mono text-neutral-600 dark:text-slate-300 border-t border-neutral-100 dark:border-slate-800/60 pt-2.5">
-                      <span>{language === 'bn' ? 'ডিসকাউন্টেড সাব-টোটাল:' : 'Discounted Subtotal:'}</span>
-                      <span>{formatPrice(subtotalValue)}</span>
+                      <span className="font-bold">{language === 'bn' ? 'ডিসকাউন্টেড সাব-টোটাল:' : 'Discounted Subtotal:'}</span>
+                      <span className="font-mono font-black text-neutral-900 dark:text-white text-sm sm:text-base">{formatPrice(subtotalValue)}</span>
                     </div>
 
                     {/* Government tax and IT service VAT */}
@@ -6579,13 +6761,33 @@ ALL PHP DEPENDENCIES ARE CONFIGURED FOR SERVERS UPWARD OF VERSION 8.1.
               </button>
               <button
                 type="button"
-                onClick={() => setSelectedInvoice(null)}
+                onClick={() => {
+                  setSelectedInvoice(null);
+                  setOrderModalActiveTab('invoice');
+                }}
                 className="px-5 py-2 bg-[#2563EB] hover:bg-blue-600 text-white text-xs font-black rounded-lg transition duration-205 cursor-pointer font-sans shadow-md"
               >
                 {language === 'bn' ? 'বন্ধ করুন' : 'Close Details'}
               </button>
             </div>
 
+              </div>
+            )}
+
+          </div>
+        </div>
+      )}
+
+      {/* 💬 Dedicated Standalone Project Requirements Chat Modal */}
+      {activeChatOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="max-w-3xl w-full">
+            <OrderProjectChat
+              order={activeChatOrder}
+              user={user}
+              language={language}
+              onClose={() => setActiveChatOrder(null)}
+            />
           </div>
         </div>
       )}

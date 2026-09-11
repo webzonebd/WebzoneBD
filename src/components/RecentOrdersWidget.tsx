@@ -186,7 +186,7 @@ export default function RecentOrdersWidget({
           custEmail,
           `"${(o.itemTitle || '').replace(/"/g, '""')}"`,
           o.price,
-          o.paymentStatus.toUpperCase(),
+          (o.paymentStatus || 'pending').toUpperCase(),
           o.date || 'N/A',
           o.paymentMethod || 'N/A'
         ];
@@ -229,7 +229,7 @@ export default function RecentOrdersWidget({
           custEmail,
           o.itemTitle || '',
           o.price,
-          o.paymentStatus.toUpperCase(),
+          (o.paymentStatus || 'pending').toUpperCase(),
           o.date || '',
           o.paymentMethod || ''
         ];

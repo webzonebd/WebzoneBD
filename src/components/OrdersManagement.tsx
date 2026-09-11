@@ -102,6 +102,7 @@ export default function OrdersManagement({
   const [sortField, setSortField] = useState<string>('date');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [activeRowMenuId, setActiveRowMenuId] = useState<string | null>(null);
+  const [transitioningOrders, setTransitioningOrders] = useState<Record<string, { status: 'completed' | 'failed' | 'refunded', stage: 'updating' | 'success' }>>({});
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Detail Drawer and interactive dialog states
@@ -394,6 +395,48 @@ export default function OrdersManagement({
     triggerToast('📝 Internal note submitted successfully!');
   };
 
+  // Trigger status update with premium loading & success transitions
+  const triggerStatusUpdateWithAnimation = (orderId: string, status: 'completed' | 'failed' | 'refunded') => {
+    // 1. Initial State: loading transition
+    setTransitioningOrders(prev => ({
+      ...prev,
+      [orderId]: { status, stage: 'updating' }
+    }));
+    setActiveRowMenuId(null);
+
+    // 2. Timeout simulation (1000ms loader phase) then flip to 'success'
+    setTimeout(() => {
+      setTransitioningOrders(prev => ({
+        ...prev,
+        [orderId]: { status, stage: 'success' }
+      }));
+
+      // Call original prop callback to execute state changes
+      updateOrderStatus(orderId, status);
+
+      // Trigger respective success toast message
+      let toastMsg = '';
+      if (status === 'completed') {
+        toastMsg = `💳 Invoice #${getOrderSerial(orderId)} marked as PAID`;
+      } else if (status === 'refunded') {
+        toastMsg = `💳 Invoice #${getOrderSerial(orderId)} marked as REFUNDED`;
+      } else {
+        toastMsg = `💳 Invoice #${getOrderSerial(orderId)} cancelled successfully.`;
+      }
+      triggerToast(toastMsg);
+
+      // 3. Clear transition wrapper state after 1500ms success animation
+      setTimeout(() => {
+        setTransitioningOrders(prev => {
+          const next = { ...prev };
+          delete next[orderId];
+          return next;
+        });
+      }, 1500);
+
+    }, 1000);
+  };
+
   // BULK AND SINGLE CONFIRMATIONS DISPATCHER
   const handleExecuteAction = () => {
     if (!confirmDialog) return;
@@ -406,8 +449,7 @@ export default function OrdersManagement({
         triggerToast(`🗑️ Invoice #${getOrderSerial(targetId)} successfully removed from registry.`);
       }
     } else if (type === 'cancel_single' && targetId) {
-      updateOrderStatus(targetId, 'failed');
-      triggerToast(`💳 Invoice #${getOrderSerial(targetId)} cancelled successfully.`);
+      triggerStatusUpdateWithAnimation(targetId, 'failed');
     } else if (type === 'delete_bulk') {
       if (deleteOrder) {
         selectedOrderIds.forEach(id => deleteOrder(id));
@@ -1222,12 +1264,30 @@ export default function OrdersManagement({
                   const isChecked = selectedOrderIds.includes(o.id);
                   const orderType = getOrderType(o);
 
+                  // Premium transition styling
+                  const transitioningInfo = transitioningOrders[o.id];
+                  const isTransitioning = !!transitioningInfo;
+                  let transitioningClass = '';
+                  if (isTransitioning) {
+                    if (transitioningInfo.stage === 'updating') {
+                      transitioningClass = 'bg-indigo-500/10 dark:bg-indigo-500/5 animate-pulse ring-1 ring-indigo-500/30';
+                    } else if (transitioningInfo.stage === 'success') {
+                      if (transitioningInfo.status === 'completed') {
+                        transitioningClass = 'bg-emerald-500/10 dark:bg-emerald-500/5 ring-1 ring-emerald-500/30';
+                      } else if (transitioningInfo.status === 'refunded') {
+                        transitioningClass = 'bg-fuchsia-500/10 dark:bg-fuchsia-500/5 ring-1 ring-fuchsia-500/30';
+                      } else if (transitioningInfo.status === 'failed') {
+                        transitioningClass = 'bg-rose-500/10 dark:bg-rose-500/5 ring-1 ring-rose-500/30';
+                      }
+                    }
+                  }
+
                   return (
                     <tr 
                       key={o.id}
-                      className={`hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors ${
+                      className={`hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-all duration-300 ${
                         isChecked ? 'bg-purple-600/[0.02] dark:bg-purple-500/[0.02]' : ''
-                      }`}
+                      } ${transitioningClass}`}
                     >
                       {/* Checkbox */}
                       <td className="py-3 px-4 text-center">
@@ -1299,6 +1359,53 @@ export default function OrdersManagement({
                       {/* Payment Status Badges */}
                       <td className="py-3 px-3">
                         {(() => {
+                          if (isTransitioning) {
+                            if (transitioningInfo.stage === 'updating') {
+                              return (
+                                <motion.div 
+                                  initial={{ scale: 0.8, opacity: 0 }}
+                                  animate={{ scale: 1, opacity: 1 }}
+                                  className="flex items-center gap-1.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-full px-2 py-0.5 w-max font-sans font-bold"
+                                >
+                                  <motion.div 
+                                    animate={{ rotate: 360 }}
+                                    transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+                                    className="w-2.5 h-2.5 border-2 border-t-transparent rounded-full border-indigo-400"
+                                  />
+                                  <span className="text-[8px] tracking-wider uppercase">Updating</span>
+                                </motion.div>
+                              );
+                            } else if (transitioningInfo.stage === 'success') {
+                              let bgStyle = 'bg-emerald-500/15 border-emerald-500/25 text-emerald-400';
+                              let text = 'PAID';
+                              if (transitioningInfo.status === 'refunded') {
+                                bgStyle = 'bg-fuchsia-500/15 border-fuchsia-500/25 text-fuchsia-400';
+                                text = 'REFUNDED';
+                              } else if (transitioningInfo.status === 'failed') {
+                                bgStyle = 'bg-rose-500/15 border-rose-500/25 text-rose-400';
+                                text = 'CANCELLED';
+                              }
+
+                              return (
+                                <motion.div
+                                  initial={{ scale: 0.8, rotate: -5, opacity: 0 }}
+                                  animate={{ scale: [1.2, 1], rotate: [5, 0], opacity: 1 }}
+                                  transition={{ duration: 0.4, type: "spring", stiffness: 150 }}
+                                  className={`flex items-center gap-1 rounded-full px-2.5 py-0.5 border font-sans font-bold text-[9px] ${bgStyle}`}
+                                >
+                                  <motion.span 
+                                    initial={{ scale: 0 }}
+                                    animate={{ scale: 1 }}
+                                    transition={{ delay: 0.15, type: "spring", stiffness: 300 }}
+                                  >
+                                    ✓
+                                  </motion.span>
+                                  <span>{text}</span>
+                                </motion.div>
+                              );
+                            }
+                          }
+
                           let style = 'bg-amber-500/10 text-amber-500 border border-amber-500/20';
                           if (o.paymentStatus === 'completed' || o.paymentStatus === 'paid') {
                             style = 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
@@ -1446,8 +1553,7 @@ export default function OrdersManagement({
                                       type="button"
                                       disabled={o.paymentStatus === 'completed'}
                                       onClick={() => {
-                                        updateOrderStatus(o.id, 'completed');
-                                        triggerToast(`💳 Invoice ${getOrderSerial(o.id)} marked as PAID`);
+                                        triggerStatusUpdateWithAnimation(o.id, 'completed');
                                       }}
                                       className={`w-full text-left text-[11px] px-2.5 py-1.5 rounded-lg hover:bg-emerald-500/10 hover:text-emerald-400 flex items-center gap-1.5 cursor-pointer font-semibold ${
                                         o.paymentStatus === 'completed' ? 'opacity-40 cursor-not-allowed' : ''
@@ -1461,8 +1567,7 @@ export default function OrdersManagement({
                                       type="button"
                                       disabled={o.paymentStatus === 'refunded'}
                                       onClick={() => {
-                                        updateOrderStatus(o.id, 'refunded');
-                                        triggerToast(`💳 Invoice ${getOrderSerial(o.id)} marked as REFUNDED`);
+                                        triggerStatusUpdateWithAnimation(o.id, 'refunded');
                                       }}
                                       className={`w-full text-left text-[11px] px-2.5 py-1.5 rounded-lg hover:bg-fuchsia-500/10 hover:text-fuchsia-400 flex items-center gap-1.5 cursor-pointer font-semibold ${
                                         o.paymentStatus === 'refunded' ? 'opacity-40 cursor-not-allowed' : ''
@@ -1855,9 +1960,21 @@ export default function OrdersManagement({
                             referrerPolicy="no-referrer"
                           />
                           <div className="text-left space-y-0.5">
-                            <h4 className="font-bold text-sm dark:text-white">{cust.name}</h4>
+                            <h4 className="font-bold text-sm dark:text-white flex items-center gap-2">
+                              <span>{cust.name}</span>
+                              {inspectingOrder.companyCategory && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                  {inspectingOrder.companyCategory}
+                                </span>
+                              )}
+                            </h4>
                             <p className="text-xs font-mono text-slate-400">{cust.email}</p>
                             <p className="text-xs font-mono text-slate-500">{cust.phone}</p>
+                            {inspectingOrder.companyName && (
+                              <p className="text-xs font-semibold text-purple-600 dark:text-purple-400 flex items-center gap-1 pt-0.5">
+                                <span>🏢 {inspectingOrder.companyName}</span>
+                              </p>
+                            )}
                           </div>
                         </div>
                       </div>

@@ -3,7 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useRef, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
+import { flushSync } from 'react-dom';
 import { 
   PhoneCall, ShieldAlert, Award, ChevronRight, Sparkles, 
   HelpCircle, ArrowRight, BookOpen, Star, Building2, ExternalLink, Bell, Clock,
@@ -11,7 +12,7 @@ import {
 } from 'lucide-react';
 
 // Import Types
-import { Language, Theme, Product, Order, SupportTicket, Coupon, SystemConfig, CartItem, UserSession, Currency, ActivityLog } from './types';
+import { Language, Theme, Product, Order, SupportTicket, Coupon, SystemConfig, CartItem, UserSession, Currency, ActivityLog, FlyingCartItem } from './types';
 
 // Import Seeds
 import { sampleProducts, systemConfigDefault, sampleCoupons, clientTestimonials } from './data';
@@ -20,10 +21,12 @@ import { sampleProducts, systemConfigDefault, sampleCoupons, clientTestimonials 
 import { db as firebaseDb, auth as firebaseAuth, handleFirestoreError, OperationType } from './firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import Header from './components/Header';
+import ProductDetails from './components/ProductDetails';
 import Footer from './components/Footer';
 import Hero from './components/Hero';
+import Services from './components/Services';
+import MacBookCartGenieAnimation from './components/MacBookCartGenieAnimation';
 const Marketplace = lazy(() => import('./components/Marketplace'));
-const Services = lazy(() => import('./components/Services'));
 const Dashboard = lazy(() => import('./components/Dashboard'));
 const AdminPanel = lazy(() => import('./components/AdminPanel'));
 const Blog = lazy(() => import('./components/Blog'));
@@ -42,10 +45,11 @@ const DomainPage = lazy(() => import('./components/DomainPage'));
 const AffiliateSystem = lazy(() => import('./components/AffiliateSystem'));
 const AuthPopup = lazy(() => import('./components/AuthPopup'));
 const RefundPolicy = lazy(() => import('./components/RefundPolicy'));
+const OffersPage = lazy(() => import('./components/OffersPage'));
 const PromotionalOfferSystem = lazy(() => import('./components/PromotionalOfferSystem'));
 import ScrollReveal from './components/ScrollReveal';
 import BottomNavigation from './components/BottomNavigation';
-import ScrollNavigationWidget from './components/ScrollNavigationWidget';
+import ScrollToTop from './components/ScrollToTop';
 import { motion, AnimatePresence } from 'motion/react';
 import Helmet from './components/Helmet';
 
@@ -274,15 +278,94 @@ const seoConfig: Record<string, Record<Language, { title: string; description: s
       title: "لوحة تحكم السوبر أدمن المتقدمة CMS - ويب زون بي دي",
       description: "إدارة ملفات المنتجات، مراجعة دفعات التحويل الرقمي المأمنة وبطاقات الدعم وتراخيص السكربتات ووضع حد الخصومات المسموحة."
     }
+  },
+  offers: {
+    en: {
+      title: "🚀 Limited Time Mega Combo Offers Festival - WebzoneBD",
+      description: "Exclusive bundle deals and massive campaigns. Save up to 50% on domains registration, high-speed NVMe hosting, e-store development, and custom news portals setup."
+    },
+    bn: {
+      title: "🚀 লিমিটেড-টাইম মেগা কম্বো অফার ফেস্টিভ্যাল - ওয়েবজোনবিডি",
+      description: "বিশেষ ক্যাম্পেইন এবং অফার। ডোমেন রেজিস্ট্রেশন, হাই-স্পিড হোস্টিং, চমৎকার কমার্স এবং নিউজ পোর্টাল ডেভলপমেন্ট প্যাকেজে ৫০% পর্যন্ত ডিসকাউন্ট পান।"
+    },
+    ar: {
+      title: "🚀 عروض المهرجان الكبرى وحزم الكومبو الحصرية - ويب زون بي دي",
+      description: "احصل على نطاق مجاني واستضافة فائقة السرعة مع بوابات دفع متكاملة في عروض الكومبو الشاملة بخصم لغاية 50% لفترة محدودة."
+    }
   }
 };
 
 export default function App() {
-  const [language, setLanguage] = useState<Language>('en');
+  const [language, setLanguageState] = useState<Language>(() => {
+    const saved = localStorage.getItem('webzone_language');
+    if (saved === 'en' || saved === 'bn' || saved === 'ar') return saved as Language;
+
+    // Quick synchronous check for Bangladesh (timezone or locale)
+    try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const isBDLocale = navigator.language && (navigator.language.includes('bn') || navigator.language.includes('BD'));
+      const isBDTz = tz && (tz.includes('Dhaka') || tz.includes('Chittagong') || tz.includes('Asia/Dhaka'));
+      if (isBDTz || isBDLocale) return 'bn';
+    } catch (e) {
+      // ignore
+    }
+    return 'en';
+  });
+
+  const setLanguage = (lang: Language) => {
+    localStorage.setItem('webzone_language', lang);
+    localStorage.setItem('webzone_language_manual', 'true');
+    setLanguageState(lang);
+  };
   const [theme, setTheme] = useState<Theme>(() => {
     const saved = localStorage.getItem('webzone_theme');
     return (saved as Theme) || 'light';
   });
+
+  // Auto-detect language based on location (Bangladesh -> bn, others -> en)
+  useEffect(() => {
+    const saved = localStorage.getItem('webzone_language');
+    const manual = localStorage.getItem('webzone_language_manual');
+    if (!saved && !manual) {
+      // 1. Try ipapi.co
+      fetch('https://ipapi.co/json/')
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.country_code === 'BD') {
+            setLanguageState('bn');
+          } else {
+            setLanguageState('en');
+          }
+        })
+        .catch(() => {
+          // 2. Fallback to ip-api.com
+          fetch('https://ip-api.com/json')
+            .then(res => res.json())
+            .then(data => {
+              if (data && (data.countryCode === 'BD' || data.country === 'Bangladesh')) {
+                setLanguageState('bn');
+              } else {
+                setLanguageState('en');
+              }
+            })
+            .catch(() => {
+              // 3. Fallback to ipinfo.io
+              fetch('https://ipinfo.io/json')
+                .then(res => res.json())
+                .then(data => {
+                  if (data && data.country === 'BD') {
+                    setLanguageState('bn');
+                  } else {
+                    setLanguageState('en');
+                  }
+                })
+                .catch(() => {
+                  // Keep synchronous default guess
+                });
+            });
+        });
+    }
+  }, []);
 
   // Capture incoming referral parameters for affiliate tracking
   useEffect(() => {
@@ -304,8 +387,10 @@ export default function App() {
     if (path === '/domain' || path === '/domain-name-generator' || path.endsWith('/domain') || path.endsWith('/domain-name-generator')) return 'domain';
     if (path === '/hosting' || path.endsWith('/hosting')) return 'hosting';
     if (path === '/refund' || path.endsWith('/refund')) return 'refund';
+    if (path === '/offers' || path.endsWith('/offers')) return 'offers';
     return 'home';
   });
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [isAdmin, setIsAdmin] = useState<boolean>(() => {
     try {
@@ -472,7 +557,17 @@ export default function App() {
             customerType: 'Regular Client',
             tags: ['New Client'],
             lastLogin: new Date().toISOString().replace('T', ' ').substring(0, 16),
-            joinedAt: new Date().toISOString().split('T')[0]
+            joinedAt: new Date().toISOString().split('T')[0],
+            workspaceFeatures: {
+              projects: true,
+              supportTickets: true,
+              digitalStore: true,
+              downloads: true,
+              affiliateSystem: false,
+              wallet: true,
+              aiTools: true,
+              notifications: true
+            }
           };
           currentList.push(formattedCustomer);
           localStorage.setItem('webzone_admin_customers', JSON.stringify(currentList));
@@ -482,9 +577,23 @@ export default function App() {
       }
     }
   };
-  const [adminLoginEmail, setAdminLoginEmail] = useState<string>('');
+  const [adminLoginEmail, setAdminLoginEmail] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem('webzone_admin_remember_login');
+      return saved ? JSON.parse(saved).email || '' : '';
+    } catch (e) {
+      return '';
+    }
+  });
   const [adminLoginPass, setAdminLoginPass] = useState<string>('');
-  const [adminRemember, setAdminRemember] = useState<boolean>(false);
+  const [adminRemember, setAdminRemember] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('webzone_admin_remember_login');
+      return saved ? JSON.parse(saved).remember === true : false;
+    } catch (e) {
+      return false;
+    }
+  });
   const [adminLoginLoading, setAdminLoginLoading] = useState<boolean>(false);
   const [adminLoginError, setAdminLoginError] = useState<string>('');
 
@@ -496,8 +605,8 @@ export default function App() {
 
   useEffect(() => {
     const path = window.location.pathname;
-    const targetPath = currentPage === 'domain' ? '/domain-name-generator' : currentPage === 'hosting' ? '/hosting' : currentPage === 'refund' ? '/refund' : '/';
-    if (path !== targetPath && (targetPath !== '/' || path === '/domain' || path === '/domain-name-generator' || path === '/hosting' || path === '/refund')) {
+    const targetPath = currentPage === 'domain' ? '/domain-name-generator' : currentPage === 'hosting' ? '/hosting' : currentPage === 'refund' ? '/refund' : currentPage === 'offers' ? '/offers' : '/';
+    if (path !== targetPath && (targetPath !== '/' || path === '/domain' || path === '/domain-name-generator' || path === '/hosting' || path === '/refund' || path === '/offers')) {
       window.history.pushState({}, '', targetPath);
     }
   }, [currentPage]);
@@ -512,6 +621,8 @@ export default function App() {
         setCurrentPage('hosting');
       } else if (path === '/refund' || path.endsWith('/refund')) {
         setCurrentPage('refund');
+      } else if (path === '/offers' || path.endsWith('/offers')) {
+        setCurrentPage('offers');
       } else {
         setCurrentPage('home');
       }
@@ -781,6 +892,46 @@ export default function App() {
     localStorage.setItem('webzone_custom_currency_settings', JSON.stringify(currencySettings));
   }, [currencySettings]);
 
+  // Async IP Geolocation State
+  const [ipCountryCode, setIpCountryCode] = useState<string | null>(null);
+
+  useEffect(() => {
+    const sim = currencySettings.simulatedCountry;
+    if (sim === 'auto') {
+      const detectIP = async () => {
+        try {
+          const res = await fetch('https://ipwho.is/');
+          if (res.ok) {
+            const data = await res.json();
+            if (data && data.success && data.country_code) {
+              setIpCountryCode(data.country_code);
+              console.log("Detected visitor country code via IP:", data.country_code);
+              return;
+            }
+          }
+          throw new Error("ipwho.is response was not successful");
+        } catch (e) {
+          console.warn("Primary IP geolocation lookup failed, trying fallback...", e);
+          // Fallback to freeipapi.com
+          try {
+            const res = await fetch('https://freeipapi.com/api/json');
+            if (res.ok) {
+              const data = await res.json();
+              if (data && data.countryCode) {
+                setIpCountryCode(data.countryCode);
+                console.log("Detected visitor country code via fallback IP:", data.countryCode);
+                return;
+              }
+            }
+          } catch (fallbackError) {
+            console.warn("Fallback IP geolocation lookup failed:", fallbackError);
+          }
+        }
+      };
+      detectIP();
+    }
+  }, [currencySettings.simulatedCountry]);
+
   // Synchronized Auto Detect Location Engine
   const lastSimulatedCountry = useRef<string>('');
   const initialDetectionRun = useRef(false);
@@ -813,6 +964,20 @@ export default function App() {
         }
       } catch (err) {
         console.error("Timezone fetch fail", err);
+      }
+
+      // Override with IP Geolocation if detected and accurate
+      if (ipCountryCode) {
+        if (ipCountryCode === 'BD') {
+          resolvedCountryName = 'Bangladesh';
+          autoCurrency = 'BDT';
+        } else if (ipCountryCode === 'SA') {
+          resolvedCountryName = 'Saudi Arabia';
+          autoCurrency = 'SAR';
+        } else {
+          resolvedCountryName = 'USA / Others';
+          autoCurrency = 'USD';
+        }
       }
     } else if (sim === 'BD') {
       resolvedCountryName = 'Bangladesh';
@@ -859,6 +1024,21 @@ export default function App() {
       targetCurrency = fall;
     }
 
+    // Language automatic update logic
+    const isManualLanguage = localStorage.getItem('webzone_language_manual') === 'true';
+    let targetLanguage: Language = 'en';
+    if (sim === 'BD' || resolvedCountryName === 'Bangladesh') {
+      targetLanguage = 'bn';
+    } else if (sim === 'SA' || resolvedCountryName === 'Saudi Arabia') {
+      targetLanguage = 'en'; // Defaults to English for Arabia as explicitly requested by the user
+    }
+
+    // Force language if simulation changed, OR if no manual preference is set yet
+    if (simChanged || (!isManualLanguage && isFirstTime)) {
+      setLanguageState(targetLanguage);
+      localStorage.setItem('webzone_language', targetLanguage);
+    }
+
     // Update settings and active currency context stably
     let updated = false;
     const nextSettings = { ...currencySettings };
@@ -868,7 +1048,7 @@ export default function App() {
       updated = true;
     }
 
-        if (updated) {
+    if (updated) {
       setCurrencySettings(nextSettings);
     }
 
@@ -879,7 +1059,7 @@ export default function App() {
     // Keep state refs clean for next execution blocks
     lastSimulatedCountry.current = sim;
     initialDetectionRun.current = true;
-  }, [currencySettings.simulatedCountry, currencySettings.enabled, currencySettings.defaultCurrency, currency]);
+  }, [currencySettings.simulatedCountry, currencySettings.enabled, currencySettings.defaultCurrency, currency, ipCountryCode]);
   const [posts, setPosts] = useState<LocalBlogPost[]>(() => {
     try {
       const saved = localStorage.getItem('webzonebd_blog_posts');
@@ -910,7 +1090,6 @@ export default function App() {
     } catch (e) {
       console.error("Failed to parse webzone_tickets", e);
     }
-    // Seed high-fidelity interactive ticket for sandbox
     return [];
   });
 
@@ -974,19 +1153,19 @@ export default function App() {
     try {
       const saved = localStorage.getItem('webzone_bd_methods');
       return saved ? JSON.parse(saved) : {
-        bkash: { enabled: true, type: 'merchant', number: '01711223344', apiKey: 'bkash_mid_9901_key', instructions: 'Send money to our merchant number and paste the transaction ID here.', qrCode: 'https://images.unsplash.com/photo-1595079676339-1534801ad6cf?auto=format&fit=crop&q=80&w=300' },
-        nagad: { enabled: true, type: 'personal', number: '01811223344', apiKey: 'nagad_api_secure_token', instructions: 'Send money with send money option and input your mobile number as reference.', qrCode: '' },
-        rocket: { enabled: false, type: 'personal', number: '019112233449', apiKey: '', instructions: ' rocket transfer to 12-digit number.', qrCode: '' },
-        cellfin: { enabled: false, number: '01511223344', instructions: 'Transfer to CellFin wallet.', qrCode: '' },
-        islamiBank: { enabled: true, bankName: 'Islami Bank Bangladesh PLC', accountName: 'WebzoneBD IT Solutions', accountNumber: '20501450201235600', iban: 'BD03IBBL20501450201235600', swift: 'IBBLBDDHXXX', qrCode: '' }
+        bkash: { enabled: true, type: 'personal', number: '0186400 0005', apiKey: 'bkash_mid_9901_key', instructions: 'Send Money or Personal transfer directly to our bKash personal wallet.', qrCode: '' },
+        nagad: { enabled: true, type: 'personal', number: '0186400 0005', apiKey: 'nagad_api_secure_token', instructions: 'Send Money directly to our secure Nagad Personal Wallet.', qrCode: '' },
+        rocket: { enabled: true, type: 'personal', number: '0186400 0005', apiKey: '', instructions: 'Direct Mobile Cash-in or Send Money via Rocket wallet.', qrCode: '' },
+        cellfin: { enabled: true, number: '0186400 0005', instructions: 'Initiate prompt cellfin transfer directly to our wallet.', qrCode: '' },
+        islamiBank: { enabled: true, bankName: 'Islami Bank Bangladesh PLC', accountName: 'MD IMRAN HOSSAIN', accountNumber: '20501290204369912', iban: 'BD03IBBL20501290204369912', swift: 'IBBLBDDHXXX', qrCode: '' }
       };
     } catch (e) {
       return {
-        bkash: { enabled: true, type: 'merchant', number: '01711223344', apiKey: 'bkash_mid_9901_key', instructions: 'Send money to our merchant number and paste the transaction ID here.', qrCode: 'https://images.unsplash.com/photo-1595079676339-1534801ad6cf?auto=format&fit=crop&q=80&w=300' },
-        nagad: { enabled: true, type: 'personal', number: '01811223344', apiKey: 'nagad_api_secure_token', instructions: 'Send money with send money option and input your mobile number as reference.', qrCode: '' },
-        rocket: { enabled: false, type: 'personal', number: '019112233449', apiKey: '', instructions: ' rocket transfer to 12-digit number.', qrCode: '' },
-        cellfin: { enabled: false, number: '01511223344', instructions: 'Transfer to CellFin wallet.', qrCode: '' },
-        islamiBank: { enabled: true, bankName: 'Islami Bank Bangladesh PLC', accountName: 'WebzoneBD IT Solutions', accountNumber: '20501450201235600', iban: 'BD03IBBL20501450201235600', swift: 'IBBLBDDHXXX', qrCode: '' }
+        bkash: { enabled: true, type: 'personal', number: '0186400 0005', apiKey: 'bkash_mid_9901_key', instructions: 'Send Money or Personal transfer directly to our bKash personal wallet.', qrCode: '' },
+        nagad: { enabled: true, type: 'personal', number: '0186400 0005', apiKey: 'nagad_api_secure_token', instructions: 'Send Money directly to our secure Nagad Personal Wallet.', qrCode: '' },
+        rocket: { enabled: true, type: 'personal', number: '0186400 0005', apiKey: '', instructions: 'Direct Mobile Cash-in or Send Money via Rocket wallet.', qrCode: '' },
+        cellfin: { enabled: true, number: '0186400 0005', instructions: 'Initiate prompt cellfin transfer directly to our wallet.', qrCode: '' },
+        islamiBank: { enabled: true, bankName: 'Islami Bank Bangladesh PLC', accountName: 'MD IMRAN HOSSAIN', accountNumber: '20501290204369912', iban: 'BD03IBBL20501290204369912', swift: 'IBBLBDDHXXX', qrCode: '' }
       };
     }
   });
@@ -995,13 +1174,13 @@ export default function App() {
     try {
       const saved = localStorage.getItem('webzone_sa_methods');
       return saved ? JSON.parse(saved) : {
-        stcPay: { enabled: true, walletNumber: '+966501234567', instructions: 'Transfer via STC Pay mobile app directly to our wallet.', qrCode: '' },
-        alRajhi: { enabled: true, bankName: 'Al Rajhi Bank', accountName: 'WebzoneBD SA Ltd', accountNumber: '880012345678901', iban: 'SA8000000000880012345678901', swift: 'RAJISARIXXX', qrCode: '' }
+        stcPay: { enabled: true, walletNumber: '+966 57 051 1931', instructions: 'Transfer via STC Pay mobile app directly to our wallet.', qrCode: '' },
+        alRajhi: { enabled: true, bankName: 'Al Rajhi Bank Saudi Arabia 🇸🇦', accountName: 'MD IMRAN HOSSAIN', accountNumber: '621000010006086016528', iban: 'SA56 8000 0621 6080 1601 6528', swift: 'RJHISARI', qrCode: '' }
       };
     } catch (e) {
       return {
-        stcPay: { enabled: true, walletNumber: '+966501234567', instructions: 'Transfer via STC Pay mobile app directly to our wallet.', qrCode: '' },
-        alRajhi: { enabled: true, bankName: 'Al Rajhi Bank', accountName: 'WebzoneBD SA Ltd', accountNumber: '880012345678901', iban: 'SA8000000000880012345678901', swift: 'RAJISARIXXX', qrCode: '' }
+        stcPay: { enabled: true, walletNumber: '+966 57 051 1931', instructions: 'Transfer via STC Pay mobile app directly to our wallet.', qrCode: '' },
+        alRajhi: { enabled: true, bankName: 'Al Rajhi Bank Saudi Arabia 🇸🇦', accountName: 'MD IMRAN HOSSAIN', accountNumber: '621000010006086016528', iban: 'SA56 8000 0621 6080 1601 6528', swift: 'RJHISARI', qrCode: '' }
       };
     }
   });
@@ -1030,14 +1209,140 @@ export default function App() {
     }
   });
 
-  // Passive localStorage Synchronization Effects
+  // Keep currencySettings rates in sync with currencyRates
   useEffect(() => {
-    localStorage.setItem('webzone_currency_rates', JSON.stringify(currencyRates));
+    setCurrencySettings(prev => {
+      if (prev.rates.BDT === currencyRates.BDT && prev.rates.SAR === currencyRates.SAR && prev.rates.USD === currencyRates.USD) {
+        return prev;
+      }
+      return {
+        ...prev,
+        rates: {
+          ...prev.rates,
+          USD: currencyRates.USD || 1.0,
+          BDT: currencyRates.BDT || 118.5,
+          SAR: currencyRates.SAR || 3.75
+        }
+      };
+    });
   }, [currencyRates]);
 
+  const [cart, setCart] = useState<CartItem[]>(() => {
+    try {
+      const savedUser = localStorage.getItem('webzone_session_user');
+      if (savedUser) {
+        const parsedUser = JSON.parse(savedUser);
+        if (parsedUser && parsedUser.id) {
+          const savedCart = localStorage.getItem(`webzone_cart_${parsedUser.id}`);
+          if (savedCart) return JSON.parse(savedCart);
+        }
+      }
+      const savedGuestCart = localStorage.getItem('webzone_cart_guest') || localStorage.getItem('webzone_cart');
+      return savedGuestCart ? JSON.parse(savedGuestCart) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+  const [cartOpen, setCartOpen] = useState(false);
+
+  // For MacBook Genie Fly-to-Cart animation
+  const [flyingItems, setFlyingItems] = useState<FlyingCartItem[]>([]);
+  const lastClickRef = useRef<{ x: number; y: number }>({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
+
   useEffect(() => {
-    localStorage.setItem('webzone_verification_settings', JSON.stringify(verificationSettings));
-  }, [verificationSettings]);
+    const handleGlobalClick = (e: MouseEvent) => {
+      lastClickRef.current = { x: e.clientX, y: e.clientY };
+    };
+    window.addEventListener('click', handleGlobalClick, { capture: true });
+    return () => {
+      window.removeEventListener('click', handleGlobalClick, { capture: true });
+    };
+  }, []);
+
+  const getCartTargetCoordinates = (): { x: number; y: number } => {
+    // Check if on mobile screen width first (bottom navigation cart button)
+    if (window.innerWidth < 768) {
+      const mobileCart = document.getElementById('nav-item-cart') || document.getElementById('mobile-bottom-cart-btn');
+      if (mobileCart) {
+        const rect = mobileCart.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          return {
+            x: rect.left + rect.width / 2,
+            y: rect.top + rect.height / 2
+          };
+        }
+      }
+    }
+
+    let el = document.getElementById('global-header-cart-btn');
+    if (!el) {
+      el = document.querySelector('[aria-label="View Cart"]') || document.querySelector('.fa-shopping-cart') || document.querySelector('.lucide-shopping-bag');
+    }
+    if (el) {
+      const rect = el.getBoundingClientRect();
+      return {
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2
+      };
+    }
+    return {
+      x: window.innerWidth - 80,
+      y: 50
+    };
+  };
+
+  const triggerCartFlyAnimation = (
+    product: Product,
+    eventOrOrigin?: React.MouseEvent | HTMLElement | { clientX: number; clientY: number }
+  ) => {
+    let startX = lastClickRef.current.x || window.innerWidth / 2;
+    let startY = lastClickRef.current.y || window.innerHeight / 2;
+
+    if (eventOrOrigin) {
+      if ('clientX' in eventOrOrigin && typeof eventOrOrigin.clientX === 'number') {
+        startX = eventOrOrigin.clientX;
+        startY = eventOrOrigin.clientY;
+      } else if (eventOrOrigin instanceof HTMLElement) {
+        const rect = eventOrOrigin.getBoundingClientRect();
+        startX = rect.left + rect.width / 2;
+        startY = rect.top + rect.height / 2;
+      } else if ('currentTarget' in (eventOrOrigin as any)) {
+        const target = (eventOrOrigin as any).currentTarget as HTMLElement;
+        if (target && target.getBoundingClientRect) {
+          const rect = target.getBoundingClientRect();
+          startX = rect.left + rect.width / 2;
+          startY = rect.top + rect.height / 2;
+        }
+      }
+    }
+
+    const { x: endX, y: endY } = getCartTargetCoordinates();
+
+    const newFlyingItem: FlyingCartItem = {
+      id: `fly-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      startX,
+      startY,
+      endX,
+      endY,
+      image: product.image || 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?auto=format&fit=crop&w=400&q=80',
+      name: language === 'bn' ? (product.nameBn || product.name) : language === 'ar' ? (product.nameAr || product.name) : product.name,
+      price: product.discountPrice || product.price,
+      badge: product.badge || 'PRO',
+      category: product.category
+    };
+
+    setFlyingItems(prev => [...prev, newFlyingItem]);
+  };
+
+  // Save cart changes per-user or guest
+  useEffect(() => {
+    if (user) {
+      localStorage.setItem(`webzone_cart_${user.id}`, JSON.stringify(cart));
+    } else {
+      localStorage.setItem('webzone_cart_guest', JSON.stringify(cart));
+      localStorage.setItem('webzone_cart', JSON.stringify(cart));
+    }
+  }, [cart, user?.id]);
 
   useEffect(() => {
     localStorage.setItem('webzone_payment_notifs', JSON.stringify(paymentNotifs));
@@ -1076,24 +1381,6 @@ export default function App() {
       };
     });
   }, [currencyRates]);
-
-  const [cart, setCart] = useState<CartItem[]>(() => {
-    try {
-      const savedUser = localStorage.getItem('webzone_session_user');
-      if (savedUser) {
-        const parsedUser = JSON.parse(savedUser);
-        if (parsedUser && parsedUser.id) {
-          const savedCart = localStorage.getItem(`webzone_cart_${parsedUser.id}`);
-          if (savedCart) return JSON.parse(savedCart);
-        }
-      }
-      const savedGuestCart = localStorage.getItem('webzone_cart_guest') || localStorage.getItem('webzone_cart');
-      return savedGuestCart ? JSON.parse(savedGuestCart) : [];
-    } catch (e) {
-      return [];
-    }
-  });
-  const [cartOpen, setCartOpen] = useState(false);
 
   // Save cart changes per-user or guest
   useEffect(() => {
@@ -1213,17 +1500,66 @@ export default function App() {
     localStorage.setItem('webzone_activity_logs', JSON.stringify(activityLogs));
   }, [activityLogs]);
 
-  // Handle theme body toggling classes with persistent storage
+  // Handle theme body toggling classes with persistent storage & smooth Hostinger animation
+  const handleThemeToggle = (newTheme?: Theme, event?: React.MouseEvent) => {
+    const nextTheme = newTheme || (theme === 'light' ? 'dark' : 'light');
+    
+    if (event) {
+      const rect = (event.currentTarget as HTMLElement)?.getBoundingClientRect?.();
+      if (rect) {
+        const x = rect.left + rect.width / 2;
+        const y = rect.top + rect.height / 2;
+        document.documentElement.style.setProperty('--theme-x', `${x}px`);
+        document.documentElement.style.setProperty('--theme-y', `${y}px`);
+      }
+    } else {
+      document.documentElement.style.setProperty('--theme-x', `50%`);
+      document.documentElement.style.setProperty('--theme-y', `50%`);
+    }
+
+    document.documentElement.classList.add('theme-transition-active');
+
+    const applyTheme = () => {
+      flushSync(() => {
+        setTheme(nextTheme);
+        const root = window.document.documentElement;
+        if (nextTheme === 'dark') {
+          root.classList.add('dark');
+          root.style.backgroundColor = '#0F172A';
+        } else {
+          root.classList.remove('dark');
+          root.style.backgroundColor = '#FFFFFF';
+        }
+      });
+    };
+
+    if (typeof document !== 'undefined' && 'startViewTransition' in document) {
+      try {
+        (document as any).startViewTransition(() => {
+          applyTheme();
+        });
+      } catch (e) {
+        applyTheme();
+      }
+    } else {
+      applyTheme();
+    }
+
+    setTimeout(() => {
+      document.documentElement.classList.remove('theme-transition-active');
+    }, 700);
+  };
+
   useEffect(() => {
     localStorage.setItem('webzone_theme', theme);
     const root = window.document.documentElement;
-    root.classList.add('transition-colors', 'duration-300');
+    root.classList.add('transition-colors', 'duration-500');
     if (theme === 'dark') {
       root.classList.add('dark');
-      root.style.backgroundColor = '#0a0a0a';
+      root.style.backgroundColor = '#0F172A';
     } else {
       root.classList.remove('dark');
-      root.style.backgroundColor = '#fafafa';
+      root.style.backgroundColor = '#FFFFFF';
     }
   }, [theme]);
 
@@ -1250,7 +1586,13 @@ export default function App() {
   };
 
   // Cart operations
-  const addToCart = (product: Product) => {
+  const addToCart = (
+    product: Product,
+    eventOrOrigin?: React.MouseEvent | HTMLElement | { clientX: number; clientY: number }
+  ) => {
+    // Trigger the MacBook Genie motion animation
+    triggerCartFlyAnimation(product, eventOrOrigin);
+
     // Check duplication
     const isAlreadyInCart = cart.some(item => item.product.id === product.id);
     if (isAlreadyInCart) {
@@ -1267,7 +1609,7 @@ export default function App() {
 
     const newItem = activeCoupon ? { product, appliedCoupon: activeCoupon } : { product };
 
-    setCart([...cart, newItem]);
+    setCart(prev => [...prev, newItem]);
     addActivityLog(`Added product in digital cart: ${product.name}`);
     triggerToast(language === 'bn' ? `${product.name} কার্ট ফাইলে যোগ করা হয়েছে!` : language === 'ar' ? `تمت إضافة ${product.name} بنجاح` : `Added ${product.name} to cart.`);
   };
@@ -1286,6 +1628,13 @@ export default function App() {
     const activeCoupon = coupons.find(c => c.code === codeUpper);
 
     if (!activeCoupon) {
+      return language === 'bn' ? "ভুল কুপন কোড!" : language === 'ar' ? "رمز الكوبون غير صالح" : "Invalid coupon code!";
+    }
+
+    const isPastExpiry = activeCoupon.expiryDate ? new Date(activeCoupon.expiryDate + 'T23:59:59') < new Date() : false;
+    const isExpired = activeCoupon.status === 'expired' || isPastExpiry;
+
+    if (isExpired) {
       return language === 'bn' ? "ভুল কুপন কোড!" : language === 'ar' ? "رمز الكوبون غير صالح" : "Invalid coupon code!";
     }
 
@@ -1650,6 +1999,10 @@ export default function App() {
     setCoupons([cp, ...coupons]);
     addActivityLog(`Created new promotional coupon code: ${cp.code} [Discount: ${cp.discountPercent}% OFF]`);
   };
+  const updateCoupon = (code: string, updatedCoupon: Coupon) => {
+    setCoupons(prev => prev.map(c => c.code.toUpperCase() === code.toUpperCase() ? updatedCoupon : c));
+    addActivityLog(`Updated promotional coupon code: ${updatedCoupon.code}`);
+  };
   const deleteCoupon = (code: string) => {
     setCoupons(coupons.filter(c => c.code !== code));
     addActivityLog(`Deactivated and deleted promotional coupon code: ${code}`);
@@ -1767,7 +2120,7 @@ export default function App() {
         language={language}
         setLanguage={setLanguage}
         theme={theme}
-        setTheme={setTheme}
+        setTheme={handleThemeToggle}
         cart={cart}
         removeFromCart={removeFromCart}
         applyCouponToCart={applyCouponToCart}
@@ -1969,54 +2322,31 @@ export default function App() {
         }>
         {currentPage === 'home' && (
           <div className="space-y-5 animate-in fade-in duration-300">
-            {/* Embedded Hero Header block */}
-            <Hero
-              language={language}
-              searchTerm={searchTerm}
-              setSearchTerm={setSearchTerm}
-              setCurrentPage={setCurrentPage}
-              triggerToast={triggerToast}
-            />
+            {/* Embedded Hero & Domain Search group without space-y-5 gap */}
+            <div className="flex flex-col">
+              <Hero
+                language={language}
+                theme={theme}
+                searchTerm={searchTerm}
+                setSearchTerm={setSearchTerm}
+                setCurrentPage={setCurrentPage}
+                triggerToast={triggerToast}
+              />
 
-            {/* Premium Domain Registration Search section */}
-            <DomainSearch
-              language={language}
-              theme={theme}
-              currency={currency}
-              addToCart={addToCart}
-              setCurrentPage={setCurrentPage}
-              currencySettings={currencySettings}
-            />
+              {/* Premium Domain Registration Search section */}
+              <DomainSearch
+                language={language}
+                theme={theme}
+                currency={currency}
+                addToCart={addToCart}
+                setCurrentPage={setCurrentPage}
+                currencySettings={currencySettings}
+              />
+            </div>
 
             {/* Services highlights preview */}
             <ScrollReveal className="w-full">
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-4">
-                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-8">
-                    <div className="p-1.5 sm:p-2 rounded-2xl bg-gradient-to-br from-indigo-50/40 via-sky-50/10 to-transparent dark:from-slate-900/40 dark:via-slate-950/10 dark:to-transparent border border-neutral-200/40 dark:border-neutral-800/40 backdrop-blur-xs w-full">
-                      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 p-4 sm:p-6">
-                        <div className="space-y-2.5">
-                          <h3 className="text-xl sm:text-2xl md:text-3.5xl font-black tracking-tight flex items-center gap-2.5">
-                            <Award className="text-blue-600 dark:text-cyan-400 w-6 h-6 sm:w-7 sm:h-7 shrink-0 animate-pulse" />
-                            <span className="bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500 dark:from-cyan-400 dark:via-blue-400 dark:to-teal-400 bg-clip-text text-transparent font-display">
-                              {tHome[language]?.servicesTitle || "Enterprise IT Services catalog"}
-                            </span>
-                          </h3>
-                          <p className="text-xs sm:text-sm md:text-[14.5px] font-medium leading-relaxed text-neutral-600 dark:text-slate-300 max-w-2xl">
-                            {tHome[language]?.servicesDesc || "We design and optimize responsive solutions ensuring maximum speed scales."}
-                          </p>
-                        </div>
-
-                        <button
-                          onClick={() => setCurrentPage('services')}
-                          className="px-4.5 py-2.5 sm:px-5 sm:py-3 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-neutral-800 dark:text-white border border-neutral-200 dark:border-neutral-800 text-xs sm:text-sm font-black rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 flex items-center gap-2 shrink-0 cursor-pointer active:scale-95"
-                        >
-                          <span>{tHome[language]?.exploreBtn || "Explore Services"}</span>
-                          <ChevronRight className={`w-4 h-4 ${isRtl ? 'rotate-180' : ''} text-blue-500 dark:text-cyan-400`} />
-                        </button>
-                      </div>
-                    </div>
-                </div>
-
                 {/* Embed services */}
                 <Services
                   user={user}
@@ -2165,6 +2495,41 @@ export default function App() {
               triggerToast={triggerToast}
               onOpenLogin={() => setIsAuthPopupOpen(true)}
               onUpdateProduct={handleUpdateProduct}
+              onViewProduct={(product) => {
+                setSelectedProduct(product);
+                setCurrentPage('product-details');
+              }}
+            />
+          </div>
+        )}
+
+        {currentPage === 'product-details' && selectedProduct && (
+          <div className="animate-in fade-in duration-200">
+            <ProductDetails
+              product={selectedProduct}
+              products={products}
+              language={language}
+              theme={theme}
+              currency={currency}
+              setCurrency={setCurrency}
+              addToCart={addToCart}
+              setCartOpen={setCartOpen}
+              wishlist={wishlist}
+              toggleWishlist={toggleWishlist}
+              triggerToast={triggerToast}
+              onBack={() => {
+                setCurrentPage('marketplace');
+                setSelectedProduct(null);
+              }}
+              onOpenLogin={() => setIsAuthPopupOpen(true)}
+              user={user}
+              orders={orders}
+              setOrders={setOrders}
+              currencyRates={currencyRates}
+              onViewProduct={(prod) => {
+                setSelectedProduct(prod);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
             />
           </div>
         )}
@@ -2265,6 +2630,20 @@ export default function App() {
               theme={theme}
               setCurrentPage={setCurrentPage}
               triggerToast={triggerToast}
+            />
+          </div>
+        )}
+
+        {currentPage === 'offers' && (
+          <div className="animate-in fade-in duration-200">
+            <OffersPage
+              language={language}
+              theme={theme}
+              currency={currency}
+              currencySettings={currencySettings}
+              triggerToast={triggerToast}
+              addToCart={addToCart}
+              setCartOpen={setCartOpen}
             />
           </div>
         )}
@@ -2388,7 +2767,7 @@ export default function App() {
                 onUpdateProductRating={updateProductRating}
                 currencySettings={currencySettings}
                 setLanguage={setLanguage}
-                setTheme={setTheme}
+                setTheme={handleThemeToggle}
                 onUpdateOrders={(newOrders) => setOrders(newOrders)}
                 deleteOrder={deleteOrder}
               />
@@ -2421,6 +2800,7 @@ export default function App() {
                   deleteOrder={deleteOrder}
                   addTicketReply={addTicketReply}
                   addNewCoupon={addNewCoupon}
+                  updateCoupon={updateCoupon}
                   deleteCoupon={deleteCoupon}
                   updateSystemConfig={setSystemConfig}
                   triggerToast={triggerToast}
@@ -2486,7 +2866,7 @@ export default function App() {
                       setSiteWideBroadcastSeverity('info');
                     }
                   }}
-                  setTheme={setTheme}
+                  setTheme={handleThemeToggle}
                   onLogout={() => {
                     addActivityLog("Terminated secure session successfully.");
                     setUser(null);
@@ -2608,6 +2988,22 @@ export default function App() {
                               status: matchedStaff.status || 'active',
                               wishlistedProductIds: []
                             };
+
+                            // Active Admin Remember Me handling
+                            if (adminRemember) {
+                              try {
+                                localStorage.setItem('webzone_admin_remember_login', JSON.stringify({
+                                  email: adminLoginEmail.trim(),
+                                  remember: true,
+                                  timestamp: Date.now()
+                                }));
+                              } catch (e) {}
+                            } else {
+                              try {
+                                localStorage.removeItem('webzone_admin_remember_login');
+                              } catch (e) {}
+                            }
+
                             setUser(adminUserSession);
                             setIsAdmin(true);
                             triggerToast(`Welcome back, ${matchedStaff.name}! Authorized staff session.`);
@@ -2657,10 +3053,20 @@ export default function App() {
                           <input
                             type="checkbox"
                             checked={adminRemember}
-                            onChange={(e) => setAdminRemember(e.target.checked)}
-                            className="rounded border-neutral-300 dark:border-neutral-800 text-blue-600 focus:ring-blue-500"
+                            onChange={(e) => {
+                              const val = e.target.checked;
+                              setAdminRemember(val);
+                              if (!val) {
+                                try {
+                                  localStorage.removeItem('webzone_admin_remember_login');
+                                } catch (err) {}
+                              }
+                            }}
+                            className="rounded border-neutral-300 dark:border-neutral-800 text-blue-600 focus:ring-blue-500 cursor-pointer"
                           />
-                          <span className="text-xs font-medium text-neutral-600 dark:text-neutral-400">Remember Me</span>
+                          <span className="text-xs font-medium text-neutral-600 dark:text-neutral-400">
+                            {language === 'bn' ? 'রিমেম্বার মি' : 'Remember Me'}
+                          </span>
                         </label>
                         
                         <button
@@ -2779,8 +3185,11 @@ export default function App() {
 
       {/* Floating Action Live Support Widget (WhatsApp & Telegram Support) */}
       {!(user && (user.role === 'admin' || user.role === 'super_admin' || user.role === 'editor')) && !isAdmin && (
-        <LiveChatWidget language={language} />
+        <LiveChatWidget language={language} currentPage={currentPage} />
       )}
+
+      {/* Floating 'Scroll to Top' button */}
+      <ScrollToTop currentPage={currentPage} />
 
       {/* Premium Telegram-style Bottom Navigation menu */}
       <BottomNavigation
@@ -2873,10 +3282,12 @@ export default function App() {
         isAdmin={isAdmin || !!(user && (user.role === 'admin' || user.role === 'super_admin' || user.role === 'editor' || user.role === 'staff'))}
       />
 
-      {/* Premium Floating Scroll Navigation Widget */}
-      <ScrollNavigationWidget
+      {/* MacBook Genie Motion Fly-to-Cart Animation Overlay */}
+      <MacBookCartGenieAnimation
+        flyingItems={flyingItems}
+        onItemComplete={(id) => setFlyingItems(prev => prev.filter(fi => fi.id !== id))}
         language={language}
-        theme={theme}
+        currency={currency}
       />
     </div>
   );

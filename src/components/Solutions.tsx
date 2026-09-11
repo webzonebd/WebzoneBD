@@ -791,39 +791,7 @@ export default function Solutions({
 
         </div>
 
-        {/* DETAILED PACKAGE FEATURES MATRIX */}
-        <div className="max-w-4xl mx-auto px-4 bg-white/40 dark:bg-slate-900/10 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-9 backdrop-blur-md text-left" id="feature-matrix">
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between border-b border-slate-200 dark:border-slate-800/80 pb-4 mb-6 gap-3">
-            <div>
-              <h3 className="text-base font-black text-slate-850 dark:text-white flex items-center gap-2">
-                <CheckCircle2 className="w-5 h-5 text-blue-600" />
-                <span>{sharedTexts.includedPerks}</span>
-              </h3>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400 font-sans mt-0.5">
-                All production modules fully included in the standard compiled source repository.
-              </p>
-            </div>
-            <span className="px-3 py-1 rounded bg-blue-500/10 border border-blue-500/10 text-blue-600 dark:text-cyan-400 text-xs font-mono font-black uppercase tracking-wider">
-              {activeSolution === 'pos' ? 'Offline & Online Cloud Hybrid Engine' : 'Zakat & Board Standard PHP Stack'}
-            </span>
-          </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-            {posInclusions.map((inc, i) => (
-              <div 
-                key={i} 
-                className="flex items-center gap-3 p-3 bg-white/70 dark:bg-slate-950/40 rounded-xl border border-slate-200/50 dark:border-slate-900/60 transition hover:border-cyan-500/20 hover:-translate-y-0.5 shadow-sm"
-              >
-                <div className="w-5 h-5 rounded-full bg-blue-500/10 text-blue-600 dark:text-cyan-400 flex items-center justify-center shrink-0">
-                  <Check className="w-3.5 h-3.5 stroke-[4]" />
-                </div>
-                <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
-                  {language === 'bn' ? inc.text.bn : language === 'ar' ? inc.text.ar : inc.text.en}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
 
         {/* PREMIUM CALL TO ACTION BLOCK */}
         <div className="relative overflow-hidden rounded-[32px] bg-[#020617] text-white p-8 md:p-14 text-center border border-slate-850 max-w-5xl mx-auto px-4 shadow-2xl">

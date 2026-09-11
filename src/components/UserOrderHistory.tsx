@@ -3,10 +3,11 @@ import {
   Search, Filter, Calendar, Clock, CreditCard, ChevronDown, ChevronUp, AlertCircle,
   CheckCircle2, Truck, RefreshCw, ArrowUpDown, ShieldCheck, ExternalLink, 
   Copy, MessageCircle, HelpCircle, Inbox, Tag, Award, Sparkles, Plus,
-  X, Download, Printer
+  X, Download, Printer, MessageSquare
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Order, Language, Currency, UserSession } from '../types';
+import OrderProjectChat from './OrderProjectChat';
 
 interface UserOrderHistoryProps {
   orders: Order[];
@@ -43,6 +44,8 @@ export default function UserOrderHistory({
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   const [copiedOrderId, setCopiedOrderId] = useState<string | null>(null);
   const [selectedOrderForModal, setSelectedOrderForModal] = useState<Order | null>(null);
+  const [modalTab, setModalTab] = useState<'invoice' | 'chat'>('invoice');
+  const [activeHistoryChatOrder, setActiveHistoryChatOrder] = useState<Order | null>(null);
   const [isDownloadingInvoice, setIsDownloadingInvoice] = useState<string | null>(null);
 
   // Translate labels dynamically supporting English, Bengali, and Arabic
@@ -441,57 +444,75 @@ export default function UserOrderHistory({
       {/* ORDERS LIST CONTAINER */}
       <div className="space-y-4">
         
-        {processedOrders.length === 0 ? (
-          
-          /* Empty State component offering Simulation */
-          <div className="bg-white dark:bg-[#1E293B] border border-neutral-200 dark:border-slate-850 rounded-3xl p-10 md:p-12 text-center max-w-2xl mx-auto space-y-6 shadow-sm">
-            <div className="mx-auto w-16 h-16 rounded-3xl bg-amber-500/10 text-amber-500 flex items-center justify-center border border-amber-500/10">
-              <Inbox className="w-8 h-8 stroke-[1.8]" />
-            </div>
+        <AnimatePresence mode="popLayout">
+          {processedOrders.length === 0 ? (
             
-            <div className="space-y-2">
-              <h4 className="text-sm font-black text-slate-800 dark:text-slate-200">
-                {l('noOrders')}
-              </h4>
-              <p className="text-xs text-slate-400 dark:text-slate-400 leading-relaxed">
-                {l('noOrdersDesc')}
-              </p>
-            </div>
+            /* Empty State component offering Simulation */
+            <motion.div 
+              key="empty-orders-state"
+              initial={{ opacity: 0, scale: 0.96, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: -8 }}
+              transition={{ duration: 0.3 }}
+              className="bg-white dark:bg-[#1E293B] border border-neutral-200 dark:border-slate-850 rounded-3xl p-10 md:p-12 text-center max-w-2xl mx-auto space-y-6 shadow-sm"
+            >
+              <div className="mx-auto w-16 h-16 rounded-3xl bg-amber-500/10 text-amber-500 flex items-center justify-center border border-amber-500/10">
+                <Inbox className="w-8 h-8 stroke-[1.8]" />
+              </div>
+              
+              <div className="space-y-2">
+                <h4 className="text-sm font-black text-slate-800 dark:text-slate-200">
+                  {l('noOrders')}
+                </h4>
+                <p className="text-xs text-slate-400 dark:text-slate-400 leading-relaxed">
+                  {l('noOrdersDesc')}
+                </p>
+              </div>
 
-            {/* No simulated demo button allowed */}
-          </div>
+              {/* No simulated demo button allowed */}
+            </motion.div>
 
-        ) : (
-          
-          /* Real Dynamic rendered Invoice Order loops */
-          processedOrders.map((ord) => {
-            const isExpanded = expandedOrderId === ord.id;
-            const stepIndex = getFulfillmentStepValue(ord.status, ord.paymentStatus);
+          ) : (
             
-            // Payment badge color matching definitions
-            const payBadges = {
-              completed: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/10',
-              pending: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/10',
-              failed: 'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/10'
-            };
+            /* Real Dynamic rendered Invoice Order loops */
+            processedOrders.map((ord, index) => {
+              const isExpanded = expandedOrderId === ord.id;
+              const stepIndex = getFulfillmentStepValue(ord.status, ord.paymentStatus);
+              
+              // Payment badge color matching definitions
+              const payBadges = {
+                completed: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/10',
+                pending: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/10',
+                failed: 'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/10'
+              };
 
-            const ordStatus = ord.status || 'pending';
-            const delBadges = {
-              pending: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-slate-200/50 dark:border-slate-800',
-              processing: 'bg-blue-500/10 text-[#2563EB] dark:text-cyan-400 border border-blue-500/10',
-              shipped: 'bg-pink-500/10 text-pink-600 dark:text-pink-400 border border-pink-500/10',
-              delivered: 'bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/10'
-            };
+              const ordStatus = ord.status || 'pending';
+              const delBadges = {
+                pending: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-slate-200/50 dark:border-slate-800',
+                processing: 'bg-blue-500/10 text-[#2563EB] dark:text-cyan-400 border border-blue-500/10',
+                shipped: 'bg-pink-500/10 text-pink-600 dark:text-pink-400 border border-pink-500/10',
+                delivered: 'bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/10'
+              };
 
-            return (
-              <div 
-                key={ord.id}
-                className={`bg-white dark:bg-[#1E293B] border rounded-3xl overflow-hidden transition-all duration-300 shadow-sm hover:translate-y-[-1px] ${
-                  isExpanded 
-                    ? 'border-indigo-500 ring-1 ring-indigo-500/30 dark:border-cyan-500/60 dark:ring-cyan-500/20' 
-                    : 'border-slate-200 hover:border-slate-350 dark:border-slate-850 dark:hover:border-slate-800'
-                }`}
-              >
+              return (
+                <motion.div 
+                  key={ord.id}
+                  layout
+                  initial={{ opacity: 0, y: 20, scale: 0.985 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.2 } }}
+                  transition={{ 
+                    duration: 0.38, 
+                    delay: Math.min(index * 0.05, 0.35),
+                    ease: [0.21, 0.47, 0.32, 0.98] 
+                  }}
+                  whileHover={{ y: -2, transition: { duration: 0.2 } }}
+                  className={`bg-white dark:bg-[#1E293B] border rounded-3xl overflow-hidden transition-colors duration-300 shadow-sm hover:shadow-md ${
+                    isExpanded 
+                      ? 'border-indigo-500 ring-1 ring-indigo-500/30 dark:border-cyan-500/60 dark:ring-cyan-500/20' 
+                      : 'border-slate-200 hover:border-slate-350 dark:border-slate-850 dark:hover:border-slate-800'
+                  }`}
+                >
                 
                 {/* Header overview row */}
                 <div 
@@ -778,15 +799,26 @@ export default function UserOrderHistory({
                                 )}
 
                                 <button
-                                  onClick={() => setSelectedOrderForModal(ord)}
+                                  onClick={() => {
+                                    setSelectedOrderForModal(ord);
+                                    setModalTab('invoice');
+                                  }}
                                   className="flex-1 inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-[11px] font-black text-white bg-indigo-650 hover:bg-indigo-700 dark:bg-cyan-600 dark:hover:bg-cyan-700 shadow-sm transition cursor-pointer"
                                 >
                                   <Printer className="w-3.5 h-3.5" />
                                   <span>{l('viewPrintInvoice')}</span>
                                 </button>
+
+                                <button
+                                  onClick={() => setActiveHistoryChatOrder(ord)}
+                                  className="flex-1 inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-[11px] font-black text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm transition cursor-pointer"
+                                >
+                                  <MessageSquare className="w-3.5 h-3.5" />
+                                  <span>{language === 'bn' ? 'স্টাফ চ্যাট 💬' : 'Staff Chat 💬'}</span>
+                                </button>
                                 
                                 <a
-                                  href={`https://wa.me/966570511931?text=Hello%20WebzoneBD!%20I%20need%20assistance%20with%20my%2520Order%2520ID%2520${ord.id}`}
+                                  href={`https://wa.me/966570511931?text=${encodeURIComponent(`Hello WebzoneBD! I need assistance with my Order ID #${ord.id}${ord.transactionId ? ` (TrxID: ${ord.transactionId})` : ''}`)}`}
                                   target="_blank"
                                   rel="noreferrer noopener"
                                   className="flex-1 inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-[11px] font-black text-slate-700 hover:text-slate-900 border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 hover:dark:bg-slate-850 shadow-xs transition"
@@ -807,10 +839,11 @@ export default function UserOrderHistory({
                   )}
                 </AnimatePresence>
 
-              </div>
-            );
-          })
-        )}
+                </motion.div>
+              );
+            })
+          )}
+        </AnimatePresence>
 
       </div>
 
@@ -837,30 +870,68 @@ export default function UserOrderHistory({
             >
               
               {/* Header Bar */}
-              <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/80 dark:bg-slate-900/60">
-                <div className="flex items-center gap-2.5">
-                  <div className="p-2 ml-0.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-[#2563EB] dark:text-cyan-400">
-                    <Printer className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-xs md:text-sm font-black text-slate-900 dark:text-white uppercase tracking-tight">
-                      {language === 'bn' ? 'অর্ডার ইনভয়েস ও রসিদ' : language === 'ar' ? 'تفاصيل فاتورة الطلب' : 'Official Invoice Receipt'}
-                    </h3>
-                    <span className="text-[10px] font-mono text-slate-400 block tracking-wider uppercase font-bold mt-0.5">Invoice: #{getOrderSerial(selectedOrderForModal.id)}</span>
-                  </div>
+              <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 bg-slate-50/80 dark:bg-slate-900/60">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setModalTab('invoice')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                      modalTab === 'invoice'
+                        ? 'bg-indigo-600 text-white shadow-sm'
+                        : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                    }`}
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                    <span>{language === 'bn' ? 'ইনভয়েস 🧾' : 'Invoice 🧾'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setModalTab('chat')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                      modalTab === 'chat'
+                        ? 'bg-indigo-600 text-white shadow-sm'
+                        : 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800'
+                    }`}
+                  >
+                    <MessageSquare className="w-3.5 h-3.5" />
+                    <span>{language === 'bn' ? 'স্টাফ চ্যাট 💬' : 'Requirements Chat 💬'}</span>
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  </button>
                 </div>
                 
-                <button
-                  onClick={() => setSelectedOrderForModal(null)}
-                  className="p-1.5 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-650 transition cursor-pointer"
-                  aria-label="Close invoice details modal"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-mono text-slate-400 hidden sm:inline-block tracking-wider uppercase font-bold">#{getOrderSerial(selectedOrderForModal.id)}</span>
+                  <button
+                    onClick={() => {
+                      setSelectedOrderForModal(null);
+                      setModalTab('invoice');
+                    }}
+                    className="p-1.5 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-650 transition cursor-pointer"
+                    aria-label="Close invoice details modal"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
 
-              {/* Modal Core Body (Scrollable) */}
-              <div className="p-6 overflow-y-auto space-y-6 text-slate-800 dark:text-slate-200 text-xs font-sans">
+              {modalTab === 'chat' ? (
+                <div className="p-4 flex-1 overflow-hidden flex flex-col">
+                  <OrderProjectChat
+                    order={selectedOrderForModal}
+                    user={user}
+                    language={language}
+                    isCompact={true}
+                    onClose={() => {
+                      setSelectedOrderForModal(null);
+                      setModalTab('invoice');
+                    }}
+                  />
+                </div>
+              ) : (
+                <>
+                  {/* Modal Core Body (Scrollable) */}
+                  <div className="p-6 overflow-y-auto space-y-6 text-slate-800 dark:text-slate-200 text-xs font-sans">
                 
                 {/* Brand & Status Banner */}
                 <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 p-5 rounded-2xl bg-slate-50 dark:bg-[#0f172a] border border-slate-150 dark:border-slate-900">
@@ -1079,14 +1150,43 @@ export default function UserOrderHistory({
                 </button>
 
                 <button
-                  onClick={() => setSelectedOrderForModal(null)}
+                  onClick={() => {
+                    setSelectedOrderForModal(null);
+                    setModalTab('invoice');
+                  }}
                   className="w-full sm:w-auto px-5 py-3 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-800 transition border-0 cursor-pointer text-center"
                 >
                   Close
                 </button>
               </div>
 
+                </>
+              )}
+
             </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Standalone Project Requirements Chat Modal */}
+      <AnimatePresence>
+        {activeHistoryChatOrder && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/70 backdrop-blur-md overflow-y-auto">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setActiveHistoryChatOrder(null)}
+              className="absolute inset-0 bg-transparent cursor-default"
+            />
+            <div className="relative w-full max-w-3xl z-20">
+              <OrderProjectChat
+                order={activeHistoryChatOrder}
+                user={user}
+                language={language}
+                onClose={() => setActiveHistoryChatOrder(null)}
+              />
+            </div>
           </div>
         )}
       </AnimatePresence>

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { 
-  ShieldCheck, LogOut, ChevronRight, ChevronLeft, Menu, X, HelpCircle, Bell, Sun, Moon
+  ShieldCheck, LogOut, ChevronRight, ChevronLeft, Menu, X, HelpCircle, Bell, Sun, Moon, ShoppingBag, Crown, Award
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Language, Currency, UserSession, Theme } from '../types';
@@ -38,7 +38,7 @@ interface SidebarProps {
   isCollapsed: boolean;
   setIsCollapsed: (collapsed: boolean) => void;
   theme?: Theme;
-  setTheme?: (theme: Theme) => void;
+  setTheme?: (theme: Theme, event?: React.MouseEvent) => void;
 }
 
 export default function Sidebar({
@@ -70,6 +70,37 @@ export default function Sidebar({
   const profileName = user?.name || 'Guest User';
   const profileEmail = user?.email || 'guest@webzonebd.com';
   const profileAvatar = user?.avatar || '';
+
+  // Load full database customer record for permission checking and badges
+  const getDbCustomerRecord = () => {
+    if (!user) return null;
+    try {
+      const saved = localStorage.getItem('webzone_admin_customers');
+      if (saved) {
+        const customers = JSON.parse(saved);
+        const match = customers.find((c: any) => 
+          (c.customer_id || c.id) === user.id || 
+          (c.customer_email || c.email)?.toLowerCase() === user.email?.toLowerCase()
+        );
+        return match;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return null;
+  };
+
+  const dbCustomer = getDbCustomerRecord();
+  
+  // 1. Is Affiliate Program enabled?
+  const isAffiliateEnabled = dbCustomer 
+    ? (dbCustomer.workspaceFeatures?.affiliateSystem !== undefined ? !!dbCustomer.workspaceFeatures.affiliateSystem : true) 
+    : (user?.role === 'affiliate' || user?.prefAffiliate);
+  
+  // 2. Is VIP Customer?
+  const isVipCustomer = dbCustomer 
+    ? (dbCustomer.customerType === 'VIP Client' || dbCustomer.tags?.includes('VIP')) 
+    : false;
 
   const getLocalizedText = (english: string, bengali: string): string => {
     if (language === 'bn') return bengali || english;
@@ -196,16 +227,40 @@ export default function Sidebar({
 
               {/* Account text parameters when expanded */}
               {!isCollapsed && (
-                <div className="text-left min-w-0 flex-1">
-                  <h4 className="text-xs font-black text-white truncate tracking-tight">
-                    {profileName}
-                  </h4>
-                  <p className="text-[10px] text-cyan-100/80 font-mono truncate mt-0.5">
-                    {profileEmail}
-                  </p>
-                  <div className="inline-flex items-center gap-1 text-[8px] font-black uppercase font-mono text-emerald-300 mt-1 bg-white/10 px-1.5 py-0.5 rounded border border-white/10">
-                    👑 OVERALL VIP
+                <div className="flex items-center justify-between gap-2 flex-1 min-w-0">
+                  <div className="text-left min-w-0 flex-1">
+                    <h4 className="text-xs font-black text-white truncate tracking-tight">
+                      {profileName}
+                    </h4>
+                    <p className="text-[10px] text-cyan-100/80 font-mono truncate mt-0.5">
+                      {profileEmail}
+                    </p>
+                    <div className="inline-flex items-center gap-1 text-[9px] font-bold font-mono text-cyan-200 mt-1 bg-white/10 px-1.5 py-0.5 rounded border border-white/10">
+                      📞 {user?.phone || '+880 1711 223344'}
+                    </div>
                   </div>
+
+                  {/* Affiliate Program and VIP Customer icons on the right side */}
+                  {(isAffiliateEnabled || isVipCustomer) && (
+                    <div className="flex items-center gap-1.5 shrink-0 pl-1">
+                      {isVipCustomer && (
+                        <div className="relative group/vip" title={language === 'bn' ? 'ভিআইপি গ্রাহক' : 'VIP Customer'}>
+                          <div className="absolute -inset-1 rounded-full bg-gradient-to-r from-amber-500 to-yellow-400 opacity-60 blur-xs animate-pulse" />
+                          <div className="relative flex items-center justify-center w-7 h-7 rounded-full bg-slate-950/80 border border-amber-500/40 text-amber-400 shadow-md">
+                            <Crown className="w-4 h-4 animate-bounce" style={{ animationDuration: '3s' }} />
+                          </div>
+                        </div>
+                      )}
+                      {isAffiliateEnabled && (
+                        <div className="relative group/aff" title={language === 'bn' ? 'অ্যাফিলিয়েট পার্টনার' : 'Affiliate Partner'}>
+                          <div className="absolute -inset-1 rounded-full bg-gradient-to-r from-fuchsia-500 to-pink-500 opacity-60 blur-xs animate-pulse" />
+                          <div className="relative flex items-center justify-center w-7 h-7 rounded-full bg-slate-950/80 border border-fuchsia-500/40 text-fuchsia-400 shadow-md">
+                            <Award className="w-4 h-4" />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -512,9 +567,17 @@ export default function Sidebar({
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-bold text-[#14B8A6] bg-[#14B8A6]/10 px-2 py-0.5 rounded-md border border-[#14B8A6]/20 font-mono">
-              {formatPrice(walletBalance)}
-            </span>
+            <button
+              onClick={() => {
+                setActiveTab('my-orders');
+                setExpandedMenu('my-orders');
+                triggerToast(language === 'bn' ? 'আমার অর্ডার 📦...' : 'Opening My Orders 📦...');
+              }}
+              className="relative p-2 bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 border border-purple-500/20 rounded-full transition-all focus:outline-none cursor-pointer flex items-center justify-center scale-95 group"
+              title={language === 'bn' ? 'আমার অর্ডার' : 'My Orders'}
+            >
+              <ShoppingBag className="w-4 h-4 text-purple-500 animate-bounce" style={{ animationDuration: '3s' }} />
+            </button>
             <button
               onClick={() => {
                 setActiveTab('notifications');
@@ -559,7 +622,7 @@ export default function Sidebar({
                         <ShieldCheck className="w-4 h-4 stroke-[2.5]" />
                       </div>
                       <span className="font-extrabold text-slate-900 dark:text-white text-xs md:text-sm tracking-tight uppercase">
-                        WebzoneBD Member
+                        WebzoneBD Customer
                       </span>
                     </div>
 
@@ -588,9 +651,9 @@ export default function Sidebar({
                     <div className="grid grid-cols-2 gap-2 font-sans text-[10.5px] font-black">
                       <button 
                         type="button"
-                        onClick={() => {
+                        onClick={(e) => {
                           if (setTheme) {
-                            setTheme('light');
+                            setTheme('light', e);
                             triggerToast('🔆 Light Theme Mode Active');
                           }
                         }}
@@ -605,9 +668,9 @@ export default function Sidebar({
                       </button>
                       <button 
                         type="button"
-                        onClick={() => {
+                        onClick={(e) => {
                           if (setTheme) {
-                            setTheme('dark');
+                            setTheme('dark', e);
                             triggerToast('🌙 Dark Theme Mode Active');
                           }
                         }}

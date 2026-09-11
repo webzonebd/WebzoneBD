@@ -116,12 +116,12 @@ export default function PromotionalOfferSystem({
       setActiveNotifyIndex(0);
     }, 5000);
 
-    // Auto-hide after 15 seconds (Total 20s from page load)
+    // Auto-hide after 3 seconds (Total 8s from page load)
     const hideNotificationTimer = setTimeout(() => {
       setShowNotification(false);
-    }, 20000);
+    }, 8000);
 
-    // Rotation cycle between notification cards inside the 15-second visible window
+    // Rotation cycle between notification cards inside the visible window
     const rotateInterval = setInterval(() => {
       setActiveNotifyIndex((prev) => (prev === 0 ? 1 : 0));
     }, 7500);

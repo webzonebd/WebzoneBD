@@ -53,14 +53,27 @@ export default function AuthPopup({
     setIsIframe(typeof window !== 'undefined' && window.self !== window.top);
   }, []);
 
-  // Form Fields - Login
-  const [loginEmail, setLoginEmail] = useState('');
+  // Form Fields - Login with Remember Me loading
+  const [rememberMe, setRememberMe] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('webzone_remember_login');
+      return saved ? JSON.parse(saved).remember === true : false;
+    } catch (e) {
+      return false;
+    }
+  });
+  const [loginEmail, setLoginEmail] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem('webzone_remember_login');
+      return saved ? JSON.parse(saved).email || '' : '';
+    } catch (e) {
+      return '';
+    }
+  });
   const [loginPassword, setLoginPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(false);
 
   // Form Fields - Registration
   const [regFullName, setRegFullName] = useState('');
-  const [regUsername, setRegUsername] = useState('');
   const [regEmail, setRegEmail] = useState('');
   const [regPhoneCode, setRegPhoneCode] = useState('+880');
   const [regPhone, setRegPhone] = useState('');
@@ -191,6 +204,20 @@ export default function AuthPopup({
       setMathInput('');
       setRateLimitCounter(0);
       setRateLimitBlocked(false);
+
+      // Auto-load remembered credentials
+      try {
+        const saved = localStorage.getItem('webzone_remember_login');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && parsed.remember && parsed.email) {
+            setLoginEmail(parsed.email);
+            setRememberMe(true);
+          }
+        }
+      } catch (e) {
+        console.warn("Could not read remembered login:", e);
+      }
     }
   }, [isOpen, defaultView]);
 
@@ -303,6 +330,27 @@ export default function AuthPopup({
           return;
         }
 
+        // Active Remember Me persistence handling
+        if (rememberMe) {
+          try {
+            localStorage.setItem('webzone_remember_login', JSON.stringify({
+              email: loginEmail.trim(),
+              remember: true,
+              timestamp: Date.now()
+            }));
+            localStorage.setItem('webzone_remember_me_enabled', 'true');
+          } catch (e) {
+            console.warn("Error saving remember me to localStorage:", e);
+          }
+        } else {
+          try {
+            localStorage.removeItem('webzone_remember_login');
+            localStorage.removeItem('webzone_remember_me_enabled');
+          } catch (e) {
+            console.warn("Error removing remember me from localStorage:", e);
+          }
+        }
+
         onLoginSuccess(matched);
         triggerToast(language === 'bn' ? `স্বাগতম, ${matched.name}! লগইন সফল হয়েছে।` : `Welcome back, ${matched.name}! Security token stored.`);
         onClose();
@@ -364,10 +412,11 @@ export default function AuthPopup({
       }
 
       // Create new customer user
+      const derivedUsername = regFullName.toLowerCase().replace(/[^a-z0-9]/g, '') || regEmail.split('@')[0] || 'user_' + Date.now().toString().slice(-4);
       const freshUser: UserSession = {
         id: 'usr-' + Date.now(),
         name: regFullName,
-        username: regUsername.toLowerCase().trim(),
+        username: derivedUsername,
         email: regEmail.toLowerCase().trim(),
         phone: combinedWhatsApp,
         phoneCode: regPhoneCode,
@@ -583,7 +632,7 @@ export default function AuthPopup({
   };
 
   return (
-    <div className={`fixed inset-0 z-[9999] flex items-center justify-center p-4 overflow-y-auto ${overlayTheme}`}>
+    <div id="auth-popup-container" className={`fixed inset-0 z-[9999] flex items-center justify-center p-4 overflow-y-auto ${overlayTheme}`}>
       <motion.div 
         initial={{ opacity: 0, scale: 0.95, y: -20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -739,14 +788,25 @@ export default function AuthPopup({
 
                 {/* Remember Me and Forgot Security Links */}
                 <div className="flex justify-between items-center text-xs select-none">
-                  <label className="flex items-center gap-2 cursor-pointer text-slate-500 dark:text-slate-400">
+                  <label className="flex items-center gap-2 cursor-pointer text-slate-600 dark:text-slate-350 hover:text-slate-900 dark:hover:text-white transition-colors">
                     <input
                       type="checkbox"
                       checked={rememberMe}
-                      onChange={(e) => setRememberMe(e.target.checked)}
+                      onChange={(e) => {
+                        const val = e.target.checked;
+                        setRememberMe(val);
+                        if (!val) {
+                          try {
+                            localStorage.removeItem('webzone_remember_login');
+                            localStorage.removeItem('webzone_remember_me_enabled');
+                          } catch (err) {}
+                        }
+                      }}
                       className="w-4 h-4 rounded text-[#2563EB] border-slate-300 dark:border-slate-700 accent-[#2563EB] cursor-pointer"
                     />
-                    <span>Remember Me</span>
+                    <span className="font-medium">
+                      {language === 'bn' ? 'রিমেম্বার মি (মনে রাখুন)' : 'Remember Me'}
+                    </span>
                   </label>
 
                   <button
@@ -754,7 +814,7 @@ export default function AuthPopup({
                     onClick={() => setView('forgot')}
                     className="text-[#2563EB] dark:text-cyan-400 hover:underline cursor-pointer font-bold"
                   >
-                    Forgot Password?
+                    {language === 'bn' ? 'পাসওয়ার্ড ভুলে গেছেন?' : 'Forgot Password?'}
                   </button>
                 </div>
 
@@ -904,78 +964,60 @@ export default function AuthPopup({
                   )}
                 </div>
 
-                {/* Grid row for UserName and WhatsApp mobile */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                  {/* Unique Username */}
-                  <div className="space-y-1">
-                    <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 font-mono">
-                      Username
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={regUsername}
-                      onChange={(e) => setRegUsername(e.target.value.replace(/[^a-zA-Z0-9_-]/g, ''))}
-                      placeholder="e.g. alamin79"
-                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-250 dark:border-slate-800 rounded-xl text-xs font-mono text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#8B5CF6]/20 focus:border-[#8B5CF6]"
-                    />
-                  </div>
-
-                  {/* WhatsApp Mobile Number */}
-                  <div className="space-y-1">
-                    <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 font-mono">
-                      WhatsApp Number
-                    </label>
-                    <div className="flex gap-2 relative">
-                      {/* Country Code Selection Dropdown */}
-                      <div className="relative w-[30%] flex-shrink-0 group">
-                        <select
-                          value={regPhoneCode}
-                          onChange={(e) => {
-                            setRegPhoneCode(e.target.value);
-                            const label = e.target.value === '+880' ? 'BD (BDT Taka)' : e.target.value === '+966' ? 'SA (SAR Riyal)' : 'Global (USD Dollar)';
-                            triggerToast(`Phone Code: ${e.target.value} (${label})`);
-                            setRegPhoneError(validatePhoneField(regPhone, e.target.value));
-                          }}
-                          className="w-full pl-2 pr-7 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-250 dark:border-slate-800 rounded-xl text-neutral border-neutral-300 dark:border-neutral-850 text-xs font-bold font-mono text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 appearance-none cursor-pointer"
-                        >
-                          <option value="+880">🇧🇩 +880</option>
-                          <option value="+966">🇸🇦 +966</option>
-                          <option value="+1">🇺🇸 +1</option>
-                          <option value="+44">🇬🇧 +44</option>
-                          <option value="+971">🇦🇪 +971</option>
-                          <option value="+91">🇮🇳 +91</option>
-                        </select>
-                        <div className="pointer-events-none absolute inset-y-0 right-1.5 flex items-center text-slate-400">
-                          <svg className="w-3.5 h-3.5 fill-none stroke-current" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </div>
-                      </div>
-
-                      {/* Phone Local Number Input */}
-                      <div className="relative w-[70%] group">
-                        <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 text-slate-400">
-                          <Phone className="w-4 h-4 text-emerald-500" />
-                        </span>
-                        <input
-                          type="tel"
-                          required
-                          value={regPhone}
-                          onChange={(e) => {
-                            const val = e.target.value.replace(/[^0-9]/g, ''); // Block letters and special characters
-                            setRegPhone(val);
-                            setRegPhoneError(validatePhoneField(val, regPhoneCode));
-                          }}
-                          placeholder="e.g. 1700112233"
-                          className="w-full pl-8 pr-3 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-250 dark:border-slate-800 rounded-xl text-xs font-mono text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/25 focus:border-emerald-500"
-                        />
+                {/* WhatsApp Mobile Number */}
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 font-mono">
+                    WhatsApp Number
+                  </label>
+                  <div className="flex gap-2 relative">
+                    {/* Country Code Selection Dropdown */}
+                    <div className="relative w-[30%] flex-shrink-0 group">
+                      <select
+                        value={regPhoneCode}
+                        onChange={(e) => {
+                          setRegPhoneCode(e.target.value);
+                          const label = e.target.value === '+880' ? 'BD (BDT Taka)' : e.target.value === '+966' ? 'SA (SAR Riyal)' : 'Global (USD Dollar)';
+                          triggerToast(`Phone Code: ${e.target.value} (${label})`);
+                          setRegPhoneError(validatePhoneField(regPhone, e.target.value));
+                        }}
+                        className="w-full pl-2 pr-7 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-250 dark:border-slate-800 rounded-xl text-neutral border-neutral-300 dark:border-neutral-850 text-xs font-bold font-mono text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 appearance-none cursor-pointer"
+                      >
+                        <option value="+880">🇧🇩 +880</option>
+                        <option value="+966">🇸🇦 +966</option>
+                        <option value="+1">🇺🇸 +1</option>
+                        <option value="+44">🇬🇧 +44</option>
+                        <option value="+971">🇦🇪 +971</option>
+                        <option value="+91">🇮🇳 +91</option>
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-1.5 flex items-center text-slate-400">
+                        <svg className="w-3.5 h-3.5 fill-none stroke-current" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" />
+                        </svg>
                       </div>
                     </div>
-                    {regPhoneError && (
-                      <p className="text-[10px] text-red-500 font-medium font-mono mt-1 pl-1">{regPhoneError}</p>
-                    )}
+
+                    {/* Phone Local Number Input */}
+                    <div className="relative w-[70%] group">
+                      <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 text-slate-400">
+                        <Phone className="w-4 h-4 text-emerald-500" />
+                      </span>
+                      <input
+                        type="tel"
+                        required
+                        value={regPhone}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/[^0-9]/g, ''); // Block letters and special characters
+                          setRegPhone(val);
+                          setRegPhoneError(validatePhoneField(val, regPhoneCode));
+                        }}
+                        placeholder="e.g. 1700112233"
+                        className="w-full pl-8 pr-3 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-250 dark:border-slate-800 rounded-xl text-xs font-mono text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/25 focus:border-emerald-500"
+                      />
+                    </div>
                   </div>
+                  {regPhoneError && (
+                    <p className="text-[10px] text-red-500 font-medium font-mono mt-1 pl-1">{regPhoneError}</p>
+                  )}
                 </div>
 
                 {/* Email Address */}

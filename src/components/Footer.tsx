@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Globe, Mail, Phone, MapPin, Send, ExternalLink, ShieldCheck, Newspaper, Briefcase, Store, Server, Users, Lock, FileText, RefreshCcw, Terminal } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Globe, Mail, Phone, MapPin, Send, ExternalLink, ShieldCheck, Newspaper, Briefcase, Store, Server, Users, Lock, FileText, RefreshCcw, Terminal, Flame } from 'lucide-react';
 import { Language, Theme, UserSession } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -30,13 +30,48 @@ export default function Footer({
   const [footerEmail, setFooterEmail] = useState('');
   const [footerPassword, setFooterPassword] = useState('');
 
+  const [visitorCountry, setVisitorCountry] = useState<'AUTO' | 'BD' | 'SA'>('AUTO');
+  const [detectedCountry, setDetectedCountry] = useState<'BD' | 'SA'>('BD');
+
+  useEffect(() => {
+    // Attempt automatic IP country detection
+    fetch('https://freeipapi.com/api/json')
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.countryCode) {
+          const code = data.countryCode.toUpperCase();
+          if (code === 'SA') {
+            setDetectedCountry('SA');
+          } else {
+            setDetectedCountry('BD');
+          }
+        }
+      })
+      .catch(err => {
+        console.warn("Geolocation API fallback activated:", err);
+        // Fallback checks (locale/timezone/language)
+        try {
+          const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+          if (tz && (tz.includes('Riyadh') || tz.includes('Asia/Riyadh') || tz.includes('Kuwait') || tz.includes('Saudi') || tz.includes('Mecca'))) {
+            setDetectedCountry('SA');
+          } else if (language === 'ar') {
+            setDetectedCountry('SA');
+          } else {
+            setDetectedCountry('BD');
+          }
+        } catch (e) {
+          setDetectedCountry('BD');
+        }
+      });
+  }, [language]);
+
   const paymentGateways = [
     {
       name: 'bKash',
       logo: (
-        <div className="flex items-center gap-1.5 font-sans font-black">
-          <span className="w-5 h-5 rounded-full bg-[#E2125B] flex items-center justify-center text-white text-[10px] shadow-sm shadow-[#E2125B]/30 animate-pulse font-bold">৳</span>
-          <span className="text-[#E2125B] tracking-tight text-xs">bKash</span>
+        <div className="flex items-center gap-1 sm:gap-1.5 font-sans font-black">
+          <span className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full bg-[#E2125B] flex items-center justify-center text-white text-[6px] sm:text-[8px] shadow-sm shadow-[#E2125B]/30 animate-pulse font-bold">৳</span>
+          <span className="text-[#E2125B] tracking-tight text-[8px] sm:text-[10px]">bKash</span>
         </div>
       ),
       badge: language === 'bn' ? 'বিকাশ পেমেন্ট' : language === 'ar' ? 'بوابة بكاش' : 'bKash Instant'
@@ -44,9 +79,9 @@ export default function Footer({
     {
       name: 'Nagad',
       logo: (
-        <div className="flex items-center gap-1.5 font-sans font-black">
-          <span className="w-5 h-5 rounded-full bg-gradient-to-tr from-[#EA4335] to-[#FBBC05] flex items-center justify-center text-white text-[9px] shadow-sm font-bold">৳</span>
-          <span className="bg-gradient-to-r from-[#EA4335] to-[#FBBC05] bg-clip-text text-transparent tracking-tight text-xs">nagad</span>
+        <div className="flex items-center gap-1 sm:gap-1.5 font-sans font-black">
+          <span className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full bg-gradient-to-tr from-[#EA4335] to-[#FBBC05] flex items-center justify-center text-white text-[5.5px] sm:text-[7px] shadow-sm font-bold">৳</span>
+          <span className="bg-gradient-to-r from-[#EA4335] to-[#FBBC05] bg-clip-text text-transparent tracking-tight text-[8px] sm:text-[10px]">nagad</span>
         </div>
       ),
       badge: language === 'bn' ? 'নগদ পেমেন্ট' : language === 'ar' ? 'بوابة نقد' : 'Nagad Instant'
@@ -54,9 +89,9 @@ export default function Footer({
     {
       name: 'Roket',
       logo: (
-        <div className="flex items-center gap-1.5 font-sans font-black">
-          <span className="w-5 h-5 rounded-full bg-[#8C3B91] flex items-center justify-center text-white text-[10px] shadow-sm shadow-[#8C3B91]/30 font-bold">৳</span>
-          <span className="text-[#8C3B91] tracking-tight text-xs">Rocket</span>
+        <div className="flex items-center gap-1 sm:gap-1.5 font-sans font-black">
+          <span className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full bg-[#8C3B91] flex items-center justify-center text-white text-[6px] sm:text-[8px] shadow-sm shadow-[#8C3B91]/30 font-bold">৳</span>
+          <span className="text-[#8C3B91] tracking-tight text-[8px] sm:text-[10px]">Rocket</span>
         </div>
       ),
       badge: language === 'bn' ? 'রকেট ওয়ালেট' : language === 'ar' ? 'محفظة روكيت' : 'Rocket DBBL'
@@ -64,14 +99,14 @@ export default function Footer({
     {
       name: 'Bangla QR',
       logo: (
-        <div className="flex items-center gap-1.5 font-sans font-black">
+        <div className="flex items-center gap-1 sm:gap-1.5 font-sans font-black">
           <div className="grid grid-cols-2 gap-0.5 p-0.5 bg-neutral-800 dark:bg-neutral-950 rounded border border-emerald-500/30">
-            <div className="w-1.5 h-1.5 bg-emerald-400 rounded-sm"></div>
-            <div className="w-1.5 h-1.5 bg-red-400 rounded-sm"></div>
-            <div className="w-1.5 h-1.5 bg-emerald-400 rounded-sm"></div>
-            <div className="w-1.5 h-1.5 bg-emerald-400 rounded-sm"></div>
+            <div className="w-0.5 h-0.5 sm:w-1 sm:h-1 bg-emerald-400 rounded-sm"></div>
+            <div className="w-0.5 h-0.5 sm:w-1 sm:h-1 bg-red-400 rounded-sm"></div>
+            <div className="w-0.5 h-0.5 sm:w-1 sm:h-1 bg-emerald-400 rounded-sm"></div>
+            <div className="w-0.5 h-0.5 sm:w-1 sm:h-1 bg-emerald-400 rounded-sm"></div>
           </div>
-          <span className="text-emerald-400 tracking-tight text-xs">Bangla QR</span>
+          <span className="text-emerald-400 tracking-tight text-[8px] sm:text-[10px]">Bangla QR</span>
         </div>
       ),
       badge: language === 'bn' ? 'বাংলা কিউআর' : language === 'ar' ? 'رمز الاستجابة' : 'Unified QR'
@@ -79,9 +114,9 @@ export default function Footer({
     {
       name: 'Cellfin',
       logo: (
-        <div className="flex items-center gap-1.5 font-sans font-black">
-          <span className="w-5 h-5 rounded-lg bg-gradient-to-br from-[#0284C7] to-[#0D9488] flex items-center justify-center text-white text-[10px] shadow-sm font-bold">c</span>
-          <span className="text-[#0284C7] dark:text-[#38BDF8] tracking-tight text-xs font-black">cellfin</span>
+        <div className="flex items-center gap-1 sm:gap-1.5 font-sans font-black">
+          <span className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded bg-gradient-to-br from-[#0284C7] to-[#0D9488] flex items-center justify-center text-white text-[6.5px] sm:text-[8px] shadow-sm font-bold">c</span>
+          <span className="text-[#0284C7] dark:text-[#38BDF8] tracking-tight text-[8px] sm:text-[10px] font-black">cellfin</span>
         </div>
       ),
       badge: language === 'bn' ? 'সেলফিন ওয়ালেট' : language === 'ar' ? 'محفظة سيلفين' : 'Cellfin Wallet'
@@ -89,12 +124,42 @@ export default function Footer({
     {
       name: 'IBBL Bank',
       logo: (
-        <div className="flex items-center gap-1.5 font-sans font-black">
-          <span className="w-5 h-5 rounded-full bg-[#059669] flex items-center justify-center text-white text-[9px] shadow-sm shadow-emerald-500/20 font-bold">i</span>
-          <span className="text-[#059669] dark:text-[#34D399] tracking-tight text-xs">IBBL</span>
+        <div className="flex items-center gap-1 sm:gap-1.5 font-sans font-black">
+          <span className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full bg-[#059669] flex items-center justify-center text-white text-[5.5px] sm:text-[7px] shadow-sm shadow-emerald-500/20 font-bold">i</span>
+          <span className="text-[#059669] dark:text-[#34D399] tracking-tight text-[8px] sm:text-[10px]">IBBL</span>
         </div>
       ),
       badge: language === 'bn' ? 'ইসলামী ব্যাংক' : language === 'ar' ? 'بنك إسلامي' : 'IBBL NetBanking'
+    },
+    {
+      name: 'STC Pay',
+      logo: (
+        <div className="flex items-center gap-1 sm:gap-1.5 font-sans font-black">
+          <span className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full bg-[#4F008C] flex items-center justify-center text-white text-[5.5px] sm:text-[7px] shadow-sm font-bold">stc</span>
+          <span className="text-[#4F008C] dark:text-[#A855F7] tracking-tight text-[8px] sm:text-[10px]">pay</span>
+        </div>
+      ),
+      badge: language === 'bn' ? 'এসটিসি পে' : language === 'ar' ? 'إس تي سي باي' : 'STC Pay'
+    },
+    {
+      name: 'STC Bank',
+      logo: (
+        <div className="flex items-center gap-1 sm:gap-1.5 font-sans font-black">
+          <span className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full bg-gradient-to-r from-[#4F008C] to-[#0D9488] flex items-center justify-center text-white text-[5.5px] sm:text-[7px] shadow-sm font-bold">stc</span>
+          <span className="text-[#0D9488] tracking-tight text-[8px] sm:text-[10px]">Bank</span>
+        </div>
+      ),
+      badge: language === 'bn' ? 'এসটিসি ব্যাংক' : language === 'ar' ? 'بنك إس تي سي' : 'STC Bank'
+    },
+    {
+      name: 'Al Rajhi Bank',
+      logo: (
+        <div className="flex items-center gap-1 sm:gap-1.5 font-sans font-black">
+          <span className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full bg-[#006A4E] flex items-center justify-center text-[#FFD700] text-[5.5px] sm:text-[7px] shadow-sm font-extrabold font-sans">ar</span>
+          <span className="text-[#005B94] dark:text-[#38BDF8] tracking-tight text-[8px] sm:text-[10px]">Rajhi</span>
+        </div>
+      ),
+      badge: language === 'bn' ? 'আল রাজি ব্যাংক' : language === 'ar' ? 'مصرف الراجحي' : 'Al Rajhi Bank'
     }
   ];
   const handleNewsletterSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -166,6 +231,11 @@ export default function Footer({
             </h4>
             <ul className="space-y-3.5 text-xs sm:text-sm font-semibold">
               {[
+                { 
+                  label: language === 'bn' ? "🔥 মেগা কম্বো অফার্স" : language === 'ar' ? "🔥 عروض الكومبو المتميزة" : "🔥 Combo Offers Festival", 
+                  icon: <Flame className="w-4 h-4 text-rose-500 shrink-0 group-hover:scale-110 transition duration-300 animate-pulse" />,
+                  onClick: () => { setCurrentPage('offers'); window.scrollTo(0, 0); } 
+                },
                 { 
                   label: language === 'bn' ? "ব্লগ ও খবর" : language === 'ar' ? "المدونات والأخبار" : "Blog", 
                   icon: <Newspaper className="w-4 h-4 text-blue-400 shrink-0 group-hover:scale-110 transition duration-300" />,
@@ -422,40 +492,93 @@ export default function Footer({
                 {language === 'bn' ? 'নিরাপদ ও স্বয়ংক্রিয় ইনস্ট্যান্ট ডেলিভারি সুরক্ষিত চ্যানেল' : language === 'ar' ? 'دفع وتفعيل تلقائي آمن وفوري ومؤمن تماماً' : 'Secure, end-to-end encrypted instant billing network'}
               </p>
             </div>
+
+            {/* Location Selector Capsule Pill Switcher (Smart preview & compliance) */}
+            <div className="flex items-center gap-1 bg-neutral-950/65 p-1.5 rounded-xl border border-neutral-800/80 self-start sm:self-center">
+              <span className="text-[9px] uppercase font-mono font-bold tracking-wider text-neutral-500 px-1.5">
+                {language === 'bn' ? 'অবস্থান:' : language === 'ar' ? 'الموقع:' : 'Region:'}
+              </span>
+              <button
+                type="button"
+                onClick={() => setVisitorCountry('AUTO')}
+                className={`px-2 py-1 text-[10px] font-bold rounded-lg cursor-pointer transition-all duration-300 ${
+                  visitorCountry === 'AUTO'
+                    ? 'bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-md'
+                    : 'text-neutral-400 hover:text-white hover:bg-neutral-900'
+                }`}
+              >
+                Auto ({detectedCountry === 'SA' ? '🇸🇦 SA' : '🇧🇩 BD'})
+              </button>
+              <button
+                type="button"
+                onClick={() => setVisitorCountry('BD')}
+                className={`px-2 py-1 text-[10px] font-bold rounded-lg cursor-pointer transition-all duration-300 ${
+                  visitorCountry === 'BD'
+                    ? 'bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-md'
+                    : 'text-neutral-400 hover:text-white hover:bg-neutral-900'
+                }`}
+              >
+                🇧🇩 BD
+              </button>
+              <button
+                type="button"
+                onClick={() => setVisitorCountry('SA')}
+                className={`px-2 py-1 text-[10px] font-bold rounded-lg cursor-pointer transition-all duration-300 ${
+                  visitorCountry === 'SA'
+                    ? 'bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-md'
+                    : 'text-neutral-400 hover:text-white hover:bg-neutral-900'
+                }`}
+              >
+                🇸🇦 SA
+              </button>
+            </div>
           </div>
 
           {/* Marquee Outer Container with horizontal overflow hidden */}
-          <div className="relative w-full overflow-hidden py-3 select-none">
-            {/* Smooth Edge Fades */}
-            <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-neutral-900 to-transparent z-10 pointer-events-none" />
-            <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-neutral-900 to-transparent z-10 pointer-events-none" />
+          {(() => {
+            const activeCountry = visitorCountry === 'AUTO' ? detectedCountry : visitorCountry;
+            const filteredGateways = paymentGateways.filter(gateway => {
+              if (activeCountry === 'SA') {
+                return ['STC Pay', 'STC Bank', 'Al Rajhi Bank'].includes(gateway.name);
+              } else {
+                return ['bKash', 'Nagad', 'Rocket', 'Bangla QR', 'cellfin', 'IBBL'].includes(gateway.name) || ['bKash', 'Nagad', 'Roket', 'Bangla QR', 'Cellfin', 'IBBL Bank'].includes(gateway.name);
+              }
+            });
 
-            <motion.div 
-              className="flex gap-4 w-max"
-              animate={{ x: ['0%', '-50%'] }}
-              transition={{
-                ease: "linear",
-                duration: 25,
-                repeat: Infinity,
-              }}
-            >
-              {/* Quadruple the list for a perfectly seamless infinite loop */}
-              {[...paymentGateways, ...paymentGateways, ...paymentGateways, ...paymentGateways].map((gateway, idx) => (
-                <div 
-                  key={idx}
-                  className="flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-neutral-950/45 border border-neutral-800/80 shadow-md backdrop-blur-md min-w-[200px] hover:border-neutral-750 transition-colors duration-300 group"
+            return (
+              <div className="relative w-full overflow-hidden py-3 select-none">
+                {/* Smooth Edge Fades */}
+                <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-neutral-900 to-transparent z-10 pointer-events-none" />
+                <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-neutral-900 to-transparent z-10 pointer-events-none" />
+
+                <motion.div 
+                  className="flex gap-4 w-max"
+                  animate={{ x: ['0%', '-50%'] }}
+                  transition={{
+                    ease: "linear",
+                    duration: filteredGateways.length <= 3 ? 12 : 25,
+                    repeat: Infinity,
+                  }}
                 >
-                  <div className="flex-1 flex items-center justify-start">
-                    {gateway.logo}
-                  </div>
-                  <div className="h-5 w-px bg-neutral-800" />
-                  <span className="text-[9px] font-mono tracking-wide text-neutral-500 uppercase group-hover:text-neutral-400 transition-colors duration-300">
-                    {gateway.badge}
-                  </span>
-                </div>
-              ))}
-            </motion.div>
-          </div>
+                  {/* Quadruple the list for a perfectly seamless infinite loop */}
+                  {[...filteredGateways, ...filteredGateways, ...filteredGateways, ...filteredGateways].map((gateway, idx) => (
+                    <div 
+                      key={idx}
+                      className="flex items-center gap-3 sm:gap-4 px-3.5 sm:px-5 py-2.5 sm:py-3.5 rounded-xl sm:rounded-2xl bg-neutral-950/45 border border-neutral-800/80 shadow-md backdrop-blur-md min-w-[170px] sm:min-w-[220px] hover:border-neutral-700 transition-colors duration-300 group animate-once"
+                    >
+                      <div className="flex-1 flex items-center justify-start scale-[1.5] origin-left">
+                        {gateway.logo}
+                      </div>
+                      <div className="h-5 sm:h-6 w-px bg-neutral-800" />
+                      <span className="text-[8px] sm:text-[10px] font-mono tracking-wide text-neutral-400 uppercase group-hover:text-white transition-colors duration-300">
+                        {gateway.badge}
+                      </span>
+                    </div>
+                  ))}
+                </motion.div>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Lower row - 50% smaller padding on mobile */}

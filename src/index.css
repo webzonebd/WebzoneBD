@@ -220,6 +220,176 @@ body,
   animation: text-gradient-flow 4s linear infinite, text-pulse-smooth 4s ease-in-out infinite, text-glow-neon 3s ease-in-out infinite, text-reveal 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* ==========================================================================
+   SERVICES TOP CARDS ANIMATION SYSTEM & GLOW UTILITIES
+   ========================================================================== */
+
+@keyframes card-shimmer-sweep {
+  0% {
+    transform: translateX(-160%) skewX(-20deg);
+  }
+  100% {
+    transform: translateX(260%) skewX(-20deg);
+  }
+}
+
+.animate-card-shimmer {
+  animation: card-shimmer-sweep 3.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes border-beam-sweep {
+  0% {
+    offset-distance: 0%;
+  }
+  100% {
+    offset-distance: 100%;
+  }
+}
+
+@keyframes hero-top-beam {
+  0% {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  25% {
+    opacity: 1;
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+.animate-hero-top-beam {
+  animation: hero-top-beam 4s ease-in-out infinite;
+}
+
+@keyframes radar-pulse-ring {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.9;
+  }
+  70% {
+    transform: scale(2.3);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+.animate-radar-pulse-ring {
+  animation: radar-pulse-ring 2.4s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@keyframes gentle-float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+.animate-gentle-float {
+  animation: gentle-float 4s ease-in-out infinite;
+}
+
+/* ==========================================================================
+   HOSTINGER-STYLE PREMIUM LIGHT / DARK THEME ANIMATION SYSTEM
+   ========================================================================== */
+
+/* Smooth Theme Transitions across the entire DOM tree when toggling */
+.theme-transition-active,
+.theme-transition-active *,
+.theme-transition-active *::before,
+.theme-transition-active *::after {
+  transition: background-color 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+              color 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+              fill 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+              stroke 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+              backdrop-filter 0.5s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* Hostinger-grade View Transitions API Circular Expansion Animation */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+  display: block;
+}
+
+::view-transition-old(root) {
+  z-index: 1;
+}
+
+::view-transition-new(root) {
+  z-index: 999999;
+  animation: hostinger-theme-circle-expand 0.62s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes hostinger-theme-circle-expand {
+  0% {
+    clip-path: circle(0% at var(--theme-x, 50%) var(--theme-y, 50%));
+  }
+  100% {
+    clip-path: circle(150vmax at var(--theme-x, 50%) var(--theme-y, 50%));
+  }
+}
+
+/* Interactive Hostinger Theme Switcher Glow Effects */
+@keyframes hostinger-sun-pulse {
+  0%, 100% {
+    transform: rotate(0deg) scale(1);
+    filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.6));
+  }
+  50% {
+    transform: rotate(180deg) scale(1.1);
+    filter: drop-shadow(0 0 16px rgba(245, 158, 11, 0.9));
+  }
+}
+
+@keyframes hostinger-moon-glow {
+  0%, 100% {
+    transform: rotate(0deg) scale(1);
+    filter: drop-shadow(0 0 8px rgba(124, 58, 237, 0.6));
+  }
+  50% {
+    transform: rotate(-20deg) scale(1.12);
+    filter: drop-shadow(0 0 18px rgba(168, 85, 247, 0.9));
+  }
+}
+
+.animate-hostinger-sun {
+  animation: hostinger-sun-pulse 8s ease-in-out infinite;
+}
+
+.animate-hostinger-moon {
+  animation: hostinger-moon-glow 6s ease-in-out infinite;
+}
+
+/* Hostinger Glass Cards for Light/Dark transitions */
+.hostinger-card-light {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dark .hostinger-card-light,
+.hostinger-card-dark {
+  background: #0F172A;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.5);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 /* Floating shine effect */
 .shine-overlay {
   position: relative;
@@ -286,7 +456,7 @@ body,
     border-radius: 0 !important;
   }
 
-  /* Force visible table structure in print */
+/* Force visible table structure in print */
   #print-area-invoice table {
     width: 100% !important;
     border-collapse: collapse !important;
@@ -318,6 +488,66 @@ body,
   #print-area-invoice span {
     color: black !important;
   }
+}
+
+/* ==========================================================================
+   SKELETON SHIMMER & LOADING SCREEN ANIMATIONS
+   ========================================================================== */
+@keyframes skeleton-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.skeleton-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.skeleton-shimmer::after {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  transform: translateX(-100%);
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.45) 30%,
+    rgba(255, 255, 255, 0.7) 50%,
+    rgba(255, 255, 255, 0.45) 70%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  animation: skeleton-shimmer 1.6s infinite ease-in-out;
+  content: '';
+}
+
+.dark .skeleton-shimmer::after {
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.04) 30%,
+    rgba(255, 255, 255, 0.09) 50%,
+    rgba(255, 255, 255, 0.04) 70%,
+    rgba(255, 255, 255, 0) 100%
+  );
+}
+
+@keyframes skeleton-pulse-glow {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.animate-skeleton-pulse {
+  animation: skeleton-pulse-glow 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
 

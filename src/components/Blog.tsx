@@ -1,5 +1,4 @@
-import * as React from 'react';
-import { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Calendar, User, Clock, ArrowRight, Tag, Search, Share2, 

@@ -179,6 +179,36 @@ export const PRESEEDED_USERS = [
     createdAt: '2026-05-15',
     status: 'active' as const,
     wishlistedProductIds: []
+  },
+  {
+    id: 'usr-order-mgr',
+    name: 'Order Operations Manager',
+    username: 'sales_manager',
+    email: 'sales@webzonebd.com',
+    phone: '+8801864000789',
+    role: 'order_manager' as UserRole,
+    password: 'sales789',
+    avatar: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=150&q=80',
+    isVerified: true,
+    isSocial: false,
+    createdAt: '2026-04-10',
+    status: 'active' as const,
+    wishlistedProductIds: []
+  },
+  {
+    id: 'usr-order-mgr-alias',
+    name: 'Order Operations Manager',
+    username: 'orders_manager',
+    email: 'orders@webzonebd.com',
+    phone: '+8801864000789',
+    role: 'order_manager' as UserRole,
+    password: 'sales789',
+    avatar: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=150&q=80',
+    isVerified: true,
+    isSocial: false,
+    createdAt: '2026-04-10',
+    status: 'active' as const,
+    wishlistedProductIds: []
   }
 ];
 
@@ -201,14 +231,27 @@ export default function AuthSystem({
     setIsIframe(typeof window !== 'undefined' && window.self !== window.top);
   }, []);
 
-  // Form Fields - Login
-  const [loginEmail, setLoginEmail] = useState('');
+  // Form Fields - Login with Remember Me persistence
+  const [rememberMe, setRememberMe] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('webzone_remember_login');
+      return saved ? JSON.parse(saved).remember === true : false;
+    } catch (e) {
+      return false;
+    }
+  });
+  const [loginEmail, setLoginEmail] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem('webzone_remember_login');
+      return saved ? JSON.parse(saved).email || '' : '';
+    } catch (e) {
+      return '';
+    }
+  });
   const [loginPassword, setLoginPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(false);
 
   // Form Fields - Registration
   const [regFullName, setRegFullName] = useState('');
-  const [regUsername, setRegUsername] = useState('');
   const [regEmail, setRegEmail] = useState('');
   const [regPhone, setRegPhone] = useState('');
   const [regRole, setRegRole] = useState<UserRole>('customer');
@@ -551,7 +594,7 @@ export default function AuthSystem({
   const handleRegisterFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!regFullName || !regUsername || !regEmail || !regPhone || !regPassword) {
+    if (!regFullName || !regEmail || !regPhone || !regPassword) {
       triggerToast('Required fields are missing. Make sure details are complete.');
       return;
     }
@@ -574,11 +617,13 @@ export default function AuthSystem({
     // Protect register endpoints from selecting admin role
     const finalRole: UserRole = regRole === 'affiliate' ? 'affiliate' : 'customer';
 
+    const derivedUsername = regFullName.toLowerCase().replace(/[^a-z0-9]/g, '') || regEmail.split('@')[0] || 'user_' + Date.now().toString().slice(-4);
+
     // Prepare draft session object (Unverified status until OTP checks pass)
     const newDraftSession: UserSession = {
       id: 'usr-' + Date.now(),
       name: regFullName,
-      username: regUsername.toLowerCase().trim(),
+      username: derivedUsername,
       email: regEmail.toLowerCase().trim(),
       phone: regPhone,
       role: finalRole,
@@ -764,7 +809,6 @@ export default function AuthSystem({
 
             // Clean reg forms
             setRegFullName('');
-            setRegUsername('');
             setRegEmail('');
             setRegPhone('');
             setRegPassword('');
@@ -834,6 +878,23 @@ export default function AuthSystem({
         const userDocSnap = await getDoc(userDocRef);
         if (userDocSnap.exists()) {
           const userSessionData = userDocSnap.data() as UserSession;
+
+          if (rememberMe) {
+            try {
+              localStorage.setItem('webzone_remember_login', JSON.stringify({
+                email: loginEmail.trim(),
+                remember: true,
+                timestamp: Date.now()
+              }));
+              localStorage.setItem('webzone_remember_me_enabled', 'true');
+            } catch (e) {}
+          } else {
+            try {
+              localStorage.removeItem('webzone_remember_login');
+              localStorage.removeItem('webzone_remember_me_enabled');
+            } catch (e) {}
+          }
+
           onLoginSuccess(userSessionData);
           triggerToast(language === 'bn' ? `সাফল্যের সাথে সাইন-ইন সম্পন্ন হয়েছে! স্বাগতম, ${userSessionData.name}` : `Security access token issued for: ${userSessionData.name}`);
           return;
@@ -884,6 +945,22 @@ export default function AuthSystem({
       if ((match.status as string) === 'suspended') {
         triggerToast('🚫 Suspended account. Please contact administrative system safeguards.');
         return;
+      }
+
+      if (rememberMe) {
+        try {
+          localStorage.setItem('webzone_remember_login', JSON.stringify({
+            email: loginEmail.trim(),
+            remember: true,
+            timestamp: Date.now()
+          }));
+          localStorage.setItem('webzone_remember_me_enabled', 'true');
+        } catch (e) {}
+      } else {
+        try {
+          localStorage.removeItem('webzone_remember_login');
+          localStorage.removeItem('webzone_remember_me_enabled');
+        } catch (e) {}
       }
 
       onLoginSuccess(match);
@@ -1316,50 +1393,26 @@ export default function AuthSystem({
                     </div>
                   </div>
 
-                  {/* Row 2: Username & Email Address */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <label className={`text-[11px] font-bold ${textSubColor} font-mono uppercase tracking-wider block`}>
-                        Username
-                      </label>
-                      <div className="relative">
-                        <Terminal className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-400" />
-                        <input
-                          type="text"
-                          required
-                          value={regUsername}
-                          onChange={(e) => setRegUsername(e.target.value)}
-                          placeholder="imranh"
-                          className="w-full pl-10 pr-4 py-3 rounded-xl text-xs font-mono lowercase outline-none transition-all"
-                          style={{
-                            background: theme === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-                            border: theme === 'dark' ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.06)',
-                            color: theme === 'dark' ? '#f8fafc' : '#0f172a'
-                          }}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className={`text-[11px] font-bold ${textSubColor} font-mono uppercase tracking-wider block`}>
-                        Email Address
-                      </label>
-                      <div className="relative">
-                        <Mail className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-400" />
-                        <input
-                          type="email"
-                          required
-                          value={regEmail}
-                          onChange={(e) => setRegEmail(e.target.value)}
-                          placeholder="imranh7900@gmail.com"
-                          className="w-full pl-10 pr-4 py-3 rounded-xl text-xs font-sans outline-none transition-all"
-                          style={{
-                            background: theme === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-                            border: theme === 'dark' ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.06)',
-                            color: theme === 'dark' ? '#f8fafc' : '#0f172a'
-                          }}
-                        />
-                      </div>
+                  {/* Row 2: Email Address */}
+                  <div className="space-y-1.5">
+                    <label className={`text-[11px] font-bold ${textSubColor} font-mono uppercase tracking-wider block`}>
+                      Email Address
+                    </label>
+                    <div className="relative">
+                      <Mail className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-400" />
+                      <input
+                        type="email"
+                        required
+                        value={regEmail}
+                        onChange={(e) => setRegEmail(e.target.value)}
+                        placeholder="imranh7900@gmail.com"
+                        className="w-full pl-10 pr-4 py-3 rounded-xl text-xs font-sans outline-none transition-all"
+                        style={{
+                          background: theme === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
+                          border: theme === 'dark' ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.06)',
+                          color: theme === 'dark' ? '#f8fafc' : '#0f172a'
+                        }}
+                      />
                     </div>
                   </div>
 
@@ -1609,7 +1662,8 @@ export default function AuthSystem({
                   <div className="flex gap-2">
                     {[
                       { label: 'Admin', email: 'admin@webzonebd.com', password: 'adminpassword', color: '#f59e0b' },
-                      { label: 'Vendor', email: 'vendor@webzonebd.com', password: 'vendorpassword', color: '#1dbf73' },
+                      { label: 'Order Mgr', email: 'sales@webzonebd.com', password: 'sales789', color: '#10b981' },
+                      { label: 'Vendor', email: 'vendor@webzonebd.com', password: 'vendorpassword', color: '#06b6d4' },
                       { label: 'User', email: 'customer@webzonebd.com', password: 'customerpassword', color: '#2d7ff9' }
                     ].map(demo => (
                       <button
@@ -1730,14 +1784,25 @@ export default function AuthSystem({
 
                   {/* Remember me and secure indicators */}
                   <div className="flex items-center justify-between text-xs text-slate-400">
-                    <label className="flex items-center gap-1.5 select-none cursor-pointer">
+                    <label className="flex items-center gap-1.5 select-none cursor-pointer hover:text-slate-200 transition-colors">
                       <input
                         type="checkbox"
                         checked={rememberMe}
-                        onChange={(e) => setRememberMe(e.target.checked)}
-                        className="accent-[#2d7ff9] h-4 w-4 rounded"
+                        onChange={(e) => {
+                          const val = e.target.checked;
+                          setRememberMe(val);
+                          if (!val) {
+                            try {
+                              localStorage.removeItem('webzone_remember_login');
+                              localStorage.removeItem('webzone_remember_me_enabled');
+                            } catch (err) {}
+                          }
+                        }}
+                        className="accent-[#2d7ff9] h-4 w-4 rounded cursor-pointer"
                       />
-                      <span className={textSubColor}>Remember Me</span>
+                      <span className={textSubColor}>
+                        {language === 'bn' ? 'রিমেম্বার মি (মনে রাখুন)' : 'Remember Me'}
+                      </span>
                     </label>
 
                     <span className="text-[10px] font-mono flex items-center gap-1 text-emerald-500 font-bold">

@@ -1,19 +1,42 @@
-import React, { useState, useEffect } from 'react';
-import { motion } from 'motion/react';
+import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Search, Globe, Shield, Terminal, MessageSquare, ArrowRight, Sparkles, Award, Star, CheckCircle, Mic, MicOff } from 'lucide-react';
-import { Language } from '../types';
+import { Language, Theme } from '../types';
 
 interface HeroProps {
   language: Language;
+  theme?: Theme;
   searchTerm: string;
   setSearchTerm: (term: string) => void;
   setCurrentPage: (page: string) => void;
   triggerToast?: (msg: string) => void;
 }
 
-export default function Hero({ language, searchTerm, setSearchTerm, setCurrentPage, triggerToast }: HeroProps) {
+export default function Hero({ language, theme = 'dark', searchTerm, setSearchTerm, setCurrentPage, triggerToast }: HeroProps) {
   const [activeClientsCount, setActiveClientsCount] = useState(880);
   
+  // Canvas particle reference for cyber background animation
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  // Dynamic text animation states
+  const [animatedIndex, setAnimatedIndex] = useState(0);
+  const animatedOffers = [
+    { en: 'Domain Registration', bn: 'ডোমেন রেজিস্ট্রেশন', ar: 'تسجيل النطاق' },
+    { en: 'Share & Cloud Hosting', bn: 'শেয়ার ও ক্লাউড হোস্টিং', ar: 'استضافة مشتركة وسحابية' },
+    { en: 'Reseller Hosting', bn: 'রিসেলার হোস্টিং', ar: 'استضافة الموزعين' },
+    { en: 'Business Website', bn: 'বিজনেস ওয়েবসাইট', ar: 'موقع أعمال تجاري' },
+    { en: 'Blog & News Portal', bn: 'ব্লগ ও নিউজ পোর্টাল', ar: 'مدونة وبوابة إخبارية' },
+    { en: 'eCommerce Website', bn: 'ই-কমার্স ওয়েবসাইট', ar: 'متجر إلكتروني متكامل' },
+    { en: 'Digital Marketing', bn: 'ডিজিটাল মার্কেটিং', ar: 'التسويق الرقمي' }
+  ];
+
+  useEffect(() => {
+    const textTimer = setInterval(() => {
+      setAnimatedIndex((prev) => (prev + 1) % animatedOffers.length);
+    }, 2500);
+    return () => clearInterval(textTimer);
+  }, [animatedOffers.length]);
+
   // Real-time micro statistics simulation for active sessions
   useEffect(() => {
     const valInterval = setInterval(() => {
@@ -22,58 +45,168 @@ export default function Hero({ language, searchTerm, setSearchTerm, setCurrentPa
     return () => clearInterval(valInterval);
   }, []);
 
+  // Canvas background particle & network lines animation (Modern Hosting-style)
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let animationFrameId: number;
+    let width = (canvas.width = canvas.offsetWidth);
+    let height = (canvas.height = canvas.offsetHeight);
+
+    const handleResize = () => {
+      if (!canvas) return;
+      width = canvas.width = canvas.offsetWidth;
+      height = canvas.height = canvas.offsetHeight;
+    };
+    window.addEventListener('resize', handleResize);
+
+    const particlesCount = 48;
+    const isLightMode = theme === 'light';
+    
+    const lightColors = [
+      'rgba(147, 51, 234, ', // Violet
+      'rgba(6, 182, 212, ',  // Cyan
+      'rgba(99, 102, 241, ',  // Indigo
+      'rgba(236, 72, 153, '   // Pink
+    ];
+
+    const darkColors = [
+      'rgba(168, 85, 247, ', // Purple
+      'rgba(56, 189, 248, ', // Sky
+      'rgba(99, 102, 241, ', // Indigo
+      'rgba(244, 114, 182, ' // Pink
+    ];
+
+    const particles: Array<{
+      x: number;
+      y: number;
+      vx: number;
+      vy: number;
+      size: number;
+      alpha: number;
+      colorBase: string;
+    }> = [];
+
+    for (let i = 0; i < particlesCount; i++) {
+      particles.push({
+        x: Math.random() * width,
+        y: Math.random() * height,
+        vx: (Math.random() - 0.5) * 0.45,
+        vy: (Math.random() - 0.5) * 0.45,
+        size: Math.random() * 2.5 + 1,
+        alpha: isLightMode ? Math.random() * 0.6 + 0.3 : Math.random() * 0.55 + 0.25,
+        colorBase: isLightMode 
+          ? lightColors[i % lightColors.length] 
+          : darkColors[i % darkColors.length]
+      });
+    }
+
+    const render = () => {
+      ctx.clearRect(0, 0, width, height);
+
+      // Draw subtle network grid lines
+      ctx.strokeStyle = isLightMode ? 'rgba(99, 102, 241, 0.08)' : 'rgba(109, 40, 217, 0.08)';
+      ctx.lineWidth = 1;
+      const gridSize = 38;
+      for (let x = 0; x < width; x += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, height);
+        ctx.stroke();
+      }
+      for (let y = 0; y < height; y += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(width, y);
+        ctx.stroke();
+      }
+
+      // Draw and connect particles
+      for (let i = 0; i < particles.length; i++) {
+        const p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+
+        if (p.x < 0) p.x = width;
+        if (p.x > width) p.x = 0;
+        if (p.y < 0) p.y = height;
+        if (p.y > height) p.y = 0;
+
+        ctx.fillStyle = `${p.colorBase}${p.alpha})`;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Connect nearby particles with subtle glowing links
+        for (let j = i + 1; j < particles.length; j++) {
+          const p2 = particles[j];
+          const dx = p.x - p2.x;
+          const dy = p.y - p2.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+
+          if (dist < 115) {
+            ctx.strokeStyle = isLightMode 
+              ? `rgba(99, 102, 241, ${0.22 * (1 - dist / 115)})` 
+              : `rgba(139, 92, 246, ${0.20 * (1 - dist / 115)})`;
+            ctx.lineWidth = 0.8;
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y);
+            ctx.lineTo(p2.x, p2.y);
+            ctx.stroke();
+          }
+        }
+      }
+
+      animationFrameId = requestAnimationFrame(render);
+    };
+
+    render();
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      cancelAnimationFrame(animationFrameId);
+    };
+  }, [theme]);
+
   const t = {
     en: {
       tag: "Smart Digital Agency",
       titleStart: "Your Digital Growth Partner,",
-      titleSpan: "✨ WebzoneBD IT Solution ✨",
-      tagline: "How can we help you build and grow your business online. You need a website, eCommerce store, Web Portal, Digital Marketing, Hosting, or technical support, our team is ready to assist you.",
+      titleSpan: "✨ WebzoneBD iT Services ✨",
+      tagline: "How can we help you build and grow your business online, Our Team is Ready to assist you.",
       searchPlaceholder: "Search themes, PHP scripts, plugins and templates...",
       btnPrimary: "Explore Digital Store",
-      btnSecondary: "Request Consultation",
-      statScripts: "Premium Script Products Sell",
-      statDelivered: "Enterprise Deployments",
-      statSupport: "Support Satisfaction",
-      uptime: "Guaranteed Uptime SLA"
+      btnSecondary: "Request Consultation"
     },
     bn: {
       tag: "স্মার্ট ডিজিটাল এজেন্সি",
       titleStart: "আপনার ডিজিটাল পার্টনার,",
-      titleSpan: "✨ ওয়েবজোনবিডি আইটি সলিউশন ✨",
-      tagline: "অনলাইনে আপনার ব্যবসা তৈরি এবং বৃদ্ধি করতে আমরা কীভাবে সাহায্য করতে পারি। আপনার যদি একটি ওয়েবসাইট, ই-কমার্স স্টোর, ওয়েব পোর্টাল, ডিজিটাল মার্কেটিং, হোস্টিং অথবা টেকনিক্যাল সাপোর্টের প্রয়োজন হয়, আমাদের টিম আপনার পাশে আছে।",
+      titleSpan: "✨ ওয়েবজোনবিডি আইটি সার্ভিসেস ✨",
+      tagline: "অনলাইনে আপনার ব্যবসা তৈরি এবং বৃদ্ধি করতে আমরা কীভাবে সাহায্য করতে পারি, আমাদের টিম আপনাকে সহায়তা করতে প্রস্তুত।",
       searchPlaceholder: "সার্চ করুন পিএইচপি স্ক্রিপ্ট, ওয়ার্ডপ্রেস থিম বা হোস্টিং প্যাকেজ...",
       btnPrimary: "ডিজিটাল স্টোর অন্বেষণ করুন",
-      btnSecondary: "ফ্রি কাস্টম কনসালটেশন",
-      statScripts: "প্রিমিয়াম স্ক্রিপ্ট প্রোডাক্ট সেল",
-      statDelivered: "এন্টারপ্রাইজ ডেপ্লয়মেন্টস",
-      statSupport: "সাপোর্ট সন্তুষ্টি রেটিং",
-      uptime: "জিবি ইউপিটাইম এসএলএ"
+      btnSecondary: "ফ্রি কাস্টম কনসালটেশন"
     },
     ar: {
       tag: "وكالة رقمية ذكية",
       titleStart: "شريكك في النمو الرقمي،",
-      titleSpan: "✨ ويب زون بي دي لتقنية المعلومات ✨",
-      tagline: "كيف يمكننا مساعدتك في بناء وتطوير أعمالك التجارية عبر الإنترنت. سواء كنت بحاجة إلى موقع ويب، متجر إلكتروني، بوابة ويب، تسويق رقمي، استضافة، أو دعم فني، فإن فريقنا جاهز دائماً لمساعدتك.",
+      titleSpan: "✨ ويب زون بي دي لخدمات تقنية المعلومات ✨",
+      tagline: "كيف يمكننا مساعدتك في بناء وتطوير أعمالك التجارية عبر الإنترنت، فريقنا جاهز دائماً لمساعدتك.",
       searchPlaceholder: "ابحث عن خوادم، سكربتات لارافيل وتطبيقات ووردبريس المعتمدة...",
       btnPrimary: "زيارة المتجر الرقمي",
-      btnSecondary: "طلب استشارة هندسية",
-      statScripts: "سكربتات برمجية ممتازة للبيع",
-      statDelivered: "تسليم المشاريع للمؤسسات",
-      statSupport: "مستوى تقييم الدعم",
-      uptime: "جاهزية الخوادم المستمرة"
+      btnSecondary: "طلب استشارة هندسية"
     }
   }[language] || {
     tag: "Smart Digital Agency",
     titleStart: "Your Digital Growth Partner,",
-    titleSpan: "✨ WebzoneBD IT Solution ✨",
-    tagline: "How can we help you build and grow your business online. You need a website, eCommerce store, Web Portal, Digital Marketing, Hosting, or technical support, our team is ready to assist you.",
+    titleSpan: "✨ WebzoneBD iT Services ✨",
+    tagline: "How can we help you build and grow your business online, Our Team is Ready to assist you.",
     searchPlaceholder: "Search PHP scripts, WordPress themes, Blogger templates...",
     btnPrimary: "Explore Digital Store",
-    btnSecondary: "Free Agency Custom Consultation",
-    statScripts: "Premium Script Products Sell",
-    statDelivered: "Enterprise Deployments",
-    statSupport: "Support Rating",
-    uptime: "Uptime SLA"
+    btnSecondary: "Free Agency Custom Consultation"
   };
 
   // Voice Search Web Speech API state
@@ -154,95 +287,194 @@ export default function Hero({ language, searchTerm, setSearchTerm, setCurrentPa
     }
   };
 
-  // Modern Staggered Animation configuration
+  // Enhanced Framer-Motion Staggered Entrance Animation Variants for Hero
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
       opacity: 1,
       transition: {
-        staggerChildren: 0.1,
-        delayChildren: 0.05
+        staggerChildren: 0.14,
+        delayChildren: 0.08
       }
     }
   };
 
-  const elementVariants = {
-    hidden: { opacity: 0, y: 30 },
+  // Badge entrance variant (Subtle scale & slide)
+  const badgeVariants = {
+    hidden: { opacity: 0, y: -20, scale: 0.94 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      scale: 1,
+      transition: {
+        duration: 0.65,
+        ease: [0.22, 1, 0.36, 1]
+      }
+    }
+  };
+
+  // H1 Main Title entrance variant (Modern blur reveal + smooth upward translation)
+  const h1Variants = {
+    hidden: { opacity: 0, y: 32, filter: 'blur(8px)', scale: 0.97 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      filter: 'blur(0px)',
+      scale: 1,
+      transition: {
+        duration: 0.85,
+        ease: [0.22, 1, 0.36, 1]
+      }
+    }
+  };
+
+  // H2 Subheading / Dynamic Showcase & Tagline entrance variant
+  const h2Variants = {
+    hidden: { opacity: 0, y: 26, filter: 'blur(6px)' },
+    visible: {
+      opacity: 1,
+      y: 0,
+      filter: 'blur(0px)',
+      transition: {
+        duration: 0.75,
+        ease: [0.22, 1, 0.36, 1]
+      }
+    }
+  };
+
+  // Search Bar entrance variant
+  const searchVariants = {
+    hidden: { opacity: 0, y: 22, scale: 0.98 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      scale: 1,
+      transition: {
+        duration: 0.7,
+        ease: [0.22, 1, 0.36, 1]
+      }
+    }
+  };
+
+  // CTA Buttons Container with inner stagger
+  const ctaContainerVariants = {
+    hidden: { opacity: 0, y: 20 },
     visible: {
       opacity: 1,
       y: 0,
       transition: {
-        type: "spring",
-        stiffness: 100,
-        damping: 15
+        duration: 0.6,
+        ease: [0.22, 1, 0.36, 1],
+        staggerChildren: 0.12,
+        delayChildren: 0.04
       }
     }
   };
 
+  // Individual CTA Button variant (with responsive spring physics)
+  const ctaButtonVariants = {
+    hidden: { opacity: 0, y: 18, scale: 0.93 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      scale: 1,
+      transition: {
+        type: "spring",
+        stiffness: 140,
+        damping: 15,
+        mass: 0.8
+      }
+    }
+  };
+
+  // Trust badges footer entrance variant
+  const trustBadgesVariants = {
+    hidden: { opacity: 0, y: 16 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: 0.7,
+        ease: [0.22, 1, 0.36, 1]
+      }
+    }
+  };
+
+  const isLight = theme === 'light';
+
   return (
-    <section className="relative overflow-hidden pt-12 pb-8 md:pt-16 md:pb-12 lg:pt-18 lg:pb-14 bg-slate-50 dark:bg-[#020617] transition-all duration-300" id="hero-showcase">
-      
-      {/* Dynamic Ambient Glow Layers & Rotating Orbs */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden select-none z-0">
-        <div className="absolute top-10 left-[15%] w-[450px] h-[450px] rounded-full bg-blue-500/15 dark:bg-blue-600/10 blur-[120px] animate-pulse-slow font-sans" />
-        <div className="absolute top-[20%] right-[10%] w-[500px] h-[550px] rounded-full bg-cyan-400/20 dark:bg-cyan-500/10 blur-[140px] animate-pulse" style={{ animationDuration: '9s' }} />
-        <div className="absolute bottom-[5%] left-[30%] w-[380px] h-[385px] rounded-full bg-violet-500/10 dark:bg-violet-650/5 blur-[110px]" />
-      </div>
+    <section 
+      className={`relative overflow-hidden pt-12 pb-8 md:pt-16 md:pb-10 lg:pt-20 lg:pb-12 transition-colors duration-500 border-b ${
+        isLight 
+          ? 'bg-gradient-to-br from-slate-50 via-purple-50/80 to-cyan-50/70 text-slate-900 border-purple-200/80' 
+          : 'bg-[#0F172A] text-slate-100 border-violet-900/40'
+      }`} 
+      id="hero-showcase"
+    >
+      {/* Canvas background particle & mesh layer */}
+      <canvas 
+        ref={canvasRef} 
+        className="absolute inset-0 w-full h-full pointer-events-none z-0"
+      />
 
-      {/* Floating Glassmorphic Auxiliary Info Cards */}
-      <div className="absolute inset-0 pointer-events-none z-10 overflow-hidden hidden xl:block">
-        {/* Metric Shape Left */}
-        <motion.div 
-          animate={{
-            y: [0, -14, 0],
-            x: [0, 8, 0],
-            rotate: [0, 1.5, -1.5, 0],
-            transition: { duration: 8, repeat: Infinity, ease: "easeInOut" }
-          }}
-          className="absolute top-36 left-[6%] bg-white/70 dark:bg-[#0f172a]/70 backdrop-blur-xl rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-xl shadow-slate-900/5 flex items-center gap-3.5 w-60 text-left"
-        >
-          <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping shrink-0" />
-          <div className="font-sans">
-            <p className="text-[9px] uppercase tracking-wider text-slate-400 font-mono font-bold">ACTIVE DEPLOYMENTS</p>
-            <p className="text-xs font-extrabold text-[#0f172a] dark:text-slate-100">{activeClientsCount} System Pipelines Live</p>
-          </div>
-        </motion.div>
+      {/* Light Color Animation Effects Background (Glowing Orbs & Radial Beam) */}
+      <motion.div 
+        animate={{ 
+          scale: [1, 1.15, 1],
+          x: [0, 25, 0],
+          y: [0, -20, 0]
+        }}
+        transition={{ repeat: Infinity, duration: 8, ease: "easeInOut" }}
+        className={`absolute top-1/4 left-[-10%] w-[520px] h-[520px] rounded-full pointer-events-none z-0 ${
+          isLight 
+            ? 'bg-gradient-to-r from-purple-300/60 via-indigo-200/50 to-cyan-300/50 blur-[120px]' 
+            : 'bg-gradient-to-r from-[#6D28D9]/30 to-[#8B5CF6]/20 blur-[130px]'
+        }`} 
+      />
+      <motion.div 
+        animate={{ 
+          scale: [1, 1.2, 1],
+          x: [0, -30, 0],
+          y: [0, 25, 0]
+        }}
+        transition={{ repeat: Infinity, duration: 10, ease: "easeInOut" }}
+        className={`absolute bottom-[-10%] right-[-5%] w-[620px] h-[620px] rounded-full pointer-events-none z-0 ${
+          isLight 
+            ? 'bg-gradient-to-r from-pink-300/50 via-rose-200/40 to-purple-300/50 blur-[130px]' 
+            : 'bg-gradient-to-r from-[#A855F7]/25 to-[#6D28D9]/25 blur-[140px]'
+        }`} 
+      />
+      <motion.div 
+        animate={{ 
+          opacity: [0.4, 0.8, 0.4],
+          scale: [0.9, 1.1, 0.9]
+        }}
+        transition={{ repeat: Infinity, duration: 7, ease: "easeInOut" }}
+        className={`absolute top-[-5%] right-[25%] w-[450px] h-[450px] rounded-full pointer-events-none z-0 ${
+          isLight 
+            ? 'bg-gradient-to-r from-cyan-300/50 via-teal-200/40 to-blue-300/40 blur-[110px]' 
+            : 'bg-gradient-to-r from-[#06B6D4]/20 to-[#3B82F6]/20 blur-[120px]'
+        }`} 
+      />
 
-        {/* Feature Shape Right */}
-        <motion.div 
-          animate={{
-            y: [0, 16, 0],
-            x: [0, -10, 0],
-            rotate: [0, -1, 1, 0],
-            transition: { duration: 10, repeat: Infinity, ease: "easeInOut" }
-          }}
-          className="absolute bottom-36 right-[6%] bg-white/70 dark:bg-[#0f172a]/70 backdrop-blur-xl rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-xl shadow-slate-900/5 flex items-center gap-3.5 w-64 text-left"
-        >
-          <div className="p-2 bg-gradient-to-tr from-blue-600 to-cyan-500 text-white rounded-xl shrink-0 shadow-md shadow-blue-500/20">
-            <Terminal className="w-4 h-4" />
-          </div>
-          <div className="font-sans">
-            <p className="text-[9px] uppercase tracking-wider text-slate-400 font-mono font-bold">MARKET DELIVERY</p>
-            <p className="text-xs font-extrabold text-[#0f172a] dark:text-slate-100">Decentralized ZIP Hook v3.6</p>
-          </div>
-        </motion.div>
-      </div>
+      {/* Ambient Radial Light Beam & Tech Grid Lines */}
+      <div className={`absolute inset-0 pointer-events-none z-0 ${
+        isLight 
+          ? 'bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-blue-500/10 via-transparent to-transparent' 
+          : 'bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-indigo-500/15 via-transparent to-transparent'
+      }`} />
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808010_1px,transparent_1px),linear-gradient(to_bottom,#80808010_1px,transparent_1px)] bg-[size:32px_32px] pointer-events-none opacity-60 z-0" />
 
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 z-20">
         <motion.div 
-          className="text-center space-y-8 max-w-4xl mx-auto"
+          className="text-center space-y-5 max-w-4xl mx-auto"
           variants={containerVariants}
           initial="hidden"
           animate="visible"
         >
-          {/* Trust endorsement premium badge with requested features:
-              1. Animation: Gradient Shift 6s ease infinite (animate-gradient-shift)
-              2. Text Glow Effect (text-glow-premium)
-              3. Glassmorphism Highlight (glass-highlight-premium)
-              4. Smooth Fade-In Up (elementVariants has springing opacity and translating y)
-          */}
+          {/* Trust endorsement premium badge */}
           <motion.div 
-            variants={elementVariants}
+            variants={badgeVariants}
             className="inline-flex items-center gap-2.5 px-5 py-2 rounded-full glass-highlight-premium text-xs font-bold font-sans hover:scale-[1.03] transition-all duration-300 select-none text-left shadow-lg overflow-hidden relative"
           >
             {/* Background animated gradient shift overlay */}
@@ -257,9 +489,9 @@ export default function Hero({ language, searchTerm, setSearchTerm, setCurrentPa
             </span>
           </motion.div>
 
-          {/* Heading - Enterprise-level, 1.1 line-height, Plus Jakarta Sans font-display */}
+          {/* Heading H1 - Enterprise-level typography with staggered entrance animation */}
           <motion.h1 
-            variants={elementVariants}
+            variants={h1Variants}
             className="text-center font-display leading-[1.25] tracking-tight"
           >
             <span className="block text-[19px] xs:text-[23px] sm:text-4xl md:text-5xl lg:text-6xl xl:text-[64px] font-black text-[#0f172a] dark:text-white whitespace-nowrap sm:whitespace-normal">
@@ -270,18 +502,36 @@ export default function Hero({ language, searchTerm, setSearchTerm, setCurrentPa
             </span>
           </motion.h1>
 
-          {/* Intro description - line height 1.8, perfectly weighted for high readability */}
-          <motion.p 
-            variants={elementVariants}
-            className="text-sm sm:text-base md:text-[18px] text-slate-600 dark:text-slate-300 max-w-3xl mx-auto leading-[1.8] font-sans"
+          {/* Heading H2 - Dynamic Rotating Services and Agency Tagline with staggered entrance animation */}
+          <motion.h2
+            variants={h2Variants}
+            className="space-y-4 max-w-3xl mx-auto"
           >
-            {t.tagline}
-          </motion.p>
+            {/* Animated services list */}
+            <div className="relative w-full h-[1.5em] overflow-hidden flex items-center justify-center -mt-1 -mb-1">
+              <AnimatePresence mode="wait">
+                <motion.span
+                  key={animatedIndex}
+                  initial={{ opacity: 0, y: 16, filter: 'blur(4px)' }}
+                  animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                  exit={{ opacity: 0, y: -16, filter: 'blur(4px)' }}
+                  transition={{ duration: 0.35, ease: 'easeInOut' }}
+                  className="absolute text-xl sm:text-2xl md:text-3xl lg:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-[#7C3AED] via-[#A855F7] to-[#EC4899] drop-shadow-sm select-none"
+                >
+                  {language === 'bn' ? animatedOffers[animatedIndex].bn : language === 'ar' ? animatedOffers[animatedIndex].ar : animatedOffers[animatedIndex].en}
+                </motion.span>
+              </AnimatePresence>
+            </div>
+
+            {/* Subtitle description tagline */}
+            <p className="text-sm sm:text-base md:text-[18px] text-slate-600 dark:text-slate-300 max-w-3xl mx-auto leading-[1.8] font-sans font-normal">
+              {t.tagline}
+            </p>
+          </motion.h2>
 
           {/* Search bar - Premium glassy SaaS input component */}
-          <div className="relative max-w-xl mx-auto w-full z-20">
-            <motion.div 
-              variants={elementVariants}
+          <motion.div variants={searchVariants} className="relative max-w-xl mx-auto w-full z-20">
+            <div 
               className="mt-4 bg-white/80 dark:bg-slate-900/60 backdrop-blur-xl rounded-2xl p-1.5 shadow-xl hover:shadow-2xl hover:border-blue-500/40 transition-all duration-300 border border-slate-200/80 dark:border-slate-800 flex items-center gap-2"
             >
               <div className="flex-1 flex items-center pl-3">
@@ -318,12 +568,12 @@ export default function Hero({ language, searchTerm, setSearchTerm, setCurrentPa
               </div>
               <button
                 onClick={() => setCurrentPage('marketplace')}
-                className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 text-white text-xs font-extrabold rounded-xl transition-all duration-305 flex items-center gap-1.5 cursor-pointer shadow-md hover:shadow-[0_0_20px_rgba(37,99,235,0.4)] hover:scale-[1.02]"
+                className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-cyan-550 hover:from-blue-700 hover:to-cyan-600 text-white text-xs font-extrabold rounded-xl transition-all duration-305 flex items-center gap-1.5 cursor-pointer shadow-md hover:shadow-[0_0_20px_rgba(37,99,235,0.4)] hover:scale-[1.02]"
               >
                 <span>{language === 'bn' ? "খুঁজুন" : language === 'ar' ? "بحث بالمتجر" : "Search"}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
-            </motion.div>
+            </div>
 
             {/* Listening floating HUD under input */}
             {isListening && (
@@ -331,7 +581,7 @@ export default function Hero({ language, searchTerm, setSearchTerm, setCurrentPa
                 <div className="flex items-center gap-2">
                   <span className="relative flex h-2 w-2">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white"></span>
                   </span>
                   <span>
                     {language === 'bn' ? "আমি শুনছি... বলুন।" : language === 'ar' ? "أنا أستمع... تحدث الآن." : "Listening... speak now."}
@@ -346,31 +596,37 @@ export default function Hero({ language, searchTerm, setSearchTerm, setCurrentPa
                 </div>
               </div>
             )}
-          </div>
-
-          {/* Action calls (Redesigned buttons with gradients, full-rounded, glow, and micro-interactions) */}
-          <motion.div 
-            variants={elementVariants}
-            className="pt-4 flex flex-col sm:flex-row justify-center items-center gap-4 max-w-md mx-auto"
-          >
-            <button
-              onClick={() => setCurrentPage('marketplace')}
-              className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-blue-600 to-cyan-550 dark:from-blue-600 dark:to-cyan-550 hover:scale-[1.03] active:scale-95 text-white font-extrabold text-sm rounded-full transition-all duration-300 shadow-lg hover:shadow-[0_8px_30px_rgba(37,99,235,0.35)] cursor-pointer"
-            >
-              {t.btnPrimary}
-            </button>
-            <button
-              onClick={() => setCurrentPage('contact')}
-              className="w-full sm:w-auto px-8 py-4 bg-white/70 dark:bg-slate-900/60 hover:bg-slate-100 dark:hover:bg-slate-800/80 backdrop-blur-md text-[#0f172a] dark:text-slate-200 border border-slate-200 dark:border-slate-800 font-extrabold text-sm rounded-full transition-all duration-200 cursor-pointer hover:border-slate-350 dark:hover:border-slate-705 shadow-sm hover:scale-[1.02]"
-            >
-              {t.btnSecondary}
-            </button>
           </motion.div>
 
-          {/* Real Trust Badges - visually appealing validation badges */}
+          {/* Staggered CTA Action Buttons */}
           <motion.div 
-            variants={elementVariants}
-            className="pt-6 flex flex-wrap justify-center items-center gap-x-6 gap-y-3 text-[11px] font-mono uppercase tracking-wider text-slate-550 dark:text-slate-400 font-bold"
+            variants={ctaContainerVariants}
+            className="pt-4 flex flex-row justify-center items-center gap-3.5 max-w-md mx-auto px-1"
+          >
+            <motion.button
+              variants={ctaButtonVariants}
+              whileHover={{ scale: 1.04, y: -2 }}
+              whileTap={{ scale: 0.96 }}
+              onClick={() => setCurrentPage('marketplace')}
+              className="w-1/2 sm:w-auto px-4 sm:px-8 py-3.5 sm:py-4 bg-gradient-to-r from-blue-600 to-cyan-550 dark:from-blue-600 dark:to-cyan-550 text-white font-extrabold text-xs sm:text-sm rounded-full transition-all duration-300 shadow-lg hover:shadow-[0_8px_30px_rgba(37,99,235,0.35)] cursor-pointer text-center truncate"
+            >
+              {t.btnPrimary}
+            </motion.button>
+            <motion.button
+              variants={ctaButtonVariants}
+              whileHover={{ scale: 1.03, y: -2 }}
+              whileTap={{ scale: 0.96 }}
+              onClick={() => setCurrentPage('contact')}
+              className="w-1/2 sm:w-auto px-4 sm:px-8 py-3.5 sm:py-4 bg-white/70 dark:bg-slate-900/60 hover:bg-slate-100 dark:hover:bg-slate-800/80 backdrop-blur-md text-[#0f172a] dark:text-slate-200 border border-slate-200 dark:border-slate-800 font-extrabold text-xs sm:text-sm rounded-full transition-all duration-200 cursor-pointer hover:border-slate-350 dark:hover:border-slate-705 shadow-sm text-center truncate"
+            >
+              {t.btnSecondary}
+            </motion.button>
+          </motion.div>
+
+          {/* Real Trust Badges */}
+          <motion.div 
+            variants={trustBadgesVariants}
+            className="pt-4 flex flex-wrap justify-center items-center gap-x-6 gap-y-3 text-[11px] font-mono uppercase tracking-wider text-slate-550 dark:text-slate-400 font-bold"
           >
             <div className="flex items-center gap-1.5">
               <Shield className="w-4 h-4 text-emerald-500" />
@@ -383,69 +639,8 @@ export default function Hero({ language, searchTerm, setSearchTerm, setCurrentPa
             </div>
             <div className="w-1.5 h-1.5 rounded-full bg-slate-350 dark:bg-slate-700 hidden sm:block" />
             <div className="flex items-center gap-1.5">
-              <Award className="w-4 h-4 text-indigo-505 text-violet-500" />
+              <Award className="w-4 h-4 text-violet-500" />
               <span>VERIFIED CODES BY DEVELOPERS</span>
-            </div>
-          </motion.div>
-        </motion.div>
-
-        {/* Redesigned Bento-metrics section */}
-        <motion.div 
-          className="mt-12 sm:mt-18 lg:mt-24 grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6" 
-          id="hero-metrics-bento"
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-        >
-          <motion.div 
-            variants={elementVariants}
-            className="bg-white dark:bg-slate-900 bg-opacity-100 dark:bg-[#0f172a] p-3 sm:p-5 rounded-xl sm:rounded-2xl border border-slate-200 dark:border-slate-800/80 flex items-center gap-2 sm:gap-4 hover:border-emerald-500/40 transition-all duration-300 shadow-sm hover:shadow-xl hover:-translate-y-1.5 text-left"
-          >
-            <div className="p-2 sm:p-3 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl shrink-0">
-              <Terminal className="w-4.5 h-4.5 sm:w-6 h-6 text-emerald-500" />
-            </div>
-            <div>
-              <p className="text-sm sm:text-lg md:text-xl lg:text-2xl font-black font-sans text-slate-900 dark:text-white leading-none">125+</p>
-              <p className="text-[8.5px] sm:text-[10px] md:text-[11px] text-slate-550 dark:text-slate-400 font-extrabold font-sans uppercase tracking-wider leading-snug mt-0.5 sm:mt-1">{t.statScripts}</p>
-            </div>
-          </motion.div>
-
-          <motion.div 
-            variants={elementVariants}
-            className="bg-white dark:bg-slate-900 bg-opacity-100 dark:bg-[#0f172a] p-3 sm:p-5 rounded-xl sm:rounded-2xl border border-slate-200 dark:border-slate-800/80 flex items-center gap-2 sm:gap-4 hover:border-emerald-500/40 transition-all duration-300 shadow-sm hover:shadow-xl hover:-translate-y-1.5 text-left"
-          >
-            <div className="p-2 sm:p-3 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl shrink-0">
-              <Globe className="w-4.5 h-4.5 sm:w-6 h-6 text-emerald-500" />
-            </div>
-            <div>
-              <p className="text-sm sm:text-lg md:text-xl lg:text-2xl font-black font-sans text-slate-900 dark:text-white leading-none">460+</p>
-              <p className="text-[8.5px] sm:text-[10px] md:text-[11px] text-slate-550 dark:text-slate-400 font-extrabold font-sans uppercase tracking-wider leading-snug mt-0.5 sm:mt-1">{t.statDelivered}</p>
-            </div>
-          </motion.div>
-
-          <motion.div 
-            variants={elementVariants}
-            className="bg-white dark:bg-slate-900 bg-opacity-100 dark:bg-[#0f172a] p-3 sm:p-5 rounded-xl sm:rounded-2xl border border-slate-200 dark:border-slate-800/80 flex items-center gap-2 sm:gap-4 hover:border-emerald-500/40 transition-all duration-300 shadow-sm hover:shadow-xl hover:-translate-y-1.5 text-left"
-          >
-            <div className="p-2 sm:p-3 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl shrink-0">
-              <Star className="w-4.5 h-4.5 sm:w-6 h-6 text-emerald-500 fill-emerald-500/40" />
-            </div>
-            <div>
-              <p className="text-sm sm:text-lg md:text-xl lg:text-2xl font-black font-sans text-slate-900 dark:text-white leading-none">4.96/5</p>
-              <p className="text-[8.5px] sm:text-[10px] md:text-[11px] text-slate-550 dark:text-slate-400 font-extrabold font-sans uppercase tracking-wider leading-snug mt-0.5 sm:mt-1">{t.statSupport}</p>
-            </div>
-          </motion.div>
-
-          <motion.div 
-            variants={elementVariants}
-            className="bg-white dark:bg-slate-900 bg-opacity-100 dark:bg-[#0f172a] p-3 sm:p-5 rounded-xl sm:rounded-2xl border border-slate-200 dark:border-slate-800/80 flex items-center gap-2 sm:gap-4 hover:border-emerald-500/40 transition-all duration-300 shadow-sm hover:shadow-xl hover:-translate-y-1.5 text-left"
-          >
-            <div className="p-2 sm:p-3 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl shrink-0">
-              <CheckCircle className="w-4.5 h-4.5 sm:w-6 h-6 text-emerald-500" />
-            </div>
-            <div>
-              <p className="text-sm sm:text-lg md:text-xl lg:text-2xl font-black font-sans text-slate-900 dark:text-white leading-none">99.99%</p>
-              <p className="text-[8.5px] sm:text-[10px] md:text-[11px] text-slate-500 dark:text-slate-400 font-extrabold font-sans uppercase tracking-wider leading-snug mt-0.5 sm:mt-1">{t.uptime}</p>
             </div>
           </motion.div>
         </motion.div>

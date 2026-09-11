@@ -255,6 +255,51 @@
         "createdAt": { "type": "string" }
       },
       "required": ["id", "name", "phone"]
+    },
+    "StoreProductReview": {
+      "title": "StoreProductReview",
+      "description": "Reviews submitted by registered customers for digital store products, requiring admin approval.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "productId": { "type": "string" },
+        "productName": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userAvatar": { "type": "string" },
+        "rating": { "type": "number" },
+        "comment": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "approved": { "type": "boolean" }
+      },
+      "required": ["id", "productId", "userId", "userName", "rating", "comment", "createdAt", "approved"]
+    },
+    "TestConnection": {
+      "title": "TestConnection",
+      "description": "Validation ping record for initial boot backend connectivity checks.",
+      "type": "object",
+      "properties": {
+        "status": { "type": "string" }
+      }
+    },
+    "OrderMessage": {
+      "title": "OrderMessage",
+      "description": "Real-time communication message between client and assigned staff regarding project requirements.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "orderId": { "type": "string" },
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "senderRole": { "type": "string", "enum": ["client", "staff", "admin", "system"] },
+        "senderAvatar": { "type": "string" },
+        "message": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "category": { "type": "string", "enum": ["general", "requirement", "specification", "asset", "revision", "milestone"] },
+        "attachments": { "type": "array" },
+        "read": { "type": "boolean" }
+      },
+      "required": ["id", "orderId", "senderId", "senderName", "senderRole", "message", "createdAt"]
     }
   },
   "firestore": {
@@ -265,6 +310,10 @@
     "/orders/{orderId}": {
       "schema": "Order",
       "description": "Tracks bespoke custom solution order transactions and script downloads references."
+    },
+    "/orders/{orderId}/messages/{messageId}": {
+      "schema": "OrderMessage",
+      "description": "Real-time communication messages for an order between client and assigned staff."
     },
     "/tickets/{ticketId}": {
       "schema": "SupportTicket",
@@ -297,6 +346,14 @@
     "/whatsapp_leads/{whatsappLeadId}": {
       "schema": "WhatsAppLead",
       "description": "Contains direct WhatsApp redirection track references."
+    },
+    "/store_reviews/{reviewId}": {
+      "schema": "StoreProductReview",
+      "description": "Maintains user reviews of digital warehouse assets with admin approval statuses."
+    },
+    "/test/{testId}": {
+      "schema": "TestConnection",
+      "description": "Probe path used to confirm backend connectivity during system initialization."
     }
   }
 }

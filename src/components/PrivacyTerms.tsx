@@ -1,5 +1,4 @@
-import * as React from 'react';
-import { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   ShieldCheck, Cpu, FileSpreadsheet, LockKeyhole, Info, 

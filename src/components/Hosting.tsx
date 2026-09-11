@@ -4,12 +4,349 @@ import {
   Check, ArrowRight, Phone, MessageSquare, ExternalLink, HelpCircle, 
   Globe, Terminal, Award, BadgeAlert, Layers, Activity, Lock, Search, 
   Star, RefreshCw, Layers as LayersIcon, CheckCircle, Info, HelpCircle as HelpIcon,
-  ChevronDown, PhoneCall, CheckCircle2, DollarSign, Upload
+  ChevronDown, PhoneCall, CheckCircle2, DollarSign, Upload, Cloud,
+  Mail, Gauge, CircuitBoard, Sliders, ShieldCheck, Code2, Headphones
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Language, Theme, Currency, Product } from '../types';
 import VpsPerformanceChart from './VpsPerformanceChart';
 import DomainSearch from './DomainSearch';
+import HostingHero from './HostingHero';
+import ServiceCard3D from './ServiceCard3D';
+
+// Helper function to resolve intuitive spec icons & color schemes for plan line items
+const getSpecDetail = (feature: string) => {
+  const lower = feature.toLowerCase();
+
+  // 1. RAM / Memory
+  if (
+    lower.includes('ram') ||
+    lower.includes('ddr4') ||
+    lower.includes('ddr5') ||
+    lower.includes('memory') ||
+    lower.includes('র্যাম') ||
+    lower.includes('ذاكرة') ||
+    lower.includes('الرام')
+  ) {
+    return {
+      icon: CircuitBoard,
+      category: 'RAM',
+      colorClass: 'text-purple-600 dark:text-purple-400 bg-purple-500/10 border-purple-500/20 dark:border-purple-500/30'
+    };
+  }
+
+  // 2. CPU / Processor / Cores
+  if (
+    lower.includes('cpu') ||
+    lower.includes('vcpu') ||
+    lower.includes('core') ||
+    lower.includes('epyc') ||
+    lower.includes('processor') ||
+    lower.includes('কোর') ||
+    lower.includes('প্রসেসর') ||
+    lower.includes('معالج')
+  ) {
+    return {
+      icon: Cpu,
+      category: 'CPU',
+      colorClass: 'text-blue-600 dark:text-cyan-400 bg-blue-500/10 border-blue-500/20 dark:border-blue-500/30'
+    };
+  }
+
+  // 3. Bandwidth / Traffic / BDIX Speed
+  if (
+    lower.includes('bandwidth') ||
+    lower.includes('traffic') ||
+    lower.includes('ব্যান্ডউইথ') ||
+    lower.includes('ترافيك') ||
+    lower.includes('باندويث')
+  ) {
+    return {
+      icon: Gauge,
+      category: 'Bandwidth',
+      colorClass: 'text-cyan-600 dark:text-cyan-400 bg-cyan-500/10 border-cyan-500/20 dark:border-cyan-500/30'
+    };
+  }
+
+  // 4. Storage / NVMe / SSD / Disk
+  if (
+    lower.includes('nvme') ||
+    lower.includes('ssd') ||
+    lower.includes('storage') ||
+    lower.includes('disk') ||
+    lower.includes('ডিস্ক') ||
+    lower.includes('স্টোরেজ') ||
+    lower.includes('এসএসডি') ||
+    lower.includes('مساحة') ||
+    lower.includes('أقراص')
+  ) {
+    return {
+      icon: HardDrive,
+      category: 'Storage',
+      colorClass: 'text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/20 dark:border-amber-500/30'
+    };
+  }
+
+  // 5. Email / Mailbox
+  if (
+    lower.includes('email') ||
+    lower.includes('mail') ||
+    lower.includes('mailbox') ||
+    lower.includes('ইমেইল') ||
+    lower.includes('মেইল') ||
+    lower.includes('بريد')
+  ) {
+    return {
+      icon: Mail,
+      category: 'Email',
+      colorClass: 'text-sky-600 dark:text-sky-400 bg-sky-500/10 border-sky-500/20 dark:border-sky-500/30'
+    };
+  }
+
+  // 6. Database / MySQL
+  if (
+    lower.includes('database') ||
+    lower.includes('mysql') ||
+    lower.includes('sql') ||
+    lower.includes('ডাটাবেস') ||
+    lower.includes('قواعد بيانات')
+  ) {
+    return {
+      icon: Database,
+      category: 'Database',
+      colorClass: 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/20 dark:border-emerald-500/30'
+    };
+  }
+
+  // 7. Dedicated IP / Root / SSH
+  if (
+    lower.includes('root') ||
+    lower.includes('ssh') ||
+    lower.includes('ipv4') ||
+    lower.includes('dedicated ip') ||
+    lower.includes('ip') ||
+    lower.includes('রুট') ||
+    lower.includes('আইপি') ||
+    lower.includes('صلاحيات') ||
+    lower.includes('جذر') ||
+    lower.includes('عنوان')
+  ) {
+    return {
+      icon: Terminal,
+      category: 'Root / IP',
+      colorClass: 'text-violet-600 dark:text-violet-400 bg-violet-500/10 border-violet-500/20 dark:border-violet-500/30'
+    };
+  }
+
+  // 8. SSL / Certificate / Padlock
+  if (
+    lower.includes('ssl') ||
+    lower.includes('certificate') ||
+    lower.includes('wildcard') ||
+    lower.includes('এসএসএল') ||
+    lower.includes('সার্টিফিকেট') ||
+    lower.includes('شهادة') ||
+    lower.includes('أمان')
+  ) {
+    return {
+      icon: Lock,
+      category: 'SSL Security',
+      colorClass: 'text-teal-600 dark:text-teal-400 bg-teal-500/10 border-teal-500/20 dark:border-teal-500/30'
+    };
+  }
+
+  // 9. DDoS / Security / Malware / Imunify / Firewall
+  if (
+    lower.includes('security') ||
+    lower.includes('ddos') ||
+    lower.includes('firewall') ||
+    lower.includes('imunify') ||
+    lower.includes('malware') ||
+    lower.includes('shield') ||
+    lower.includes('শিল্ড') ||
+    lower.includes('সিকিউরিটি') ||
+    lower.includes('ম্যালওয়্যার') ||
+    lower.includes('حماية') ||
+    lower.includes('جدران')
+  ) {
+    return {
+      icon: ShieldCheck,
+      category: 'Security',
+      colorClass: 'text-rose-600 dark:text-rose-400 bg-rose-500/10 border-rose-500/20 dark:border-rose-500/30'
+    };
+  }
+
+  // 10. cPanel / WHM / Control Panel / CyberPanel / Hestia
+  if (
+    lower.includes('cpanel') ||
+    lower.includes('whm') ||
+    lower.includes('panel') ||
+    lower.includes('cyberpanel') ||
+    lower.includes('hestia') ||
+    lower.includes('সিপ্যানেল') ||
+    lower.includes('প্যানেল') ||
+    lower.includes('لوحة')
+  ) {
+    return {
+      icon: Sliders,
+      category: 'Control Panel',
+      colorClass: 'text-orange-600 dark:text-orange-400 bg-orange-500/10 border-orange-500/20 dark:border-orange-500/30'
+    };
+  }
+
+  // 11. Website / Domain / Subdomain / Addon
+  if (
+    lower.includes('website') ||
+    lower.includes('domain') ||
+    lower.includes('subdomain') ||
+    lower.includes('nameserver') ||
+    lower.includes('ওয়েবসাইট') ||
+    lower.includes('ডোমেইন') ||
+    lower.includes('সাবডোমেইন') ||
+    lower.includes('নেমসার্ভার') ||
+    lower.includes('موقع') ||
+    lower.includes('نطاقات') ||
+    lower.includes('دومين')
+  ) {
+    return {
+      icon: Globe,
+      category: 'Domain',
+      colorClass: 'text-indigo-600 dark:text-indigo-400 bg-indigo-500/10 border-indigo-500/20 dark:border-indigo-500/30'
+    };
+  }
+
+  // 12. Backup / Cloud Backup / Remote Backup
+  if (
+    lower.includes('backup') ||
+    lower.includes('ব্যাকআপ') ||
+    lower.includes('نسخ') ||
+    lower.includes('احتياطي')
+  ) {
+    return {
+      icon: Cloud,
+      category: 'Backup',
+      colorClass: 'text-blue-600 dark:text-cyan-400 bg-blue-500/10 border-blue-500/20 dark:border-blue-500/30'
+    };
+  }
+
+  // 13. Web Server / LiteSpeed / Cache / Fast Speed / BDIX
+  if (
+    lower.includes('litespeed') ||
+    lower.includes('cache') ||
+    lower.includes('caching') ||
+    lower.includes('bdix') ||
+    lower.includes('বিডিআইএক্স') ||
+    lower.includes('স্পীড') ||
+    lower.includes('ক্যাশিং') ||
+    lower.includes('مسرعات')
+  ) {
+    return {
+      icon: Zap,
+      category: 'Speed Engine',
+      colorClass: 'text-amber-500 dark:text-amber-400 bg-amber-500/10 border-amber-500/20 dark:border-amber-500/30'
+    };
+  }
+
+  // 14. Support / 24/7 / VIP / Managed
+  if (
+    lower.includes('support') ||
+    lower.includes('24/7') ||
+    lower.includes('vip') ||
+    lower.includes('সাপোর্ট') ||
+    lower.includes('دعم')
+  ) {
+    return {
+      icon: Headphones,
+      category: 'Support',
+      colorClass: 'text-pink-600 dark:text-pink-400 bg-pink-500/10 border-pink-500/20 dark:border-pink-500/30'
+    };
+  }
+
+  // 15. Apps / WordPress / Softaculous / Python / Node / Ruby / PHP
+  if (
+    lower.includes('wordpress') ||
+    lower.includes('softaculous') ||
+    lower.includes('python') ||
+    lower.includes('node') ||
+    lower.includes('ruby') ||
+    lower.includes('php') ||
+    lower.includes('অ্যাপস') ||
+    lower.includes('ওয়ার্ডপ্রেস') ||
+    lower.includes('تثبيت')
+  ) {
+    return {
+      icon: Code2,
+      category: 'Apps & Code',
+      colorClass: 'text-violet-600 dark:text-purple-400 bg-violet-500/10 border-violet-500/20 dark:border-violet-500/30'
+    };
+  }
+
+  // 16. FTP / SFTP / Migration
+  if (
+    lower.includes('ftp') ||
+    lower.includes('sftp') ||
+    lower.includes('migration') ||
+    lower.includes('মাইগ্রেশন') ||
+    lower.includes('نقل')
+  ) {
+    return {
+      icon: Upload,
+      category: 'Transfer',
+      colorClass: 'text-teal-600 dark:text-teal-400 bg-teal-500/10 border-teal-500/20 dark:border-teal-500/30'
+    };
+  }
+
+  // 17. Uptime / SLA Guarantee
+  if (
+    lower.includes('uptime') ||
+    lower.includes('sla') ||
+    lower.includes('99.9') ||
+    lower.includes('গ্যারান্টি') ||
+    lower.includes('আপটাইম') ||
+    lower.includes('ضمان') ||
+    lower.includes('تشغيل')
+  ) {
+    return {
+      icon: Activity,
+      category: 'Uptime SLA',
+      colorClass: 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/20 dark:border-emerald-500/30'
+    };
+  }
+
+  // 18. Money Back / Guarantee
+  if (
+    lower.includes('money back') ||
+    lower.includes('মানি ব্যাক') ||
+    lower.includes('استعادة')
+  ) {
+    return {
+      icon: DollarSign,
+      category: 'Guarantee',
+      colorClass: 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/20 dark:border-emerald-500/30'
+    };
+  }
+
+  // 19. White-Label / Branding / Reseller
+  if (
+    lower.includes('white-label') ||
+    lower.includes('whitelabel') ||
+    lower.includes('হোয়াইট') ||
+    lower.includes('ব্র্যান্ডিং')
+  ) {
+    return {
+      icon: Award,
+      category: 'White-Label',
+      colorClass: 'text-purple-600 dark:text-purple-400 bg-purple-500/10 border-purple-500/20 dark:border-purple-500/30'
+    };
+  }
+
+  // Default fallback
+  return {
+    icon: CheckCircle2,
+    category: 'Included',
+    colorClass: 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/20 dark:border-emerald-500/30'
+  };
+};
 
 const vpsSetupTrans = {
   en: {
@@ -147,9 +484,9 @@ export default function Hosting({
 }: HostingProps) {
   
   // Active category tab for filtering Packages
-  const [activeTab, setActiveTab] = useState<'bdix' | 'vps' | 'reseller'>('bdix');
+  const [activeTab, setActiveTab] = useState<'bdix' | 'vps' | 'reseller' | 'cloud'>('bdix');
 
-  const selectTab = (tab: 'bdix' | 'vps' | 'reseller') => {
+  const selectTab = (tab: 'bdix' | 'vps' | 'reseller' | 'cloud') => {
     setActiveTab(tab);
     localStorage.setItem('webzone_target_hosting_tab', tab);
   };
@@ -157,7 +494,7 @@ export default function Hosting({
   useEffect(() => {
     const handleStorage = () => {
       const target = localStorage.getItem('webzone_target_hosting_tab');
-      if (target === 'bdix' || target === 'vps' || target === 'reseller') {
+      if (target === 'bdix' || target === 'vps' || target === 'reseller' || target === 'cloud') {
         setActiveTab(target);
       }
     };
@@ -236,6 +573,9 @@ export default function Hosting({
     'reseller-10g': { '1': 899, '12': 8500, '24': 15000 },
     'reseller-20g': { '1': 1799, '12': 16500, '24': 29000 },
     'reseller-50g': { '1': 2499, '12': 23500, '24': 42000 },
+    'cloud-starter': { '1': 999, '12': 9590, '24': 16783 },
+    'cloud-business': { '1': 1999, '12': 19190, '24': 33583 },
+    'cloud-vps': { '1': 3999, '12': 38390, '24': 67183 },
   };
 
   const bdtPrices: Record<string, number> = {
@@ -248,6 +588,9 @@ export default function Hosting({
     'reseller-10g': 899,
     'reseller-20g': 1799,
     'reseller-50g': 2499,
+    'cloud-starter': 999,
+    'cloud-business': 1999,
+    'cloud-vps': 3999,
   };
 
   // Currency rates & precise formatting
@@ -841,6 +1184,125 @@ export default function Hosting({
         ],
         url: "https://host.webzonebd.com/index.php?rp=/store/reseller-hosting"
       }
+    ],
+    cloud: [
+      {
+        id: "cloud-starter",
+        name: "Starter Cloud",
+        nameBn: "স্টার্টার ক্লাউড",
+        nameAr: "الاستضافة السحابية للمبتدئين Starter Cloud",
+        price: 8.43,
+        storage: "5 GB NVMe Disk",
+        badge: null,
+        features: [
+          language === 'bn' ? "বার্ষিক ক্রয়ে ফ্রি .XYZ, .SHOP, .MY.ID ডোমেইন" : language === 'ar' ? "دومين .XYZ, .SHOP, .MY.ID مجاني عند الاشتراك السنوي" : "Free .XYZ, .SHOP, .MY.ID on Annual Purchase",
+          language === 'bn' ? "৫ জিবি এনভিএমই ডিস্ক স্টোরেজ" : language === 'ar' ? "مساحة 5 GB NVMe Disk" : "5 GB NVMe Disk Storage",
+          language === 'bn' ? "২টি অ্যাডঅন ডোমেইন" : language === 'ar' ? "2 دومين إضافي Addon Domains" : "2 Addon Domains",
+          language === 'bn' ? "১০০ জিবি হাই-স্পিড ব্যান্ডউইথ" : language === 'ar' ? "100 GB Bandwidth" : "100 GB Bandwidth",
+          language === 'bn' ? "আনলিমিটেড সাব ডোমেইন" : language === 'ar' ? "نطاقات فرعية غير محدودة" : "Unlimited Sub Domains",
+          language === 'bn' ? "আনলিমিটেড মাইএসকিউএল ডাটাবেস" : language === 'ar' ? "قواعد بيانات غير محدودة" : "Unlimited Databases",
+          language === 'bn' ? "আনলিমিটেড ইমেইল অ্যাকাউন্ট" : language === 'ar' ? "حسابات بريد غير محدودة" : "Unlimited Email Accounts",
+          language === 'bn' ? "লাইফটাইম ফ্রি এসএসএল সার্টিফিকেট" : language === 'ar' ? "شهادات SSL مجانية مدى الحياة" : "Lifetime Free SSL Certificates",
+          language === 'bn' ? "৯৯.৯% গ্যারান্টিযুক্ত আপটাইম" : language === 'ar' ? "ضمان تشغيل 99.9% Uptime" : "99.9% Guaranteed Uptime",
+          language === 'bn' ? "এফটিপি এবং এসএফটিপি সাপোর্ট" : language === 'ar' ? "دعم FTP & SFTP" : "FTP & SFTP Support",
+          language === 'bn' ? "ওয়ার্ডপ্রেস অপটিমাইজড ইঞ্জিন" : language === 'ar' ? "تحسين كلي للووردبريس" : "WordPress Optimized",
+          language === 'bn' ? "লেটেস্ট সিপ্যানেল কন্ট্রোল প্যানেল" : language === 'ar' ? "أحدث لوحة تحكم cPanel" : "Latest cPanel Control Panel",
+          language === 'bn' ? "লাইটস্পীড ওয়েব সার্ভার" : language === 'ar' ? "خادم LiteSpeed فائق السرعة" : "Litespeed Web Server",
+          language === 'bn' ? "ক্লাউডলিনাক্স পিএইচপি সিলেক্টর" : language === 'ar' ? "محدد PHP Cloudlinux" : "Cloudlinux PHP Selector",
+          language === 'bn' ? "সফটাকুলার ১-ক্লিক অ্যাপস ইনস্টলার" : language === 'ar' ? "تثبيت التطبيقات Softaculous" : "Softaculous Apps Installer",
+          language === 'bn' ? "ইমিউনিফাই ৩৬০ সিকিউরিটি প্রটেকশন" : language === 'ar' ? "حماية Imunify 360 Security" : "Imunify 360 Security",
+          language === 'bn' ? "এডভান্সড ডিডিওএস প্রোটেকশন" : language === 'ar' ? "حماية تقدمية من هجمات DDoS" : "DDoS Protection",
+          language === 'bn' ? "ওনড ও সেলফ-ম্যানেজড ইনফ্রাস্ট্রাকচার" : language === 'ar' ? "بنية تحتية مملوكة بالكامل" : "Owned Infrastructure",
+          language === 'bn' ? "পাইথন, নোড.জেএস এবং রুবি সাপোর্টেড" : language === 'ar' ? "دعم Python, Node.js, Ruby" : "Python, Node.js, Ruby Supported",
+          language === 'bn' ? "ফ্রি ওয়েবসাইট মাইগ্রেশন সার্ভিস" : language === 'ar' ? "نقل المواقع مجاناً" : "Free Website Migration",
+          language === 'bn' ? "২৪/৭ প্রিমিয়াম সাপোর্ট সিস্টেম" : language === 'ar' ? "نظام دعم فني مميز" : "Premium Support System",
+          language === 'bn' ? "৩ দিনের মানি ব্যাক গ্যারান্টি" : language === 'ar' ? "ضمان استعادة الأموال خلال 3 أيام" : "3 Days Money Back Guarantee"
+        ],
+        perfectFor: [
+          language === 'bn' ? "স্টার্টআপ ও নতুন প্রজেক্ট" : "Startups & New Projects",
+          language === 'bn' ? "পার্সোনাল ও বিজনেস পোর্টফোলিও" : "Personal & Business Portfolios"
+        ],
+        url: "https://host.webzonebd.com/index.php?rp=/store/cloud-hosting"
+      },
+      {
+        id: "cloud-business",
+        name: "Small Business Cloud",
+        nameBn: "স্মল বিজনেস ক্লাউড",
+        nameAr: "الاستضافة السحابية للأعمال الصغيرة Small Business Cloud",
+        price: 16.87,
+        storage: "10 GB NVMe Disk",
+        badge: language === 'bn' ? "সবচেয়ে জনপ্রিয় 🔥" : language === 'ar' ? "الأكثر شعبية 🔥" : "Most Popular 🔥",
+        features: [
+          language === 'bn' ? "বার্ষিক ক্রয়ে ফ্রি .XYZ, .SHOP, .MY.ID ডোমেইন" : language === 'ar' ? "دومين .XYZ, .SHOP, .MY.ID مجاني عند الاشتراك السنوي" : "Free .XYZ, .SHOP, .MY.ID on Annual Purchase",
+          language === 'bn' ? "১০ জিবি এনভিএমই ডিস্ক স্টোরেজ" : language === 'ar' ? "مساحة 10 GB NVMe Disk" : "10 GB NVMe Disk Storage",
+          language === 'bn' ? "৫টি অ্যাডঅন ডোমেইন" : language === 'ar' ? "5 دومين إضافي Addon Domains" : "5 Addon Domains",
+          language === 'bn' ? "আনলিমিটেড হাই-স্পিড ব্যান্ডউইথ" : language === 'ar' ? "باندويث غير محدود Unlimited Bandwidth" : "Unlimited Bandwidth",
+          language === 'bn' ? "আনলিমিটেড সাব ডোমেইন" : language === 'ar' ? "نطاقات فرعية غير محدودة" : "Unlimited Sub Domains",
+          language === 'bn' ? "আনলিমিটেড মাইএসকিউএল ডাটাবেস" : language === 'ar' ? "قواعد بيانات غير محدودة" : "Unlimited Databases",
+          language === 'bn' ? "আনলিমিটেড ইমেইল অ্যাকাউন্ট" : language === 'ar' ? "حسابات بريد غير محدودة" : "Unlimited Email Accounts",
+          language === 'bn' ? "লাইফটাইম ফ্রি এসএসএল সার্টিফিকেট" : language === 'ar' ? "شهادات SSL مجانية مدى الحياة" : "Lifetime Free SSL Certificates",
+          language === 'bn' ? "৯৯.৯% গ্যারান্টিযুক্ত আপটাইম" : language === 'ar' ? "ضمان تشغيل 99.9% Uptime" : "99.9% Guaranteed Uptime",
+          language === 'bn' ? "এফটিপি এবং এসএফটিপি সাপোর্ট" : language === 'ar' ? "دعم FTP & SFTP" : "FTP & SFTP Support",
+          language === 'bn' ? "ওয়ার্ডপ্রেস অপটিমাইজড ইঞ্জিন" : language === 'ar' ? "تحسين كلي للووردبريس" : "WordPress Optimized",
+          language === 'bn' ? "লেটেস্ট সিপ্যানেল কন্ট্রোল প্যানেল" : language === 'ar' ? "أحدث لوحة تحكم cPanel" : "Latest cPanel Control Panel",
+          language === 'bn' ? "লাইটস্পীড ওয়েব সার্ভার" : language === 'ar' ? "خادم LiteSpeed فائق السرعة" : "Litespeed Web Server",
+          language === 'bn' ? "ক্লাউডলিনাক্স পিএইচপি সিলেক্টর" : language === 'ar' ? "محدد PHP Cloudlinux" : "Cloudlinux PHP Selector",
+          language === 'bn' ? "সফটাকুলার ১-ক্লিক অ্যাপস ইনস্টলার" : language === 'ar' ? "تثبيت التطبيقات Softaculous" : "Softaculous Apps Installer",
+          language === 'bn' ? "ইমিউনিফাই ৩৬০ সিকিউরিটি প্রটেকশন" : language === 'ar' ? "حماية Imunify 360 Security" : "Imunify 360 Security",
+          language === 'bn' ? "এডভান্সড ডিডিওএস প্রোটেকশন" : language === 'ar' ? "حماية تقدمية من هجمات DDoS" : "DDoS Protection",
+          language === 'bn' ? "ডেইলি অটোমেটিক ক্লাউড ব্যাকআপ" : language === 'ar' ? "نسخ احتياطي يومي آلي Daily Automatic Backups" : "Daily Automatic Backups",
+          language === 'bn' ? "ওনড ও সেলফ-ম্যানেজড ইনফ্রাস্ট্রাকচার" : language === 'ar' ? "بنية تحتية مملوكة بالكامل" : "Owned Infrastructure",
+          language === 'bn' ? "পাইথন, নোড.জেএস এবং রুবি সাপোর্টেড" : language === 'ar' ? "دعم Python, Node.js, Ruby" : "Python, Node.js, Ruby Supported",
+          language === 'bn' ? "ফ্রি ওয়েবসাইট মাইগ্রেশন সার্ভিস" : language === 'ar' ? "نقل المواقع مجاناً" : "Free Website Migration",
+          language === 'bn' ? "২৪/৭ প্রিমিয়াম সাপোর্ট সিস্টেম" : language === 'ar' ? "نظام دعم فني مميز" : "Premium Support System",
+          language === 'bn' ? "৩ দিনের মানি ব্যাক গ্যারান্টি" : language === 'ar' ? "ضمان استعادة الأموال خلال 3 أيام" : "3 Days Money Back Guarantee"
+        ],
+        perfectFor: [
+          language === 'bn' ? "গ্রোইং বিজনেস ও ই-কমার্স স্টোর" : "Growing Businesses & Ecommerce",
+          language === 'bn' ? "হাই-ট্রাফিক পোর্টাল ও কর্পোরেট ওয়েবসাইট" : "High-Traffic Portals & Websites"
+        ],
+        url: "https://host.webzonebd.com/index.php?rp=/store/cloud-hosting"
+      },
+      {
+        id: "cloud-vps",
+        name: "Business Cloud VPS",
+        nameBn: "বিজনেস ক্লাউড ভিপিএস",
+        nameAr: "خادم الأعمال السحابية Business Cloud VPS",
+        price: 33.75,
+        storage: "30 GB NVMe Disk",
+        buttonText: language === 'bn' ? "বিজনেস শুরু করুন" : language === 'ar' ? "ابدأ الأعمال الآن" : "Start Business",
+        badge: language === 'bn' ? "হাই পারফরম্যান্স 🚀" : language === 'ar' ? "أداء فائق 🚀" : "High Performance 🚀",
+        features: [
+          language === 'bn' ? "বার্ষিক ক্রয়ে ফ্রি .XYZ, .SHOP, .MY.ID ডোমেইন" : language === 'ar' ? "دومين .XYZ, .SHOP, .MY.ID مجاني عند الاشتراك السنوي" : "Free .XYZ, .SHOP, .MY.ID on Annual Purchase",
+          language === 'bn' ? "৩০ জিবি এনভিএমই ডিস্ক স্টোরেজ" : language === 'ar' ? "مساحة 30 GB NVMe Disk" : "30 GB NVMe Disk Storage",
+          language === 'bn' ? "৫টি অ্যাডঅন ডোমেইন" : language === 'ar' ? "5 دومين إضافي Addon Domains" : "5 Addon Domains",
+          language === 'bn' ? "আনলিমিটেড হাই-স্পিড ব্যান্ডউইথ" : language === 'ar' ? "باندويث غير محدود Unlimited Bandwidth" : "Unlimited Bandwidth",
+          language === 'bn' ? "আনলিমিটেড সাব ডোমেইন" : language === 'ar' ? "نطاقات فرعية غير محدودة" : "Unlimited Sub Domains",
+          language === 'bn' ? "আনলিমিটেড মাইএসকিউএল ডাটাবেস" : language === 'ar' ? "قواعد بيانات غير محدودة" : "Unlimited Databases",
+          language === 'bn' ? "আনলিমিটেড ইমেইল অ্যাকাউন্ট" : language === 'ar' ? "حسابات بريد غير محدودة" : "Unlimited Email Accounts",
+          language === 'bn' ? "লাইফটাইম ফ্রি এসএসএল সার্টিফিকেট" : language === 'ar' ? "شهادات SSL مجانية مدى الحياة" : "Lifetime Free SSL Certificates",
+          language === 'bn' ? "৯৯.৯% গ্যারান্টিযুক্ত আপটাইম" : language === 'ar' ? "ضمان تشغيل 99.9% Uptime" : "99.9% Guaranteed Uptime",
+          language === 'bn' ? "এফটিপি এবং এসএফটিপি সাপোর্ট" : language === 'ar' ? "دعم FTP & SFTP" : "FTP & SFTP Support",
+          language === 'bn' ? "ওয়ার্ডপ্রেস অপটিমাইজড ইঞ্জিন" : language === 'ar' ? "تحسين كلي للووردبرিস" : "WordPress Optimized",
+          language === 'bn' ? "লেটেস্ট সিপ্যানেল কন্ট্রোল প্যানেল" : language === 'ar' ? "أحدث لوحة تحكم cPanel" : "Latest cPanel Control Panel",
+          language === 'bn' ? "লাইটস্পীড ওয়েব সার্ভার" : language === 'ar' ? "خادم LiteSpeed فائق السرعة" : "Litespeed Web Server",
+          language === 'bn' ? "ক্লাউডলিনাক্স পিএইচপি সিলেক্টর" : language === 'ar' ? "محدد PHP Cloudlinux" : "Cloudlinux PHP Selector",
+          language === 'bn' ? "সফটাকুলার ১-ক্লিক অ্যাপস ইনস্টলার" : language === 'ar' ? "تثبيت التطبيقات Softaculous" : "Softaculous Apps Installer",
+          language === 'bn' ? "ইমিউনিফাই ৩৬০ সিকিউরিটি প্রটেকশন" : language === 'ar' ? "حماية Imunify 360 Security" : "Imunify 360 Security",
+          language === 'bn' ? "এডভান্সড ডিডিওএস প্রোটেকশন" : language === 'ar' ? "حماية تقدمية من هجمات DDoS" : "DDoS Protection",
+          language === 'bn' ? "ডেইলি অটোমেটিক ক্লাউড ব্যাকআপ" : language === 'ar' ? "نسخ احتياطي يومي آلي Daily Automatic Backups" : "Daily Automatic Backups",
+          language === 'bn' ? "ওনড ও সেলফ-ম্যানেজড ইনফ্রাস্ট্রাকচার" : language === 'ar' ? "بنية تحتية مملوكة بالكامل" : "Owned Infrastructure",
+          language === 'bn' ? "পাইথন, নোড.জেএস এবং রুবি সাপোর্টেড" : language === 'ar' ? "دعم Python, Node.js, Ruby" : "Python, Node.js, Ruby Supported",
+          language === 'bn' ? "ফ্রি ওয়েবসাইট মাইগ্রেশন সার্ভিস" : language === 'ar' ? "نقل المواقع مجاناً" : "Free Website Migration",
+          language === 'bn' ? "২৪/৭ প্রিমিয়াম সাপোর্ট সিস্টেম" : language === 'ar' ? "نظام دعم فني مميز" : "Premium Support System",
+          language === 'bn' ? "৩ দিনের মানি ব্যাক গ্যারান্টি" : language === 'ar' ? "ضمان استعادة الأموال خلال 3 أيام" : "3 Days Money Back Guarantee"
+        ],
+        perfectFor: [
+          language === 'bn' ? "বড় ই-কমার্স প্ল্যাটফর্ম ও এজেন্সি" : "Enterprise Ecommerce & Agencies",
+          language === 'bn' ? "উচ্চ ক্ষমতাসম্পন্ন কাস্টম ওয়েব অ্যাপস" : "High-Demand Custom Web Applications"
+        ],
+        url: "https://host.webzonebd.com/index.php?rp=/store/cloud-hosting"
+      }
     ]
   };
 
@@ -858,7 +1320,7 @@ export default function Hosting({
     }
   };
 
-   const handleExternalNav = (url: string) => {
+  const handleExternalNav = (url: string) => {
     const divider = url.includes('?') ? '&' : '?';
     const finalUrl = `${url}${divider}currency=${currency}`;
     window.open(finalUrl, '_blank', 'noopener,noreferrer');
@@ -1112,6 +1574,9 @@ export default function Hosting({
     { id: 'reseller-10g', title: '10 GB NVMe Reseller', titleBn: '১০ জিবি এনভিএমই রিসেলার', category: 'Reseller Hosting', price: 8.99, hostingType: 'reseller' },
     { id: 'reseller-20g', title: '30 GB NVMe Reseller', titleBn: '৩০ জিবি এনভিএমই রিসেলার', category: 'Reseller Hosting', price: 17.99, hostingType: 'reseller' },
     { id: 'reseller-50g', title: '50 GB NVMe Reseller', titleBn: '৫০ জিবি এনভিএমই রিসেলার', category: 'Reseller Hosting', price: 24.99, hostingType: 'reseller' },
+    { id: 'cloud-starter', title: 'Starter Cloud (৳999/mo)', titleBn: 'স্টার্টার ক্লাউড (৳৯৯৯/মাস)', category: 'Cloud Hosting', price: 8.43, hostingType: 'cloud' },
+    { id: 'cloud-business', title: 'Small Business Cloud (৳1,999/mo)', titleBn: 'স্মল বিজনেস ক্লাউড (৳১,৯৯৯/মাস)', category: 'Cloud Hosting', price: 16.87, hostingType: 'cloud' },
+    { id: 'cloud-vps', title: 'Business Cloud VPS (৳3,999/mo)', titleBn: 'বিজনেস ক্লাউড ভিপিএস (৳৩,৯৯৯/মাস)', category: 'Cloud Hosting', price: 33.75, hostingType: 'cloud' },
   ];
 
   const handleHostingTypeChange = (type: string) => {
@@ -1130,6 +1595,8 @@ export default function Hosting({
       detectedType = 'vps';
     } else if (selectedPlanId.startsWith('reseller-')) {
       detectedType = 'reseller';
+    } else if (selectedPlanId.startsWith('cloud-')) {
+      detectedType = 'cloud';
     }
 
     setOrderForm({
@@ -1227,80 +1694,16 @@ Sent from WebzoneBD Premium Order System`;
     >
       
       {/* ================================= HERO SECTION ================================= */}
-      <section className="relative pt-16 pb-24 md:pt-24 md:pb-32 overflow-hidden bg-gradient-to-b from-[#E0F2FE]/50 via-white to-[#F8FAFC] dark:from-[#0B1528] dark:via-[#020617] dark:to-[#020617]">
-        {/* Animated Background Gradients & Floating shapes */}
-        <div className="absolute top-1/4 left-1/10 w-96 h-96 rounded-full bg-gradient-to-r from-cyan-400/20 to-blue-550/20 blur-[100px] pointer-events-none animate-pulse duration-[8s]" />
-        <div className="absolute bottom-1/5 right-1/12 w-80 h-80 rounded-full bg-gradient-to-r from-purple-500/10 to-indigo-500/20 blur-[110px] pointer-events-none animate-pulse duration-[10s]" />
-        
-        {/* Floating geometric particles */}
-        <div className="absolute top-20 right-1/4 w-4 h-4 rounded-full bg-blue-500/30 dark:bg-cyan-500/30 animate-bounce duration-[4s]" />
-        <div className="absolute bottom-24 left-1/5 w-6 h-6 rounded-md bg-purple-500/20 dark:bg-purple-500/30 rotate-45 animate-spin duration-[12s]" />
-        
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
-          
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-cyan-400 border border-blue-200/40 dark:border-blue-900/40 text-xs font-black uppercase tracking-wider animate-pulse mb-6">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>SSD Cloud Web VPS Hosting</span>
-          </div>
-
-          <motion.h1
-            initial={{ opacity: 0, y: 25 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ type: "spring", stiffness: 100, damping: 15, delay: 0.15 }}
-            className="text-4xl md:text-6xl font-black tracking-tight text-slate-900 dark:text-white leading-tight mb-6"
-          >
-            <motion.span 
-              animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
-              transition={{ repeat: Infinity, duration: 8, ease: "easeInOut" }}
-              style={{ backgroundSize: "200% auto" }}
-              className="bg-gradient-to-r from-[#2563EB] via-[#8B5CF6] to-[#0EA5E9] bg-clip-text text-transparent inline-block pb-1"
-            >
-              {currentTrans.heroTitle}
-            </motion.span>
-          </motion.h1>
-
-          <motion.p
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="text-base sm:text-lg md:text-xl text-slate-600 dark:text-slate-300 max-w-3xl mx-auto leading-relaxed mb-10"
-          >
-            {currentTrans.heroSubtitle}
-          </motion.p>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.3 }}
-            className="flex flex-wrap justify-center gap-4 mb-12"
-          >
-            <button
-              onClick={() => handleScrollToId('redesigned-categories')}
-              className="px-8 py-4 bg-gradient-to-r from-[#2563EB] to-[#8B5CF6] hover:from-[#1D4ED8] hover:to-[#7C3AED] text-white font-extrabold text-sm sm:text-base rounded-2xl shadow-xl shadow-blue-500/20 transition-all duration-300 hover:scale-[1.03] cursor-pointer flex items-center gap-2 ring-2 ring-white/10"
-            >
-              <Zap className="w-4 h-4 fill-current text-white animate-pulse" />
-              <span>{currentTrans.getStarted}</span>
-            </button>
-            
-            <button
-              onClick={() => handleScrollToId('redesigned-comparison-table')}
-              className="px-8 py-4 bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-850 text-slate-800 dark:text-slate-200 font-extrabold text-sm sm:text-base rounded-2xl border border-slate-200 dark:border-slate-800 transition-all duration-300 hover:scale-[1.03] cursor-pointer inline-flex items-center gap-2"
-            >
-              <Layers className="w-4 h-4 text-purple-500" />
-              <span>{currentTrans.comparePlans}</span>
-            </button>
-
-            <button
-              onClick={() => handleSupportInquiry('whatsapp')}
-              className="px-8 py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-sm sm:text-base rounded-2xl shadow-md transition-all duration-300 hover:scale-[1.03] cursor-pointer inline-flex items-center gap-2"
-            >
-              <Phone className="w-4 h-4 text-white" />
-              <span>{currentTrans.whatsappSupport}</span>
-            </button>
-          </motion.div>
-
-        </div>
-      </section>
+      <HostingHero
+        language={language}
+        theme={theme}
+        onGetStarted={() => handleScrollToId('redesigned-categories')}
+        onViewPlans={() => handleScrollToId('redesigned-comparison-table')}
+        onSearchDomain={(query) => {
+          setDomainQuery(query);
+          handleScrollToId('redesigned-domain-search');
+        }}
+      />
 
       {/* ================================= DOMAIN SEARCH SECTION ================================= */}
       <DomainSearch
@@ -1310,6 +1713,7 @@ Sent from WebzoneBD Premium Order System`;
         addToCart={addToCart || (() => {})}
         setCurrentPage={setCurrentPage || (() => {})}
         currencySettings={currencySettings}
+        showCategories={false}
       />
 
       {/* ================================= HOSTING CATEGORIES ================================= */}
@@ -1323,7 +1727,7 @@ Sent from WebzoneBD Premium Order System`;
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {[
             {
               id: 'bdix',
@@ -1332,16 +1736,9 @@ Sent from WebzoneBD Premium Order System`;
               price: 0.99,
               icon: Database,
               color: 'from-sky-400 to-blue-600',
-              accent: 'border-blue-500/20 shadow-blue-500/10'
-            },
-            {
-              id: 'vps',
-              title: currentTrans.vpsTitle,
-              desc: currentTrans.vpsDesc,
-              price: 14.99,
-              icon: Cpu,
-              color: 'from-[#2563EB] to-[#8B5CF6]',
-              accent: 'border-purple-500/20 shadow-purple-500/10'
+              accent: 'border-blue-500/20 shadow-blue-500/10',
+              badge: language === 'bn' ? "বিডিআইএক্স অপ্টিমাইজড ⚡" : language === 'ar' ? "تحسين BDIX ⚡" : "BDIX Optimized ⚡",
+              subBadge: "BDIX Network"
             },
             {
               id: 'reseller',
@@ -1350,7 +1747,31 @@ Sent from WebzoneBD Premium Order System`;
               price: 11.99,
               icon: Layers,
               color: 'from-emerald-400 to-cyan-500',
-              accent: 'border-emerald-500/20 shadow-emerald-500/10'
+              accent: 'border-emerald-500/20 shadow-emerald-500/10',
+              badge: language === 'bn' ? "হোয়াইট-লেবেল 👥" : language === 'ar' ? "علامة تجارية مخصصة 👥" : "White-Label 👥",
+              subBadge: "WHM Panel"
+            },
+            {
+              id: 'vps',
+              title: currentTrans.vpsTitle,
+              desc: currentTrans.vpsDesc,
+              price: 14.99,
+              icon: Cpu,
+              color: 'from-[#2563EB] to-[#8B5CF6]',
+              accent: 'border-purple-500/20 shadow-purple-500/10',
+              badge: language === 'bn' ? "ডেডিকেটেড কোর 🚀" : language === 'ar' ? "أنوية مخصصة 🚀" : "Dedicated Core 🚀",
+              subBadge: "Root Access"
+            },
+            {
+              id: 'cloud',
+              title: language === 'bn' ? 'ক্লাউড হোস্টিং' : language === 'ar' ? 'الاستضافة السحابية' : 'Cloud Hosting',
+              desc: language === 'bn' ? 'উচ্চ গতিসম্পন্ন ও নিরাপদ ক্লাউড ইনফ্রাস্ট্রাকচার, ফ্রি ডিডিওএস ও ইমিউনিফাই ৩৬০ সিকিউরিটি।' : language === 'ar' ? 'بنية سحابية عالية الأداء مع حماية كاملة ودعم معالجات مختلفة.' : 'High-availability cloud infrastructure with NVMe storage, cPanel & LiteSpeed.',
+              price: 8.43,
+              icon: Cloud,
+              color: 'from-cyan-400 to-blue-600',
+              accent: 'border-cyan-500/20 shadow-cyan-500/10',
+              badge: language === 'bn' ? "আল্ট্রা ফাস্ট ☁️" : language === 'ar' ? "أداء سحابي ☁️" : "Ultra Fast ☁️",
+              subBadge: "Cloud NVMe"
             }
           ].map((cat) => {
             const Icon = cat.icon;
@@ -1368,6 +1789,12 @@ Sent from WebzoneBD Premium Order System`;
                   : language === 'ar'
                   ? ["🚀 صلاحية وصول كاملة للـ Root", "🌐 عناوين IP مخصصة لكل سيرفر", "⚙️ لوحة قيادة مدارة بالكامل"]
                   : ["🚀 Server-grade Dedicated IP", "🌐 Full root administrator access", "⚙️ Managed server optimizations"])
+              : cat.id === 'cloud'
+              ? (language === 'bn'
+                  ? ["☁️ ১০০% এনভিএমই ক্লাউড ক্লাস্টার", "🚀 সিপ্যানেল ও লাইটস্পিড সার্ভার", "🛡️ ইমিউনিফাই ৩৬০ ও ফ্রি ডিডিওএস প্রটেকশন"]
+                  : language === 'ar'
+                  ? ["☁️ بنية تحتية سحابية NVMe 100%", "🚀 خادم LiteSpeed ولوحة cPanel", "🛡️ حماية Imunify360 و DDoS مجاناً"]
+                  : ["☁️ 100% NVMe Cloud Infrastructure", "🚀 cPanel & LiteSpeed Web Server", "🛡️ Imunify360 & Free DDoS Protection"])
               : (language === 'bn'
                   ? ["👥 হোয়াইট-লেবেল ব্রান্ডিং অপশন", "🛠️ মাস্টার WHM অ্যাডমিন প্যানেল", "💰 আনলিমিটেড সিপ্যানেল অ্যাকাউন্ট তৈরি"]
                   : language === 'ar'
@@ -1375,78 +1802,102 @@ Sent from WebzoneBD Premium Order System`;
                   : ["👥 White-label custom branding", "🛠️ Master WHM administrative access", "💰 Create unlimited standard cPanels"]);
 
             return (
-              <div
+              <ServiceCard3D
                 key={cat.id}
+                isSelected={isSelected}
+                glowGradient={
+                  cat.id === 'bdix'
+                    ? 'from-sky-400 via-blue-500 to-indigo-600'
+                    : cat.id === 'vps'
+                    ? 'from-blue-600 via-purple-500 to-indigo-600'
+                    : cat.id === 'cloud'
+                    ? 'from-cyan-400 via-blue-500 to-indigo-600'
+                    : 'from-emerald-400 via-teal-500 to-cyan-500'
+                }
                 onClick={() => {
                   selectTab(cat.id as any);
                   handleScrollToId('redesigned-packages');
                 }}
-                className={`p-6 sm:p-8 bg-white dark:bg-[#0F172A] rounded-3xl border transition-all duration-300 hover:-translate-y-1 cursor-pointer relative overflow-hidden group flex flex-col justify-between ${
-                  isSelected 
-                    ? `border-blue-500 dark:border-cyan-400 shadow-2xl ${cat.accent}` 
-                    : 'border-slate-200/50 dark:border-slate-800/40 shadow-md hover:border-slate-300 dark:hover:border-slate-700/80 shadow-slate-950/5'
-                }`}
+                innerClassName="p-6 sm:p-8"
               >
                 {/* Visual glow accent */}
-                <div className={`absolute top-0 right-0 w-24 h-24 bg-gradient-to-br ${cat.color} opacity-10 blur-xl pointer-events-none group-hover:opacity-30 transition`} />
+                <div className={`absolute top-0 right-0 w-24 h-24 bg-gradient-to-br ${cat.color} opacity-6 blur-xl pointer-events-none group-hover:opacity-18 transition`} />
                 
-                <div>
+                {/* Floating Badge */}
+                {cat.badge && (
+                  <span className="absolute top-4 right-4 text-white font-mono font-black text-[9px] uppercase tracking-wider px-3 py-1 rounded-full shadow bg-gradient-to-r from-blue-600 to-cyan-500">
+                    {cat.badge}
+                  </span>
+                )}
+
+                <div className="space-y-6">
                   {/* Icon beside title */}
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className={`p-3 rounded-2xl bg-gradient-to-tr ${cat.color} text-white flex items-center justify-center w-12 h-12 shadow-md shrink-0`}>
+                  <div className="flex items-center gap-3">
+                    <div className={`p-3 rounded-2xl bg-gradient-to-tr ${cat.color} text-white flex items-center justify-center w-12 h-12 shadow-lg shrink-0`}>
                       <Icon className="w-6 h-6 stroke-[2]" />
                     </div>
                     <div>
-                      <h3 className="text-base sm:text-lg font-extrabold text-slate-900 dark:text-white font-display leading-tight">
+                      <h3 className="text-lg font-black text-slate-900 dark:text-white font-display leading-tight">
                         {cat.title}
                       </h3>
+                      <span className="inline-block text-[10px] font-mono uppercase bg-blue-500/10 dark:bg-cyan-500/10 text-blue-600 dark:text-cyan-400 px-2.5 py-0.5 rounded-md font-bold mt-1">
+                        {cat.subBadge}
+                      </span>
                     </div>
                   </div>
 
-                  <p className="text-xs sm:text-xs text-slate-500 dark:text-slate-400 leading-relaxed mb-5">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
                     {cat.desc}
                   </p>
 
-                  {/* Highlights section */}
-                  <div className="flex flex-col gap-2 mb-6 border-t border-slate-100/70 dark:border-slate-800/40 pt-4">
-                    {highlights.map((hlt, hIdx) => (
-                      <div key={hIdx} className="flex items-center gap-2 text-xxs sm:text-xs text-slate-600 dark:text-slate-350">
-                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
-                        <span className="font-medium tracking-tight">{hlt}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex items-end justify-between mt-auto pt-4 border-t border-slate-100/70 dark:border-slate-800/40">
-                  <div>
+                  {/* Pricing view */}
+                  <div className="py-4 border-y border-slate-100 dark:border-slate-800">
                     <span className="text-xxs sm:text-xs text-slate-400 uppercase font-bold font-mono block leading-none mb-1">
                       {currentTrans.from}
                     </span>
-                    <span className="text-lg sm:text-xl font-black text-slate-900 dark:text-white">
-                      {(() => {
-                        const baseVal = cat.id === 'bdix' 
-                          ? getDisplayPrice('bdix-starter', '24').monthlyAvg 
-                          : cat.id === 'vps' 
-                          ? getDisplayPrice('vps-starter', '24').monthlyAvg 
-                          : getDisplayPrice('reseller-10g', '24').monthlyAvg;
-                        return formatPriceVal(baseVal);
-                      })()}
-                    </span>
-                    <span className="text-xxs text-slate-500 dark:text-slate-400 font-bold ml-1">
-                      {formatPeriod()}
-                    </span>
-                    <span className="block text-[9px] text-green-600 dark:text-green-400 font-mono font-extrabold mt-0.5">
-                      {language === 'bn' ? '২৪ মাসের কিস্তিতে' : language === 'ar' ? 'فوترة ٢٤ شهراً' : '(Billed 24 months)'}
+                    <div className="flex items-baseline gap-1.5 font-sans mt-1">
+                      <span className="text-3xl sm:text-4xl font-extrabold text-[#2563EB] dark:text-cyan-400">
+                        {(() => {
+                          const baseVal = cat.id === 'bdix' 
+                            ? getDisplayPrice('bdix-starter', '24').monthlyAvg 
+                            : cat.id === 'vps' 
+                            ? getDisplayPrice('vps-starter', '24').monthlyAvg 
+                            : getDisplayPrice('reseller-10g', '24').monthlyAvg;
+                          return formatPriceVal(baseVal);
+                        })()}
+                      </span>
+                      <span className="text-xs font-bold text-slate-400">
+                        {formatPeriod()}
+                      </span>
+                    </div>
+                    <span className="block text-[9.5px] text-green-600 dark:text-green-400 font-mono font-extrabold mt-1.5">
+                      {language === 'bn' ? '⚡ ২৪ মাসের বিলিং কিস্তিতে' : language === 'ar' ? '⚡ فوترة ٢٤ شهراً' : '⚡ (Billed 24 months for maximum discount)'}
                     </span>
                   </div>
 
-                  <button className="px-3.5 py-2 rounded-xl text-xxs font-black text-white bg-gradient-to-r from-blue-600 to-cyan-500 hover:scale-[1.02] shadow transition duration-300 inline-flex items-center gap-1 cursor-pointer">
+                  {/* Highlights section */}
+                  <div className="p-3.5 bg-slate-50 dark:bg-slate-950/20 rounded-xl text-left border border-slate-200/40 dark:border-slate-800/50 space-y-2">
+                    <span className="text-[9.5px] font-black uppercase text-slate-400 tracking-wider block mb-1">
+                      {language === 'bn' ? 'ফিচার হাইলাইটস' : language === 'ar' ? 'أبرز المزايا' : 'Category Highlights'}
+                    </span>
+                    <ul className="space-y-1.5">
+                      {highlights.map((hlt, hIdx) => (
+                        <li key={hIdx} className="text-[11px] font-bold text-slate-650 dark:text-slate-350 leading-snug flex items-start gap-1.5">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
+                          <span>{hlt}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="mt-6 pt-4 border-t border-slate-100/70 dark:border-slate-800/40">
+                  <button className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 text-white text-xs font-black rounded-xl shadow-md cursor-pointer flex items-center justify-center gap-1.5 transition-all duration-300 hover:scale-[1.01]">
                     <span>{currentTrans.explorePlans}</span>
-                    <ArrowRight className="w-3 h-3" />
+                    <ArrowRight className="w-3.5 h-3.5" />
                   </button>
                 </div>
-              </div>
+              </ServiceCard3D>
             );
           })}
         </div>
@@ -1470,26 +1921,270 @@ Sent from WebzoneBD Premium Order System`;
           </div>
 
           {/* Tab Selector & Billing Period switches */}
-          <div className="flex flex-col items-center gap-6 mb-16 select-none">
+          <div className="flex flex-col items-center gap-6 mb-14 select-none">
             
-            <div className="p-1.5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/70 dark:border-slate-800 flex items-center justify-center gap-1 shadow-md">
-              {[
-                { id: 'bdix', label: language === 'bn' ? 'বিডিআইএক্স হোস্টিং' : language === 'ar' ? 'استضافة BDIX' : 'Shared BDIX' },
-                { id: 'vps', label: language === 'bn' ? 'ভিপিএস সার্ভার' : language === 'ar' ? 'خوادم VPS' : 'VPS Hosting' },
-                { id: 'reseller', label: language === 'bn' ? 'রিসেলার হোস্টিং' : language === 'ar' ? 'استضافة الموزعين' : 'Reseller Hosting' },
-              ].map((categoryTab) => (
-                <button
-                  key={categoryTab.id}
-                  onClick={() => selectTab(categoryTab.id as any)}
-                  className={`px-4 py-2 font-black text-xs rounded-xl cursor-pointer transition ${
-                    activeTab === categoryTab.id 
-                      ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow' 
-                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-850'
-                  }`}
-                >
-                  {categoryTab.label}
-                </button>
-              ))}
+            {/* Premium Modern Category Selector Field */}
+            <div className="w-full max-w-5xl mx-auto">
+              <div className="text-center mb-3">
+                <span className="text-[10px] uppercase font-extrabold tracking-widest text-slate-400 dark:text-slate-500 font-mono">
+                  {language === 'bn' ? 'হোস্টিং ক্যাটাগরি বেছে নিন' : language === 'ar' ? 'اختر فئة الاستضافة' : 'Select Hosting Infrastructure Category'}
+                </span>
+              </div>
+
+              {/* Responsive Category Grid: 2 columns on mobile, 4 columns on large screens */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5 p-2 bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-slate-800/90 shadow-xl shadow-slate-200/40 dark:shadow-slate-950/60">
+                {[
+                  {
+                    id: 'bdix' as const,
+                    label: language === 'bn' ? 'শেয়ার্ড বিডিআইএক্স' : language === 'ar' ? 'استضافة BDIX' : 'Shared BDIX',
+                    subtitle: language === 'bn' ? '১-৫ms সুপারফাস্ট স্পিড' : language === 'ar' ? 'سرعة فائقة BDIX' : '1-5ms Ultra-Low Ping',
+                    badge: language === 'bn' ? 'জনপ্রিয়' : language === 'ar' ? 'شائع' : 'Fastest',
+                    badgeStyle: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30',
+                    activeBadgeStyle: 'bg-emerald-400 text-slate-950 font-black',
+                    icon: Globe,
+                    gradient: 'from-blue-600 via-indigo-600 to-cyan-500',
+                    iconBg: 'bg-blue-500/10 text-blue-600 dark:text-cyan-400',
+                    activeIconBg: 'bg-white/20 text-white shadow-inner',
+                    features: language === 'bn' 
+                      ? ['LiteSpeed ক্যাশ', 'ফ্রি এসএসএল', 'cPanel প্যানেল', 'ডেইলি ব্যাকআপ']
+                      : language === 'ar'
+                      ? ['كاش LiteSpeed', 'شهادة SSL مجاناً', 'لوحة cPanel', 'نسخ احتياطي']
+                      : ['LiteSpeed Cache', 'Free SSL', 'cPanel Access', 'Daily Backups'],
+                    summary: language === 'bn'
+                      ? 'বাংলাদেশি ও দক্ষিণ এশিয়ান ভিজিটরদের জন্য কম ল্যাটেন্সি এবং লাইটস্পিড ক্যাশ সহ সুপারফাস্ট BDIX কানেক্টিভিটি।'
+                      : language === 'ar'
+                      ? 'استضافة BDIX فائقة السرعة مع مخدمات LiteSpeed لضمان تحميل صفحات فوري وأعلى أداء للمواقع.'
+                      : 'Ultra-low latency NVMe BDIX routing engineered for instantaneous page rendering and high concurrency.'
+                  },
+                  {
+                    id: 'reseller' as const,
+                    label: language === 'bn' ? 'রিসেলার হোস্টিং' : language === 'ar' ? 'استضافة الموزعين' : 'Reseller Hosting',
+                    subtitle: language === 'bn' ? 'হোয়াইট-লেবেল WHM' : language === 'ar' ? 'لوحة WHM كاملة' : 'White-Label WHM',
+                    badge: language === 'bn' ? 'এজেন্সি' : language === 'ar' ? 'للشركات' : 'Agency',
+                    badgeStyle: 'bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border-indigo-500/30',
+                    activeBadgeStyle: 'bg-cyan-400 text-slate-950 font-black',
+                    icon: Layers,
+                    gradient: 'from-indigo-600 via-purple-600 to-blue-600',
+                    iconBg: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400',
+                    activeIconBg: 'bg-white/20 text-white shadow-inner',
+                    features: language === 'bn'
+                      ? ['কাস্টম নেমসার্ভার', 'ফ্রি WHM প্যানেল', 'ক্লায়েন্ট একাউন্ট তৈরি', 'ম্যালওয়্যার শিল্ড']
+                      : language === 'ar'
+                      ? ['خوادم أسماء مخصصة', 'لوحة WHM مجاناً', 'حسابات cPanel غير محدودة', 'حماية متقدمة']
+                      : ['Private Nameservers', 'Free WHM Panel', 'Unmetered Accounts', 'Malware Shield'],
+                    summary: language === 'bn'
+                      ? 'আপনার নিজস্ব ব্র্যান্ড নামে হোস্টিং ব্যবসা শুরু করতে আনলিমিটেড cPanel অ্যাকাউন্ট ও ফুল WHM কন্ট্রোল।'
+                      : language === 'ar'
+                      ? 'ابدأ شركة استضافتك الخاصة بعلامتك التجارية الكاملة مع لوحة تحكم WHM ودعم فني على مدار الساعة.'
+                      : 'Launch your independent web hosting business with white-label WHM, custom branding, and automated provisioning.'
+                  },
+                  {
+                    id: 'vps' as const,
+                    label: language === 'bn' ? 'ভিপিএস হোস্টিং' : language === 'ar' ? 'خوادم VPS' : 'VPS Hosting',
+                    subtitle: language === 'bn' ? 'ডেডিকেটেড KVM নোড' : language === 'ar' ? 'خوادم KVM مخصصة' : 'Dedicated KVM Node',
+                    badge: language === 'bn' ? 'রুট অ্যাক্সেস' : language === 'ar' ? 'رووت كامل' : 'Root Access',
+                    badgeStyle: 'bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/30',
+                    activeBadgeStyle: 'bg-amber-400 text-slate-950 font-black',
+                    icon: Terminal,
+                    gradient: 'from-purple-600 via-fuchsia-600 to-indigo-600',
+                    iconBg: 'bg-purple-500/10 text-purple-600 dark:text-purple-400',
+                    activeIconBg: 'bg-white/20 text-white shadow-inner',
+                    features: language === 'bn'
+                      ? ['ডেডিকেটেড vCPU', 'NVMe Gen4 স্টোরেজ', 'ফুল রুট SSH', 'IPv4 এড্রেস']
+                      : language === 'ar'
+                      ? ['معالجات vCPU مخصصة', 'أقراص NVMe Gen4', 'صلاحيات SSH كاملة', 'عنوان IPv4 مخصص']
+                      : ['Dedicated vCPU', 'NVMe Gen4 Storage', 'Full Root SSH', 'Dedicated IPv4'],
+                    summary: language === 'bn'
+                      ? 'ফুল রুট এক্সেস, ডেডিকেটেড সিপিইউ/র‍্যাম এবং কাস্টম ওএস কনফিগারেশন সহ এন্টারপ্রাইজ KVM ভার্চুয়ালাইজেশন।'
+                      : language === 'ar'
+                      ? 'خوادم سحابية افتراضية عالية الأداء مع صلاحيات Root كاملة وموارد مخصصة تماماً لتطبيقاتك.'
+                      : 'High-performance KVM virtual private servers with guaranteed hardware allocation, zero noisy neighbors, and full root access.'
+                  },
+                  {
+                    id: 'cloud' as const,
+                    label: language === 'bn' ? 'ক্লাউড হোস্টিং' : language === 'ar' ? 'الاستضافة السحابية' : 'Cloud Hosting',
+                    subtitle: language === 'bn' ? '৯৯.৯৯% হাই SLA' : language === 'ar' ? 'توسيع تلقائي 99.99%' : '99.99% High SLA',
+                    badge: language === 'bn' ? 'স্কেল-আপ' : language === 'ar' ? 'سحابي' : 'Auto Scale',
+                    badgeStyle: 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border-cyan-500/30',
+                    activeBadgeStyle: 'bg-emerald-400 text-slate-950 font-black',
+                    icon: Cloud,
+                    gradient: 'from-cyan-600 via-teal-600 to-blue-600',
+                    iconBg: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400',
+                    activeIconBg: 'bg-white/20 text-white shadow-inner',
+                    features: language === 'bn'
+                      ? ['অটো ফেইলওভার', 'রিডানড্যান্ট স্টোরেজ', 'ইনস্ট্যান্ট স্কেলিং', 'এন্টারপ্রাইজ SLA']
+                      : language === 'ar'
+                      ? ['نقل تلقائي عند العطل', 'تخزين سحابي مكرر', 'ترقية فورية للموارد', 'ضمان استقرار فائق']
+                      : ['Auto-Failover Node', 'Redundant Ceph SAN', 'Instant Scale', 'Enterprise SLA'],
+                    summary: language === 'bn'
+                      ? 'উচ্চ ট্রাফিকের জন্য রিডানড্যান্ট ক্লাউড ক্লাস্টার আর্কিটেকচার এবং ৯৯.৯৯% নিরবচ্ছিন্ন আপটাইম গ্যারান্টি।'
+                      : language === 'ar'
+                      ? 'بنية تحتية سحابية متقدمة متعددة العقد تضمن عدم توقف موقعك حتى في أوقات ذروة الزيارات.'
+                      : 'Multi-node cloud infrastructure with automatic resource redistribution, instant autoscaling, and zero downtime.'
+                  },
+                ].map((categoryTab) => {
+                  const isSelected = activeTab === categoryTab.id;
+                  const IconComponent = categoryTab.icon;
+
+                  return (
+                    <button
+                      key={categoryTab.id}
+                      type="button"
+                      onClick={() => selectTab(categoryTab.id)}
+                      className={`relative group text-left rtl:text-right p-3 sm:p-4 rounded-xl sm:rounded-2xl transition-all duration-300 cursor-pointer overflow-hidden flex flex-col justify-between min-h-[92px] sm:min-h-[110px] ${
+                        isSelected
+                          ? `bg-gradient-to-br ${categoryTab.gradient} text-white shadow-lg shadow-blue-500/20 scale-[1.02] border border-white/20`
+                          : 'bg-slate-50/80 dark:bg-slate-800/40 hover:bg-slate-100/90 dark:hover:bg-slate-800/80 text-slate-800 dark:text-slate-200 border border-slate-200/60 dark:border-slate-800/80 hover:border-blue-400/40 dark:hover:border-cyan-500/40'
+                      }`}
+                    >
+                      {/* Active Indicator Glow Ring */}
+                      {isSelected && (
+                        <div className="absolute -top-12 -right-12 w-28 h-28 bg-white/10 rounded-full blur-xl pointer-events-none" />
+                      )}
+
+                      {/* Header Row: Icon + Badge */}
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl flex items-center justify-center transition-transform group-hover:scale-110 ${
+                          isSelected ? categoryTab.activeIconBg : categoryTab.iconBg
+                        }`}>
+                          <IconComponent className="w-4 h-4 sm:w-4.5 sm:h-4.5 stroke-[2.2px]" />
+                        </div>
+
+                        <span className={`text-[8.5px] sm:text-[9.5px] font-black uppercase font-mono px-2 py-0.5 rounded-full border transition-all ${
+                          isSelected 
+                            ? categoryTab.activeBadgeStyle
+                            : categoryTab.badgeStyle
+                        }`}>
+                          {categoryTab.badge}
+                        </span>
+                      </div>
+
+                      {/* Title & Subtitle */}
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className={`text-xs sm:text-sm font-extrabold tracking-tight line-clamp-1 ${
+                            isSelected ? 'text-white' : 'text-slate-900 dark:text-white'
+                          }`}>
+                            {categoryTab.label}
+                          </span>
+                          {isSelected && (
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                          )}
+                        </div>
+                        <p className={`text-[10px] sm:text-[11px] font-medium line-clamp-1 mt-0.5 ${
+                          isSelected ? 'text-white/80' : 'text-slate-500 dark:text-slate-400'
+                        }`}>
+                          {categoryTab.subtitle}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Active Category Highlights Summary Strip */}
+              <AnimatePresence mode="wait">
+                {(() => {
+                  const activeConfig = [
+                    {
+                      id: 'bdix',
+                      label: language === 'bn' ? 'শেয়ার্ড বিডিআইএক্স' : language === 'ar' ? 'استضافة BDIX' : 'Shared BDIX',
+                      icon: Globe,
+                      summary: language === 'bn'
+                        ? 'বাংলাদেশি ও দক্ষিণ এশিয়ান ভিজিটরদের জন্য কম ল্যাটেন্সি এবং লাইটস্পিড ক্যাশ সহ সুপারফাস্ট BDIX কানেক্টিভিটি।'
+                        : language === 'ar'
+                        ? 'استضافة BDIX فائقة السرعة مع مخدمات LiteSpeed لضمان تحميل صفحات فوري وأعلى أداء للمواقع.'
+                        : 'Ultra-low latency NVMe BDIX routing engineered for instantaneous page rendering and high concurrency.',
+                      features: language === 'bn' 
+                        ? ['LiteSpeed ক্যাশ', 'ফ্রি এসএসএল', 'cPanel এক্সেস', 'ডেইলি ক্লাউড ব্যাকআপ']
+                        : language === 'ar'
+                        ? ['كاش LiteSpeed', 'شهادة SSL مجاناً', 'لوحة cPanel', 'نسخ احتياطي يومي']
+                        : ['LiteSpeed Cache', 'Free SSL', 'cPanel Access', 'Daily Backups']
+                    },
+                    {
+                      id: 'reseller',
+                      label: language === 'bn' ? 'রিসেলার হোস্টিং' : language === 'ar' ? 'استضافة الموزعين' : 'Reseller Hosting',
+                      icon: Layers,
+                      summary: language === 'bn'
+                        ? 'আপনার নিজস্ব ব্র্যান্ড নামে হোস্টিং ব্যবসা শুরু করতে আনলিমিটেড cPanel অ্যাকাউন্ট ও ফুল WHM কন্ট্রোল।'
+                        : language === 'ar'
+                        ? 'ابدأ شركة استضافتك الخاصة بعلامتك التجارية الكاملة مع لوحة تحكم WHM ودعم فني على مدار الساعة.'
+                        : 'Launch your independent web hosting business with white-label WHM, custom branding, and automated provisioning.',
+                      features: language === 'bn'
+                        ? ['কাস্টম নেমসার্ভার', 'ফ্রি WHM প্যানেল', 'ক্লায়েন্ট একাউন্ট তৈরি', 'ম্যালওয়্যার শিল্ড']
+                        : language === 'ar'
+                        ? ['خوادم أسماء مخصصة', 'لوحة WHM مجاناً', 'حسابات cPanel غير محدودة', 'حماية متقدمة']
+                        : ['Private Nameservers', 'Free WHM Panel', 'Unmetered Accounts', 'Malware Shield']
+                    },
+                    {
+                      id: 'vps',
+                      label: language === 'bn' ? 'ভিপিএস হোস্টিং' : language === 'ar' ? 'خوادم VPS' : 'VPS Hosting',
+                      icon: Terminal,
+                      summary: language === 'bn'
+                        ? 'ফুল রুট এক্সেস, ডেডিকেটেড সিপিইউ/র‍্যাম এবং কাস্টম ওএস কনফিগারেশন সহ এন্টারপ্রাইজ KVM ভার্চুয়ালাইজেশন।'
+                        : language === 'ar'
+                        ? 'خوادم سحابية افتراضية عالية الأداء مع صلاحيات Root كاملة وموارد مخصصة تماماً لتطبيقاتك.'
+                        : 'High-performance KVM virtual private servers with guaranteed hardware allocation, zero noisy neighbors, and full root access.',
+                      features: language === 'bn'
+                        ? ['ডেডিকেটেড vCPU', 'NVMe Gen4 স্টোরেজ', 'ফুল রুট SSH', 'IPv4 এড্রেস']
+                        : language === 'ar'
+                        ? ['معالجات vCPU مخصصة', 'أقراص NVMe Gen4', 'صلاحيات SSH كاملة', 'عنوان IPv4 مخصص']
+                        : ['Dedicated vCPU', 'NVMe Gen4 Storage', 'Full Root SSH', 'Dedicated IPv4']
+                    },
+                    {
+                      id: 'cloud',
+                      label: language === 'bn' ? 'ক্লাউড হোস্টিং' : language === 'ar' ? 'الاستضافة السحابية' : 'Cloud Hosting',
+                      icon: Cloud,
+                      summary: language === 'bn'
+                        ? 'উচ্চ ট্রাফিকের জন্য রিডানড্যান্ট ক্লাউড ক্লাস্টার আর্কিটেকচার এবং ৯৯.৯৯% নিরবচ্ছিন্ন আপটাইম গ্যারান্টি।'
+                        : language === 'ar'
+                        ? 'بنية تحتية سحابية متقدمة متعددة العقد تضمن عدم توقف موقعك حتى في أوقات ذروة الزيارات.'
+                        : 'Multi-node cloud infrastructure with automatic resource redistribution, instant autoscaling, and zero downtime.',
+                      features: language === 'bn'
+                        ? ['অটো ফেইলওভার', 'রিডানড্যান্ট স্টোরেজ', 'ইনস্ট্যান্ট স্কেলিং', 'এন্টারপ্রাইজ SLA']
+                        : language === 'ar'
+                        ? ['نقل تلقائي عند العطل', 'تخزين سحابي مكرر', 'ترقية فورية للموارد', 'ضمان استقرار فائق']
+                        : ['Auto-Failover Node', 'Redundant Ceph SAN', 'Instant Scale', 'Enterprise SLA']
+                    }
+                  ].find(c => c.id === activeTab);
+
+                  if (!activeConfig) return null;
+                  const ActiveIcon = activeConfig.icon;
+
+                  return (
+                    <motion.div
+                      key={activeTab}
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -6 }}
+                      transition={{ duration: 0.2 }}
+                      className="mt-3.5 px-4 py-3 sm:px-5 sm:py-3.5 bg-gradient-to-r from-blue-500/5 via-indigo-500/5 to-cyan-500/5 dark:from-blue-950/30 dark:via-indigo-950/30 dark:to-cyan-950/30 border border-blue-500/20 dark:border-blue-500/30 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <span className="p-1.5 rounded-lg bg-blue-500/10 dark:bg-cyan-500/20 text-blue-600 dark:text-cyan-400 shrink-0">
+                          <ActiveIcon className="w-4 h-4" />
+                        </span>
+                        <p className="text-slate-700 dark:text-slate-300 font-medium text-[11px] sm:text-xs leading-relaxed">
+                          <strong className="text-slate-900 dark:text-white font-extrabold mr-1">{activeConfig.label}:</strong>
+                          {activeConfig.summary}
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+                        {activeConfig.features.map((feat, fIdx) => (
+                          <span
+                            key={fIdx}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 text-[10px] font-bold text-slate-700 dark:text-slate-300 shadow-2xs"
+                          >
+                            <Check className="w-3 h-3 text-emerald-500 stroke-[3px]" />
+                            <span>{feat}</span>
+                          </span>
+                        ))}
+                      </div>
+                    </motion.div>
+                  );
+                })()}
+              </AnimatePresence>
             </div>
 
             {/* Elegant Custom Billing Cycle Dropdown Selector */}
@@ -1633,24 +2328,27 @@ Sent from WebzoneBD Premium Order System`;
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ duration: 0.4 }}
-                  className={`relative overflow-hidden flex flex-col justify-between p-6 sm:p-8 rounded-3xl bg-white dark:bg-[#0F172A] border transition-all duration-300 transform hover:-translate-y-2 ${
-                    activeBadge 
-                      ? activeBadge.includes('Best Value') || activeBadge.includes('সেরা ভ্যালু')
-                        ? 'border-emerald-500 dark:border-emerald-400 shadow-2xl ring-2 ring-emerald-500/20'
-                        : 'border-blue-500 dark:border-cyan-400 shadow-2xl ring-2 ring-blue-500/20'
-                      : 'border-slate-200/50 dark:border-slate-800 shadow-md shadow-slate-900/5'
-                  }`}
+                  className="h-full"
                 >
-                  {/* Floating Badge */}
-                  {activeBadge && (
-                    <span className={`absolute top-4 right-4 text-white font-mono font-black text-[9px] uppercase tracking-wider px-3 py-1 rounded-full shadow animate-pulse bg-gradient-to-r ${
-                      activeBadge.includes('Best Value') || activeBadge.includes('সেরা ভ্যালু')
-                        ? 'from-emerald-500 to-teal-600'
-                        : 'from-blue-600 to-indigo-650'
-                    }`}>
-                      {activeBadge}
-                    </span>
-                  )}
+                  <ServiceCard3D
+                    glowGradient={
+                      activeBadge && (activeBadge.includes('Best Value') || activeBadge.includes('সেরা ভ্যালু'))
+                        ? 'from-emerald-500 via-teal-500 to-cyan-400'
+                        : 'from-blue-600 via-indigo-500 to-purple-500'
+                    }
+                    isSelected={!!activeBadge}
+                    innerClassName="p-6 sm:p-8"
+                  >
+                    {/* Floating Badge */}
+                    {activeBadge && (
+                      <span className={`absolute top-4 right-4 text-white font-mono font-black text-[9px] uppercase tracking-wider px-3 py-1 rounded-full shadow animate-pulse bg-gradient-to-r ${
+                        activeBadge.includes('Best Value') || activeBadge.includes('সেরা ভ্যালু')
+                          ? 'from-emerald-500 to-teal-600'
+                          : 'from-blue-600 to-indigo-650'
+                      }`}>
+                        {activeBadge}
+                      </span>
+                    )}
 
                   <div className="space-y-6">
                     <div className="flex items-center gap-3">
@@ -1664,6 +2362,50 @@ Sent from WebzoneBD Premium Order System`;
                         <span className="inline-block text-[10px] font-mono uppercase bg-blue-500/10 dark:bg-cyan-500/10 text-blue-600 dark:text-cyan-400 px-2.5 py-0.5 rounded-md font-bold mt-1">
                           {pkg.storage}
                         </span>
+                      </div>
+                    </div>
+
+                    {/* Select Billing Cycle Duration Selector Inside Card */}
+                    <div className="pt-3 pb-1 border-t border-slate-100 dark:border-slate-800">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 dark:text-slate-500 font-mono">
+                          {language === 'bn' ? 'বিলিং সাইকেল সময়কাল' : language === 'ar' ? 'دورة الفوترة' : 'Billing Cycle Duration'}
+                        </span>
+                        <span className="text-[9.5px] font-black text-blue-600 dark:text-cyan-400 font-mono">
+                          {billingCycle === '24' ? '30% OFF 🔥' : billingCycle === '12' ? '20% OFF ⭐' : 'Regular'}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-100/80 dark:bg-slate-900/90 rounded-xl border border-slate-200/60 dark:border-slate-800/80">
+                        {[
+                          { cycle: '1' as const, label: language === 'bn' ? '১ মাস' : language === 'ar' ? 'شهر' : '1 Mo', badge: '' },
+                          { cycle: '12' as const, label: language === 'bn' ? '১২ মাস' : language === 'ar' ? '١٢ شهر' : '12 Mo', badge: '-20%' },
+                          { cycle: '24' as const, label: language === 'bn' ? '২৪ মাস' : language === 'ar' ? '٢٤ شهر' : '24 Mo', badge: '-30%' }
+                        ].map((btn) => {
+                          const isSelected = billingCycle === btn.cycle;
+                          return (
+                            <button
+                              key={btn.cycle}
+                              type="button"
+                              onClick={() => setBillingCycle(btn.cycle)}
+                              className={`relative py-1.5 px-2 rounded-lg text-center cursor-pointer transition-all duration-200 flex flex-col items-center justify-center ${
+                                isSelected
+                                  ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-cyan-400 font-black shadow-sm border border-blue-500/20 dark:border-cyan-500/30'
+                                  : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-slate-800/50 font-medium'
+                              }`}
+                            >
+                              <span className="text-[11px] leading-tight font-bold">{btn.label}</span>
+                              {btn.badge && (
+                                <span className={`text-[8.5px] font-mono leading-none font-bold mt-0.5 px-1 py-0.2 rounded-full ${
+                                  isSelected
+                                    ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                                    : 'text-emerald-500/80 dark:text-emerald-400/80'
+                                }`}>
+                                  {btn.badge}
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
 
@@ -1746,16 +2488,25 @@ Sent from WebzoneBD Premium Order System`;
                       </ul>
                     </div>
 
-                    {/* Core Features bullets */}
+                    {/* Core Features / Specs List with intuitive SVG icons */}
                     <div className="space-y-2 text-left">
-                      {pkg.features.map((feature, i) => (
-                        <div key={i} className="flex items-start gap-2 text-xs">
-                          <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-                          <span className="text-slate-700 dark:text-slate-300 font-medium">
-                            {feature}
-                          </span>
-                        </div>
-                      ))}
+                      {pkg.features.map((feature, i) => {
+                        const spec = getSpecDetail(feature);
+                        const SpecIcon = spec.icon;
+                        return (
+                          <div 
+                            key={i} 
+                            className="group/item flex items-start gap-2.5 p-1.5 rounded-xl hover:bg-slate-100/60 dark:hover:bg-slate-900/60 transition-all duration-200 text-xs"
+                          >
+                            <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 border shadow-xs transition-transform duration-200 group-hover/item:scale-110 mt-0.5 ${spec.colorClass}`}>
+                              <SpecIcon className="w-3.5 h-3.5 stroke-[2.2]" />
+                            </div>
+                            <span className="text-slate-750 dark:text-slate-250 font-medium leading-relaxed flex-1">
+                              {feature}
+                            </span>
+                          </div>
+                        );
+                      })}
                     </div>
 
                   </div>
@@ -1777,7 +2528,7 @@ Sent from WebzoneBD Premium Order System`;
                       <span>{language === 'bn' ? '🟢 হোয়াটসঅ্যাপ অর্ডার ফর্ম' : language === 'ar' ? '🟢 طلب عبر الواتساب' : '🟢 WhatsApp Order Form'}</span>
                     </button>
                   </div>
-
+                  </ServiceCard3D>
                 </motion.div>
               );
             })}
@@ -3274,7 +4025,7 @@ Sent from WebzoneBD Premium Order System`;
       {/* WhatsApp Order Form Modal */}
       <AnimatePresence>
         {isOrderModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-md">
+          <div id="wbd-whatsapp-order-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-md">
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -3344,6 +4095,7 @@ Sent from WebzoneBD Premium Order System`;
                           <option value="bdix" className="dark:bg-[#111827]">Shared BDiX</option>
                           <option value="reseller" className="dark:bg-[#111827]">Reseller Hosting</option>
                           <option value="vps" className="dark:bg-[#111827]">VPS Hosting</option>
+                          <option value="cloud" className="dark:bg-[#111827]">Cloud Hosting</option>
                         </select>
                         <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
                       </div>

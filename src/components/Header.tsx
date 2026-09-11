@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Globe, Sun, Moon, ShoppingBag, User, Settings, 
   Menu, X, Trash2, Tag, Percent, ArrowRight, ShieldCheck,
@@ -8,19 +8,21 @@ import {
   ExternalLink, HelpCircle, Briefcase, Settings2, Laptop, Database, Globe2,
   BookOpen, Heart, Bell, UserPlus, LogIn, Coins,
   Star, Bot, MessageSquare, Flame, CheckCircle, Users, Wifi, Copy, Check, Upload,
-  Eye, EyeOff
+  Eye, EyeOff, Camera, QrCode, ArrowUp, Download, Store, Zap, Info
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Language, Theme, CartItem, Coupon, UserSession, Currency, Product } from '../types';
 import { sampleCoupons, sampleProducts } from '../data';
 import { catalogServicesData, fixedPackagesData } from './ServicesData';
 import { initialLocalBlogs } from './BlogData';
+import { sendOrderToWhatsApp, constructWhatsAppOrderSummaryMessage } from '../utils/whatsapp';
+import { MegaMenuDesktop } from './MegaMenuDesktop';
 
 interface HeaderProps {
   language: Language;
   setLanguage: (lang: Language) => void;
   theme: Theme;
-  setTheme: (theme: Theme) => void;
+  setTheme: (theme: Theme, event?: React.MouseEvent) => void;
   cart: CartItem[];
   removeFromCart: (index: number) => void;
   applyCouponToCart: (couponCode: string) => string | null;
@@ -53,6 +55,319 @@ interface HeaderProps {
   saMethods?: any;
   intlMethods?: any;
   customMethods?: any[];
+}
+
+interface AutoCheckoutQrGeneratorProps {
+  gateway: string;
+  orderTotalFormatted: string;
+  orderTotalNumber: number;
+  currency: Currency;
+  language: Language;
+  triggerToast: (msg: string) => void;
+  merchantNumber?: string;
+  accountName?: string;
+  accountNo?: string;
+  bankBranch?: string;
+  routingNo?: string;
+  swiftCode?: string;
+  instructions?: string;
+  defaultColorHex?: string;
+}
+
+function AutoCheckoutQrGenerator({
+  gateway,
+  orderTotalFormatted,
+  orderTotalNumber,
+  currency,
+  language,
+  triggerToast,
+  merchantNumber,
+  accountName,
+  accountNo,
+  bankBranch,
+  routingNo,
+  swiftCode,
+  instructions,
+  defaultColorHex
+}: AutoCheckoutQrGeneratorProps) {
+  const [payloadType, setPayloadType] = useState<'pay_amount' | 'invoice' | 'tel_direct'>('pay_amount');
+  const [qrTheme, setQrTheme] = useState<'brand' | 'royal' | 'slate'>('brand');
+  const [copiedPayload, setCopiedPayload] = useState(false);
+
+  const brandColorHex = useMemo(() => {
+    if (defaultColorHex) return defaultColorHex;
+    if (gateway.includes('bKash')) return 'd1245e';
+    if (gateway.includes('Nagad')) return 'f15a22';
+    if (gateway.includes('Rocket')) return '8c2aeb';
+    if (gateway.includes('Cellfin')) return '0081d6';
+    if (gateway.includes('Islami')) return '059669';
+    if (gateway.includes('STC')) return '7c3aed';
+    if (gateway.includes('Alraji') || gateway.includes('Al Rajhi')) return '1d4ed8';
+    if (gateway.includes('USD')) return '059669';
+    return '7c3aed';
+  }, [gateway, defaultColorHex]);
+
+  const activeColorHex = 
+    qrTheme === 'royal' ? '7c3aed' :
+    qrTheme === 'slate' ? '0f172a' : brandColorHex;
+
+  const targetIdentifier = merchantNumber || accountNo || '01864000005';
+
+  const qrPayload = useMemo(() => {
+    if (payloadType === 'tel_direct') {
+      return targetIdentifier.replace(/\s/g, '');
+    }
+    if (payloadType === 'invoice') {
+      return `WebzoneBD Payment Invoice\nGateway: ${gateway}\nAmount Due: ${orderTotalFormatted}\nRecipient: ${accountName || 'Webzone BD Merchant'}\nAccount/Wallet: ${targetIdentifier}\nStatus: Pending Payment`;
+    }
+    return `Pay ${orderTotalFormatted} via ${gateway} to ${targetIdentifier} [Ref: WebzoneBD Order Total ${orderTotalFormatted}]`;
+  }, [payloadType, gateway, orderTotalFormatted, targetIdentifier, accountName]);
+
+  const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&color=${activeColorHex}&data=${encodeURIComponent(qrPayload)}`;
+
+  const handleDownloadQr = async () => {
+    try {
+      const response = await fetch(qrImageUrl);
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = `${gateway.replace(/\s+/g, '_')}_Order_${orderTotalFormatted.replace(/[^a-zA-Z0-9]/g, '')}_QR.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
+      triggerToast(language === 'bn' ? "পেমেন্ট কিউআর কোড ডাউনলোড হয়েছে!" : "Payment QR Code saved to device! 📲");
+    } catch (err) {
+      window.open(qrImageUrl, '_blank');
+      triggerToast(language === 'bn' ? "নতুন ট্যাবে QR কোড দেখানো হয়েছে!" : "QR Code opened in a new tab!");
+    }
+  };
+
+  const handleCopyPayload = () => {
+    navigator.clipboard.writeText(qrPayload);
+    setCopiedPayload(true);
+    setTimeout(() => setCopiedPayload(false), 2000);
+    triggerToast(language === 'bn' ? "পেমেন্ট ডেটা কপি করা হয়েছে!" : "Payment details & total copied!");
+  };
+
+  const handleAppLaunch = () => {
+    if (gateway.includes('bKash')) {
+      window.open('bkash://', '_blank');
+      triggerToast(language === 'bn' ? "বিকাশ অ্যাপ ওপেন করা হচ্ছে বা ডায়াল করুন *247#" : "Opening bKash App or Dial *247#");
+    } else if (gateway.includes('Nagad')) {
+      window.open('nagad://', '_blank');
+      triggerToast(language === 'bn' ? "নগদ অ্যাপ ওপেন করা হচ্ছে বা ডায়াল করুন *167#" : "Opening Nagad App or Dial *167#");
+    } else if (gateway.includes('Cellfin')) {
+      window.open('cellfin://', '_blank');
+      triggerToast(language === 'bn' ? "সেলফিন অ্যাপ ওপেন করা হচ্ছে" : "Opening Cellfin App");
+    } else if (gateway.includes('STC')) {
+      window.open('stcpay://', '_blank');
+      triggerToast("Opening STC Pay App");
+    } else {
+      triggerToast(language === 'bn' ? "কিউআর কোড স্ক্যান করে পেমেন্ট সম্পূর্ণ করুন" : "Scan QR code to process payment");
+    }
+  };
+
+  return (
+    <div className="w-full my-3 p-3.5 sm:p-4 rounded-2xl border border-neutral-200/80 dark:border-slate-800 bg-white/80 dark:bg-[#080d19]/90 shadow-sm transition-all duration-300 font-sans">
+      {/* Top Banner with Auto-Generated Badge */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pb-3 mb-3 border-b border-neutral-200/60 dark:border-slate-800">
+        <div className="flex items-center gap-2">
+          <div className="p-1.5 rounded-lg bg-gradient-to-r from-violet-500/20 to-pink-500/20 border border-violet-500/30">
+            <QrCode className="w-4 h-4 text-violet-600 dark:text-violet-400 animate-pulse" />
+          </div>
+          <div className="text-left">
+            <span className="text-xs font-black text-neutral-900 dark:text-white block leading-tight">
+              {language === 'bn' ? 'অটোমেটিক কিউআর কোড জেনারেটর' : 'Automatic Payment QR Generator'}
+            </span>
+            <span className="text-[9px] font-bold text-neutral-400 block">
+              {gateway} • {language === 'bn' ? 'তাৎক্ষণিক মোবাইল স্ক্যান' : 'Instant Mobile Scanning'}
+            </span>
+          </div>
+        </div>
+
+        {/* Dynamic Total Badge */}
+        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 dark:bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 text-[11px] font-black font-mono shadow-xs shrink-0">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+          <span>{language === 'bn' ? `সর্বমোট: ${orderTotalFormatted}` : `Order Total: ${orderTotalFormatted}`}</span>
+        </div>
+      </div>
+
+      {/* Interactive Controls Row */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
+        {/* Payload Selector */}
+        <div className="flex flex-col items-center sm:items-start">
+          <span className="text-[8px] uppercase tracking-wider text-neutral-400 font-black mb-1">
+            {language === 'bn' ? 'পেমেন্ট এনকোডিং টাইপ' : 'Encoded QR Data'}
+          </span>
+          <div className="flex gap-1 p-0.5 bg-neutral-100 dark:bg-slate-900 rounded-lg border border-neutral-200 dark:border-slate-800 w-full">
+            <button
+              type="button"
+              onClick={() => setPayloadType('pay_amount')}
+              className={`flex-1 py-1 px-1.5 rounded-md text-[9px] font-extrabold transition-all cursor-pointer ${
+                payloadType === 'pay_amount'
+                  ? 'bg-white dark:bg-slate-800 text-violet-600 dark:text-cyan-400 shadow-xs border border-violet-500/30'
+                  : 'text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200'
+              }`}
+            >
+              {language === 'bn' ? 'টাকা সমেত পে' : 'Amount Payload'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setPayloadType('invoice')}
+              className={`flex-1 py-1 px-1.5 rounded-md text-[9px] font-extrabold transition-all cursor-pointer ${
+                payloadType === 'invoice'
+                  ? 'bg-white dark:bg-slate-800 text-violet-600 dark:text-cyan-400 shadow-xs border border-violet-500/30'
+                  : 'text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200'
+              }`}
+            >
+              {language === 'bn' ? 'ইনভয়েস' : 'Invoice'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setPayloadType('tel_direct')}
+              className={`flex-1 py-1 px-1.5 rounded-md text-[9px] font-extrabold transition-all cursor-pointer ${
+                payloadType === 'tel_direct'
+                  ? 'bg-white dark:bg-slate-800 text-violet-600 dark:text-cyan-400 shadow-xs border border-violet-500/30'
+                  : 'text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200'
+              }`}
+            >
+              {language === 'bn' ? 'নাম্বার' : 'Number'}
+            </button>
+          </div>
+        </div>
+
+        {/* QR Color Theme Selector */}
+        <div className="flex flex-col items-center sm:items-end">
+          <span className="text-[8px] uppercase tracking-wider text-neutral-400 font-black mb-1">
+            {language === 'bn' ? 'কিউআর থিম' : 'QR Style Theme'}
+          </span>
+          <div className="flex gap-1 p-0.5 bg-neutral-100 dark:bg-slate-900 rounded-lg border border-neutral-200 dark:border-slate-800 w-full sm:w-auto">
+            <button
+              type="button"
+              onClick={() => setQrTheme('brand')}
+              className={`px-2.5 py-1 rounded-md text-[9px] font-extrabold transition-all cursor-pointer ${
+                qrTheme === 'brand'
+                  ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-xs border border-indigo-500/30'
+                  : 'text-neutral-500'
+              }`}
+            >
+              {language === 'bn' ? 'ব্র্যান্ড' : 'Brand'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setQrTheme('royal')}
+              className={`px-2.5 py-1 rounded-md text-[9px] font-extrabold transition-all cursor-pointer ${
+                qrTheme === 'royal'
+                  ? 'bg-white dark:bg-slate-800 text-purple-600 dark:text-purple-400 shadow-xs border border-purple-500/30'
+                  : 'text-neutral-500'
+              }`}
+            >
+              Royal
+            </button>
+            <button
+              type="button"
+              onClick={() => setQrTheme('slate')}
+              className={`px-2.5 py-1 rounded-md text-[9px] font-extrabold transition-all cursor-pointer ${
+                qrTheme === 'slate'
+                  ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs border border-slate-500/30'
+                  : 'text-neutral-500'
+              }`}
+            >
+              Slate
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* QR Code Center Showcase */}
+      <div className="flex flex-col items-center justify-center py-2">
+        <div className="relative group p-3 bg-white dark:bg-[#0c1222] rounded-2xl border border-neutral-200 dark:border-slate-800 shadow-md transition-all duration-300 hover:shadow-lg max-w-[180px]">
+          {/* Subtle Glow Ring */}
+          <div 
+            className="absolute -inset-1 rounded-2xl opacity-20 group-hover:opacity-40 transition duration-500 blur-sm pointer-events-none"
+            style={{ backgroundColor: `#${activeColorHex}` }}
+          />
+          
+          <div className="relative w-[150px] h-[150px] bg-neutral-50 dark:bg-[#080c18] rounded-xl p-2 border border-neutral-150 dark:border-slate-800 flex items-center justify-center overflow-hidden">
+            <img 
+              src={qrImageUrl} 
+              alt={`${gateway} Payment QR Code`}
+              className="w-full h-full object-contain rounded transition-transform duration-300 group-hover:scale-105 pointer-events-none"
+              referrerPolicy="no-referrer"
+            />
+          </div>
+
+          <div className="mt-2 flex items-center justify-center gap-1">
+            <Sparkles className="w-3 h-3 text-emerald-500" />
+            <span className="text-[8.5px] font-mono font-black text-emerald-600 dark:text-emerald-400 tracking-tight uppercase">
+              {orderTotalFormatted} Auto-Encoded
+            </span>
+          </div>
+        </div>
+
+        {/* Action Toolbar underneath QR code */}
+        <div className="flex items-center gap-2 mt-3 w-full max-w-xs">
+          {/* Download Button */}
+          <motion.button
+            type="button"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={handleDownloadQr}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl bg-neutral-100 dark:bg-slate-900 border border-neutral-200/80 dark:border-slate-800 text-neutral-800 dark:text-white text-[10px] font-black hover:border-violet-500 transition-all cursor-pointer shadow-2xs"
+            title="Download QR Image"
+          >
+            <Download className="w-3.5 h-3.5 text-violet-500" />
+            <span>{language === 'bn' ? 'ডাউনলোড' : 'Download QR'}</span>
+          </motion.button>
+
+          {/* Copy Payload Button */}
+          <motion.button
+            type="button"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={handleCopyPayload}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl bg-neutral-100 dark:bg-slate-900 border border-neutral-200/80 dark:border-slate-800 text-neutral-800 dark:text-white text-[10px] font-black hover:border-violet-500 transition-all cursor-pointer shadow-2xs"
+            title="Copy QR Payload"
+          >
+            {copiedPayload ? (
+              <>
+                <Check className="w-3.5 h-3.5 text-emerald-500" />
+                <span className="text-emerald-600 dark:text-emerald-400">{language === 'bn' ? 'কপিড!' : 'Copied!'}</span>
+              </>
+            ) : (
+              <>
+                <Copy className="w-3.5 h-3.5 text-indigo-500" />
+                <span>{language === 'bn' ? 'কপি পে-লোড' : 'Copy Payload'}</span>
+              </>
+            )}
+          </motion.button>
+
+          {/* Mobile App Launch button if MFS / STC Pay */}
+          {(gateway.includes('bKash') || gateway.includes('Nagad') || gateway.includes('Cellfin') || gateway.includes('STC')) && (
+            <motion.button
+              type="button"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={handleAppLaunch}
+              className="p-2 rounded-xl bg-violet-500/10 border border-violet-500/30 text-violet-600 dark:text-violet-400 hover:bg-violet-500 hover:text-white transition-all cursor-pointer shadow-2xs"
+              title="Open Mobile Payment App"
+            >
+              <Smartphone className="w-3.5 h-3.5" />
+            </motion.button>
+          )}
+        </div>
+
+        {/* Concise Scanning Guide */}
+        <p className="text-[10px] text-neutral-500 dark:text-neutral-400 mt-2.5 leading-relaxed text-center max-w-sm">
+          {language === 'bn' 
+            ? `আপনার মোবাইল ক্যামেরা অথবা ${gateway} অ্যাপ দিয়ে কিউআর কোড স্ক্যান করুন। মোট মূল্য ${orderTotalFormatted} স্বয়ংক্রিয়ভাবে সংযুক্ত করা হয়েছে।`
+            : `Scan this QR code with your mobile camera or ${gateway} app. The ${orderTotalFormatted} total is auto-encoded.`}
+        </p>
+      </div>
+    </div>
+  );
 }
 
 export default function Header({
@@ -99,17 +414,31 @@ export default function Header({
   const setCartOpen = propSetCartOpen !== undefined ? propSetCartOpen : setLocalCartOpen;
 
   // Fallbacks for payment configurations
-  const finalBdMethods = bdMethods || {
-    bkash: { enabled: true, type: 'merchant', number: '01711223344', apiKey: 'bkash_mid_9901_key', instructions: 'Send money to our merchant number and paste the transaction ID here.', qrCode: 'https://images.unsplash.com/photo-1595079676339-1534801ad6cf?auto=format&fit=crop&q=80&w=300' },
-    nagad: { enabled: true, type: 'personal', number: '01811223344', apiKey: 'nagad_api_secure_token', instructions: 'Send money with send money option and input your mobile number as reference.', qrCode: '' },
-    rocket: { enabled: false, type: 'personal', number: '019112233449', apiKey: '', instructions: ' rocket transfer to 12-digit number.', qrCode: '' },
-    cellfin: { enabled: false, number: '01511223344', instructions: 'Transfer to CellFin wallet.', qrCode: '' },
-    islamiBank: { enabled: true, bankName: 'Islami Bank Bangladesh PLC', accountName: 'WebzoneBD IT Solutions', accountNumber: '20501450201235600', iban: 'BD03IBBL20501450201235600', swift: 'IBBLBDDHXXX', qrCode: '' }
+  const baseBdMethods = bdMethods || {
+    bkash: { enabled: true, type: 'personal', number: '0186400 0005', apiKey: 'bkash_mid_9901_key', instructions: 'Send Money or Personal transfer directly to our bKash personal wallet.', qrCode: '' },
+    nagad: { enabled: true, type: 'personal', number: '0186400 0005', apiKey: 'nagad_api_secure_token', instructions: 'Send Money directly to our secure Nagad Personal Wallet.', qrCode: '' },
+    rocket: { enabled: true, type: 'personal', number: '0186400 0005', apiKey: '', instructions: 'Direct Mobile Cash-in or Send Money via Rocket wallet.', qrCode: '' },
+    cellfin: { enabled: true, number: '0186400 0005', instructions: 'Initiate prompt cellfin transfer directly to our wallet.', qrCode: '' },
+    islamiBank: { enabled: true, bankName: 'Islami Bank Bangladesh PLC', accountName: 'MD IMRAN HOSSAIN', accountNumber: '20501290204369912', iban: 'BD03IBBL20501290204369912', swift: 'IBBLBDDHXXX', qrCode: '' }
   };
 
-  const finalSaMethods = saMethods || {
-    stcPay: { enabled: true, walletNumber: '+966501234567', instructions: 'Transfer via STC Pay mobile app directly to our wallet.', qrCode: '' },
-    alRajhi: { enabled: true, bankName: 'Al Rajhi Bank', accountName: 'WebzoneBD SA Ltd', accountNumber: '880012345678901', iban: 'SA8000000000880012345678901', swift: 'RAJISARIXXX', qrCode: '' }
+  const baseSaMethods = saMethods || {
+    stcPay: { enabled: true, walletNumber: '+966 57 051 1931', instructions: 'Transfer via STC Pay mobile app directly to our wallet.', qrCode: '' },
+    alRajhi: { enabled: true, bankName: 'Al Rajhi Bank Saudi Arabia 🇸🇦', accountName: 'MD IMRAN HOSSAIN', accountNumber: '621000010006086016528', iban: 'SA56 8000 0621 6080 1601 6528', swift: 'RJHISARI', qrCode: '' }
+  };
+
+  // Ensure real/correct numbers are always used to match logged-in checkout details
+  const finalBdMethods = {
+    bkash: { ...baseBdMethods.bkash, number: '0186400 0005', instructions: 'Send Money or Personal transfer directly to our bKash personal wallet.' },
+    nagad: { ...baseBdMethods.nagad, number: '0186400 0005', instructions: 'Send Money directly to our secure Nagad Personal Wallet.' },
+    rocket: { ...baseBdMethods.rocket, number: '0186400 0005', instructions: 'Direct Mobile Cash-in or Send Money via Rocket wallet.' },
+    cellfin: { ...baseBdMethods.cellfin, number: '0186400 0005', instructions: 'Initiate prompt cellfin transfer directly to our wallet.' },
+    islamiBank: { ...baseBdMethods.islamiBank, accountName: 'MD IMRAN HOSSAIN', accountNumber: '20501290204369912', iban: 'BD03IBBL20501290204369912' }
+  };
+
+  const finalSaMethods = {
+    stcPay: { ...baseSaMethods.stcPay, walletNumber: '+966 57 051 1931' },
+    alRajhi: { ...baseSaMethods.alRajhi, bankName: 'Al Rajhi Bank Saudi Arabia 🇸🇦', accountName: 'MD IMRAN HOSSAIN', accountNumber: '621000010006086016528', iban: 'SA56 8000 0621 6080 1601 6528', swift: 'RJHISARI' }
   };
 
   const finalIntlMethods = intlMethods || {
@@ -446,35 +775,109 @@ export default function Header({
   const [copiedAlrajiAccName, setCopiedAlrajiAccName] = useState(false);
   const [copiedAlrajiIban, setCopiedAlrajiIban] = useState(false);
   const [copiedAlrajiSwift, setCopiedAlrajiSwift] = useState(false);
-  const [selectedRegisteredGateway, setSelectedRegisteredGateway] = useState<string>('');
+  const [selectedRegisteredGateway, setSelectedRegisteredGateway] = useState<string>(() => localStorage.getItem('webzone_selected_registered_gateway') || '');
+  const [headerQrMode, setHeaderQrMode] = useState<'brand' | 'royal' | 'slate'>('brand');
+  const [headerQrType, setHeaderQrType] = useState<'tel' | 'invoice' | 'standard'>('invoice');
   const [deletingCartIndex, setDeletingCartIndex] = useState<number | null>(null);
   
   // Guest checkout details for frictionless direct checkouts
   const [checkoutMode, setCheckoutMode] = useState<'guest' | 'login'>('guest');
-  const [guestName, setGuestName] = useState('');
-  const [guestPhone, setGuestPhone] = useState('');
-  const [guestEmail, setGuestEmail] = useState('');
-  const [guestTransactionId, setGuestTransactionId] = useState('');
+  const [showAccountBenefitsTooltip, setShowAccountBenefitsTooltip] = useState(false);
+  const [guestName, setGuestName] = useState(() => localStorage.getItem('webzone_guest_name') || '');
+  const [guestPhone, setGuestPhone] = useState(() => localStorage.getItem('webzone_guest_phone') || '');
+  const [guestEmail, setGuestEmail] = useState(() => localStorage.getItem('webzone_guest_email') || '');
+  const [guestTransactionId, setGuestTransactionId] = useState(() => localStorage.getItem('webzone_guest_transaction_id') || '');
   const [guestReceipt, setGuestReceipt] = useState('');
   const [guestReceiptName, setGuestReceiptName] = useState('');
-  const [selectedGuestGateway, setSelectedGuestGateway] = useState<string>('');
+  const [selectedGuestGateway, setSelectedGuestGateway] = useState<string>(() => localStorage.getItem('webzone_selected_guest_gateway') || '');
   const [guestValidationError, setGuestValidationError] = useState('');
-  const [orderNotes, setOrderNotes] = useState('');
+  const [orderNotes, setOrderNotes] = useState(() => localStorage.getItem('webzone_order_notes') || '');
+  const [isPaymentConfirmed, setIsPaymentConfirmed] = useState(false);
+
+  // Sync state values to localStorage
+  useEffect(() => {
+    localStorage.setItem('webzone_selected_registered_gateway', selectedRegisteredGateway);
+  }, [selectedRegisteredGateway]);
+
+  useEffect(() => {
+    localStorage.setItem('webzone_guest_name', guestName);
+  }, [guestName]);
+
+  useEffect(() => {
+    localStorage.setItem('webzone_guest_phone', guestPhone);
+  }, [guestPhone]);
+
+  useEffect(() => {
+    localStorage.setItem('webzone_guest_email', guestEmail);
+  }, [guestEmail]);
+
+  useEffect(() => {
+    localStorage.setItem('webzone_guest_transaction_id', guestTransactionId);
+  }, [guestTransactionId]);
+
+  useEffect(() => {
+    localStorage.setItem('webzone_selected_guest_gateway', selectedGuestGateway);
+  }, [selectedGuestGateway]);
+
+  useEffect(() => {
+    localStorage.setItem('webzone_order_notes', orderNotes);
+  }, [orderNotes]);
+
+  // Premium Multiple Screenshot & Payment Receipt photo upload state
+  const [guestReceiptsList, setGuestReceiptsList] = useState<{name: string, url: string}[]>([]);
+
+  useEffect(() => {
+    if (guestReceiptsList.length > 0) {
+      setGuestReceipt(guestReceiptsList[0].url); // primary receipt for existing checkout logic
+      setGuestReceiptName(guestReceiptsList.map(r => r.name).join(', '));
+    } else {
+      setGuestReceipt('');
+      setGuestReceiptName('');
+    }
+  }, [guestReceiptsList]);
+
+  // 🎉 PREMIUM CONGRATULATIONS SUCCESS POPUP FOR SHOPPING CART ORDERS
+  const [isSuccessPopupOpen, setIsSuccessPopupOpen] = useState(false);
+  const [successOrderId, setSuccessOrderId] = useState('');
+  const [successItems, setSuccessItems] = useState<{name: string, price: number}[]>([]);
+  const [successTotal, setSuccessTotal] = useState(0);
+  const [successPaymentMethod, setSuccessPaymentMethod] = useState('');
+  const [successRecipientName, setSuccessRecipientName] = useState('');
+  const [successTransactionId, setSuccessTransactionId] = useState('');
+  const [copiedOrderMsg, setCopiedOrderMsg] = useState(false);
+
+  useEffect(() => {
+    setIsPaymentConfirmed(false);
+  }, [selectedGuestGateway, selectedRegisteredGateway, cartOpen]);
 
   // Sender details for registered BDT payment verification
-  const [senderName, setSenderName] = useState('');
-  const [senderNumber, setSenderNumber] = useState('');
-  const [senderTrxId, setSenderTrxId] = useState('');
+  const [senderName, setSenderName] = useState(() => localStorage.getItem('webzone_sender_name') || '');
+  const [senderNumber, setSenderNumber] = useState(() => localStorage.getItem('webzone_sender_number') || '');
+  const [senderTrxId, setSenderTrxId] = useState(() => localStorage.getItem('webzone_sender_trx_id') || '');
+
+  useEffect(() => {
+    localStorage.setItem('webzone_sender_name', senderName);
+  }, [senderName]);
+
+  useEffect(() => {
+    localStorage.setItem('webzone_sender_number', senderNumber);
+  }, [senderNumber]);
+
+  useEffect(() => {
+    localStorage.setItem('webzone_sender_trx_id', senderTrxId);
+  }, [senderTrxId]);
 
   useEffect(() => {
     if (user) {
-      setSenderName(user.name || '');
+      setSenderName(user.name || localStorage.getItem('webzone_sender_name') || '');
       if (user.phone) {
-        setSenderNumber(user.phone || '');
+        setSenderNumber(user.phone || localStorage.getItem('webzone_sender_number') || '');
+      } else {
+        setSenderNumber(localStorage.getItem('webzone_sender_number') || '');
       }
     } else {
-      setSenderName('');
-      setSenderNumber('');
+      setSenderName(localStorage.getItem('webzone_sender_name') || '');
+      setSenderNumber(localStorage.getItem('webzone_sender_number') || '');
     }
   }, [user]);
 
@@ -633,7 +1036,19 @@ export default function Header({
         triggerToast(language === 'bn' ? 'দয়া করে প্রেরকের নাম, নম্বর এবং ট্রানজেকশন আইডি পূরণ করুন!' : 'Please fill out all payment details: Sender Name, Phone/Account Number and Transaction ID.');
         return;
       }
+      if (!isPaymentConfirmed) {
+        triggerToast(language === 'bn' ? 'দয়া করে নিশ্চিত করুন যে আপনি পেমেন্ট করেছেন!' : 'Please confirm that you have paid by checking the confirmation box.');
+        return;
+      }
     }
+
+    const generatedOrderId = `WBD-ORD-${Math.floor(100000 + Math.random() * 900000)}`;
+    const itemsToSave = cart.map(item => ({
+      name: item.product.name,
+      price: item.product.discountPrice || item.product.price
+    }));
+    const totalToSave = total;
+    const recipientToSave = user ? (senderName || user.name || '') : (guestName || '');
 
     setCheckoutSuccess(true);
     setCheckoutSelectedMethod(method);
@@ -659,6 +1074,16 @@ export default function Header({
 
       setCheckoutSuccess(false);
       setCartOpen(false);
+
+      // Save to success states before resetting cart!
+      setSuccessOrderId(generatedOrderId);
+      setSuccessItems(itemsToSave);
+      setSuccessTotal(totalToSave);
+      setSuccessPaymentMethod(method);
+      setSuccessRecipientName(recipientToSave);
+      setSuccessTransactionId(senderTrxId || '');
+      setIsSuccessPopupOpen(true);
+
       resetCart();
       setDiscountAmount(0);
       setCouponCode('');
@@ -682,6 +1107,11 @@ export default function Header({
       return;
     }
 
+    if (!isPaymentConfirmed) {
+      setGuestValidationError(language === 'bn' ? 'দয়া করে নিশ্চিত করুন যে আপনি পেমেন্ট করেছেন!' : 'Please confirm that you have paid by checking the confirmation box.');
+      return;
+    }
+
     // Determine gateway method
     let method = selectedGuestGateway;
     if (!method) {
@@ -689,6 +1119,14 @@ export default function Header({
       else if (currency === 'BDT') method = 'bKash Wallet';
       else method = 'USD Bank Transfer';
     }
+
+    const generatedOrderId = `WBD-ORD-${Math.floor(100000 + Math.random() * 900000)}`;
+    const itemsToSave = cart.map(item => ({
+      name: item.product.name,
+      price: item.product.discountPrice || item.product.price
+    }));
+    const totalToSave = total;
+    const recipientToSave = guestName;
 
     setCheckoutSelectedMethod(method);
     setCheckoutSuccess(true);
@@ -753,6 +1191,16 @@ Please verify this payment and process the order. Thank you!`;
 
       setCheckoutSuccess(false);
       setCartOpen(false);
+
+      // Save to success states before resetting cart!
+      setSuccessOrderId(generatedOrderId);
+      setSuccessItems(itemsToSave);
+      setSuccessTotal(totalToSave);
+      setSuccessPaymentMethod(method);
+      setSuccessRecipientName(recipientToSave);
+      setSuccessTransactionId(guestTransactionId || '');
+      setIsSuccessPopupOpen(true);
+
       resetCart();
       setDiscountAmount(0);
       setCouponCode('');
@@ -811,9 +1259,13 @@ Please verify this payment and process the order. Thank you!`;
       window.dispatchEvent(new Event('storage'));
       setCurrentPage('marketplace');
     } else if (type === 'hosting') {
-      localStorage.setItem('webzone_target_hosting_tab', 'all');
-      window.dispatchEvent(new Event('storage'));
-      setCurrentPage('hosting');
+      if (item.title === "Domain Registration") {
+        setCurrentPage('domain');
+      } else {
+        localStorage.setItem('webzone_target_hosting_tab', 'all');
+        window.dispatchEvent(new Event('storage'));
+        setCurrentPage('hosting');
+      }
     }
     setMobileMenuOpen(false);
   };
@@ -1177,7 +1629,7 @@ Please verify this payment and process the order. Thank you!`;
               </div>
             </div>
 
-            {/* Currency Switcher Dropdown (Respects admin activation state toggle settings) */}
+            {/* Currency Switcher Dropdown */}
             <div className="relative currency-dropdown-container">
               <button 
                 onClick={(e) => {
@@ -1185,17 +1637,17 @@ Please verify this payment and process the order. Thank you!`;
                   setDesktopCurrencyOpen(!desktopCurrencyOpen);
                   setDesktopLanguageOpen(false);
                 }}
-                className={`flex items-center gap-1.5 py-1 px-2.5 rounded-lg border text-[11px] font-mono font-black transition duration-155 cursor-pointer select-none ${
+                className={`flex items-center gap-1.5 py-1 px-2.5 rounded-lg border text-[11px] font-bold transition duration-155 cursor-pointer select-none ${
                   desktopCurrencyOpen
                     ? 'border-blue-500 bg-blue-50/10 text-blue-600 dark:text-cyan-400'
-                    : 'border-neutral-300 dark:border-neutral-800 bg-white/40 dark:bg-neutral-900/40 backdrop-blur-sm hover:bg-neutral-100 dark:hover:bg-neutral-800/60'
+                    : 'border-neutral-200 dark:border-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-800/60'
                 }`}
               >
                 <span>{currency === 'BDT' ? '🇧🇩 ৳ BDT' : currency === 'SAR' ? '🇸🇦 ﷼ SAR' : '🇺🇸 $ USD'}</span>
-                <ChevronDown className={`w-3 h-3 text-neutral-400 transition-transform duration-205 ${desktopCurrencyOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`w-3 h-3 text-neutral-400 transition-transform duration-200 ${desktopCurrencyOpen ? 'rotate-180' : ''}`} />
               </button>
               <div 
-                className={`absolute right-0 top-full mt-1.5 w-36 origin-top-right rounded-xl border bg-white/80 dark:bg-neutral-950/80 backdrop-blur-xl shadow-2xl transition-all duration-200 z-50 border-neutral-200/80 dark:border-neutral-800 p-1.5 space-y-1 ${
+                className={`absolute right-0 top-full mt-1.5 w-32 origin-top-right rounded-xl border bg-white dark:bg-neutral-950 shadow-2xl transition-all duration-150 z-50 border-neutral-200/60 dark:border-neutral-800 p-1 space-y-0.5 ${
                   desktopCurrencyOpen 
                     ? 'scale-100 opacity-100 visible pointer-events-auto' 
                     : 'scale-95 opacity-0 invisible pointer-events-none'
@@ -1213,10 +1665,10 @@ Please verify this payment and process the order. Thank you!`;
                       setCurrency(cur);
                       setDesktopCurrencyOpen(false);
                     }}
-                    className={`w-full flex items-center justify-between px-2.5 py-1.5 text-xs font-black rounded-lg cursor-pointer transition text-left select-none ${
+                    className={`w-full flex items-center justify-between px-2.5 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer select-none ${
                       currency === cur 
-                        ? 'bg-gradient-to-r from-blue-600 to-cyan-555 text-white font-black shadow' 
-                        : 'hover:bg-neutral-150/80 dark:hover:bg-neutral-900/80 text-slate-700 dark:text-neutral-300'
+                        ? 'bg-blue-600 text-white font-black' 
+                        : 'hover:bg-neutral-100 dark:hover:bg-neutral-900 text-neutral-500 dark:text-neutral-300'
                     }`}
                   >
                     <span>{cur === 'BDT' ? '🇧🇩 BDT' : cur === 'SAR' ? '🇸🇦 SAR' : '🇺🇸 USD'}</span>
@@ -1229,7 +1681,7 @@ Please verify this payment and process the order. Thank you!`;
         </div>
       </div>
 
-      {/* Main Main Header - Sticky Navigation (Height: 64px) */}
+      {/* Main Header - Sticky Navigation (Height: 64px) */}
       <header className={`sticky top-0 z-40 w-full transition-all duration-300 ${
         isScrolled 
           ? 'backdrop-blur-md bg-white/90 dark:bg-neutral-950/90 shadow-lg border-b border-neutral-200/80 dark:border-neutral-850/80' 
@@ -1257,505 +1709,34 @@ Please verify this payment and process the order. Thank you!`;
               </div>
             </div>
 
-            {/* CENTER: Main Navigation Menu with hover-triggered luxurious Mega Menus */}
-            <nav className="hidden md:flex items-center space-x-1 lg:space-x-1.5" aria-label="Desktop Navigation">
-              
-              {/* Home Link */}
-              <button
-                className={`px-3 py-2 rounded-xl text-xs font-bold font-sans transition-all duration-150 cursor-pointer ${
-                  currentPage === 'home'
-                    ? 'bg-blue-50 dark:bg-neutral-900/60 text-blue-600 dark:text-cyan-400 font-extrabold'
-                    : 'text-neutral-750 dark:text-neutral-300 hover:text-blue-600 dark:hover:text-cyan-400 hover:bg-neutral-50 dark:hover:bg-neutral-900/40'
-                }`}
-                onClick={() => {
-                  setCurrentPage('home');
-                  if (setIsAdmin) setIsAdmin(false);
-                }}
-              >
-                {language === 'bn' ? "হোম" : language === 'ar' ? "الرئيسية" : "Home"}
-              </button>
-
-              {/* Mega Menu: Hosting */}
-              <div className="relative group/menu-hosting">
-                <button
-                  className={`px-3 py-2 rounded-xl text-xs font-bold font-sans transition-all duration-150 flex items-center gap-1 cursor-pointer ${
-                    currentPage === 'hosting'
-                      ? 'bg-blue-50 dark:bg-neutral-900/60 text-blue-600 dark:text-cyan-400 font-extrabold'
-                      : 'text-neutral-750 dark:text-neutral-300 hover:text-blue-600 dark:hover:text-cyan-400 hover:bg-neutral-50 dark:hover:bg-neutral-900/40'
-                  }`}
-                  onClick={() => {
-                    localStorage.setItem('webzone_target_hosting_tab', 'bdix');
-                    window.dispatchEvent(new Event('storage'));
-                    setCurrentPage('hosting');
-                  }}
-                >
-                  <span>Hosting</span>
-                  <ChevronDown className="w-3.5 h-3.5 transition-transform duration-250 group-hover/menu-hosting:rotate-180" />
-                </button>
-
-                {/* Hosting Mega Menu Box - 1200px ultra modern glassmorphic card */}
-                <div className="absolute left-1/2 -translate-x-[40%] top-full pt-3 w-[1000px] lg:w-[1100px] xl:w-[1150px] opacity-0 invisible group-hover/menu-hosting:opacity-100 group-hover/menu-hosting:visible transition-all duration-300 transform scale-95 group-hover/menu-hosting:scale-100 p-0 z-55 pointer-events-none group-hover/menu-hosting:pointer-events-auto">
-                  <div className="p-6 rounded-[24px] bg-white/95 dark:bg-[#0F172A]/95 backdrop-blur-[30px] border border-neutral-200/50 dark:border-slate-800/85 grid grid-cols-12 gap-5 text-left shadow-2xl shadow-indigo-500/10">
-                    
-                    {/* Columns 1 & 2: Main Hosting Products */}
-                    <div className="col-span-8 space-y-4">
-                      <span className="text-[10px] uppercase font-mono font-black tracking-widest text-[#4F46E5] dark:text-cyan-400 border-b border-neutral-100 dark:border-slate-800 pb-1.5 flex items-center gap-1.5">
-                        <Database className="w-4 h-4 text-[#4F46E5] dark:text-cyan-400" />
-                        <span>BDIX Cloud Infrastructures</span>
-                      </span>
-                      
-                      <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-                        {[
-                          { id: 'bdix', title: 'Shared Hosting', desc: 'Secure reliable hosting optimized for Bangladeshi visitors.', badge: 'SAVINGS' },
-                          { id: 'bdix', title: 'WordPress Hosting', desc: 'Pre-installed LiteSpeed caching plugins for bloggers.', badge: 'AUTO CACHE' },
-                          { id: 'bdix', title: 'Business Hosting', desc: 'Enterprise isolated systems built for online shopping stores.', badge: 'POWER CORES' },
-                          { id: 'bdix', title: 'Cloud Hosting', desc: 'High availability instances with real-time automatic failover.', badge: '99.9% Up' },
-                          { id: 'reseller', title: 'Reseller Hosting', desc: 'Start a commercial server hosting service utilizing custom corporate name servers.', badge: 'WHM ADMIN' },
-                          { id: 'vps', title: 'VPS Hosting', desc: 'Guaranteed AMD Epyc virtual system instances with full root permissions.', badge: 'SSD VPS' },
-                          { id: 'vps', title: 'Dedicated Server', desc: 'Top tier physical server configurations for extreme enterprise databases.', badge: 'PHYSICAL' }
-                        ].map((item, idx) => (
-                          <div 
-                            key={idx}
-                            onClick={() => {
-                              localStorage.setItem('webzone_target_hosting_tab', item.id);
-                              window.dispatchEvent(new Event('storage'));
-                              setCurrentPage('hosting');
-                            }}
-                            className="group/item flex items-start gap-3 p-2 rounded-xl hover:bg-neutral-150/40 dark:hover:bg-slate-800/40 cursor-pointer transition duration-200"
-                          >
-                            <div className="p-2.5 bg-indigo-55/10 dark:bg-slate-800 text-indigo-600 dark:text-cyan-400 group-hover/item:text-white group-hover/item:bg-[#4F46E5] rounded-xl transition duration-150">
-                              <Server className="w-4 h-4" />
-                            </div>
-                            <div className="min-w-0">
-                              <div className="text-xs font-black text-neutral-850 dark:text-white flex items-center gap-1.5">
-                                <span className="truncate">{item.title}</span>
-                                <span className="bg-indigo-100 dark:bg-indigo-500/20 text-indigo-605 dark:text-indigo-300 text-[7px] px-1.5 py-0.5 rounded font-black uppercase shrink-0">{item.badge}</span>
-                              </div>
-                              <p className="text-[10px] text-neutral-400 dark:text-neutral-450 mt-0.5 line-clamp-1 leading-normal">{item.desc}</p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Column 4: Featured Promo & BDIX Hosting Card */}
-                    <div className="col-span-4 flex flex-col justify-between p-5 rounded-xl bg-gradient-to-br from-[#4F46E5] to-[#06B6D4] text-white relative overflow-hidden shadow-lg shadow-indigo-500/10">
-                      <div className="absolute -top-10 -right-10 w-24 h-24 bg-white/10 rounded-full blur-xl pointer-events-none" />
-                      <div className="space-y-4">
-                        <div className="bg-white/15 px-2.5 py-0.5 rounded-full text-[9px] uppercase tracking-wider font-extrabold border border-white/25 w-max">
-                          🚀 Premium Hosting
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-[10px] text-indigo-100 font-medium">Starting From</p>
-                          <h4 className="text-xl font-black">$2.99/mo</h4>
-                        </div>
-                        <div className="space-y-2 pt-2 border-t border-white/10">
-                          <div className="flex items-center gap-2 text-[10.5px]">
-                            <CheckCircle className="w-3.5 h-3.5 text-cyan-300" />
-                            <span>Free SSL Certificate</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-[10.5px]">
-                            <CheckCircle className="w-3.5 h-3.5 text-cyan-300" />
-                            <span>Daily Cloud Backup</span>
-                          </div>
-                        </div>
-                      </div>
-                      <button 
-                        onClick={() => {
-                          localStorage.setItem('webzone_target_hosting_tab', 'bdix');
-                          window.dispatchEvent(new Event('storage'));
-                          setCurrentPage('hosting');
-                        }}
-                        className="mt-6 w-full py-2 bg-white text-indigo-600 hover:bg-neutral-50 rounded-xl text-xs font-black tracking-wide text-center transition-all cursor-pointer shadow-sm active:scale-95"
-                      >
-                        Deploy Server Now
-                      </button>
-                    </div>
-
-                  </div>
-                </div>
-              </div>
-
-              {/* Mega Menu: Services */}
-              <div className="relative group/menu-services">
-                <button
-                  className={`px-3 py-2 rounded-xl text-xs font-bold font-sans transition-all duration-150 flex items-center gap-1 cursor-pointer ${
-                    currentPage === 'services'
-                      ? 'bg-blue-50 dark:bg-neutral-900/60 text-blue-600 dark:text-cyan-400 font-extrabold'
-                      : 'text-neutral-750 dark:text-neutral-300 hover:text-blue-600 dark:hover:text-cyan-400 hover:bg-neutral-50 dark:hover:bg-neutral-900/40'
-                  }`}
-                  onClick={() => {
-                    localStorage.setItem('webzone_target_services_tab', 'all');
-                    window.dispatchEvent(new Event('storage'));
-                    setCurrentPage('services');
-                  }}
-                >
-                  <span>{t.services}</span>
-                  <ChevronDown className="w-3.5 h-3.5 transition-transform duration-250 group-hover/menu-services:rotate-180" />
-                </button>
-
-                <div className="absolute left-1/2 -translate-x-[45%] top-full pt-3 w-[1120px] lg:w-[1200px] opacity-0 invisible group-hover/menu-services:opacity-100 group-hover/menu-services:visible transition-all duration-300 transform scale-95 group-hover/menu-services:scale-100 p-0 z-55 pointer-events-none group-hover/menu-services:pointer-events-auto flex">
-                  <div className="p-6 rounded-[24px] bg-white/95 dark:bg-[#0F172A]/95 backdrop-blur-[30px] border border-neutral-200/50 dark:border-slate-800/85 w-full text-left shadow-2xl shadow-indigo-500/10">
-                    
-                    <div className="grid grid-cols-5 gap-5">
-                      {/* Column 1: 🖥️ Web Design & WordPress */}
-                      <div className="space-y-3">
-                        <span className="text-[10.5px] uppercase font-sans font-black tracking-wide text-blue-600 dark:text-cyan-405 border-b border-neutral-150 dark:border-slate-800 pb-1.5 flex items-center gap-1.5">
-                          <span>🖥️</span>
-                          <span>{language === 'bn' ? 'ওয়েব ডিজাইন ও ওয়ার্ডপ্রেস' : language === 'ar' ? 'تصميم المواقع وووردبريس' : 'Web Design & WordPress'}</span>
-                        </span>
-                        <div className="space-y-1">
-                          {[
-                            { title: 'WordPress sites', titleBn: 'ওয়ার্ডপ্রেস সাইট', titleAr: 'مواقع ووردبريس', desc: 'Custom blogs & portal configurations.', descBn: 'পোর্টাল ও কাস্টম ওয়ার্ডপ্রেস ডিজাইন', descAr: 'بوابات ومواقع ووردبريس احترافية', tab: 'web' },
-                            { title: 'Framer & Webflow', titleBn: 'ফ্রেমার ও ওয়েবফ্লো', titleAr: 'فريمر وويب فلو', desc: 'Pixel-perfect vector designs.', descBn: 'পিক্সেল-পারফেক্ট কাস্টম ভেক্টর ল্যান্ডিং', descAr: 'صفحات هبوط فريمر متجاوبة', tab: 'web' },
-                            { title: 'UI/UX Prototypes', titleBn: 'ইউআই/ইউএক্স প্রোটোটাইপ', titleAr: 'واجهات وتجربة المستخدم', desc: 'Figma wireframes & mockups.', descBn: 'ফিগোমা লেআউট ও রেসপন্সিভ ডিজাইন', descAr: 'نماذج فيجما للتطبيقات والمواقع', tab: 'web' },
-                            { title: 'Corporate Websites', titleBn: 'কর্পোরেট ওয়েবসাইটস', titleAr: 'المواقع التعريفية للشركات', desc: 'High-converting agency layouts.', descBn: 'উচ্চ কনভার্সন বিজনেস লেআউট', descAr: 'تصميم مواقع شركات متميزة', tab: 'web' }
-                          ].map((item, idx) => (
-                            <div
-                              key={idx}
-                              onClick={() => {
-                                localStorage.setItem('webzone_target_services_tab', 'all');
-                                localStorage.setItem('webzone_services_filter_keyword', item.title);
-                                window.dispatchEvent(new Event('storage'));
-                                setCurrentPage('services');
-                              }}
-                              className="p-1.5 rounded-xl hover:bg-neutral-50 dark:hover:bg-slate-800/40 cursor-pointer transition duration-150"
-                            >
-                              <div className="text-[11.5px] font-black text-neutral-850 dark:text-white leading-tight">{language === 'bn' ? item.titleBn : language === 'ar' ? item.titleAr : item.title}</div>
-                              <p className="text-[9.5px] text-neutral-400 dark:text-neutral-450 mt-0.5 leading-normal">{language === 'bn' ? item.descBn : language === 'ar' ? item.descAr : item.desc}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Column 2: ⚙️ Laravel & Custom Development */}
-                      <div className="space-y-3">
-                        <span className="text-[10.5px] uppercase font-sans font-black tracking-wide text-purple-600 dark:text-purple-400 border-b border-neutral-150 dark:border-slate-800 pb-1.5 flex items-center gap-1.5">
-                          <span>⚙️</span>
-                          <span>{language === 'bn' ? 'লারাভেল ও কাস্টম ডেভেলপমেন্ট' : language === 'ar' ? 'لارافيل والبرمجة الخاصة' : 'Laravel & Custom Development'}</span>
-                        </span>
-                        <div className="space-y-1">
-                          {[
-                            { title: 'Laravel Apps', titleBn: 'লারাভেল অ্যাপস', titleAr: 'تطبيقات لارافيل', desc: 'Bespoke secure PHP SaaS engines.', descBn: 'দারুণ সিকিউরড পিএইচপি ওয়েব অ্যাপ্লিকেশন', descAr: 'أنظمة ويب مخصصة وسحابية', tab: 'web' },
-                            { title: 'Custom CMS Systems', titleBn: 'কাস্টম সিএমএস', titleAr: 'لوحات تحكم مخصصة', desc: 'Tailored admin system portals.', descBn: 'ব্যবসায়িক ড্যাশবোর্ড ও কাস্টম প্যানেল', descAr: 'برمجة أنظمة إدارة محتوى مخصصة', tab: 'web' },
-                            { title: 'Database Architectures', titleBn: 'ডাটাবেস আর্কিটেকচার', titleAr: 'قواعد البيانات المعقدة', desc: 'Complex PostgreSQL/MySQL.', descBn: 'তথ্যাদি ডাটাبهস সুরক্ষিত ডিজাইন', descAr: 'تصميم قواعد بيانات متطورة', tab: 'web' },
-                            { title: 'REST API Systems', titleBn: 'রেস্ট এপিআই সলিউশন', titleAr: 'ربط الأنظمة وتطوير API', desc: 'Secure backend bridges.', descBn: 'নিরাপদ ব্যাকএন্ড এপিআই কানেক্টিভিটি', descAr: 'بناء واجهات برمجية آمنة', tab: 'web' }
-                          ].map((item, idx) => (
-                            <div
-                              key={idx}
-                              onClick={() => {
-                                localStorage.setItem('webzone_target_services_tab', 'all');
-                                localStorage.setItem('webzone_services_filter_keyword', item.title);
-                                window.dispatchEvent(new Event('storage'));
-                                setCurrentPage('services');
-                              }}
-                              className="p-1.5 rounded-xl hover:bg-neutral-50 dark:hover:bg-slate-800/40 cursor-pointer transition duration-150"
-                            >
-                              <div className="text-[11.5px] font-black text-neutral-850 dark:text-white leading-tight">{language === 'bn' ? item.titleBn : language === 'ar' ? item.titleAr : item.title}</div>
-                              <p className="text-[9.5px] text-neutral-400 dark:text-neutral-450 mt-0.5 leading-normal">{language === 'bn' ? item.descBn : language === 'ar' ? item.descAr : item.desc}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Column 3: 📈 Digital Marketing & SEO */}
-                      <div className="space-y-3">
-                        <span className="text-[10.5px] uppercase font-sans font-black tracking-wide text-emerald-600 dark:text-emerald-400 border-b border-neutral-150 dark:border-slate-800 pb-1.5 flex items-center gap-1.5">
-                          <span>📈</span>
-                          <span>{language === 'bn' ? 'ডিজিটাল মার্কেটিং ও এসইও' : language === 'ar' ? 'التسويق الرقمي والسيو' : 'Digital Marketing & SEO'}</span>
-                        </span>
-                        <div className="space-y-1">
-                          {[
-                            { title: 'Technical Search SEO', titleBn: 'টেকনিক্যাল সার্চ এসইও', titleAr: 'سيو تقني متقدم', desc: 'Rank high on Google Search indices.', descBn: 'সার্চ ইঞ্জিনের প্রথম পেজে নিয়ে আসার কাজ', descAr: 'تحسين الأرشفة والظهور بجوجل', tab: 'seo' },
-                            { title: 'Social Campaigns', titleBn: 'সোশ্যাল ক্যাম্পেইনস', titleAr: 'حملات التواصل الاجتماعي', desc: 'Facebook, Instagram & Google ads.', descBn: 'টার্গেটেড কাস্টমার ফেসবুক এডস বুস্টিং', descAr: 'إعلانات ممولة فيسبوك وجوجل', tab: 'marketing' },
-                            { title: 'Conversion Funnels', titleBn: 'কনভার্সন ফানেল', titleAr: 'أقماع المبيعات والتحليلات', desc: 'Analytics and pixel traffic setup.', descBn: 'পিক্সেল ট্র্যাকিং ও কাস্টমার রিটার্নিং ফানেল', descAr: 'إعداد البيكسل وتتبع الزوار بدقة', tab: 'marketing' },
-                            { title: 'Brand Identity Vector', titleBn: 'ব্র্যান্ড আইডেন্টিটি ডিজাইন', titleAr: 'هويات بصرية وشعارات', desc: 'Logos, copywriting, high-end assets.', descBn: 'লোগো ডিজাইন ও প্রিমিয়াম প্রমো ব্যানার', descAr: 'تصميم كتابة إعلانية وشعارات', tab: 'graphics' }
-                          ].map((item, idx) => (
-                            <div
-                              key={idx}
-                              onClick={() => {
-                                localStorage.setItem('webzone_target_services_tab', 'all');
-                                localStorage.setItem('webzone_services_filter_keyword', item.title);
-                                window.dispatchEvent(new Event('storage'));
-                                setCurrentPage('services');
-                              }}
-                              className="p-1.5 rounded-xl hover:bg-neutral-50 dark:hover:bg-slate-800/40 cursor-pointer transition duration-150"
-                            >
-                              <div className="text-[11.5px] font-black text-neutral-850 dark:text-white leading-tight">{language === 'bn' ? item.titleBn : language === 'ar' ? item.titleAr : item.title}</div>
-                              <p className="text-[9.5px] text-neutral-400 dark:text-neutral-450 mt-0.5 leading-normal">{language === 'bn' ? item.descBn : language === 'ar' ? item.descAr : item.desc}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Column 4: 🛒 E-Commerce Solutions */}
-                      <div className="space-y-3">
-                        <span className="text-[10.5px] uppercase font-sans font-black tracking-wide text-cyan-600 dark:text-cyan-400 border-b border-neutral-150 dark:border-slate-800 pb-1.5 flex items-center gap-1.5">
-                          <span>🛒</span>
-                          <span>{language === 'bn' ? 'ই-কমার্স সলিউশন' : language === 'ar' ? 'حلول المتاجر الإلكترونية' : 'E-Commerce Solutions'}</span>
-                        </span>
-                        <div className="space-y-1">
-                          {[
-                            { title: 'Single-Vendor Shops', titleBn: 'সিঙ্গেল ভেন্ডর স্টোর', titleAr: 'متاجر تجزئة فردية', desc: 'Digital store with dynamic carts.', descBn: 'পেমেন্ট গেটওয়ে সহ ডাইনামিক স্টোর', descAr: 'متاجر بيع قطاعي بدعم السلات', tab: 'web' },
-                            { title: 'Payment Gateways', titleBn: 'পেমেন্ট গেটওয়ে ইন্টিগ্রেশন', titleAr: 'بوابات الدفع الإلكترونية', desc: 'Secure bKash, SSLCommerz, STC Pay.', descBn: 'সহজ পেমেন্ট বিকাশ নগদ ও রকেট গেটওয়ে', descAr: 'تكامل بوابات مدى وفيزا و STC', tab: 'web' },
-                            { title: 'Inventory Track Systems', titleBn: 'ইনভেন্টরি ট্র্যাকিং সিস্টেম', titleAr: 'أنظمة إدارة الإنزال والفوائد', desc: 'Automated cataloging & stock.', descBn: 'অটো স্টক বুক ও সেলস ডাটাবেস', descAr: 'إدارة مخزون وفواتير تلقائية', tab: 'web' },
-                            { title: 'Multi-Vendor Digital Stores', titleBn: 'মাল্টি-ভেন্ডর ডিজিটাল স্টোর', titleAr: 'منصات تجار متعددين', desc: 'Escrow features & seller dashboards.', descBn: 'একাধিক বিক্রেতা যুক্ত বড় ই-কমার্স পোর্টাল', descAr: 'لوحات منفصلة للتجار والعملاء', tab: 'web' }
-                          ].map((item, idx) => (
-                            <div
-                              key={idx}
-                              onClick={() => {
-                                localStorage.setItem('webzone_target_services_tab', 'all');
-                                localStorage.setItem('webzone_services_filter_keyword', item.title);
-                                window.dispatchEvent(new Event('storage'));
-                                setCurrentPage('services');
-                              }}
-                              className="p-1.5 rounded-xl hover:bg-neutral-50 dark:hover:bg-slate-800/40 cursor-pointer transition duration-150"
-                            >
-                              <div className="text-[11.5px] font-black text-neutral-850 dark:text-white leading-tight">{language === 'bn' ? item.titleBn : language === 'ar' ? item.titleAr : item.title}</div>
-                              <p className="text-[9.5px] text-neutral-400 dark:text-neutral-450 mt-0.5 leading-normal">{language === 'bn' ? item.descBn : language === 'ar' ? item.descAr : item.desc}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Column 5: 💼 Digital Store Gig Services */}
-                      <div className="space-y-3">
-                        <span className="text-[10.5px] uppercase font-sans font-black tracking-wide text-amber-600 dark:text-amber-500 border-b border-neutral-150 dark:border-slate-800 pb-1.5 flex items-center gap-1.5">
-                          <span>💼</span>
-                          <span>{language === 'bn' ? 'ডিজিটাল স্টোর গিগ সার্ভিসেস' : language === 'ar' ? 'خدمات جج وفايفر' : 'Digital Store Gig Services'}</span>
-                        </span>
-                        <div className="space-y-1">
-                          {[
-                            { title: 'Bespoke Fix Gigs', titleBn: 'ওয়েবসাইট ফিক্সিং গিগ', titleAr: 'حل المشاكل البرمجية السريعة', desc: 'Hosting faults & firewall repairs.', descBn: 'সার্ভার সমাধান ও সাইট হ্যাকিং রিকভারি', descAr: 'حل مشاكل الاستضافات وحمايتها', tab: 'web' },
-                            { title: 'Speed Optimization Gigs', titleBn: 'স্পিড অপ্টিমাইজেশন', titleAr: 'تسريع المواقع وتنظيف الكاش', desc: 'Heavy loading times calibration.', descBn: 'স্লো সাইট ফাস্ট এবং ইমেজ অপ্টিমাইজার', descAr: 'تقليص وقت التحميل وتهيئة الكاش', tab: 'web' },
-                            { title: 'WHMCS Automation Setup', titleBn: 'WHMCS সলিউশন', titleAr: 'أتمتة الاستضافات وبوابات WHMCS', desc: 'Dedicated billing codes setup.', descBn: 'অটো হোস্টিং সেলস বিলিং ড্যাশবোর্ড', descAr: 'إعداد أنظمة سداد وفواتير سيرفرات', tab: 'web' },
-                            { title: 'Custom Extensions Integration', titleBn: 'কাস্টম প্লাগইন সেটআপ', titleAr: 'تكامل الإضافات والبرمجيات الخاصة', desc: 'Add feature hooks & widgets.', descBn: 'যেকোনো থিমে কাস্টম ফিচার সেটআপ', descAr: 'ربط إضافات برمجية مخصصة للعملاء', tab: 'web' }
-                          ].map((item, idx) => (
-                            <div
-                              key={idx}
-                              onClick={() => {
-                                localStorage.setItem('webzone_target_services_tab', 'all');
-                                localStorage.setItem('webzone_services_filter_keyword', item.title);
-                                window.dispatchEvent(new Event('storage'));
-                                setCurrentPage('services');
-                              }}
-                              className="p-1.5 rounded-xl hover:bg-neutral-50 dark:hover:bg-slate-800/40 cursor-pointer transition duration-150"
-                            >
-                              <div className="text-[11.5px] font-black text-neutral-850 dark:text-white leading-tight">{language === 'bn' ? item.titleBn : language === 'ar' ? item.titleAr : item.title}</div>
-                              <p className="text-[9.5px] text-neutral-400 dark:text-neutral-450 mt-0.5 leading-normal">{language === 'bn' ? item.descBn : language === 'ar' ? item.descAr : item.desc}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                    </div>
-
-                    {/* Bottom Promo/Submenu row for Premium Landing Pages */}
-                    <div className="mt-6 pt-5 border-t border-neutral-200/50 dark:border-slate-800/80 grid grid-cols-3 gap-4">
-                      {[
-                        { 
-                          id: 'digital-web-dev', 
-                          title: '🚀 Digital Web Development', 
-                          titleBn: '🚀 ডিজিটাল ওয়েব ডেভেলপমেন্ট', 
-                          desc: 'SaaS-style professional startup web deployment.', 
-                          descBn: 'স্টার্টআপ ও এজেন্সির জন্য প্রিমিয়াম ওয়েব সলিউশন' 
-                        },
-                        { 
-                          id: 'google-business', 
-                          title: '📍 Google Business Setup', 
-                          titleBn: '📍 গুগল মাই বিজনেস ভেরিফাই', 
-                          desc: 'Verify Google Maps location for hyper-local traffic.', 
-                          descBn: '১০০% গুগল ম্যাপ লোকেশন ও এসইও অপ্টিমাইজেশন' 
-                        },
-                        { 
-                          id: 'growth-package', 
-                          title: '📈 Business Growth Packages', 
-                          titleBn: '📈 বিজনেস গ্রোথ প্যাকেজস', 
-                          desc: 'Full-suite digital optimization and local marketing.', 
-                          descBn: 'ব্যবসা দ্রুত বৃদ্ধি করার আল্টিমেট মার্কেটিং প্যাকেজ' 
-                        }
-                      ].map((item) => (
-                        <div
-                          key={item.id}
-                          onClick={() => {
-                            localStorage.setItem('webzone_target_services_tab', item.id);
-                            window.dispatchEvent(new Event('storage'));
-                            setCurrentPage('services');
-                          }}
-                          className="flex items-start gap-3 p-3 rounded-2xl bg-gradient-to-r from-blue-50/20 to-indigo-50/25 dark:from-[#1E293B]/45 dark:to-[#0F172A]/50 hover:from-blue-500 hover:to-indigo-600 hover:text-white dark:hover:from-blue-600 dark:hover:to-indigo-700 dark:hover:text-white border border-neutral-150 dark:border-slate-800/80 hover:border-transparent transition-all duration-300 cursor-pointer group shadow-sm"
-                        >
-                          <div className="space-y-1">
-                            <h4 className="text-[12px] font-black text-neutral-850 dark:text-white group-hover:text-white leading-tight">
-                              {language === 'bn' ? item.titleBn : item.title}
-                            </h4>
-                            <p className="text-[10px] text-neutral-400 group-hover:text-cyan-100 leading-snug">
-                              {language === 'bn' ? item.descBn : item.desc}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                  </div>
-                </div>
-              </div>
-
-              {/* Mega Menu: Ready Marketplace */}
-              <div className="relative group/menu-marketplace">
-                <button
-                  className={`px-3 py-2 rounded-xl text-xs font-bold font-sans transition-all duration-150 flex items-center gap-1 cursor-pointer ${
-                    currentPage === 'marketplace'
-                      ? 'bg-blue-50 dark:bg-neutral-900/60 text-blue-600 dark:text-cyan-400 font-extrabold'
-                      : 'text-neutral-750 dark:text-neutral-300 hover:text-blue-600 dark:hover:text-cyan-400 hover:bg-neutral-50 dark:hover:bg-neutral-900/40'
-                  }`}
-                  onClick={() => setCurrentPage('marketplace')}
-                >
-                  <span>{language === 'bn' ? 'ডিজিটাল স্টোর' : language === 'ar' ? 'المتجر الرقمي' : 'Digital Store'}</span>
-                  <ChevronDown className="w-3.5 h-3.5 transition-transform duration-250 group-hover/menu-marketplace:rotate-180" />
-                </button>
-
-                <div className="absolute left-1/2 -translate-x-[45%] top-full pt-3 w-[1000px] lg:w-[1100px] opacity-0 invisible group-hover/menu-marketplace:opacity-100 group-hover/menu-marketplace:visible transition-all duration-300 transform scale-95 group-hover/menu-marketplace:scale-100 p-0 z-55 pointer-events-none group-hover/menu-marketplace:pointer-events-auto">
-                  <div className="p-6 rounded-[24px] bg-white/95 dark:bg-[#0F172A]/95 backdrop-blur-[30px] border border-neutral-200/50 dark:border-slate-800/85 grid grid-cols-12 gap-6 text-left shadow-2xl shadow-indigo-500/10">
-                    
-                    {/* Columns 1, 2, 3: Marketplace categories */}
-                    <div className="col-span-9 grid grid-cols-3 gap-5">
-                      {/* Column 1 */}
-                      <div className="space-y-3">
-                        <span className="text-[10px] uppercase font-mono font-black tracking-widest text-[#10B981] border-b border-neutral-100 dark:border-slate-800 pb-1.5 flex items-center gap-1.5">
-                          <Code className="w-4 h-4 text-[#10B981]" />
-                          <span>Pre-made Layouts</span>
-                        </span>
-                        <div className="space-y-1">
-                          {[
-                            { title: 'Themes', desc: 'Secure responsive templates optimized for commercial platforms.' },
-                            { title: 'Website Templates', desc: 'Instant standalone components & raw frontend kits.' },
-                            { title: 'UI Kits', desc: 'Beautiful design assets, Figma mockups, interactive frames.' }
-                          ].map((item, idx) => (
-                            <div
-                              key={idx}
-                              onClick={() => setCurrentPage('marketplace')}
-                              className="p-2 rounded-xl hover:bg-neutral-50 dark:hover:bg-slate-800/40 cursor-pointer transition duration-150"
-                            >
-                              <div className="text-xs font-black text-neutral-850 dark:text-white">{item.title}</div>
-                              <p className="text-[9.5px] text-neutral-400 dark:text-neutral-450 mt-0.5 leading-normal">{item.desc}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Column 2 */}
-                      <div className="space-y-3">
-                        <span className="text-[10px] uppercase font-mono font-black tracking-widest text-[#2563EB] dark:text-blue-400 border-b border-neutral-100 dark:border-slate-800 pb-1.5 flex items-center gap-1.5">
-                          <Layers className="w-4 h-4 text-blue-600" />
-                          <span>Interactive Extensions</span>
-                        </span>
-                        <div className="space-y-1">
-                          {[
-                            { title: 'Plugins', desc: 'Custom CMS hooks, API integrations, payment tunnels.' },
-                            { title: 'Scripts', desc: 'Full stack PHP, Node.JS, and native React boilerplates.' },
-                            { title: 'Addons', desc: 'Powerful modular components & page builder modifications.' }
-                          ].map((item, idx) => (
-                            <div
-                              key={idx}
-                              onClick={() => setCurrentPage('marketplace')}
-                              className="p-2 rounded-xl hover:bg-neutral-50 dark:hover:bg-slate-800/40 cursor-pointer transition duration-150"
-                            >
-                              <div className="text-xs font-black text-[#0F172A] dark:text-white">{item.title}</div>
-                              <p className="text-[9.5px] text-neutral-400 dark:text-neutral-450 mt-0.5 leading-normal">{item.desc}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Column 3 */}
-                      <div className="space-y-3">
-                        <span className="text-[10px] uppercase font-mono font-black tracking-widest text-[#7C3AED] dark:text-purple-400 border-b border-neutral-100 dark:border-slate-800 pb-1.5 flex items-center gap-1.5">
-                          <Sparkles className="w-4 h-4 text-purple-600" />
-                          <span>GPL Licenses</span>
-                        </span>
-                        <div className="space-y-1">
-                          {[
-                            { title: 'Premium GPL Themes', desc: '100% clean malware-free source code with licensing.' },
-                            { title: 'Premium GPL Plugins', desc: 'Fully unlocked features with active code updates.' },
-                            { title: 'GPL License Offers', desc: 'Extreme bundles with developer credentials.' }
-                          ].map((item, idx) => (
-                            <div
-                              key={idx}
-                              onClick={() => setCurrentPage('marketplace')}
-                              className="p-2 rounded-xl hover:bg-neutral-50 dark:hover:bg-slate-800/40 cursor-pointer transition duration-150"
-                            >
-                              <div className="text-xs font-black text-[#0F172A] dark:text-white">{item.title}</div>
-                              <p className="text-[9.5px] text-neutral-400 dark:text-neutral-450 mt-0.5 leading-normal">{item.desc}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Column 4: Premium GPL Feature Promo Card */}
-                    <div className="col-span-3 flex flex-col justify-between p-5 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-655 text-white relative overflow-hidden shadow-lg shadow-emerald-500/10">
-                      <div className="absolute -top-10 -right-10 w-24 h-24 bg-white/10 rounded-full blur-xl pointer-events-none" />
-                      <div className="space-y-3 relative z-10">
-                        <span className="text-[8px] uppercase tracking-wider font-extrabold bg-white/15 px-2 py-0.5 rounded-full border border-white/20 w-fit block">
-                          🔥 GPL Hub Sale
-                        </span>
-                        <h4 className="text-sm font-black leading-snug">Download Premium GPL Themes & Plugins</h4>
-                        <p className="text-[10.5px] font-bold text-center bg-white/20 border border-white/20 rounded-lg py-1 px-1.5 font-mono">
-                          Starting from $4.99
-                        </p>
-                      </div>
-                      <button 
-                        onClick={() => setCurrentPage('marketplace')}
-                        className="mt-6 relative z-10 w-full py-2 bg-white text-emerald-600 hover:bg-neutral-50 rounded-lg text-xs font-black tracking-wide text-center transition-all cursor-pointer shadow-sm active:scale-95"
-                      >
-                        Browse GPL Inventory
-                      </button>
-                    </div>
-
-                  </div>
-                </div>
-              </div>
-
-              {/* Portfolio Link */}
-              <button
-                className={`px-3 py-2 rounded-xl text-xs font-bold font-sans transition-all duration-150 cursor-pointer ${
-                  currentPage === 'portfolio'
-                    ? 'bg-blue-50 dark:bg-neutral-900/60 text-blue-600 dark:text-cyan-400 font-extrabold'
-                    : 'text-neutral-750 dark:text-neutral-300 hover:text-blue-600 dark:hover:text-cyan-400 hover:bg-neutral-50 dark:hover:bg-neutral-900/40'
-                }`}
-                onClick={() => {
-                  setCurrentPage('portfolio');
-                }}
-              >
-                Portfolio
-              </button>
-
-              {/* Blog Link */}
-              <button
-                className={`px-3 py-2 rounded-xl text-xs font-bold font-sans transition-all duration-150 cursor-pointer ${
-                  currentPage === 'blog'
-                    ? 'bg-blue-50 dark:bg-neutral-900/60 text-blue-600 dark:text-cyan-400 font-extrabold'
-                    : 'text-neutral-750 dark:text-neutral-300 hover:text-blue-600 dark:hover:text-cyan-400 hover:bg-neutral-50 dark:hover:bg-neutral-900/40'
-                }`}
-                onClick={() => {
-                  setCurrentPage('blog');
-                }}
-              >
-                Blog
-              </button>
-            </nav>
+            {/* CENTER: Modern Mega Menu Desktop */}
+            <MegaMenuDesktop
+              language={language}
+              currency={currency}
+              currentPage={currentPage}
+              setCurrentPage={setCurrentPage}
+              setIsAdmin={setIsAdmin}
+              triggerToast={triggerToast}
+            />
 
             {/* RIGHT: Theme Toggle, Wishlist, Notifications, Cart, Login, Register, User Account */}
             <div className="flex items-center gap-2 lg:gap-3 shrink-0">
               
-              {/* Theme Selector Light / Dark Mode Toggle Icon */}
+              {/* Hostinger-Style Animated Theme Selector Toggle */}
               <button 
-                onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-                className="p-2 rounded-xl border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-all duration-150 cursor-pointer"
+                onClick={(e) => setTheme(theme === 'light' ? 'dark' : 'light', e)}
+                className="relative p-2 rounded-xl border border-neutral-200/80 dark:border-white/10 text-neutral-700 dark:text-neutral-200 bg-white/80 dark:bg-slate-900/80 hover:bg-neutral-100 dark:hover:bg-slate-800/80 transition-all duration-300 cursor-pointer shadow-sm hover:shadow-md hover:scale-105 active:scale-95 group overflow-hidden"
                 aria-label="Toggle Theme"
-                title={theme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
+                title={theme === 'light' ? 'Switch to Dark Mode (Hostinger Theme Engine)' : 'Switch to Light Mode (Hostinger Theme Engine)'}
               >
-                {theme === 'light' ? <Moon className="h-4.5 w-4.5 text-blue-600" /> : <Sun className="h-4.5 w-4.5 text-amber-500" />}
+                <div className="relative z-10 flex items-center justify-center">
+                  {theme === 'light' ? (
+                    <Moon className="h-4.5 w-4.5 text-indigo-600 group-hover:rotate-12 transition-transform duration-300 animate-hostinger-moon" />
+                  ) : (
+                    <Sun className="h-4.5 w-4.5 text-amber-400 group-hover:rotate-45 transition-transform duration-300 animate-hostinger-sun" />
+                  )}
+                </div>
+                <div className="absolute inset-0 bg-gradient-to-r from-violet-500/10 via-purple-500/10 to-pink-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-xl" />
               </button>
 
               {/* Wishlist Heart Icon & premium dropdown */}
@@ -1888,7 +1869,7 @@ Please verify this payment and process the order. Thank you!`;
                                               {formatPriceInCart(item.price)}
                                             </span>
                                           )}
-                                          <span className="bg-gradient-to-r from-[#7C3AED] via-[#A855F7] to-[#EC4899] bg-clip-text text-transparent font-black text-xs font-mono">
+                                          <span className="bg-gradient-to-r from-[#7C3AED] via-[#A855F7] to-[#EC4899] bg-clip-text text-transparent font-black text-xs">
                                             {formatPriceInCart(activePrice)}
                                           </span>
                                         </div>
@@ -2058,6 +2039,7 @@ Please verify this payment and process the order. Thank you!`;
 
               {/* Cart Button */}
               <button 
+                id="global-header-cart-btn"
                 onClick={() => setCartOpen(!cartOpen)}
                 className="relative p-2 rounded-xl border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition cursor-pointer"
                 aria-label="View Cart"
@@ -2143,7 +2125,13 @@ Please verify this payment and process the order. Thank you!`;
                               <h4 className="text-xs font-black text-white truncate tracking-tight">{user.name}</h4>
                               <p className="text-[10px] text-cyan-100/90 font-mono truncate mt-0.5">{user.email}</p>
                               <div className="inline-flex items-center gap-1 text-[8px] font-black uppercase font-mono text-cyan-200 mt-1 bg-white/10 px-1.5 py-0.5 rounded border border-white/10 animate-pulse" id="header-desktop-superadmin-badge">
-                                {(user.role === 'admin' || user.role === 'super_admin') ? '👑 SYSTEM SUPER ADMIN' : '👑 PREMIUM CLIENT'}
+                                {user.role === 'super_admin' ? '👑 SYSTEM SUPER ADMIN' : 
+                                 user.role === 'admin' ? '⚡ SYSTEM ADMIN' : 
+                                 user.role === 'order_manager' ? '📦 ORDER OPERATIONS MANAGER' : 
+                                 user.role === 'content_manager' ? '📝 CONTENT MANAGER' :
+                                 user.role === 'support_staff' ? '🎫 SUPPORT STAFF' :
+                                 user.role === 'editor' ? '✍️ EDITOR' :
+                                 user.role === 'staff' ? '👨‍💼 STAFF' : '👑 PREMIUM CLIENT'}
                               </div>
                             </div>
                           </div>
@@ -2151,7 +2139,7 @@ Please verify this payment and process the order. Thank you!`;
 
                         {/* Dropdown Scrollable Custom Navigation Items with individual aesthetic icons */}
                         <div className="p-2.5 max-h-96 overflow-y-auto space-y-1.5" id="profile-dropdown-menu-list">
-                          {(user.role === 'admin' || isAdmin) && (
+                          {(user.role === 'admin' || user.role === 'super_admin' || user.role === 'order_manager' || user.role === 'content_manager' || user.role === 'support_staff' || user.role === 'editor' || user.role === 'staff' || isAdmin) && (
                             <div className="pb-2 mb-1 border-b border-neutral-150 dark:border-slate-800">
                               <button
                                 onClick={() => {
@@ -2179,8 +2167,8 @@ Please verify this payment and process the order. Thank you!`;
                             </div>
                           )}
 
-                          {user.role === 'admin' || user.role === 'super_admin' || user.role === 'editor' || isAdmin ? (
-                            // SUPER ADMIN PROFILE MENU
+                          {user.role === 'admin' || user.role === 'super_admin' || user.role === 'order_manager' || user.role === 'content_manager' || user.role === 'support_staff' || user.role === 'editor' || user.role === 'staff' || isAdmin ? (
+                            // SUPER ADMIN / STAFF PROFILE MENU
                             [
                               { id: 'dashboard', label: '🏠 Super Admin Dashboard', labelBn: '🏠 সুপার এডমিন ড্যাশবোর্ড' },
                               { id: 'customers', label: '👥 Customers & Users', labelBn: '👥 গ্রাহক ও ইউজার কন্ট্রোল' },
@@ -2219,7 +2207,6 @@ Please verify this payment and process the order. Thank you!`;
                             [
                               { id: 'dashboard', label: '👤 Dashboard', labelBn: '👤 ড্যাশবোর্ড' },
                               { id: 'my-orders', label: '📦 My Orders', labelBn: '📦 আমার অর্ডার' },
-                              { id: 'downloads', label: '⬇️ Downloads', labelBn: '⬇️ ডাউনলোডস' },
                               { id: 'my-wallet', label: '💰 My Wallet', labelBn: '💰 আমার ওয়ালেট' },
                               { id: 'wishlist', label: '❤️ Wishlist', labelBn: '❤️ উইশলিস্ট' },
                               { id: 'affiliate-program', label: '🤝 Affiliate Program', labelBn: '🤝 এফিলিয়েট প্রোগ্রাম' },
@@ -2498,7 +2485,6 @@ Please verify this payment and process the order. Thank you!`;
                                 [
                                   { id: 'dashboard', label: '👤 Dashboard', labelBn: '👤 ড্যাশবোর্ড' },
                                   { id: 'my-orders', label: '📦 My Orders', labelBn: '📦 আমার অর্ডার' },
-                                  { id: 'downloads', label: '⬇️ Downloads', labelBn: '⬇️ ডাউনলোডস' },
                                   { id: 'my-wallet', label: '💰 My Wallet', labelBn: '💰 আমার ওয়ালেট' },
                                   { id: 'wishlist', label: '❤️ Wishlist', labelBn: '❤️ উইশলিস্ট' },
                                   { id: 'affiliate-program', label: '🤝 Affiliate Program', labelBn: '🤝 এফিলিয়েট প্রোগ্রাম' },
@@ -2672,16 +2658,68 @@ Please verify this payment and process the order. Thank you!`;
               className="absolute inset-0 bg-neutral-950/80 backdrop-blur-xs transition-opacity cursor-pointer duration-300"
             />
 
-            {/* Sliding Drawer element (Width: 85% Screen Width) with Premium Glassmorphism & Gradient Background */}
+            {/* Sliding Drawer element (Width: 85% Screen Width) with Premium Glassmorphism & Light/Dark Theme Adaptability */}
             <motion.div 
               initial={{ x: '-100%' }}
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
               transition={{ type: 'spring', damping: 26, stiffness: 210 }}
-              className="relative w-[85%] max-w-[340px] h-full bg-gradient-to-br from-[#4F46E5]/95 via-[#1E1B4B]/98 to-[#06B6D4]/95 text-white flex flex-col shadow-[25px_0_60px_rgba(79,70,229,0.35)] border-r border-white/20 overflow-hidden backdrop-blur-2xl"
+              className={`relative w-[85%] max-w-[340px] h-full transition-colors duration-500 flex flex-col border-r overflow-hidden backdrop-blur-2xl ${
+                theme === 'light'
+                  ? 'bg-gradient-to-br from-slate-50/98 via-purple-50/90 to-cyan-50/80 text-slate-900 border-purple-200/80 shadow-[25px_0_60px_rgba(79,70,229,0.35)]'
+                  : 'bg-gradient-to-b from-[#181a27]/98 via-[#13151f]/98 to-[#0d0f17]/98 text-slate-100 border-slate-800/80 shadow-[25px_0_60px_rgba(0,0,0,0.65)]'
+              }`}
             >
+              {/* Soft Animated Background Effects for Mobile Drawer (Active in Light Mode) */}
+              {theme === 'light' && (
+                <>
+                  <motion.div 
+                    animate={{ 
+                      scale: [1, 1.25, 1],
+                      x: [0, 25, 0],
+                      y: [0, -20, 0]
+                    }}
+                    transition={{ repeat: Infinity, duration: 8, ease: "easeInOut" }}
+                    className="absolute -top-16 -left-16 w-72 h-72 rounded-full pointer-events-none z-0 bg-gradient-to-r from-purple-300/50 via-indigo-200/40 to-cyan-300/40 blur-[85px]" 
+                  />
+
+                  <motion.div 
+                    animate={{ 
+                      scale: [1, 1.3, 1],
+                      x: [0, -30, 0],
+                      y: [0, 25, 0]
+                    }}
+                    transition={{ repeat: Infinity, duration: 10, ease: "easeInOut" }}
+                    className="absolute top-1/3 -right-20 w-72 h-72 rounded-full pointer-events-none z-0 bg-gradient-to-r from-pink-300/45 via-rose-200/40 to-purple-300/40 blur-[90px]" 
+                  />
+
+                  <motion.div 
+                    animate={{ 
+                      scale: [0.9, 1.25, 0.9],
+                      x: [0, 20, 0],
+                      y: [0, -25, 0]
+                    }}
+                    transition={{ repeat: Infinity, duration: 9, ease: "easeInOut" }}
+                    className="absolute -bottom-12 -left-16 w-72 h-72 rounded-full pointer-events-none z-0 bg-gradient-to-r from-cyan-300/45 via-teal-200/40 to-blue-300/40 blur-[85px]" 
+                  />
+
+                  {/* Ambient Radial Light Beam Overlay */}
+                  <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-200/35 via-transparent to-transparent pointer-events-none z-0" />
+                </>
+              )}
+
+              {/* Soft Ambient Glow & Gradient Top for Mobile Drawer in Dark Mode */}
+              {theme === 'dark' && (
+                <>
+                  <div className="absolute top-0 inset-x-0 h-80 bg-gradient-to-b from-indigo-500/12 via-purple-500/6 to-transparent pointer-events-none z-0" />
+                  <div className="absolute -top-10 -left-10 w-48 h-48 rounded-full bg-indigo-500/10 blur-[55px] pointer-events-none z-0" />
+                  <div className="absolute top-12 -right-10 w-48 h-48 rounded-full bg-purple-500/8 blur-[55px] pointer-events-none z-0" />
+                  <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-500/8 via-transparent to-transparent pointer-events-none z-0" />
+                </>
+              )}
+
               {/* Top Row: Logo & Close Toggle */}
-              <div className="p-4 border-b border-white/10 bg-white/5 backdrop-blur-md flex items-center justify-between">
+              <div className="p-4 border-b border-purple-200/60 dark:border-slate-800/70 bg-white/60 dark:bg-slate-900/60 backdrop-blur-md flex items-center justify-between relative z-10">
                 <div 
                   className="flex items-center space-x-1.5 cursor-pointer"
                   onClick={() => {
@@ -2689,14 +2727,14 @@ Please verify this payment and process the order. Thank you!`;
                     setMobileMenuOpen(false);
                   }}
                 >
-                  <div className="p-1 px-1.5 bg-white text-[#4F46E5] rounded-lg font-black animate-pulse shadow-md">
+                  <div className="p-1 px-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white dark:bg-gradient-to-r dark:from-indigo-500/20 dark:to-purple-500/20 dark:text-indigo-300 dark:border dark:border-indigo-500/30 rounded-lg font-black shadow-md">
                     <Globe className="h-4 w-4 stroke-[2.5]" />
                   </div>
                   <div className="flex flex-col text-left">
-                    <span className="text-[11px] font-black tracking-tight text-white">
+                    <span className="text-[11px] font-black tracking-tight text-slate-900 dark:text-slate-100">
                       WebzoneBD
                     </span>
-                    <span className="text-[6.5px] uppercase tracking-wider font-mono text-cyan-200/80 font-black">
+                    <span className="text-[6.5px] uppercase tracking-wider font-mono text-purple-600 dark:text-indigo-300/90 font-black">
                       IT Solution
                     </span>
                   </div>
@@ -2704,7 +2742,7 @@ Please verify this payment and process the order. Thank you!`;
 
                 <button
                   onClick={() => setMobileMenuOpen(false)}
-                  className="p-1.5 bg-white/10 hover:bg-white/20 text-white rounded-lg border border-white/10 transition duration-300 cursor-pointer hover:scale-105"
+                  className="p-1.5 bg-slate-200/70 hover:bg-slate-300/80 dark:bg-slate-800/80 dark:hover:bg-slate-700/90 text-slate-800 dark:text-slate-200 rounded-lg border border-slate-300/60 dark:border-slate-700/60 transition duration-300 cursor-pointer hover:scale-105"
                   aria-label="Close Sidebar"
                 >
                   <X className="h-4 w-4" />
@@ -2712,40 +2750,46 @@ Please verify this payment and process the order. Thank you!`;
               </div>
 
               {/* Sidebar Header Block with Client Profile Onboarding */}
-              <div className="p-4 border-b border-white/10 bg-white/5 flex flex-col gap-3">
+              <div className="p-4 border-b border-purple-200/60 dark:border-slate-800/70 bg-purple-50/40 dark:bg-gradient-to-b dark:from-slate-900/50 dark:via-slate-900/25 dark:to-transparent flex flex-col gap-3 relative z-10">
                 {/* 2. Client Profile / Onboarding Block */}
                 <div>
                   {user ? (
-                    <div className="p-3 bg-white/10 border border-white/15 rounded-2xl shadow-lg shadow-indigo-950/20 space-y-3">
+                    <div className="p-3 bg-white/90 dark:bg-slate-800/60 border border-purple-200/80 dark:border-slate-700/50 rounded-2xl shadow-lg shadow-purple-100/50 dark:shadow-[0_8px_20px_rgba(0,0,0,0.35)] space-y-3">
                       <div className="flex items-center gap-2.5">
                         <div className="relative">
                           {user.avatar ? (
                             <img 
                               src={user.avatar} 
                               alt="Profile" 
-                              className="w-10 h-10 rounded-xl object-cover ring-2 ring-cyan-300/40"
+                              className="w-10 h-10 rounded-xl object-cover ring-2 ring-purple-400 dark:ring-indigo-400/40"
                               referrerPolicy="no-referrer"
                             />
                           ) : (
-                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-500 text-white font-black flex items-center justify-center text-sm uppercase shadow-sm">
+                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 dark:from-indigo-600 dark:to-purple-700 text-white font-black flex items-center justify-center text-sm uppercase shadow-sm">
                               {user.name.slice(0, 2)}
                             </div>
                           )}
-                          <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-400 border-2 border-indigo-600 rounded-full animate-pulse" />
+                          <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-white dark:border-slate-800 rounded-full animate-pulse" />
                         </div>
                         <div className="text-left flex-1 min-w-0">
-                          <p className="font-extrabold text-xs text-white truncate leading-tight">{user.name}</p>
-                          <p className="text-[9px] font-mono text-cyan-300 uppercase tracking-widest mt-0.5 font-bold flex items-center gap-1">
+                          <p className="font-extrabold text-xs text-slate-900 dark:text-white truncate leading-tight">{user.name}</p>
+                          <p className="text-[9px] font-mono text-purple-600 dark:text-indigo-300 uppercase tracking-widest mt-0.5 font-bold flex items-center gap-1">
                             <span>👑</span>
-                            <span>{(user.role === 'admin' || user.role === 'super_admin') ? 'SYSTEM ADMIN' : 'PREMIUM MEMBER'}</span>
+                            <span>{user.role === 'super_admin' ? 'SYSTEM SUPER ADMIN' :
+                                   user.role === 'admin' ? 'SYSTEM ADMIN' :
+                                   user.role === 'order_manager' ? 'ORDER OPERATIONS MANAGER' :
+                                   user.role === 'content_manager' ? 'CONTENT MANAGER' :
+                                   user.role === 'support_staff' ? 'SUPPORT STAFF' :
+                                   user.role === 'editor' ? 'EDITOR' :
+                                   user.role === 'staff' ? 'STAFF' : 'PREMIUM MEMBER'}</span>
                           </p>
                         </div>
                       </div>
 
-                       <div className="grid grid-cols-2 gap-2 pt-1.5 border-t border-white/10">
+                       <div className="grid grid-cols-2 gap-2 pt-1.5 border-t border-purple-100 dark:border-slate-700/50">
                         <button
                           onClick={() => {
-                            if (user.role === 'admin' || user.role === 'super_admin') {
+                            if (user.role === 'admin' || user.role === 'super_admin' || user.role === 'order_manager' || user.role === 'content_manager' || user.role === 'support_staff' || user.role === 'editor' || user.role === 'staff') {
                               setCurrentPage('admin');
                             } else {
                               localStorage.setItem('webzone_dashboard_active_tab', 'profile');
@@ -2753,13 +2797,13 @@ Please verify this payment and process the order. Thank you!`;
                             }
                             setMobileMenuOpen(false);
                           }}
-                          className="py-1.5 px-3 bg-white/10 hover:bg-white/20 text-white text-[10px] font-extrabold rounded-xl cursor-pointer text-center transition duration-300 border border-white/10 hover:scale-[1.03] shadow-sm"
+                          className="py-1.5 px-3 bg-purple-100 hover:bg-purple-200 dark:bg-slate-800/90 dark:hover:bg-slate-700 text-purple-950 dark:text-slate-200 text-[10px] font-extrabold rounded-xl cursor-pointer text-center transition duration-300 border border-purple-200 dark:border-slate-700/60 hover:scale-[1.03] shadow-sm"
                         >
                           {language === 'bn' ? 'অ্যাকাউন্ট সেটিংস' : 'Account Settings'}
                         </button>
                         <button
                           onClick={() => {
-                            if (user.role === 'admin' || user.role === 'super_admin') {
+                            if (user.role === 'admin' || user.role === 'super_admin' || user.role === 'order_manager' || user.role === 'content_manager' || user.role === 'support_staff' || user.role === 'editor' || user.role === 'staff') {
                               setCurrentPage('admin');
                             } else {
                               localStorage.setItem('webzone_dashboard_active_tab', 'wallet-funds');
@@ -2767,19 +2811,19 @@ Please verify this payment and process the order. Thank you!`;
                             }
                             setMobileMenuOpen(false);
                           }}
-                          className="py-1.5 px-3 bg-white hover:bg-slate-100 text-[#4F46E5] text-[10px] font-extrabold rounded-xl cursor-pointer text-center shadow-lg shadow-indigo-950/20 transition duration-300 hover:scale-[1.03]"
+                          className="py-1.5 px-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white dark:bg-gradient-to-r dark:from-indigo-600 dark:to-purple-600 dark:text-white text-[10px] font-extrabold rounded-xl cursor-pointer text-center shadow-md shadow-purple-200/50 dark:shadow-indigo-950/30 border dark:border-indigo-400/30 transition duration-300 hover:scale-[1.03]"
                         >
-                          {language === 'bn' ? 'ব্যালেন্স' : 'Balance'}
+                          {language === 'bn' ? 'প্যানেল ড্যাশবোর্ড' : 'Panel Dashboard'}
                         </button>
                       </div>
                     </div>
                   ) : (
-                    <div className="p-3 bg-white/10 border border-white/15 rounded-2xl text-left space-y-2.5 shadow-lg shadow-indigo-950/20">
+                    <div className="p-3 bg-white/90 dark:bg-slate-800/60 border border-purple-200/80 dark:border-slate-700/50 rounded-2xl text-left space-y-2.5 shadow-lg shadow-purple-100/50 dark:shadow-[0_8px_20px_rgba(0,0,0,0.35)]">
                       <div className="flex items-center justify-between">
-                        <span className="text-[10px] uppercase font-mono font-black text-cyan-300 tracking-wider">
+                        <span className="text-[10px] uppercase font-mono font-black text-purple-700 dark:text-indigo-300 tracking-wider">
                           {language === 'bn' ? 'কাস্টমার জোন' : 'Client Hub Portal'}
                         </span>
-                        <span className="bg-white/20 text-white text-[8px] font-black uppercase rounded px-1.5 py-0.5 border border-white/10">
+                        <span className="bg-purple-100 text-purple-700 dark:bg-indigo-950/60 dark:text-indigo-300 text-[8px] font-black uppercase rounded px-1.5 py-0.5 border border-purple-200 dark:border-indigo-500/20">
                           SECURE
                         </span>
                       </div>
@@ -2790,7 +2834,7 @@ Please verify this payment and process the order. Thank you!`;
                             onLoginClick('login');
                             setMobileMenuOpen(false);
                           }}
-                          className="flex items-center justify-center gap-1 py-1.5 px-2 bg-white text-[#4F46E5] font-black text-[11px] rounded-xl shadow-lg hover:bg-slate-100 transition duration-300 hover:scale-[1.03] cursor-pointer"
+                          className="flex items-center justify-center gap-1 py-1.5 px-2 bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 text-white dark:bg-gradient-to-r dark:from-indigo-600 dark:to-purple-600 dark:text-white dark:border dark:border-indigo-400/30 font-black text-[11px] rounded-xl shadow-md transition duration-300 hover:scale-[1.03] cursor-pointer"
                         >
                           <Key className="w-3.5 h-3.5" />
                           <span>{language === 'bn' ? 'লগইন' : 'Login'}</span>
@@ -2800,7 +2844,7 @@ Please verify this payment and process the order. Thank you!`;
                             onLoginClick('register');
                             setMobileMenuOpen(false);
                           }}
-                          className="py-1.5 px-2 border border-white/20 hover:bg-white/10 text-white text-[11px] font-bold rounded-xl cursor-pointer text-center transition duration-300 hover:scale-[1.03]"
+                          className="py-1.5 px-2 border border-purple-300 dark:border-slate-700/60 bg-transparent hover:bg-purple-50 dark:bg-slate-800/80 dark:hover:bg-slate-700 text-purple-950 dark:text-slate-200 text-[11px] font-bold rounded-xl cursor-pointer text-center transition duration-300 hover:scale-[1.03]"
                         >
                           {language === 'bn' ? 'নিবন্ধন' : 'Register'}
                         </button>
@@ -2810,10 +2854,10 @@ Please verify this payment and process the order. Thank you!`;
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-4 space-y-4 font-sans text-left dynamic-sidebar-scroller bg-transparent text-white">
+              <div className="flex-1 overflow-y-auto p-4 space-y-4 font-sans text-left dynamic-sidebar-scroller bg-transparent text-slate-900 dark:text-slate-100 relative z-10">
                 {/* Standard Links & Custom Dropdowns */}
                 <div className="space-y-1">
-                  <span className="text-[9px] uppercase tracking-widest text-white/50 font-mono font-bold block px-2 mb-2">Webzone Navigator</span>
+                  <span className="text-[9px] uppercase tracking-widest text-slate-400 dark:text-slate-400 font-mono font-bold block px-2 mb-2">Webzone Navigator</span>
 
                   {/* Home */}
                   <button
@@ -2823,11 +2867,11 @@ Please verify this payment and process the order. Thank you!`;
                     }}
                     className={`flex items-center gap-3 w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold transition-all duration-300 hover:scale-[1.02] cursor-pointer shadow-sm ${
                       currentPage === 'home'
-                        ? 'bg-white/20 text-white font-extrabold border border-white/25 shadow-lg'
-                        : 'text-white/80 hover:text-white hover:bg-white/10'
+                        ? 'bg-gradient-to-r from-purple-600 to-indigo-600 dark:from-indigo-600 dark:to-purple-600 text-white font-extrabold shadow-lg shadow-purple-500/20 dark:shadow-indigo-900/30'
+                        : 'text-slate-700 dark:text-slate-300 hover:text-purple-700 dark:hover:text-white hover:bg-purple-100/80 dark:hover:bg-slate-800/60'
                     }`}
                   >
-                    <Globe className={`w-4 h-4 ${currentPage === 'home' ? 'text-white' : 'text-cyan-200'}`} />
+                    <Globe className={`w-4 h-4 ${currentPage === 'home' ? 'text-white' : 'text-purple-600 dark:text-indigo-400'}`} />
                     <span>Home</span>
                   </button>
 
@@ -2844,12 +2888,28 @@ Please verify this payment and process the order. Thank you!`;
                     }}
                     className={`flex items-center gap-3 w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold transition-all duration-300 hover:scale-[1.02] cursor-pointer shadow-sm ${
                       currentPage === 'marketplace'
-                        ? 'bg-white/20 text-white font-extrabold border border-white/25 shadow-lg'
-                        : 'text-white/80 hover:text-white hover:bg-white/10'
+                        ? 'bg-gradient-to-r from-purple-600 to-indigo-600 dark:from-indigo-600 dark:to-purple-600 text-white font-extrabold shadow-lg shadow-purple-500/20 dark:shadow-indigo-900/30'
+                        : 'text-slate-700 dark:text-slate-300 hover:text-purple-700 dark:hover:text-white hover:bg-purple-100/80 dark:hover:bg-slate-800/60'
                     }`}
                   >
-                    <Sparkles className={`w-4 h-4 ${currentPage === 'marketplace' ? 'text-white' : 'text-cyan-200'}`} />
+                    <Sparkles className={`w-4 h-4 ${currentPage === 'marketplace' ? 'text-white' : 'text-purple-600 dark:text-indigo-400'}`} />
                     <span>{language === 'bn' ? 'ডিজিটাল স্টোর' : language === 'ar' ? 'المتجر الرقمي' : 'Digital Store'}</span>
+                  </button>
+
+                  {/* Combo Offers - Early Top Menu Placement */}
+                  <button
+                    onClick={() => {
+                      setCurrentPage('offers');
+                      setMobileMenuOpen(false);
+                    }}
+                    className={`flex items-center gap-3 w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold transition-all duration-300 hover:scale-[1.02] cursor-pointer shadow-sm ${
+                      currentPage === 'offers'
+                        ? 'bg-rose-500 text-white font-extrabold shadow-lg'
+                        : 'bg-rose-500/10 text-rose-700 dark:text-rose-300 hover:text-rose-900 dark:hover:text-white hover:bg-rose-500/20 border border-rose-200 dark:border-rose-500/20'
+                    }`}
+                  >
+                    <span className="text-sm animate-pulse">🔥</span>
+                    <span>{language === 'bn' ? "কম্বো অফার্স" : language === 'ar' ? "عروض الكومبو" : "Combo Offers"}</span>
                   </button>
 
                   {/* Hosting Accordion expandable */}
@@ -2858,18 +2918,18 @@ Please verify this payment and process the order. Thank you!`;
                       onClick={() => toggleAccordion('hosting')}
                       className={`flex items-center justify-between gap-3 w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold transition-all duration-300 hover:scale-[1.02] cursor-pointer shadow-sm ${
                         currentPage === 'hosting' || expandedAccordion === 'hosting' 
-                          ? 'bg-white/20 text-white font-black border border-white/25 shadow-lg' 
-                          : 'text-white/80 hover:text-white hover:bg-white/10'
+                          ? 'bg-gradient-to-r from-purple-600 to-indigo-600 dark:from-indigo-600 dark:to-purple-600 text-white font-black shadow-lg shadow-purple-500/20 dark:shadow-indigo-900/30' 
+                          : 'text-slate-700 dark:text-slate-300 hover:text-purple-700 dark:hover:text-white hover:bg-purple-100/80 dark:hover:bg-slate-800/60'
                       }`}
                     >
                       <span className="flex items-center gap-3">
-                        <Database className={`w-4 h-4 ${currentPage === 'hosting' || expandedAccordion === 'hosting' ? 'text-white' : 'text-cyan-200'}`} />
-                        <span>{t.hosting}</span>
+                        <Database className={`w-4 h-4 ${currentPage === 'hosting' || expandedAccordion === 'hosting' ? 'text-white' : 'text-purple-600 dark:text-indigo-400'}`} />
+                        <span>{language === 'bn' ? 'হোস্টিং এবং ডোমেন' : language === 'ar' ? 'الاستضافة والنطاقات' : 'Hosting & Domains'}</span>
                       </span>
                       {expandedAccordion === 'hosting' ? (
-                        <ChevronUp className={`w-3.5 h-3.5 ${currentPage === 'hosting' || expandedAccordion === 'hosting' ? 'text-white' : 'text-white/60'}`} />
+                        <ChevronUp className={`w-3.5 h-3.5 ${currentPage === 'hosting' || expandedAccordion === 'hosting' ? 'text-white' : 'text-slate-500 dark:text-slate-400'}`} />
                       ) : (
-                        <ChevronDown className={`w-3.5 h-3.5 ${currentPage === 'hosting' || expandedAccordion === 'hosting' ? 'text-white' : 'text-white/60'}`} />
+                        <ChevronDown className={`w-3.5 h-3.5 ${currentPage === 'hosting' || expandedAccordion === 'hosting' ? 'text-white' : 'text-slate-500 dark:text-slate-400'}`} />
                       )}
                     </button>
                     <AnimatePresence>
@@ -2885,7 +2945,7 @@ Please verify this payment and process the order. Thank you!`;
                               setCurrentPage('domain');
                               setMobileMenuOpen(false);
                             }}
-                            className="block w-full text-left py-2 px-2 text-[11px] text-white/70 hover:text-white border-l border-white/10 pl-3 font-semibold hover:border-white transition duration-300 hover:scale-[1.02] cursor-pointer"
+                            className="block w-full text-left py-2 px-2 text-[11px] text-slate-600 hover:text-purple-700 border-l border-purple-200 hover:border-purple-600 dark:text-slate-400 dark:hover:text-white dark:border-slate-800 dark:hover:border-indigo-400 pl-3 font-semibold transition duration-300 hover:scale-[1.02] cursor-pointer"
                           >
                             {language === 'bn' ? 'ডোমেন রেজিস্ট্রেশন' : 'Domain Registration'}
                           </button>
@@ -2896,7 +2956,7 @@ Please verify this payment and process the order. Thank you!`;
                               setCurrentPage('hosting');
                               setMobileMenuOpen(false);
                             }}
-                            className="block w-full text-left py-2 px-2 text-[11px] text-white/70 hover:text-white border-l border-white/10 pl-3 font-semibold hover:border-white transition duration-300 hover:scale-[1.02] cursor-pointer"
+                            className="block w-full text-left py-2 px-2 text-[11px] text-slate-600 hover:text-purple-700 border-l border-purple-200 hover:border-purple-600 dark:text-slate-400 dark:hover:text-white dark:border-slate-800 dark:hover:border-indigo-400 pl-3 font-semibold transition duration-300 hover:scale-[1.02] cursor-pointer"
                           >
                             {t.hostingShared}
                           </button>
@@ -2907,7 +2967,7 @@ Please verify this payment and process the order. Thank you!`;
                               setCurrentPage('hosting');
                               setMobileMenuOpen(false);
                             }}
-                            className="block w-full text-left py-2 px-2 text-[11px] text-white/70 hover:text-white border-l border-white/10 pl-3 font-semibold hover:border-white transition duration-300 hover:scale-[1.02] cursor-pointer"
+                            className="block w-full text-left py-2 px-2 text-[11px] text-slate-600 hover:text-purple-700 border-l border-purple-200 hover:border-purple-600 dark:text-slate-400 dark:hover:text-white dark:border-slate-800 dark:hover:border-indigo-400 pl-3 font-semibold transition duration-300 hover:scale-[1.02] cursor-pointer"
                           >
                             {t.hostingVps}
                           </button>
@@ -2918,7 +2978,7 @@ Please verify this payment and process the order. Thank you!`;
                               setCurrentPage('hosting');
                               setMobileMenuOpen(false);
                             }}
-                            className="block w-full text-left py-2 px-2 text-[11px] text-white/70 hover:text-white border-l border-white/10 pl-3 font-semibold hover:border-white transition duration-300 hover:scale-[1.02] cursor-pointer"
+                            className="block w-full text-left py-2 px-2 text-[11px] text-slate-600 hover:text-purple-700 border-l border-purple-200 hover:border-purple-600 dark:text-slate-400 dark:hover:text-white dark:border-slate-800 dark:hover:border-indigo-400 pl-3 font-semibold transition duration-300 hover:scale-[1.02] cursor-pointer"
                           >
                             {t.hostingReseller}
                           </button>
@@ -2928,7 +2988,7 @@ Please verify this payment and process the order. Thank you!`;
                   </div>
 
                   {/* Services - Direct Button Link with Expandable Sub-options */}
-                  <div className="space-y-1 bg-white/5 p-1.5 rounded-2xl border border-white/10 shadow-inner">
+                  <div className="space-y-1 bg-purple-50/60 dark:bg-slate-800/40 p-1.5 rounded-2xl border border-purple-200/80 dark:border-slate-700/50 shadow-inner">
                     <button
                       onClick={() => {
                         localStorage.setItem('webzone_target_services_tab', 'all');
@@ -2939,14 +2999,14 @@ Please verify this payment and process the order. Thank you!`;
                       }}
                       className={`flex items-center gap-3 w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold transition-all duration-300 hover:scale-[1.02] cursor-pointer shadow-sm ${
                         currentPage === 'services'
-                          ? 'bg-white/20 text-white font-extrabold border border-white/25 shadow-lg'
-                          : 'text-white/80 hover:text-white hover:bg-white/10'
+                          ? 'bg-gradient-to-r from-purple-600 to-indigo-600 dark:from-indigo-600 dark:to-purple-600 text-white font-extrabold shadow-lg shadow-purple-500/20 dark:shadow-indigo-900/30'
+                          : 'text-slate-700 dark:text-slate-300 hover:text-purple-700 dark:hover:text-white hover:bg-purple-100/80 dark:hover:bg-slate-800/60'
                       }`}
                     >
-                      <Laptop className={`w-4 h-4 ${currentPage === 'services' ? 'text-white' : 'text-cyan-200'}`} />
+                      <Laptop className={`w-4 h-4 ${currentPage === 'services' ? 'text-white' : 'text-purple-600 dark:text-indigo-400'}`} />
                       <span>{t.services}</span>
                     </button>
-                    <div className="pl-6 pt-1.5 pb-2.5 flex flex-col gap-2.5 text-[11px] font-black text-white/80">
+                    <div className="pl-6 pt-1.5 pb-2.5 flex flex-col gap-2.5 text-[11px] font-black text-slate-700 dark:text-slate-300">
                       <button 
                         onClick={() => {
                           localStorage.setItem('webzone_target_services_tab', 'digital-web-dev');
@@ -2954,7 +3014,7 @@ Please verify this payment and process the order. Thank you!`;
                           setCurrentPage('services');
                           setMobileMenuOpen(false);
                         }}
-                        className="text-left font-semibold hover:text-white transition duration-300 flex items-center gap-1.5 hover:scale-[1.02] cursor-pointer"
+                        className="text-left font-semibold hover:text-purple-700 dark:hover:text-white transition duration-300 flex items-center gap-1.5 hover:scale-[1.02] cursor-pointer"
                       >
                         <span>🚀</span>
                         <span>{language === 'bn' ? 'ডিজিটাল ওয়েব ডেভেলপমেন্ট' : 'Digital Web Development'}</span>
@@ -2966,7 +3026,7 @@ Please verify this payment and process the order. Thank you!`;
                           setCurrentPage('services');
                           setMobileMenuOpen(false);
                         }}
-                        className="text-left font-semibold hover:text-white transition duration-300 flex items-center gap-1.5 hover:scale-[1.02] cursor-pointer"
+                        className="text-left font-semibold hover:text-purple-700 dark:hover:text-white transition duration-300 flex items-center gap-1.5 hover:scale-[1.02] cursor-pointer"
                       >
                         <span>📍</span>
                         <span>{language === 'bn' ? 'গুগল মাই বিজনেস সেটআপ' : 'Google Business Setup'}</span>
@@ -2978,7 +3038,7 @@ Please verify this payment and process the order. Thank you!`;
                           setCurrentPage('services');
                           setMobileMenuOpen(false);
                         }}
-                        className="text-left font-semibold hover:text-white transition duration-300 flex items-center gap-1.5 hover:scale-[1.02] cursor-pointer"
+                        className="text-left font-semibold hover:text-purple-700 dark:hover:text-white transition duration-300 flex items-center gap-1.5 hover:scale-[1.02] cursor-pointer"
                       >
                         <span>📈</span>
                         <span>{language === 'bn' ? 'বিজনেস গ্রোথ প্যাকেজ' : 'Business Growth Package'}</span>
@@ -2992,18 +3052,18 @@ Please verify this payment and process the order. Thank you!`;
                       onClick={() => toggleAccordion('solutions')}
                       className={`flex items-center justify-between gap-3 w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold transition-all duration-300 hover:scale-[1.02] cursor-pointer shadow-sm ${
                         currentPage === 'solutions' || expandedAccordion === 'solutions'
-                          ? 'bg-white/20 text-white font-black border border-white/25 shadow-lg'
-                          : 'text-white/80 hover:text-white hover:bg-white/10'
+                          ? 'bg-gradient-to-r from-purple-600 to-indigo-600 dark:from-indigo-600 dark:to-purple-600 text-white font-black shadow-lg shadow-purple-500/20 dark:shadow-indigo-900/30'
+                          : 'text-slate-700 dark:text-slate-300 hover:text-purple-700 dark:hover:text-white hover:bg-purple-100/80 dark:hover:bg-slate-800/60'
                       }`}
                     >
                       <span className="flex items-center gap-3">
-                        <Layers className={`w-4 h-4 ${currentPage === 'solutions' || expandedAccordion === 'solutions' ? 'text-white' : 'text-cyan-200'}`} />
+                        <Layers className={`w-4 h-4 ${currentPage === 'solutions' || expandedAccordion === 'solutions' ? 'text-white' : 'text-purple-600 dark:text-indigo-400'}`} />
                         <span>Solutions</span>
                       </span>
                       {expandedAccordion === 'solutions' ? (
-                        <ChevronUp className={`w-3.5 h-3.5 ${currentPage === 'solutions' || expandedAccordion === 'solutions' ? 'text-white' : 'text-white/60'}`} />
+                        <ChevronUp className={`w-3.5 h-3.5 ${currentPage === 'solutions' || expandedAccordion === 'solutions' ? 'text-white' : 'text-slate-500 dark:text-slate-400'}`} />
                       ) : (
-                        <ChevronDown className={`w-3.5 h-3.5 ${currentPage === 'solutions' || expandedAccordion === 'solutions' ? 'text-white' : 'text-white/60'}`} />
+                        <ChevronDown className={`w-3.5 h-3.5 ${currentPage === 'solutions' || expandedAccordion === 'solutions' ? 'text-white' : 'text-slate-500 dark:text-slate-400'}`} />
                       )}
                     </button>
                     <AnimatePresence>
@@ -3018,7 +3078,7 @@ Please verify this payment and process the order. Thank you!`;
                             <button
                               key={index}
                               onClick={() => handleMobileSubitemClick(sol, 'solution')}
-                              className="block w-full text-left py-2 px-2 text-[11px] text-white/70 hover:text-white border-l border-white/10 pl-3 font-semibold hover:border-white transition duration-300 hover:scale-[1.02] cursor-pointer"
+                              className="block w-full text-left py-2 px-2 text-[11px] text-slate-600 hover:text-purple-700 border-l border-purple-200 hover:border-purple-600 dark:text-slate-400 dark:hover:text-white dark:border-slate-800 dark:hover:border-indigo-400 pl-3 font-semibold transition duration-300 hover:scale-[1.02] cursor-pointer"
                             >
                               {sol.title}
                             </button>
@@ -3036,11 +3096,11 @@ Please verify this payment and process the order. Thank you!`;
                     }}
                     className={`flex items-center gap-3 w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold transition-all duration-300 hover:scale-[1.02] cursor-pointer shadow-sm ${
                       currentPage === 'portfolio'
-                        ? 'bg-white/20 text-white font-extrabold border border-white/25 shadow-lg'
-                        : 'text-white/80 hover:text-white hover:bg-white/10'
+                        ? 'bg-gradient-to-r from-purple-600 to-indigo-600 dark:from-indigo-600 dark:to-purple-600 text-white font-extrabold shadow-lg shadow-purple-500/20 dark:shadow-indigo-900/30'
+                        : 'text-slate-700 dark:text-slate-300 hover:text-purple-700 dark:hover:text-white hover:bg-purple-100/80 dark:hover:bg-slate-800/60'
                     }`}
                   >
-                    <Briefcase className={`w-4 h-4 ${currentPage === 'portfolio' ? 'text-white' : 'text-cyan-200'}`} />
+                    <Briefcase className={`w-4 h-4 ${currentPage === 'portfolio' ? 'text-white' : 'text-purple-600 dark:text-indigo-400'}`} />
                     <span>Portfolio</span>
                   </button>
 
@@ -3052,11 +3112,11 @@ Please verify this payment and process the order. Thank you!`;
                     }}
                     className={`flex items-center gap-3 w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold transition-all duration-300 hover:scale-[1.02] cursor-pointer shadow-sm ${
                       currentPage === 'blog'
-                        ? 'bg-white/20 text-white font-extrabold border border-white/25 shadow-lg'
-                        : 'text-white/80 hover:text-white hover:bg-white/10'
+                        ? 'bg-gradient-to-r from-purple-600 to-indigo-600 dark:from-indigo-600 dark:to-purple-600 text-white font-extrabold shadow-lg shadow-purple-500/20 dark:shadow-indigo-900/30'
+                        : 'text-slate-700 dark:text-slate-300 hover:text-purple-700 dark:hover:text-white hover:bg-purple-100/80 dark:hover:bg-slate-800/60'
                     }`}
                   >
-                    <BookOpen className={`w-4 h-4 ${currentPage === 'blog' ? 'text-white' : 'text-cyan-200'}`} />
+                    <BookOpen className={`w-4 h-4 ${currentPage === 'blog' ? 'text-white' : 'text-purple-600 dark:text-indigo-400'}`} />
                     <span>Blog</span>
                   </button>
 
@@ -3068,11 +3128,11 @@ Please verify this payment and process the order. Thank you!`;
                     }}
                     className={`flex items-center gap-3 w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold transition-all duration-300 hover:scale-[1.02] cursor-pointer shadow-sm ${
                       currentPage === 'affiliate'
-                        ? 'bg-white/20 text-white font-extrabold border border-white/25 shadow-lg'
-                        : 'text-white/80 hover:text-white hover:bg-white/10'
+                        ? 'bg-gradient-to-r from-purple-600 to-indigo-600 dark:from-indigo-600 dark:to-purple-600 text-white font-extrabold shadow-lg shadow-purple-500/20 dark:shadow-indigo-900/30'
+                        : 'text-slate-700 dark:text-slate-300 hover:text-purple-700 dark:hover:text-white hover:bg-purple-100/80 dark:hover:bg-slate-800/60'
                     }`}
                   >
-                    <Coins className={`w-4 h-4 ${currentPage === 'affiliate' ? 'text-white' : 'text-cyan-200'} animate-pulse`} />
+                    <Coins className={`w-4 h-4 ${currentPage === 'affiliate' ? 'text-white' : 'text-purple-600 dark:text-indigo-400'} animate-pulse`} />
                     <span>{language === 'bn' ? "অ্যাফিলিয়েট প্রোগ্রাম" : language === 'ar' ? "التسويق بالعمولة" : "Affiliate Program"}</span>
                   </button>
 
@@ -3084,24 +3144,24 @@ Please verify this payment and process the order. Thank you!`;
                     }}
                     className={`flex items-center gap-3 w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold transition-all duration-300 hover:scale-[1.02] cursor-pointer shadow-sm ${
                       currentPage === 'contact'
-                        ? 'bg-white/20 text-white font-extrabold border border-white/25 shadow-lg'
-                        : 'text-white/80 hover:text-white hover:bg-white/10'
+                        ? 'bg-gradient-to-r from-purple-600 to-indigo-600 dark:from-indigo-600 dark:to-purple-600 text-white font-extrabold shadow-lg shadow-purple-500/20 dark:shadow-indigo-900/30'
+                        : 'text-slate-700 dark:text-slate-300 hover:text-purple-700 dark:hover:text-white hover:bg-purple-100/80 dark:hover:bg-slate-800/60'
                     }`}
                   >
-                    <Mail className={`w-4 h-4 ${currentPage === 'contact' ? 'text-white' : 'text-cyan-200'}`} />
+                    <Mail className={`w-4 h-4 ${currentPage === 'contact' ? 'text-white' : 'text-purple-600 dark:text-indigo-400'}`} />
                     <span>Contact</span>
                   </button>
                 </div>
 
                 {/* Hosting & Domain - Separate Highlights Block */}
                 <div className="pt-2">
-                  <div className="p-3 bg-white/10 border border-white/15 rounded-2xl space-y-2.5 shadow-lg shadow-indigo-950/20">
+                  <div className="p-3 bg-white/90 dark:bg-slate-800/60 border border-purple-200/80 dark:border-slate-700/50 rounded-2xl space-y-2.5 shadow-lg shadow-purple-100/50 dark:shadow-[0_8px_20px_rgba(0,0,0,0.35)]">
                     <div className="flex items-center justify-between px-1">
-                      <span className="text-[10px] font-bold text-white uppercase tracking-widest flex items-center gap-1">
-                        <Server className="w-3.5 h-3.5 text-cyan-200" />
+                      <span className="text-[10px] font-bold text-slate-900 dark:text-slate-200 uppercase tracking-widest flex items-center gap-1">
+                        <Server className="w-3.5 h-3.5 text-purple-600 dark:text-indigo-400" />
                         <span>Hosting & domains</span>
                       </span>
-                      <span className="bg-white/20 text-white text-[8px] font-black uppercase rounded-lg px-1.5 py-0.5 tracking-wider border border-white/10">Secure Hosting</span>
+                      <span className="bg-purple-100 text-purple-700 dark:bg-indigo-950/60 dark:text-indigo-300 text-[8px] font-black uppercase rounded-lg px-1.5 py-0.5 tracking-wider border border-purple-200 dark:border-indigo-500/20">Secure Hosting</span>
                     </div>
 
                     <div className="grid grid-cols-2 gap-1.5">
@@ -3109,7 +3169,7 @@ Please verify this payment and process the order. Thank you!`;
                         <button
                           key={index}
                           onClick={() => handleMobileSubitemClick(hst, 'hosting')}
-                          className="py-1.5 px-2 bg-white/5 rounded-lg text-[9.5px] font-bold border border-white/10 text-white/90 hover:text-white hover:bg-white/15 hover:border-white/20 transition-all duration-300 text-left truncate block cursor-pointer hover:scale-[1.02]"
+                          className="py-1.5 px-2 bg-purple-50/80 hover:bg-purple-100/90 text-slate-800 border-purple-200/80 dark:bg-slate-900/60 dark:text-slate-300 dark:border-slate-700/50 dark:hover:bg-slate-800 dark:hover:border-slate-600 rounded-lg text-[9.5px] font-bold border transition-all duration-300 text-left truncate block cursor-pointer hover:scale-[1.02]"
                         >
                           {hst.title}
                         </button>
@@ -3119,29 +3179,29 @@ Please verify this payment and process the order. Thank you!`;
                 </div>
 
                 {/* Premium Theme Switching section within drawer */}
-                <div className="pt-2 border-t border-white/10">
-                  <p className="text-[10px] text-white/50 uppercase tracking-widest block mb-2 font-mono font-bold px-1 flex items-center gap-1">
-                    <Sun className="w-3 h-3 text-cyan-200" />
+                <div className="pt-2 border-t border-purple-200/60 dark:border-slate-800/70">
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-widest block mb-2 font-mono font-bold px-1 flex items-center gap-1">
+                    <Sun className="w-3 h-3 text-purple-600 dark:text-indigo-400" />
                     <span>Theme settings</span>
                   </p>
                   <div className="grid grid-cols-2 gap-1.5 font-sans text-[10px] font-extrabold">
                     <button 
-                      onClick={() => setTheme('light')}
+                      onClick={(e) => setTheme('light', e)}
                       className={`py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer duration-300 hover:scale-[1.02] ${
                         theme === 'light' 
-                          ? 'bg-white text-[#4F46E5] font-black shadow-lg shadow-indigo-950/25' 
-                          : 'bg-white/10 hover:bg-white/20 text-white border border-white/5'
+                          ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-black shadow-md shadow-purple-500/20' 
+                          : 'bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700/60'
                       }`}
                     >
                       <span className="text-[11px]">☀</span>
                       <span>Light Mode</span>
                     </button>
                     <button 
-                      onClick={() => setTheme('dark')}
+                      onClick={(e) => setTheme('dark', e)}
                       className={`py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer duration-300 hover:scale-[1.02] ${
                         theme === 'dark' 
-                          ? 'bg-white text-[#4F46E5] font-black shadow-lg shadow-indigo-950/25' 
-                          : 'bg-white/10 hover:bg-white/20 text-white border border-white/5'
+                          ? 'bg-gradient-to-r from-purple-600 to-indigo-600 dark:from-indigo-600 dark:to-purple-600 text-white font-black shadow-md shadow-purple-500/20 dark:shadow-indigo-900/30' 
+                          : 'bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700/60'
                       }`}
                     >
                       <span className="text-[11px]">🌙</span>
@@ -3151,14 +3211,14 @@ Please verify this payment and process the order. Thank you!`;
                 </div>
 
                 {/* Company Contact & Social Footer */}
-                <div className="pt-3 border-t border-white/10 space-y-2.5 text-white/55 text-[10px]">
+                <div className="pt-3 border-t border-purple-200/60 dark:border-slate-800/70 space-y-2.5 text-slate-500 dark:text-slate-400 text-[10px]">
                   {/* Social Icons links block */}
                   <div className="flex items-center gap-3 pt-1">
                     <a 
                       href="https://facebook.com" 
                       target="_blank" 
                       referrerPolicy="no-referrer"
-                      className="p-2 bg-white/10 hover:bg-[#1877F2] text-white rounded-xl transition-all duration-300 shadow-sm flex items-center justify-center cursor-pointer hover:scale-110 border border-white/10"
+                      className="p-2 bg-slate-100 hover:bg-[#1877F2] text-slate-700 hover:text-white dark:bg-slate-800/80 dark:text-slate-300 dark:hover:bg-[#1877F2] dark:hover:text-white rounded-xl transition-all duration-300 shadow-sm flex items-center justify-center cursor-pointer hover:scale-110 border border-slate-200 dark:border-slate-700/60"
                       aria-label="Facebook Profile Link"
                     >
                       <Facebook className="w-4 h-4 shrink-0" />
@@ -3167,7 +3227,7 @@ Please verify this payment and process the order. Thank you!`;
                       href="https://linkedin.com" 
                       target="_blank" 
                       referrerPolicy="no-referrer"
-                      className="p-2 bg-white/10 hover:bg-[#0A66C2] text-white rounded-xl transition-all duration-300 shadow-sm flex items-center justify-center cursor-pointer hover:scale-110 border border-white/10"
+                      className="p-2 bg-slate-100 hover:bg-[#0A66C2] text-slate-700 hover:text-white dark:bg-slate-800/80 dark:text-slate-300 dark:hover:bg-[#0A66C2] dark:hover:text-white rounded-xl transition-all duration-300 shadow-sm flex items-center justify-center cursor-pointer hover:scale-110 border border-slate-200 dark:border-slate-700/60"
                       aria-label="LinkedIn Profile Link"
                     >
                       <Linkedin className="w-4 h-4 shrink-0" />
@@ -3176,14 +3236,14 @@ Please verify this payment and process the order. Thank you!`;
                       href="https://youtube.com" 
                       target="_blank" 
                       referrerPolicy="no-referrer"
-                      className="p-2 bg-white/10 hover:bg-[#FF0000] text-white rounded-xl transition-all duration-300 shadow-sm flex items-center justify-center cursor-pointer hover:scale-110 border border-white/10"
+                      className="p-2 bg-slate-100 hover:bg-[#FF0000] text-slate-700 hover:text-white dark:bg-slate-800/80 dark:text-slate-300 dark:hover:bg-[#FF0000] dark:hover:text-white rounded-xl transition-all duration-300 shadow-sm flex items-center justify-center cursor-pointer hover:scale-110 border border-slate-200 dark:border-slate-700/60"
                       aria-label="YouTube Profile Link"
                     >
                       <Youtube className="w-4 h-4 shrink-0" />
                     </a>
                   </div>
 
-                  <p className="text-[8px] text-white/40 pt-2 text-center border-t border-white/10 leading-normal">
+                  <p className="text-[8px] text-slate-400 dark:text-slate-400 pt-2 text-center border-t border-purple-200/60 dark:border-slate-800/70 leading-normal">
                     © {new Date().getFullYear()} WebzoneBD IT Solution. All codes clean validated secures.
                   </p>
                 </div>
@@ -4156,8 +4216,43 @@ Please verify this payment and process the order. Thank you!`;
 
           <div className="pointer-events-none fixed inset-y-0 right-0 flex max-w-full pl-10">
             <div className="pointer-events-auto w-screen max-w-md animate-in slide-in-from-right duration-250">
-              <div className="flex h-full flex-col bg-white/95 dark:bg-[#0F172A]/95 backdrop-blur-[20px] shadow-[0_20px_50px_rgba(0,0,0,0.12)] border-l border-neutral-200/50 dark:border-white/8 rounded-l-[24px]">
-                <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-6 scrollbar-thin scrollbar-thumb-violet-500/20">
+              <div className="flex h-full flex-col relative overflow-hidden bg-white/95 dark:bg-[#0F172A]/95 backdrop-blur-[20px] shadow-[0_20px_50px_rgba(0,0,0,0.12)] border-l border-neutral-200/50 dark:border-white/8 rounded-l-[24px]">
+                
+                {/* Light Color Background Animation Effects for ShoppingCart */}
+                <motion.div 
+                  animate={{ 
+                    scale: [1, 1.25, 1],
+                    x: [0, 30, 0],
+                    y: [0, -25, 0]
+                  }}
+                  transition={{ repeat: Infinity, duration: 8, ease: "easeInOut" }}
+                  className="absolute -top-20 -left-20 w-80 h-80 rounded-full pointer-events-none z-0 bg-gradient-to-r from-purple-300/50 via-indigo-200/40 to-cyan-300/40 dark:from-purple-600/25 dark:via-indigo-600/20 dark:to-cyan-600/20 blur-[90px]" 
+                />
+
+                <motion.div 
+                  animate={{ 
+                    scale: [1, 1.3, 1],
+                    x: [0, -35, 0],
+                    y: [0, 30, 0]
+                  }}
+                  transition={{ repeat: Infinity, duration: 10, ease: "easeInOut" }}
+                  className="absolute top-1/3 -right-24 w-80 h-80 rounded-full pointer-events-none z-0 bg-gradient-to-r from-pink-300/45 via-rose-200/40 to-purple-300/40 dark:from-pink-600/22 dark:via-rose-600/18 dark:to-purple-600/20 blur-[95px]" 
+                />
+
+                <motion.div 
+                  animate={{ 
+                    scale: [0.9, 1.25, 0.9],
+                    x: [0, 25, 0],
+                    y: [0, -30, 0]
+                  }}
+                  transition={{ repeat: Infinity, duration: 9, ease: "easeInOut" }}
+                  className="absolute -bottom-16 -left-20 w-80 h-80 rounded-full pointer-events-none z-0 bg-gradient-to-r from-cyan-300/45 via-teal-200/40 to-blue-300/40 dark:from-cyan-600/22 dark:via-teal-600/18 dark:to-blue-600/20 blur-[90px]" 
+                />
+
+                {/* Light Beam Overlay */}
+                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-200/30 via-transparent to-transparent dark:from-purple-900/25 pointer-events-none z-0" />
+
+                <div className="relative z-10 flex-1 flex flex-col overflow-y-auto px-4 py-6 sm:px-6 scrollbar-thin scrollbar-thumb-violet-500/20">
                   <div className="flex items-center justify-between pb-4 border-b border-neutral-200/65 dark:border-white/8">
                     <h2 className="text-lg font-bold flex items-center gap-2">
                       <div className="p-2 bg-gradient-to-tr from-[#7C3AED] via-[#A855F7] to-[#EC4899] rounded-xl text-white shadow-md shadow-purple-500/10 shrink-0">
@@ -4176,36 +4271,158 @@ Please verify this payment and process the order. Thank you!`;
 
                   <div className="mt-6 text-left">
                     {cart.length === 0 ? (
-                      <div className="text-center py-16 text-neutral-450 px-4">
-                        <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-neutral-100 dark:bg-slate-800/60 flex items-center justify-center text-[#CBD5E1] dark:text-[#475569] border border-neutral-200/40 dark:border-white/5 shadow-inner">
-                          <ShoppingBag className="w-10 h-10 stroke-[1.5]" />
+                      <motion.div 
+                        initial={{ opacity: 0, y: 15 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.35, ease: "easeOut" }}
+                        className="py-10 px-4 text-center flex flex-col items-center justify-center"
+                        id="empty-cart-container"
+                      >
+                        {/* Layered Floating Cart Graphic & Illustration */}
+                        <div className="relative mb-6 flex items-center justify-center">
+                          {/* Ambient Pulsing Glow Backdrop */}
+                          <div className="absolute w-32 h-32 rounded-full bg-gradient-to-tr from-[#7C3AED]/25 via-[#EC4899]/20 to-cyan-400/20 blur-2xl animate-pulse pointer-events-none" />
+
+                          {/* Outer Concentric Gradient Ring */}
+                          <div className="relative w-28 h-28 rounded-3xl bg-gradient-to-b from-neutral-100/90 to-neutral-200/50 dark:from-slate-800/80 dark:to-slate-900/60 p-0.5 border border-neutral-200/80 dark:border-white/10 shadow-[0_12px_32px_rgba(124,58,237,0.12)] flex items-center justify-center backdrop-blur-md">
+                            {/* Inner Circle Container */}
+                            <div className="w-full h-full rounded-[22px] bg-white/90 dark:bg-[#0F172A]/90 flex items-center justify-center relative overflow-hidden">
+                              {/* Background subtle mesh lines */}
+                              <div className="absolute inset-0 opacity-[0.08] dark:opacity-[0.15] bg-[radial-gradient(#7C3AED_1px,transparent_1px)] [background-size:8px_8px]" />
+                              
+                              {/* Central Animated Floating Shopping Icon */}
+                              <motion.div
+                                animate={{ 
+                                  y: [0, -6, 0],
+                                  rotate: [0, -2, 2, 0]
+                                }}
+                                transition={{ 
+                                  repeat: Infinity, 
+                                  duration: 4, 
+                                  ease: "easeInOut" 
+                                }}
+                                className="relative z-10 p-4 rounded-2xl bg-gradient-to-tr from-[#7C3AED]/12 via-[#A855F7]/10 to-[#EC4899]/12 dark:from-[#7C3AED]/25 dark:to-[#EC4899]/20 border border-[#7C3AED]/20 text-[#7C3AED] dark:text-[#C084FC]"
+                              >
+                                <ShoppingBag className="w-10 h-10 stroke-[1.75]" />
+                              </motion.div>
+                            </div>
+                          </div>
+
+                          {/* Floating Decorative Mini Badges */}
+                          <motion.div
+                            animate={{ 
+                              y: [-3, 3, -3],
+                              scale: [1, 1.05, 1]
+                            }}
+                            transition={{ repeat: Infinity, duration: 3.2, ease: "easeInOut" }}
+                            className="absolute -top-2 -right-2 p-2 rounded-xl bg-gradient-to-r from-[#EC4899] to-[#F43F5E] text-white shadow-lg shadow-pink-500/30 border border-white/20"
+                            title="Deals & Discounts"
+                          >
+                            <Sparkles className="w-3.5 h-3.5" />
+                          </motion.div>
+
+                          <motion.div
+                            animate={{ 
+                              y: [3, -3, 3],
+                              scale: [1, 1.05, 1]
+                            }}
+                            transition={{ repeat: Infinity, duration: 3.8, ease: "easeInOut", delay: 0.5 }}
+                            className="absolute -bottom-2 -left-2 p-2 rounded-xl bg-gradient-to-r from-[#7C3AED] to-[#6366F1] text-white shadow-lg shadow-purple-500/30 border border-white/20"
+                            title="Digital Marketplace"
+                          >
+                            <Tag className="w-3.5 h-3.5" />
+                          </motion.div>
                         </div>
-                        <p className="text-sm font-bold text-neutral-700 dark:text-neutral-300 mb-2">{t.cartEmpty}</p>
-                        <p className="text-xs text-neutral-450 dark:text-neutral-500 max-w-xs mx-auto mb-6">Explore our curated marketplace for scripts, license keys, high-speed domains, and premium hosting.</p>
-                        <div className="flex flex-col gap-2.5 items-center justify-center">
+
+                        {/* Title & Explanatory Copy */}
+                        <h3 className="text-base sm:text-lg font-black text-neutral-900 dark:text-white tracking-tight mb-2">
+                          {language === 'bn' 
+                            ? 'আপনার শপিং কার্ট খালি' 
+                            : language === 'ar'
+                              ? 'سلة المشتريات فارغة'
+                              : 'Your Cart is Empty'}
+                        </h3>
+                        <p className="text-xs text-neutral-500 dark:text-neutral-400 max-w-[280px] sm:max-w-xs leading-relaxed mb-6 font-medium">
+                          {language === 'bn'
+                            ? 'আপনার কার্টে এখনো কোনো ডিজিটাল প্রডাক্ট বা সার্ভিস যোগ করেননি। মার্কেটপ্লেসের প্রিমিয়াম স্ক্রিপ্ট ও সলিউশন এক্সপ্লোর করুন।'
+                            : language === 'ar'
+                              ? 'لم تقم بإضافة أي منتجات رقمية أو خدمات حتى الآن. اكتشف أفضل السكربتات والحلول البرمجية.'
+                              : 'You haven\'t added any items to your cart yet. Explore our curated marketplace of ready scripts, themes, and hosting packages.'}
+                        </p>
+
+                        {/* Primary Action Button: Browse Marketplace */}
+                        <div className="w-full space-y-3">
                           <button
+                            id="cart-empty-browse-marketplace-btn"
+                            type="button"
                             onClick={() => {
                               setCartOpen(false);
                               setCurrentPage('marketplace');
                             }}
-                            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs text-white font-semibold bg-gradient-to-r from-[#7C3AED] via-[#A855F7] to-[#EC4899] hover:scale-[1.02] shadow-[0_8px_20px_rgba(124,58,237,0.2)] active:scale-95 transition-all duration-300 cursor-pointer"
+                            className="w-full py-3.5 px-6 rounded-2xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-[#7C3AED] via-[#A855F7] to-[#EC4899] hover:opacity-95 hover:shadow-[0_12px_28px_rgba(124,58,237,0.32)] hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 cursor-pointer flex items-center justify-center gap-2 group shadow-[0_8px_20px_rgba(124,58,237,0.22)]"
                           >
-                            <span>Browse Digital Store</span>
-                            <ArrowRight className="w-3.5 h-3.5" />
+                            <Store className="w-4 h-4 transition-transform duration-300 group-hover:scale-110" />
+                            <span>
+                              {language === 'bn' 
+                                ? 'মার্কেটপ্লেস ব্রাউজ করুন' 
+                                : language === 'ar' 
+                                  ? 'تصفح المتجر الرقمي' 
+                                  : 'Browse Marketplace'}
+                            </span>
+                            <ArrowRight className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1" />
                           </button>
-                          
-                          <button
-                            onClick={() => {
-                              setCartOpen(false);
-                              setCurrentPage('services');
-                            }}
-                            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-semibold bg-neutral-100 dark:bg-slate-800 text-neutral-800 dark:text-neutral-200 hover:bg-neutral-200 dark:hover:bg-slate-700 hover:scale-[1.02] border border-neutral-200 dark:border-white/5 active:scale-95 transition-all duration-300 cursor-pointer"
-                          >
-                            <span>Browse Services</span>
-                            <ArrowRight className="w-3.5 h-3.5 text-[#7C3AED] dark:text-[#A855F7]" />
-                          </button>
+
+                          {/* Secondary Exploration Suggestions */}
+                          <div className="pt-2">
+                            <span className="text-[10px] uppercase font-bold tracking-wider text-neutral-400 dark:text-neutral-500 block mb-2 font-mono">
+                              {language === 'bn' ? 'অথবা এক্সপ্লোর করুন' : language === 'ar' ? 'أو تصفح الفئات' : 'Quick Categories'}
+                            </span>
+                            <div className="grid grid-cols-2 gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setCartOpen(false);
+                                  setCurrentPage('services');
+                                }}
+                                className="py-2.5 px-3 rounded-xl bg-neutral-100/90 dark:bg-slate-800/70 hover:bg-neutral-200/90 dark:hover:bg-slate-700/80 text-neutral-700 dark:text-neutral-200 text-xs font-semibold border border-neutral-200/60 dark:border-white/5 transition-all duration-200 hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
+                              >
+                                <Cpu className="w-3.5 h-3.5 text-[#7C3AED] dark:text-[#A855F7]" />
+                                <span>{language === 'bn' ? 'সার্ভিসেস' : language === 'ar' ? 'الخدمات' : 'Custom Services'}</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setCartOpen(false);
+                                  setCurrentPage('hosting');
+                                }}
+                                className="py-2.5 px-3 rounded-xl bg-neutral-100/90 dark:bg-slate-800/70 hover:bg-neutral-200/90 dark:hover:bg-slate-700/80 text-neutral-700 dark:text-neutral-200 text-xs font-semibold border border-neutral-200/60 dark:border-white/5 transition-all duration-200 hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
+                              >
+                                <Server className="w-3.5 h-3.5 text-[#EC4899]" />
+                                <span>{language === 'bn' ? 'হোস্টিং প্যাকেজ' : language === 'ar' ? 'الاستضافة' : 'BDIX Hosting'}</span>
+                              </button>
+                            </div>
+                          </div>
                         </div>
-                      </div>
+
+                        {/* Trust Assurance Footer Badges */}
+                        <div className="mt-8 pt-4 border-t border-neutral-200/50 dark:border-white/5 w-full flex items-center justify-around text-[10px] font-semibold text-neutral-400 dark:text-neutral-500">
+                          <span className="flex items-center gap-1">
+                            <Zap className="w-3 h-3 text-amber-500" />
+                            {language === 'bn' ? 'ইনস্ট্যান্ট ডেলিভারি' : 'Instant Access'}
+                          </span>
+                          <span>•</span>
+                          <span className="flex items-center gap-1">
+                            <ShieldCheck className="w-3 h-3 text-emerald-500" />
+                            {language === 'bn' ? 'ভেরিফাইড কোড' : '100% Verified'}
+                          </span>
+                          <span>•</span>
+                          <span className="flex items-center gap-1">
+                            <Sparkles className="w-3 h-3 text-[#A855F7]" />
+                            {language === 'bn' ? 'লাইভ সাপোর্ট' : '24/7 Support'}
+                          </span>
+                        </div>
+                      </motion.div>
                     ) : (
                       <div className="flow-root mt-4">
                         <ul role="list" className="space-y-4">
@@ -4381,20 +4598,20 @@ Please verify this payment and process the order. Thank you!`;
                       </div>
 
                       {/* Currency output rates block */}
-                      <div className="space-y-2 text-sm bg-[#F8FAFC]/50 dark:bg-[#111827]/40 p-4 rounded-[20px] border border-neutral-200/60 dark:border-white/8 text-left shadow-sm">
-                        <div className="flex justify-between text-[#475569] dark:text-[#CBD5E1] text-xs sm:text-sm font-semibold">
-                          <span>{t.subtotal}</span>
-                          <span className="font-mono font-bold text-[#0F172A] dark:text-white">{formatPriceInCart(subtotal)}</span>
+                      <div className="space-y-2.5 text-sm bg-[#F8FAFC]/50 dark:bg-[#111827]/40 p-4 rounded-[20px] border border-neutral-200/60 dark:border-white/8 text-left shadow-sm">
+                        <div className="flex justify-between text-[#475569] dark:text-[#CBD5E1] text-xs sm:text-sm font-bold">
+                          <span className="font-extrabold text-[#0F172A] dark:text-white">{t.subtotal}</span>
+                          <span className="font-black text-base sm:text-lg text-[#0F172A] dark:text-white">{formatPriceInCart(subtotal)}</span>
                         </div>
                         {discountAmount > 0 && (
                           <div className="flex justify-between text-[#22C55E] text-xs sm:text-sm font-bold animate-pulse">
-                             <span>Savings Discount</span>
-                             <span className="font-mono">-{formatPriceInCart(discountAmount)}</span>
+                             <span className="font-bold">Savings Discount</span>
+                             <span className="font-black text-base sm:text-lg">-{formatPriceInCart(discountAmount)}</span>
                           </div>
                         )}
                         <div className="flex justify-between font-black text-neutral-900 dark:text-white pt-2.5 border-t border-neutral-200/60 dark:border-white/8 text-sm sm:text-base">
-                          <span>{t.total}</span>
-                          <span className="text-transparent bg-gradient-to-r from-[#7C3AED] via-[#A855F7] to-[#EC4899] bg-clip-text font-black font-mono">{formatPriceInCart(total)}</span>
+                          <span className="font-black text-base sm:text-lg">{t.total}</span>
+                          <span className="text-transparent bg-gradient-to-r from-[#7C3AED] via-[#A855F7] to-[#EC4899] bg-clip-text font-black text-lg sm:text-2xl">{formatPriceInCart(total)}</span>
                         </div>
                         {(() => {
                           const hasAdvanceItem = cart.some(item => item.product.advancePercent !== undefined && item.product.advancePercent < 100);
@@ -4415,12 +4632,12 @@ Please verify this payment and process the order. Thank you!`;
                           return (
                             <>
                               <div className="flex justify-between text-indigo-600 dark:text-cyan-400 font-black pt-2.5 border-t border-dashed border-neutral-200/60 dark:border-white/5 text-xs sm:text-sm">
-                                <span>{language === 'bn' ? 'অগ্রিম পরিশোধযোগ্য (Payable Now):' : 'Payable Now (Advance):'}</span>
-                                <span className="font-mono font-black">{formatPriceInCart(Math.max(0, totalPayableNow))}</span>
+                                <span className="font-black">{language === 'bn' ? 'অগ্রিম পরিশোধযোগ্য (Payable Now):' : 'Payable Now (Advance):'}</span>
+                                <span className="font-black text-base sm:text-lg">{formatPriceInCart(Math.max(0, totalPayableNow))}</span>
                               </div>
-                              <div className="flex justify-between text-amber-500 font-bold text-[11px] sm:text-xs">
-                                <span>{language === 'bn' ? 'বকেয়া বাকি (Remaining Due):' : 'Remaining Due:'}</span>
-                                <span className="font-mono">{formatPriceInCart(totalDueRemaining)}</span>
+                              <div className="flex justify-between text-amber-500 font-extrabold text-xs sm:text-sm">
+                                <span className="font-extrabold">{language === 'bn' ? 'বকেয়া বাকি (Remaining Due):' : 'Remaining Due:'}</span>
+                                <span className="font-black text-base sm:text-lg">{formatPriceInCart(totalDueRemaining)}</span>
                               </div>
                             </>
                           );
@@ -4454,6 +4671,154 @@ Please verify this payment and process the order. Thank you!`;
                           </div>
                         ) : !user ? (
                           <div className="w-full space-y-4">
+                            {/* Account Creation Benefits Informational Callout & Interactive Tooltip */}
+                            <div className="relative rounded-2xl bg-gradient-to-br from-indigo-50/95 via-purple-50/70 to-pink-50/40 dark:from-[#1E1B4B]/50 dark:via-[#2E1065]/35 dark:to-[#0F172A]/70 border border-indigo-200/90 dark:border-indigo-800/70 p-3.5 shadow-xs transition-all duration-300">
+                              <div className="flex items-start justify-between gap-2.5">
+                                <div className="flex items-start gap-2.5 min-w-0">
+                                  <div className="p-2 rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 text-white shrink-0 shadow-xs mt-0.5">
+                                    <Sparkles className="w-4 h-4" />
+                                  </div>
+                                  <div className="space-y-1">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <span className="text-xs font-black text-slate-900 dark:text-white">
+                                        {language === 'bn' ? 'অ্যাকাউন্ট খোলার সুবিধা' : language === 'ar' ? 'مزايا إنشاء حساب' : 'Why Create an Account?'}
+                                      </span>
+                                      <span className="inline-flex items-center px-1.5 py-0.2 rounded-full text-[8.5px] font-extrabold bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300">
+                                        {language === 'bn' ? 'প্রস্তাবিত' : language === 'ar' ? 'موصى به' : 'Recommended'}
+                                      </span>
+                                    </div>
+                                    <p className="text-[11px] font-medium text-slate-600 dark:text-slate-300 leading-snug">
+                                      {language === 'bn' 
+                                        ? 'অর্ডার হিস্টোরি সংরক্ষণ, যেকোনো সময় ফাইল পুনরায় ডাউনলোড ও প্রায়োরিটি সাপোর্ট পেতে অ্যাকাউন্ট খুলুন।' 
+                                        : language === 'ar' 
+                                        ? 'سجل حسابك لحفظ سجل طلباتك، وإعادة تحميل الملفات لاحقاً، والحصول على دعم فني أولوي فوري.' 
+                                        : 'Save your complete order history, unlock lifetime re-downloads, and get 24/7 priority customer support.'}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                {/* Interactive Tooltip Popover Trigger */}
+                                <div className="relative shrink-0">
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowAccountBenefitsTooltip(prev => !prev)}
+                                    onMouseEnter={() => setShowAccountBenefitsTooltip(true)}
+                                    onMouseLeave={() => setShowAccountBenefitsTooltip(false)}
+                                    className="p-1.5 rounded-lg bg-white/90 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-700 text-indigo-600 dark:text-indigo-400 border border-indigo-200/80 dark:border-indigo-700/60 shadow-2xs transition-all cursor-pointer flex items-center gap-1 text-[10.5px] font-bold"
+                                    aria-label="Account benefits details"
+                                  >
+                                    <Info className="w-3.5 h-3.5" />
+                                    <span className="hidden sm:inline text-[10px]">{language === 'bn' ? 'বিস্তারিত' : 'Perks'}</span>
+                                  </button>
+
+                                  {/* Floating Detailed Benefits Tooltip */}
+                                  <AnimatePresence>
+                                    {showAccountBenefitsTooltip && (
+                                      <motion.div
+                                        initial={{ opacity: 0, y: 6, scale: 0.96 }}
+                                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                                        exit={{ opacity: 0, y: 4, scale: 0.96 }}
+                                        transition={{ duration: 0.15 }}
+                                        className="absolute right-0 top-full mt-2 w-72 sm:w-80 p-3.5 rounded-2xl bg-slate-900/98 dark:bg-[#090D16]/98 text-white backdrop-blur-2xl border border-indigo-500/40 shadow-[0_20px_50px_rgba(0,0,0,0.6)] z-50 text-left pointer-events-auto"
+                                      >
+                                        <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-800">
+                                          <span className="text-[11px] font-black text-indigo-300 uppercase tracking-wider flex items-center gap-1.5">
+                                            <ShieldCheck className="w-3.5 h-3.5 text-indigo-400" />
+                                            {language === 'bn' ? 'অ্যাকাউন্ট মেম্বারশিপ সুবিধা' : 'Account Member Benefits'}
+                                          </span>
+                                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold">100% FREE</span>
+                                        </div>
+                                        
+                                        <div className="space-y-2 text-[10.5px]">
+                                          <div className="flex items-start gap-2">
+                                            <div className="p-1 rounded-lg bg-indigo-500/20 text-indigo-300 mt-0.5 shrink-0">
+                                              <Download className="w-3 h-3" />
+                                            </div>
+                                            <div>
+                                              <strong className="text-white font-bold block">{language === 'bn' ? 'সংরক্ষিত অর্ডার ও লাইসেন্স হিস্টোরি' : 'Saved Order History & License Keys'}</strong>
+                                              <span className="text-slate-300 text-[9.5px]">{language === 'bn' ? 'সকল কেনা ডিজিটাল স্ক্রিপ্ট, থিম, লাইসেন্স কী ও ইনভয়েস আজীবন ড্যাশবোর্ডে থাকবে।' : 'Permanent lifetime access to purchased files, source code zips, license keys, and receipts.'}</span>
+                                            </div>
+                                          </div>
+
+                                          <div className="flex items-start gap-2">
+                                            <div className="p-1 rounded-lg bg-emerald-500/20 text-emerald-300 mt-0.5 shrink-0">
+                                              <Zap className="w-3 h-3" />
+                                            </div>
+                                            <div>
+                                              <strong className="text-white font-bold block">{language === 'bn' ? 'প্রায়োরিটি সাপোর্ট ডেস্ক' : 'Priority Customer Support'}</strong>
+                                              <span className="text-slate-300 text-[9.5px]">{language === 'bn' ? 'টিকিট ও হোয়াটসঅ্যাপে দ্রুত অগ্রাধিকার ভিত্তিতে সহায়তা পাবেন।' : 'Expedited customer queue on WhatsApp & support tickets with automated order verification.'}</span>
+                                            </div>
+                                          </div>
+
+                                          <div className="flex items-start gap-2">
+                                            <div className="p-1 rounded-lg bg-purple-500/20 text-purple-300 mt-0.5 shrink-0">
+                                              <Coins className="w-3 h-3" />
+                                            </div>
+                                            <div>
+                                              <strong className="text-white font-bold block">{language === 'bn' ? '৩০% অ্যাফিলিয়েট ও স্পেশাল ছাড়' : 'Affiliate Rewards & Member Deals'}</strong>
+                                              <span className="text-slate-300 text-[9.5px]">{language === 'bn' ? 'রেফার করে কমিশন আয় এবং এক্সক্লুসিভ মেম্বার ডিসকাউন্ট উপভোগ করুন।' : 'Earn up to 30% affiliate commissions and unlock member-exclusive promo codes.'}</span>
+                                            </div>
+                                          </div>
+                                        </div>
+
+                                        {/* Quick Action inside Tooltip */}
+                                        <div className="mt-3 pt-2.5 border-t border-slate-800 flex items-center gap-2">
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setShowAccountBenefitsTooltip(false);
+                                              if (setCartOpen) setCartOpen(false);
+                                              onLoginClick('register');
+                                            }}
+                                            className="flex-1 py-1.5 px-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-lg text-[10px] font-bold text-center transition-all cursor-pointer shadow-xs"
+                                          >
+                                            {language === 'bn' ? 'ফ্রি অ্যাকাউন্ট খুলুন' : 'Create Free Account'}
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setShowAccountBenefitsTooltip(false);
+                                              if (setCartOpen) setCartOpen(false);
+                                              onLoginClick('login');
+                                            }}
+                                            className="py-1.5 px-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-[10px] font-bold text-center transition-all cursor-pointer"
+                                          >
+                                            {language === 'bn' ? 'লগইন' : 'Sign In'}
+                                          </button>
+                                        </div>
+                                      </motion.div>
+                                    )}
+                                  </AnimatePresence>
+                                </div>
+                              </div>
+
+                              {/* Quick CTA row below message */}
+                              <div className="mt-2.5 pt-2 border-t border-indigo-100/70 dark:border-indigo-900/40 flex items-center justify-between gap-2 text-[10px]">
+                                <div className="flex items-center gap-2 text-indigo-700 dark:text-indigo-300 font-semibold">
+                                  <span className="flex items-center gap-1">
+                                    <Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                                    {language === 'bn' ? 'অর্ডার হিস্টোরি' : 'Saved History'}
+                                  </span>
+                                  <span className="flex items-center gap-1">
+                                    <Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                                    {language === 'bn' ? 'প্রায়োরিটি সাপোর্ট' : 'Priority Support'}
+                                  </span>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (setCartOpen) setCartOpen(false);
+                                    onLoginClick('register');
+                                  }}
+                                  className="inline-flex items-center gap-1 text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-extrabold cursor-pointer group"
+                                >
+                                  <span>{language === 'bn' ? 'ফ্রি সাইন আপ' : 'Register Free'}</span>
+                                  <ArrowRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />
+                                </button>
+                              </div>
+                            </div>
+
                             {/* Toggle switcher */}
                             <div className="grid grid-cols-2 p-1 bg-neutral-100 dark:bg-slate-950/80 border border-neutral-200/50 dark:border-white/5 rounded-[14px]" id="guest-checkout-switcher">
                               <button
@@ -4499,9 +4864,29 @@ Please verify this payment and process the order. Thank you!`;
                               </div>
                             ) : (
                               <div className="w-full space-y-4">
-                                <p className="text-[11px] leading-relaxed font-semibold text-neutral-500 dark:text-[#CBD5E1] bg-[#F8FAFC]/80 dark:bg-[#111827]/40 p-3 rounded-[14px] border border-neutral-200/50 dark:border-white/5">
-                                  ⚡ Enter your details below for instant Guest Checkout. Download links are safely shared.
-                                </p>
+                                <div className="p-3 bg-gradient-to-r from-amber-500/10 via-indigo-500/10 to-purple-500/10 border border-amber-500/20 dark:border-indigo-500/20 rounded-[14px] flex items-start gap-2 text-[11px] font-medium text-slate-700 dark:text-slate-200">
+                                  <span className="text-amber-500 text-xs shrink-0 mt-0.5">⚡</span>
+                                  <div className="min-w-0 flex-1">
+                                    <span>
+                                      {language === 'bn' 
+                                        ? 'গেস্ট চেকআউটের তথ্য দিন। স্থায়ী অর্ডার হিস্টোরি ও প্রায়োরিটি সাপোর্ট পেতে ' 
+                                        : language === 'ar' 
+                                        ? 'أدخل بياناتك للدفع السريع. للحصول على سجل دائم ودعم مميز ' 
+                                        : 'Instant Guest Checkout. To save this order to your account & get priority support, '}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (setCartOpen) setCartOpen(false);
+                                        onLoginClick('register');
+                                      }}
+                                      className="font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer inline-flex items-center gap-0.5"
+                                    >
+                                      <span>{language === 'bn' ? 'ফ্রি অ্যাকাউন্ট খুলুন' : language === 'ar' ? 'سجل الآن' : 'register free'}</span>
+                                      <ArrowRight className="w-2.5 h-2.5" />
+                                    </button>
+                                  </div>
+                                </div>
                                 
                                 <div className="space-y-4 text-left">
                                   {/* Full Name */}
@@ -4580,57 +4965,96 @@ Please verify this payment and process the order. Thank you!`;
                                     </label>
                                   </div>
 
-                                  {/* Upload Receipt */}
-                                  <div className="space-y-2">
-                                    <span className="text-[10px] font-semibold text-[#475569] dark:text-[#CBD5E1] uppercase tracking-wider block">
-                                      {language === 'bn' ? 'টাকা পাঠানোর রসিদ (ঐচ্ছিক)' : 'Transaction Receipt Image (Optional)'}
-                                    </span>
-                                    <div className="flex items-center gap-3">
-                                      <input
-                                        type="file"
-                                        id="guest-receipt-file-input"
+                                  {/* Row 5.6: Premium Multiple Payment Screenshot / Recipe photo upload system */}
+                                  <div className="space-y-2 p-3 bg-slate-50 dark:bg-slate-900/40 border border-slate-200/60 dark:border-slate-800/60 rounded-[16px] transition-all duration-300">
+                                    <div className="flex items-center gap-1.5">
+                                      <div className="p-1 bg-violet-500/10 rounded-md">
+                                        <Upload className="w-3.5 h-3.5 text-violet-500" />
+                                      </div>
+                                      <label className="text-[11px] sm:text-xs font-bold text-[#475569] dark:text-[#CBD5E1]">
+                                        {language === 'bn' ? 'পেমেন্ট স্ক্রিনশট বা রসিদ আপলোড:' : 'Payment Screenshots or Receipts Upload:'}
+                                      </label>
+                                    </div>
+
+                                    {/* Multi-file input drag-and-drop zone */}
+                                    <div className="group relative border border-dashed border-slate-200 dark:border-slate-800 hover:border-violet-500/50 rounded-lg p-2.5 transition-all duration-300 bg-[#F8FAFC]/50 dark:bg-[#111827]/30 text-center cursor-pointer">
+                                      <input 
+                                        type="file" 
                                         accept="image/*"
-                                        className="hidden"
+                                        multiple
                                         onChange={(e) => {
-                                          const file = e.target.files?.[0];
-                                          if (file) {
-                                            setGuestReceiptName(file.name);
-                                            const reader = new FileReader();
-                                            reader.onload = (event) => {
-                                              if (event.target?.result) {
-                                                setGuestReceipt(event.target.result as string);
-                                              }
-                                            };
-                                            reader.readAsDataURL(file);
+                                          const files = e.target.files;
+                                          if (files) {
+                                            const fileArray = Array.from(files) as File[];
+                                            fileArray.forEach((file: File) => {
+                                              const reader = new FileReader();
+                                              reader.onloadend = () => {
+                                                const url = reader.result as string;
+                                                setGuestReceiptsList(prev => {
+                                                  // Prevent duplicates
+                                                  if (prev.some(item => item.name === file.name)) return prev;
+                                                  return [...prev, { name: file.name, url }];
+                                                });
+                                              };
+                                              reader.readAsDataURL(file);
+                                            });
+                                            triggerToast(language === 'bn' ? 'পেমেন্ট ফাইল সংযুক্ত করা হয়েছে!' : 'Payment file(s) successfully attached!');
                                           }
                                         }}
+                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                                       />
-                                      <label
-                                        htmlFor="guest-receipt-file-input"
-                                        className="flex items-center gap-2 px-4 h-[44px] rounded-[12px] border border-dashed border-[#E2E8F0] dark:border-[#374151] hover:border-[#7C3AED] dark:hover:border-[#A855F7] bg-[#F8FAFC] dark:bg-[#111827] hover:bg-[#F1F5F9] dark:hover:bg-[#1E293B] cursor-pointer text-xs font-bold text-[#475569] dark:text-[#CBD5E1] transition-all duration-300 select-none shadow-sm active:scale-95"
-                                      >
-                                        <Upload className="w-4 h-4 text-[#7C3AED] dark:text-[#A855F7] shrink-0" />
-                                        <span>{guestReceiptName ? (language === 'bn' ? 'রসিদ পরিবর্তন' : 'Change Receipt') : (language === 'bn' ? 'রসিদ আপলোড' : 'Upload Receipt')}</span>
-                                      </label>
-                                      {guestReceiptName && (
-                                        <span className="text-[11px] text-[#475569] dark:text-[#CBD5E1] font-mono truncate max-w-[150px] bg-neutral-100 dark:bg-neutral-800 px-2 py-1 rounded" title={guestReceiptName}>
-                                          {guestReceiptName}
+                                      <div className="flex flex-col items-center justify-center gap-1">
+                                        <div className="p-1.5 bg-violet-500/5 dark:bg-violet-500/10 rounded-lg group-hover:bg-violet-500/15 transition-colors duration-300">
+                                          <Upload className="w-4 h-4 text-violet-500" />
+                                        </div>
+                                        <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300 leading-none">
+                                          {language === 'bn' ? 'স্ক্রিনশট বা রসিদ যুক্ত করুন (একের অধিক)' : 'Upload Receipts (Multiple Files Supported)'}
                                         </span>
-                                      )}
+                                        <span className="text-[9px] text-slate-400 dark:text-slate-500 leading-none mt-0.5">
+                                          {language === 'bn' ? 'ড্র্যাগ অ্যান্ড ড্রপ অথবা ক্লিক করুন' : 'Drag & drop or click to browse'}
+                                        </span>
+                                      </div>
                                     </div>
-                                    {guestReceipt && (
-                                      <div className="mt-2 relative w-12 h-12 border border-neutral-300 dark:border-slate-800 rounded bg-neutral-100 overflow-hidden group">
-                                        <img src={guestReceipt} alt="Receipt preview" className="w-full h-full object-cover" />
-                                        <button 
-                                          type="button"
-                                          onClick={() => {
-                                            setGuestReceipt('');
-                                            setGuestReceiptName('');
-                                          }}
-                                          className="absolute inset-0 bg-red-600/90 hover:bg-red-700 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center text-white text-[9px] font-bold"
-                                        >
-                                          {language === 'bn' ? 'মুছুন' : 'Del'}
-                                        </button>
+
+                                    {/* Uploaded receipt screenshots list */}
+                                    {guestReceiptsList.length > 0 && (
+                                      <div className="space-y-2 pt-2">
+                                        <div className="text-[10px] uppercase font-bold font-mono tracking-wider text-neutral-400 dark:text-neutral-500 text-left">
+                                          {language === 'bn' ? `সংযুক্ত রসিদসমূহ (${guestReceiptsList.length})` : `Attached Receipts (${guestReceiptsList.length})`}
+                                        </div>
+                                        <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto pr-1 scrollbar-thin">
+                                          {guestReceiptsList.map((receipt, index) => (
+                                            <div 
+                                              key={index} 
+                                              className="relative rounded-xl overflow-hidden border border-emerald-500/30 bg-emerald-500/5 dark:bg-emerald-950/10 p-2.5 flex items-center justify-between gap-3 animate-in fade-in slide-in-from-bottom-2 duration-300"
+                                            >
+                                              <img 
+                                                src={receipt.url} 
+                                                alt={receipt.name} 
+                                                className="w-12 h-10 object-cover rounded-lg border border-emerald-500/20 shadow-xs"
+                                              />
+                                              <div className="flex-1 text-left min-w-0">
+                                                <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 block truncate">
+                                                  {receipt.name}
+                                                </span>
+                                                <span className="text-[9px] text-slate-400 font-semibold uppercase tracking-wider block">
+                                                  {language === 'bn' ? 'যাচাইকরণের জন্য প্রস্তুত' : 'Ready for Verification'}
+                                                </span>
+                                              </div>
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  setGuestReceiptsList(prev => prev.filter((_, i) => i !== index));
+                                                  triggerToast(language === 'bn' ? 'রসিদ মুছে ফেলা হয়েছে' : 'Receipt removed');
+                                                }}
+                                                className="p-1.5 rounded-lg hover:bg-rose-500/10 text-rose-500 hover:text-rose-600 transition-all cursor-pointer active:scale-90"
+                                                title="Remove receipt"
+                                              >
+                                                <X className="w-4 h-4" />
+                                              </button>
+                                            </div>
+                                          ))}
+                                        </div>
                                       </div>
                                     )}
                                   </div>
@@ -4667,84 +5091,74 @@ Please verify this payment and process the order. Thank you!`;
                                   {currency === 'BDT' && (
                                     <div className="grid grid-cols-2 gap-2 w-full font-sans">
                                       {/* bKash */}
-                                      {finalBdMethods.bkash?.enabled && (
-                                        <button
-                                          type="button"
-                                          onClick={() => setSelectedGuestGateway('bKash Wallet')}
-                                          className={`flex flex-col items-center justify-center p-2 rounded-lg border transition-all cursor-pointer text-center ${
-                                            selectedGuestGateway === 'bKash Wallet'
-                                              ? 'border-pink-550 bg-pink-500/10 ring-2 ring-pink-500/40 dark:bg-pink-950/20'
-                                              : 'border-neutral-200 dark:border-slate-800 bg-white dark:bg-neutral-950 hover:border-pink-505'
-                                          }`}
-                                        >
-                                          <span className="text-xs font-black text-pink-600 font-sans">bKash (বিকাশ)</span>
-                                          <span className="text-[9px] text-neutral-400">Instant Verification</span>
-                                        </button>
-                                      )}
+                                      <button
+                                        type="button"
+                                        onClick={() => setSelectedGuestGateway('bKash Wallet')}
+                                        className={`flex flex-col items-center justify-center p-2 rounded-lg border transition-all cursor-pointer text-center ${
+                                          selectedGuestGateway === 'bKash Wallet'
+                                            ? 'border-pink-550 bg-pink-500/10 ring-2 ring-pink-500/40 dark:bg-pink-950/20'
+                                            : 'border-neutral-200 dark:border-slate-800 bg-white dark:bg-neutral-950 hover:border-pink-505'
+                                        }`}
+                                      >
+                                        <span className="text-xs font-black text-pink-600 font-sans">bKash (বিকাশ)</span>
+                                        <span className="text-[9px] text-neutral-400">Instant Verification</span>
+                                      </button>
 
                                       {/* Nagad */}
-                                      {finalBdMethods.nagad?.enabled && (
-                                        <button
-                                          type="button"
-                                          onClick={() => setSelectedGuestGateway('Nagad Digital')}
-                                          className={`flex flex-col items-center justify-center p-2 rounded-lg border transition-all cursor-pointer text-center relative overflow-hidden ${
-                                            selectedGuestGateway === 'Nagad Digital'
-                                              ? 'border-orange-500 bg-orange-500/10 ring-2 ring-orange-500/40 dark:bg-orange-950/20'
-                                              : 'border-neutral-200 dark:border-slate-800 bg-white dark:bg-neutral-950 hover:border-orange-500 hover:shadow-xs'
-                                          }`}
-                                        >
-                                          <span className="text-xs font-black text-orange-600 font-sans">Nagad (নগদ)</span>
-                                          <span className="text-[9px] text-neutral-400">Secure BD Wallet</span>
-                                        </button>
-                                      )}
+                                      <button
+                                        type="button"
+                                        onClick={() => setSelectedGuestGateway('Nagad Digital')}
+                                        className={`flex flex-col items-center justify-center p-2 rounded-lg border transition-all cursor-pointer text-center relative overflow-hidden ${
+                                          selectedGuestGateway === 'Nagad Digital'
+                                            ? 'border-orange-500 bg-orange-500/10 ring-2 ring-orange-500/40 dark:bg-orange-950/20'
+                                            : 'border-neutral-200 dark:border-slate-800 bg-white dark:bg-neutral-950 hover:border-orange-500 hover:shadow-xs'
+                                        }`}
+                                      >
+                                        <span className="text-xs font-black text-orange-600 font-sans">Nagad (নগদ)</span>
+                                        <span className="text-[9px] text-neutral-400">Secure BD Wallet</span>
+                                      </button>
 
                                       {/* Rocket */}
-                                      {finalBdMethods.rocket?.enabled && (
-                                        <button
-                                          type="button"
-                                          onClick={() => setSelectedGuestGateway('Rocket Wallet')}
-                                          className={`flex flex-col items-center justify-center p-2 rounded-lg border transition-all cursor-pointer text-center ${
-                                            selectedGuestGateway === 'Rocket Wallet'
-                                              ? 'border-purple-600 bg-purple-500/10 ring-2 ring-purple-600/40 dark:bg-purple-950/20'
-                                              : 'border-neutral-200 dark:border-slate-800 bg-white dark:bg-neutral-950 hover:border-purple-550 hover:shadow-xs'
-                                          }`}
-                                        >
-                                          <span className="text-xs font-black text-purple-600 font-sans">Rocket (রকেট)</span>
-                                          <span className="text-[9px] text-neutral-400 font-sans">Dutch-Bangla Bank</span>
-                                        </button>
-                                      )}
+                                      <button
+                                        type="button"
+                                        onClick={() => setSelectedGuestGateway('Rocket Wallet')}
+                                        className={`flex flex-col items-center justify-center p-2 rounded-lg border transition-all cursor-pointer text-center ${
+                                          selectedGuestGateway === 'Rocket Wallet'
+                                            ? 'border-purple-600 bg-purple-500/10 ring-2 ring-purple-600/40 dark:bg-purple-950/20'
+                                            : 'border-neutral-200 dark:border-slate-800 bg-white dark:bg-neutral-950 hover:border-purple-550 hover:shadow-xs'
+                                        }`}
+                                      >
+                                        <span className="text-xs font-black text-purple-600 font-sans">Rocket (রকেট)</span>
+                                        <span className="text-[9px] text-neutral-400 font-sans">Dutch-Bangla Bank</span>
+                                      </button>
 
                                       {/* Cellfin */}
-                                      {finalBdMethods.cellfin?.enabled && (
-                                        <button
-                                          type="button"
-                                          onClick={() => setSelectedGuestGateway('Cellfin Payment')}
-                                          className={`flex flex-col items-center justify-center p-2 rounded-lg border transition-all cursor-pointer text-center ${
-                                            selectedGuestGateway === 'Cellfin Payment'
-                                              ? 'border-sky-500 bg-sky-500/10 ring-2 ring-sky-500/40 dark:bg-sky-950/20'
-                                              : 'border-neutral-200 dark:border-slate-800 bg-white dark:bg-neutral-950 hover:border-sky-500 hover:shadow-xs'
-                                          }`}
-                                        >
-                                          <span className="text-xs font-black text-sky-600 font-sans">Cellfin Card</span>
-                                          <span className="text-[9px] text-neutral-400 font-sans">Cellfin Wallet</span>
-                                        </button>
-                                      )}
+                                      <button
+                                        type="button"
+                                        onClick={() => setSelectedGuestGateway('Cellfin Payment')}
+                                        className={`flex flex-col items-center justify-center p-2 rounded-lg border transition-all cursor-pointer text-center ${
+                                          selectedGuestGateway === 'Cellfin Payment'
+                                            ? 'border-sky-500 bg-sky-500/10 ring-2 ring-sky-500/40 dark:bg-sky-950/20'
+                                            : 'border-neutral-200 dark:border-slate-800 bg-white dark:bg-neutral-950 hover:border-sky-500 hover:shadow-xs'
+                                        }`}
+                                      >
+                                        <span className="text-xs font-black text-sky-600 font-sans">Cellfin Card</span>
+                                        <span className="text-[9px] text-neutral-400 font-sans">Cellfin Wallet</span>
+                                      </button>
 
                                       {/* Bank Transfer */}
-                                      {finalBdMethods.islamiBank?.enabled && (
-                                        <button
-                                          type="button"
-                                          onClick={() => setSelectedGuestGateway('Islami Bank Transfer')}
-                                          className={`flex flex-col items-center justify-center p-2 rounded-lg border transition-all cursor-pointer col-span-2 text-center ${
-                                            selectedGuestGateway === 'Islami Bank Transfer'
-                                              ? 'border-emerald-600 bg-emerald-500/10 ring-2 ring-emerald-600/40 dark:bg-emerald-950/20'
-                                              : 'border-neutral-200 dark:border-slate-800 bg-white dark:bg-neutral-950 hover:border-emerald-500 hover:shadow-xs'
-                                          }`}
-                                        >
-                                          <span className="text-xs font-black text-emerald-600 font-sans">Islami Bank Transfer</span>
-                                          <span className="text-[9px] text-neutral-400 font-sans">Direct IBB Internet Net Banking</span>
-                                        </button>
-                                      )}
+                                      <button
+                                        type="button"
+                                        onClick={() => setSelectedGuestGateway('Islami Bank Transfer')}
+                                        className={`flex flex-col items-center justify-center p-2 rounded-lg border transition-all cursor-pointer col-span-2 text-center ${
+                                          selectedGuestGateway === 'Islami Bank Transfer'
+                                            ? 'border-emerald-600 bg-emerald-500/10 ring-2 ring-emerald-600/40 dark:bg-emerald-950/20'
+                                            : 'border-neutral-200 dark:border-slate-800 bg-white dark:bg-neutral-950 hover:border-emerald-500 hover:shadow-xs'
+                                        }`}
+                                      >
+                                        <span className="text-xs font-black text-emerald-600 font-sans">Islami Bank Transfer</span>
+                                        <span className="text-[9px] text-neutral-400 font-sans">Direct IBB Internet Net Banking</span>
+                                      </button>
 
                                       {/* SSLCommerz */}
                                       <button
@@ -4756,7 +5170,7 @@ Please verify this payment and process the order. Thank you!`;
                                             : 'border-neutral-200 dark:border-slate-800 bg-white dark:bg-neutral-950 hover:border-cyan-550 hover:shadow-xs'
                                         }`}
                                       >
-                                        <span className="text-xs font-bold text-cyan-600 font-sans">SSLCommerz BD Checkout</span>
+                                        <span className="text-xs font-bold text-cyan-600 font-sans">Online instant Pay</span>
                                         <span className="text-[9px] text-neutral-400 font-sans">Cards / Net Banking / Mobiles</span>
                                       </button>
 
@@ -4791,18 +5205,18 @@ Please verify this payment and process the order. Thank you!`;
                                                 </span>
                                               </div>
 
-                                              {/* QR Code */}
-                                              <div className="flex flex-col items-center p-2.5 bg-white dark:bg-[#0c1222] rounded-xl border border-neutral-200 dark:border-slate-800 shadow-sm max-w-[150px] mb-2.5">
-                                                <span className="text-[9px] font-bold text-neutral-500 mb-1.5">{language === 'bn' ? 'স্ক্যান করুন' : 'Scan to Pay'}</span>
-                                                <div className="w-[110px] h-[110px] flex items-center justify-center bg-neutral-100/30 rounded border border-neutral-150 dark:border-slate-800 overflow-hidden">
-                                                  <img 
-                                                    src={activeMfs.qrCodeUrl || `https://api.qrserver.com/v1/create-qr-code/?size=140x140&color=${activeMfs.qrColor}&data=tel:${activeMfs.number.replace(/\s/g, '')}`} 
-                                                    alt={`${activeMfs.name} QR Code`}
-                                                    className="max-w-full max-h-full object-contain rounded pointer-events-none"
-                                                    referrerPolicy="no-referrer"
-                                                  />
-                                                </div>
-                                              </div>
+                                              {/* Auto QR Generator */}
+                                              <AutoCheckoutQrGenerator
+                                                gateway={activeMfs.name}
+                                                orderTotalFormatted={formatPriceInCart(total)}
+                                                orderTotalNumber={total}
+                                                currency={currency}
+                                                language={language}
+                                                triggerToast={triggerToast}
+                                                merchantNumber={activeMfs.number}
+                                                instructions={activeMfs.instructions}
+                                                defaultColorHex={activeMfs.qrColor}
+                                              />
 
                                               {/* Instructions & Phone Number */}
                                               <p className="text-[10px] text-neutral-500 dark:text-neutral-400 mb-3 leading-relaxed max-w-sm">
@@ -4961,20 +5375,19 @@ Please verify this payment and process the order. Thank you!`;
 
                                               </div>
 
-                                              {/* QR System */}
-                                              <div className="md:col-span-5 flex flex-col items-center justify-center bg-white dark:bg-neutral-950 p-3 rounded-lg border border-neutral-150 dark:border-slate-800 shadow-xs text-center">
-                                                <span className="text-[9px] font-bold text-neural-500 dark:text-neutral-400 uppercase tracking-wider mb-2">{language === 'bn' ? 'কিউআর কোড (পেমেন্ট)' : 'Scan QR for Banking'}</span>
-                                                <div className="w-[115px] h-[115px] bg-neutral-50 dark:bg-[#0c1222] p-1.5 rounded border border-neutral-200 dark:border-slate-800 flex items-center justify-center">
-                                                  <img 
-                                                    src="https://api.qrserver.com/v1/create-qr-code/?size=140x140&color=059669&data=MD+IMRAN+HOSSAIN+A/C+20501290204369912+IBBL+New+Market+Dhaka+Routing+125263522" 
-                                                    alt="IBBL QR Code" 
-                                                    className="max-w-full max-h-full object-contain pointer-events-none"
-                                                    referrerPolicy="no-referrer"
-                                                  />
-                                                </div>
-                                                <span className="text-[8px] text-neutral-400 font-bold mt-2 leading-tight">
-                                                  {language === 'bn' ? 'ইসলামী ব্যাংক অ্যাপ বা যেকোনো সেলফিন দিয়ে স্ক্যান করুন' : 'Scan via Cellfin or IBBL Smart app'}
-                                                </span>
+                                              {/* Auto QR Generator */}
+                                              <div className="md:col-span-5 flex flex-col items-center justify-center">
+                                                <AutoCheckoutQrGenerator
+                                                  gateway="Islami Bank Transfer"
+                                                  orderTotalFormatted={formatPriceInCart(total)}
+                                                  orderTotalNumber={total}
+                                                  currency={currency}
+                                                  language={language}
+                                                  triggerToast={triggerToast}
+                                                  merchantNumber="20501290204369912"
+                                                  accountName="MD IMRAN HOSSAIN"
+                                                  defaultColorHex="059669"
+                                                />
                                               </div>
 
                                             </div>
@@ -5025,20 +5438,18 @@ Please verify this payment and process the order. Thank you!`;
                                             {finalSaMethods.stcPay?.instructions || (language === 'bn' ? 'কোড স্ক্যান করুন পেমেন্ট করার জন্য' : 'Scan QR code to pay using STC Pay app')}
                                           </p>
 
-                                          {/* Single QR Code Presentation */}
-                                          <div className="flex justify-center my-3">
-                                            <div className="flex flex-col items-center p-2.5 bg-white dark:bg-[#0F172A] rounded-lg border border-purple-200 dark:border-slate-800 shadow-sm max-w-[170px]">
-                                              <span className="text-[10px] font-bold text-purple-600 mb-1.5">{language === 'bn' ? 'কিউআর কোড' : 'QR Code'}</span>
-                                              <div className="w-[130px] h-[130px] flex items-center justify-center overflow-hidden bg-purple-50/20 rounded border border-neutral-150 dark:border-slate-800">
-                                                <img 
-                                                  src={finalSaMethods.stcPay?.qrCode || `https://api.qrserver.com/v1/create-qr-code/?size=180x180&color=7c3aed&data=tel:${(finalSaMethods.stcPay?.walletNumber || '+966570511931').replace(/\s/g, '')}`} 
-                                                  alt="STC Pay QR Code"
-                                                  className="max-w-full max-h-full object-contain rounded pointer-events-none"
-                                                  referrerPolicy="no-referrer"
-                                                />
-                                              </div>
-                                            </div>
-                                          </div>
+                                          {/* Auto QR Generator */}
+                                          <AutoCheckoutQrGenerator
+                                            gateway="STC Pay"
+                                            orderTotalFormatted={formatPriceInCart(total)}
+                                            orderTotalNumber={total}
+                                            currency={currency}
+                                            language={language}
+                                            triggerToast={triggerToast}
+                                            merchantNumber={finalSaMethods.stcPay?.walletNumber || '+966 57 051 1931'}
+                                            instructions={finalSaMethods.stcPay?.instructions}
+                                            defaultColorHex="7c3aed"
+                                          />
 
                                           <div className="flex flex-col items-center">
                                             <p className="text-[10px] text-purple-600 dark:text-purple-400 font-mono font-bold bg-purple-100/50 dark:bg-purple-950/40 py-1.5 rounded-md px-2 inline-block w-full text-center font-sans">
@@ -5234,20 +5645,19 @@ Please verify this payment and process the order. Thank you!`;
 
                                               </div>
 
-                                              {/* QR System */}
-                                              <div className="md:col-span-12 lg:col-span-5 flex flex-col items-center justify-center bg-white dark:bg-neutral-950 p-3 rounded-lg border border-neutral-150 dark:border-slate-800 shadow-xs text-center">
-                                                <span className="text-[9px] font-bold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider mb-2">{language === 'bn' ? 'কিউআর কোড (পেমেন্ট)' : 'Scan QR for Banking'}</span>
-                                                <div className="w-[115px] h-[115px] bg-neutral-50 dark:bg-[#0c1222] p-1.5 rounded border border-neutral-200 dark:border-slate-800 flex items-center justify-center">
-                                                  <img 
-                                                    src="https://api.qrserver.com/v1/create-qr-code/?size=140x140&color=1d4ed8&data=Al+Rajhi+Bank+Account+Name:+MD+IMRAN+HOSSAIN+Account+No:+621000010006086016528+IBAN:+SA5680000621608016016528+Swift+Code:+RJHISARI" 
-                                                    alt="Al Rajhi Bank QR Code" 
-                                                    className="max-w-full max-h-full object-contain pointer-events-none"
-                                                    referrerPolicy="no-referrer"
-                                                  />
-                                                </div>
-                                                <span className="text-[8px] text-neutral-400 font-bold mt-2 leading-tight">
-                                                  {language === 'bn' ? 'আল রাজি ব্যাংক অ্যাপ দিয়ে স্ক্যান করুন' : 'Scan via Al Rajhi Bank app'}
-                                                </span>
+                                              {/* Auto QR Generator */}
+                                              <div className="md:col-span-12 lg:col-span-5 flex flex-col items-center justify-center">
+                                                <AutoCheckoutQrGenerator
+                                                  gateway="Alraji Bank Transfer"
+                                                  orderTotalFormatted={formatPriceInCart(total)}
+                                                  orderTotalNumber={total}
+                                                  currency={currency}
+                                                  language={language}
+                                                  triggerToast={triggerToast}
+                                                  merchantNumber={finalSaMethods.alRajhi?.accountNumber || '621000010006086016528'}
+                                                  accountName={finalSaMethods.alRajhi?.accountName || 'MD IMRAN HOSSAIN'}
+                                                  defaultColorHex="1d4ed8"
+                                                />
                                               </div>
 
                                             </div>
@@ -5259,16 +5669,63 @@ Please verify this payment and process the order. Thank you!`;
 
                                   {/* Final Submit Guest Transaction Button block */}
                                   <div className="mt-4 pt-4 border-t border-neutral-200 dark:border-slate-800">
-                                    <div className="flex flex-col gap-1 text-[11.5px] text-neutral-500 dark:text-neutral-400 mb-3 text-left font-sans">
+                                    <div className="flex flex-col gap-1 text-[11.5px] text-neutral-500 dark:text-neutral-400 mb-2 text-left font-sans">
                                       <p className="flex items-center gap-1.5">
                                         <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                                         <span>Selected Mode: <strong className="text-indigo-600 dark:text-indigo-400">{selectedGuestGateway || (currency === 'SAR' ? 'STC Pay (+966 57 051 1931)' : currency === 'BDT' ? 'bKash Wallet' : 'USD Bank Transfer')}</strong></span>
                                       </p>
                                     </div>
+
+                                    {/* Premium Checkbox for payment verification */}
+                                    <div 
+                                      className={`mb-4 flex items-start gap-3 p-3.5 rounded-[16px] border transition-all duration-300 select-none ${
+                                        isPaymentConfirmed 
+                                          ? 'bg-emerald-50/25 dark:bg-emerald-950/10 border-emerald-500/30' 
+                                          : 'bg-[#F8FAFC] dark:bg-[#111827] border-[#E2E8F0] dark:border-[#374151]'
+                                      }`}
+                                    >
+                                      <div className="relative flex items-center h-5 mt-0.5">
+                                        <motion.button
+                                          type="button"
+                                          onClick={() => setIsPaymentConfirmed(!isPaymentConfirmed)}
+                                          className={`w-[22px] h-[22px] rounded-[7px] border flex items-center justify-center transition-colors duration-300 focus:outline-none focus:ring-4 focus:ring-violet-500/18 cursor-pointer ${
+                                            isPaymentConfirmed
+                                              ? 'bg-gradient-to-r from-[#7C3AED] via-[#A855F7] to-[#EC4899] border-transparent shadow-[0_4px_12px_rgba(124,58,237,0.25)]'
+                                              : 'bg-white dark:bg-[#111827] border-neutral-300 dark:border-neutral-700'
+                                          }`}
+                                          whileTap={{ scale: 0.9 }}
+                                          animate={{ scale: isPaymentConfirmed ? 1.08 : 1 }}
+                                          transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+                                        >
+                                          {isPaymentConfirmed && (
+                                            <motion.div
+                                              initial={{ scale: 0, opacity: 0 }}
+                                              animate={{ scale: 1, opacity: 1 }}
+                                              transition={{ type: "spring", stiffness: 500, damping: 12 }}
+                                            >
+                                              <Check className="w-4 h-4 text-white stroke-[3.5]" />
+                                            </motion.div>
+                                          )}
+                                        </motion.button>
+                                      </div>
+                                      <label
+                                        onClick={() => setIsPaymentConfirmed(!isPaymentConfirmed)}
+                                        className="text-xs font-semibold text-[#475569] dark:text-[#CBD5E1] cursor-pointer leading-relaxed text-left"
+                                      >
+                                        {language === 'bn' 
+                                          ? `আমি পেমেন্ট করেছি (${formatPriceInCart(total)})`
+                                          : `I have Paid (${formatPriceInCart(total)})`}
+                                      </label>
+                                    </div>
+
                                     <button
                                       type="button"
                                       onClick={handleSubmitGuestTransaction}
-                                      className="w-full py-3 px-4 font-bold rounded-xl text-white text-xs uppercase tracking-wide bg-gradient-to-r from-indigo-600 to-purple-650 hover:from-indigo-700 hover:to-purple-700 hover:shadow-lg active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer select-none"
+                                      className={`w-full py-3 px-4 font-bold rounded-xl text-white text-xs uppercase tracking-wide bg-gradient-to-r transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer select-none ${
+                                        isPaymentConfirmed 
+                                          ? 'from-[#7C3AED] via-[#A855F7] to-[#EC4899] hover:scale-[1.02] hover:shadow-[0_12px_30px_rgba(124,58,237,0.35)] active:scale-[0.98]' 
+                                          : 'from-neutral-400 to-neutral-500 opacity-80 cursor-not-allowed'
+                                      }`}
                                     >
                                       <span>Submit Transaction</span>
                                       <ArrowRight className="w-3.5 h-3.5" />
@@ -5368,7 +5825,7 @@ Please verify this payment and process the order. Thank you!`;
                                   onClick={() => handleSimulatePayment('SSLCommerz Gateway')}
                                   className="flex flex-col items-center justify-center p-2.5 rounded-lg border border-neutral-200 dark:border-slate-800 bg-white dark:bg-neutral-950 hover:border-cyan-500 transition-all cursor-pointer col-span-2 text-center"
                                 >
-                                  <span className="text-xs font-bold text-cyan-600 font-sans">SSLCommerz BD Checkout</span>
+                                  <span className="text-xs font-bold text-cyan-600 font-sans">Online instant Pay</span>
                                   <span className="text-[9px] text-neutral-400 font-sans">Cards / Net Banking / Mobiles</span>
                                 </button>
 
@@ -5390,22 +5847,21 @@ Please verify this payment and process the order. Thank you!`;
                                         </span>
                                       </div>
 
-                                      {/* QR Code */}
-                                      <div className="flex flex-col items-center p-2.5 bg-white dark:bg-[#0c1222] rounded-xl border border-neutral-200 dark:border-slate-800 shadow-sm max-w-[150px] mb-2.5">
-                                        <span className="text-[9px] font-bold text-neutral-500 mb-1.5">{language === 'bn' ? 'স্ক্যান করুন' : 'Scan to Pay'}</span>
-                                        <div className="w-[110px] h-[110px] flex items-center justify-center bg-neutral-100/30 rounded border border-neutral-150 dark:border-slate-800">
-                                          <img 
-                                            src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&color=${
-                                              selectedRegisteredGateway === 'bKash Wallet' ? 'd1245e' :
-                                              selectedRegisteredGateway === 'Nagad Digital' ? 'f15a22' :
-                                              selectedRegisteredGateway === 'Rocket Wallet' ? '8c2aeb' : '0081d6'
-                                            }&data=tel:01864000005`} 
-                                            alt="MFS QR Code"
-                                            className="max-w-full max-h-full object-contain rounded pointer-events-none"
-                                            referrerPolicy="no-referrer"
-                                          />
-                                        </div>
-                                      </div>
+                                      {/* Auto QR Generator */}
+                                      <AutoCheckoutQrGenerator
+                                        gateway={selectedRegisteredGateway}
+                                        orderTotalFormatted={formatPriceInCart(total)}
+                                        orderTotalNumber={total}
+                                        currency={currency}
+                                        language={language}
+                                        triggerToast={triggerToast}
+                                        merchantNumber="01864000005"
+                                        defaultColorHex={
+                                          selectedRegisteredGateway === 'bKash Wallet' ? 'd1245e' :
+                                          selectedRegisteredGateway === 'Nagad Digital' ? 'f15a22' :
+                                          selectedRegisteredGateway === 'Rocket Wallet' ? '8c2aeb' : '0081d6'
+                                        }
+                                      />
 
                                       {/* Instructions & Phone Number */}
                                       <p className="text-[10px] text-neutral-500 dark:text-neutral-400 mb-3 leading-relaxed max-w-sm">
@@ -5512,6 +5968,48 @@ Please verify this payment and process the order. Thank you!`;
                                         </div>
                                       </div>
 
+                                      {/* Premium Checkbox for payment verification */}
+                                      <div 
+                                        className={`mb-3 flex items-start gap-3 p-3.5 rounded-[16px] border transition-all duration-300 select-none ${
+                                          isPaymentConfirmed 
+                                            ? 'bg-emerald-50/25 dark:bg-emerald-950/10 border-emerald-500/30' 
+                                            : 'bg-[#F8FAFC] dark:bg-[#111827] border-[#E2E8F0] dark:border-[#374151]'
+                                        }`}
+                                      >
+                                        <div className="relative flex items-center h-5 mt-0.5">
+                                          <motion.button
+                                            type="button"
+                                            onClick={() => setIsPaymentConfirmed(!isPaymentConfirmed)}
+                                            className={`w-[22px] h-[22px] rounded-[7px] border flex items-center justify-center transition-colors duration-300 focus:outline-none focus:ring-4 focus:ring-violet-500/18 cursor-pointer ${
+                                              isPaymentConfirmed
+                                                ? 'bg-gradient-to-r from-[#7C3AED] via-[#A855F7] to-[#EC4899] border-transparent shadow-[0_4px_12px_rgba(124,58,237,0.25)]'
+                                                : 'bg-white dark:bg-[#111827] border-neutral-300 dark:border-neutral-700'
+                                            }`}
+                                            whileTap={{ scale: 0.9 }}
+                                            animate={{ scale: isPaymentConfirmed ? 1.08 : 1 }}
+                                            transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+                                          >
+                                            {isPaymentConfirmed && (
+                                              <motion.div
+                                                initial={{ scale: 0, opacity: 0 }}
+                                                animate={{ scale: 1, opacity: 1 }}
+                                                transition={{ type: "spring", stiffness: 500, damping: 12 }}
+                                              >
+                                                <Check className="w-4 h-4 text-white stroke-[3.5]" />
+                                              </motion.div>
+                                            )}
+                                          </motion.button>
+                                        </div>
+                                        <label
+                                          onClick={() => setIsPaymentConfirmed(!isPaymentConfirmed)}
+                                          className="text-xs font-semibold text-[#475569] dark:text-[#CBD5E1] cursor-pointer leading-relaxed text-left"
+                                        >
+                                          {language === 'bn' 
+                                            ? `আমি পেমেন্ট করেছি (${formatPriceInCart(total)})`
+                                            : `I have Paid (${formatPriceInCart(total)})`}
+                                        </label>
+                                      </div>
+
                                       {/* Submit button for Registered */}
                                       <button
                                         type="button"
@@ -5519,9 +6017,13 @@ Please verify this payment and process the order. Thank you!`;
                                           handleSimulatePayment(selectedRegisteredGateway);
                                           setSelectedRegisteredGateway('');
                                         }}
-                                        className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-indigo-650 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-black tracking-wide rounded-xl transition duration-200 shadow-md cursor-pointer"
+                                        className={`w-full py-3 px-4 font-bold rounded-xl text-white text-xs uppercase tracking-wide bg-gradient-to-r transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer select-none ${
+                                          isPaymentConfirmed 
+                                            ? 'from-[#7C3AED] via-[#A855F7] to-[#EC4899] hover:scale-[1.02] hover:shadow-[0_12px_30px_rgba(124,58,237,0.35)] active:scale-[0.98]' 
+                                            : 'from-neutral-400 to-neutral-500 opacity-80 cursor-not-allowed'
+                                        }`}
                                       >
-                                        {language === 'bn' ? 'আমি পেমেন্ট করেছি (অর্ডার প্লেস করুন)' : 'I Have Paid (Place Order Now)'}
+                                        <span>{language === 'bn' ? 'অর্ডার কনফার্ম করুন' : 'Confirm & Place Order'}</span>
                                       </button>
                                     </div>
                                   </div>
@@ -5735,6 +6237,48 @@ Please verify this payment and process the order. Thank you!`;
                                         </div>
                                       </div>
 
+                                      {/* Premium Checkbox for payment verification */}
+                                      <div 
+                                        className={`mb-3 flex items-start gap-3 p-3.5 rounded-[16px] border transition-all duration-300 select-none ${
+                                          isPaymentConfirmed 
+                                            ? 'bg-emerald-50/25 dark:bg-emerald-950/10 border-emerald-500/30' 
+                                            : 'bg-[#F8FAFC] dark:bg-[#111827] border-[#E2E8F0] dark:border-[#374151]'
+                                        }`}
+                                      >
+                                        <div className="relative flex items-center h-5 mt-0.5">
+                                          <motion.button
+                                            type="button"
+                                            onClick={() => setIsPaymentConfirmed(!isPaymentConfirmed)}
+                                            className={`w-[22px] h-[22px] rounded-[7px] border flex items-center justify-center transition-colors duration-300 focus:outline-none focus:ring-4 focus:ring-violet-500/18 cursor-pointer ${
+                                              isPaymentConfirmed
+                                                ? 'bg-gradient-to-r from-[#7C3AED] via-[#A855F7] to-[#EC4899] border-transparent shadow-[0_4px_12px_rgba(124,58,237,0.25)]'
+                                                : 'bg-white dark:bg-[#111827] border-neutral-300 dark:border-neutral-700'
+                                            }`}
+                                            whileTap={{ scale: 0.9 }}
+                                            animate={{ scale: isPaymentConfirmed ? 1.08 : 1 }}
+                                            transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+                                          >
+                                            {isPaymentConfirmed && (
+                                              <motion.div
+                                                initial={{ scale: 0, opacity: 0 }}
+                                                animate={{ scale: 1, opacity: 1 }}
+                                                transition={{ type: "spring", stiffness: 500, damping: 12 }}
+                                              >
+                                                <Check className="w-4 h-4 text-white stroke-[3.5]" />
+                                              </motion.div>
+                                            )}
+                                          </motion.button>
+                                        </div>
+                                        <label
+                                          onClick={() => setIsPaymentConfirmed(!isPaymentConfirmed)}
+                                          className="text-xs font-semibold text-[#475569] dark:text-[#CBD5E1] cursor-pointer leading-relaxed text-left"
+                                        >
+                                          {language === 'bn' 
+                                            ? `আমি পেমেন্ট করেছি (${formatPriceInCart(total)})`
+                                            : `I have Paid (${formatPriceInCart(total)})`}
+                                        </label>
+                                      </div>
+
                                       {/* Place Order Button */}
                                       <button
                                         type="button"
@@ -5742,9 +6286,13 @@ Please verify this payment and process the order. Thank you!`;
                                           handleSimulatePayment('Islami Bank Transfer');
                                           setSelectedRegisteredGateway('');
                                         }}
-                                        className="w-full mt-2 py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white text-xs font-black tracking-wide rounded-xl transition duration-200 shadow-md cursor-pointer font-sans"
+                                        className={`w-full py-3 px-4 font-bold rounded-xl text-white text-xs uppercase tracking-wide bg-gradient-to-r transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer select-none ${
+                                          isPaymentConfirmed 
+                                            ? 'from-emerald-600 to-emerald-700 hover:scale-[1.02] hover:shadow-[0_12px_30px_rgba(16,185,129,0.35)] active:scale-[0.98]' 
+                                            : 'from-neutral-400 to-neutral-500 opacity-80 cursor-not-allowed'
+                                        }`}
                                       >
-                                        {language === 'bn' ? 'আমি পেমেন্ট করেছি (অর্ডার প্লেস করুন)' : 'I Have Paid (Place Order Now)'}
+                                        <span>{language === 'bn' ? 'অর্ডার কনফার্ম করুন' : 'Confirm & Place Order'}</span>
                                       </button>
                                     </div>
                                   </div>
@@ -5789,20 +6337,18 @@ Please verify this payment and process the order. Thank you!`;
                                       {language === 'bn' ? 'কোড স্ক্যান করুন পেমেন্ট করার জন্য' : 'Scan QR code to pay using STC Pay app'}
                                     </p>
 
-                                    {/* Single QR Code Presentation */}
-                                    <div className="flex justify-center my-3">
-                                      <div className="flex flex-col items-center p-2.5 bg-white dark:bg-[#0F172A] rounded-lg border border-purple-200 dark:border-slate-800 shadow-sm max-w-[170px]">
-                                        <span className="text-[10px] font-bold text-purple-600 mb-1.5">{language === 'bn' ? 'কিউআর কোড' : 'QR Code'}</span>
-                                        <div className="w-[130px] h-[130px] flex items-center justify-center overflow-hidden bg-purple-50/20 rounded border border-neutral-150 dark:border-slate-800">
-                                          <img 
-                                            src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&color=7c3aed&data=tel:%2B966570511931" 
-                                            alt="STC Pay QR Code"
-                                            className="max-w-full max-h-full object-contain rounded pointer-events-none"
-                                            referrerPolicy="no-referrer"
-                                          />
-                                        </div>
-                                      </div>
-                                    </div>
+                                    {/* Auto QR Generator */}
+                                    <AutoCheckoutQrGenerator
+                                      gateway="STC Pay"
+                                      orderTotalFormatted={formatPriceInCart(total)}
+                                      orderTotalNumber={total}
+                                      currency={currency}
+                                      language={language}
+                                      triggerToast={triggerToast}
+                                      merchantNumber="+966 57 051 1931"
+                                      accountName="Imran Hasan"
+                                      defaultColorHex="7c3aed"
+                                    />
 
                                     <div className="flex flex-col items-center mb-3">
                                       <p className="text-[10px] text-purple-600 dark:text-purple-400 font-mono font-bold bg-purple-100/50 dark:bg-purple-950/40 py-1.5 rounded-md px-2 inline-block w-full text-center">
@@ -5920,12 +6466,58 @@ Please verify this payment and process the order. Thank you!`;
                                       </div>
                                     </div>
 
+                                    {/* Premium Checkbox for payment verification */}
+                                    <div 
+                                      className={`mb-3 flex items-start gap-3 p-3.5 rounded-[16px] border transition-all duration-300 select-none ${
+                                        isPaymentConfirmed 
+                                          ? 'bg-emerald-50/25 dark:bg-emerald-950/10 border-emerald-500/30' 
+                                          : 'bg-[#F8FAFC] dark:bg-[#111827] border-[#E2E8F0] dark:border-[#374151]'
+                                      }`}
+                                    >
+                                      <div className="relative flex items-center h-5 mt-0.5">
+                                        <motion.button
+                                          type="button"
+                                          onClick={() => setIsPaymentConfirmed(!isPaymentConfirmed)}
+                                          className={`w-[22px] h-[22px] rounded-[7px] border flex items-center justify-center transition-colors duration-300 focus:outline-none focus:ring-4 focus:ring-violet-500/18 cursor-pointer ${
+                                            isPaymentConfirmed
+                                              ? 'bg-gradient-to-r from-[#7C3AED] via-[#A855F7] to-[#EC4899] border-transparent shadow-[0_4px_12px_rgba(124,58,237,0.25)]'
+                                              : 'bg-white dark:bg-[#111827] border-neutral-300 dark:border-neutral-700'
+                                          }`}
+                                          whileTap={{ scale: 0.9 }}
+                                          animate={{ scale: isPaymentConfirmed ? 1.08 : 1 }}
+                                          transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+                                        >
+                                          {isPaymentConfirmed && (
+                                            <motion.div
+                                              initial={{ scale: 0, opacity: 0 }}
+                                              animate={{ scale: 1, opacity: 1 }}
+                                              transition={{ type: "spring", stiffness: 500, damping: 12 }}
+                                            >
+                                              <Check className="w-4 h-4 text-white stroke-[3.5]" />
+                                            </motion.div>
+                                          )}
+                                        </motion.button>
+                                      </div>
+                                      <label
+                                        onClick={() => setIsPaymentConfirmed(!isPaymentConfirmed)}
+                                        className="text-xs font-semibold text-[#475569] dark:text-[#CBD5E1] cursor-pointer leading-relaxed text-left"
+                                      >
+                                        {language === 'bn' 
+                                          ? `আমি পেমেন্ট করেছি (${formatPriceInCart(total)})`
+                                          : `I have Paid (${formatPriceInCart(total)})`}
+                                      </label>
+                                    </div>
+
                                     <button
                                       type="button"
                                       onClick={() => handleSimulatePayment('STC Pay (+966 57 051 1931)')}
-                                      className="w-full mt-4 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-650 hover:from-purple-700 hover:to-indigo-700 text-white font-extrabold rounded-lg text-xs tracking-wider transition duration-200 shadow-md uppercase select-none cursor-pointer"
+                                      className={`w-full py-3 px-4 font-bold rounded-xl text-white text-xs uppercase tracking-wide bg-gradient-to-r transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer select-none ${
+                                        isPaymentConfirmed 
+                                          ? 'from-[#7C3AED] via-[#A855F7] to-[#EC4899] hover:scale-[1.02] hover:shadow-[0_12px_30px_rgba(124,58,237,0.35)] active:scale-[0.98]' 
+                                          : 'from-neutral-400 to-neutral-500 opacity-80 cursor-not-allowed'
+                                      }`}
                                     >
-                                      {language === 'bn' ? 'আমি পেমেন্ট করেছি (Place Order Now)' : 'I have paid (Place Order Now)'}
+                                      <span>{language === 'bn' ? 'অর্ডার কনফার্ম করুন' : 'Confirm & Place Order'}</span>
                                     </button>
                                   </div>
                                 )}
@@ -6159,12 +6751,58 @@ Please verify this payment and process the order. Thank you!`;
                                       </div>
                                     </div>
 
+                                    {/* Premium Checkbox for payment verification */}
+                                    <div 
+                                      className={`mb-3 flex items-start gap-3 p-3.5 rounded-[16px] border transition-all duration-300 select-none ${
+                                        isPaymentConfirmed 
+                                          ? 'bg-emerald-50/25 dark:bg-emerald-950/10 border-emerald-500/30' 
+                                          : 'bg-[#F8FAFC] dark:bg-[#111827] border-[#E2E8F0] dark:border-[#374151]'
+                                      }`}
+                                    >
+                                      <div className="relative flex items-center h-5 mt-0.5">
+                                        <motion.button
+                                          type="button"
+                                          onClick={() => setIsPaymentConfirmed(!isPaymentConfirmed)}
+                                          className={`w-[22px] h-[22px] rounded-[7px] border flex items-center justify-center transition-colors duration-300 focus:outline-none focus:ring-4 focus:ring-violet-500/18 cursor-pointer ${
+                                            isPaymentConfirmed
+                                              ? 'bg-gradient-to-r from-[#7C3AED] via-[#A855F7] to-[#EC4899] border-transparent shadow-[0_4px_12px_rgba(124,58,237,0.25)]'
+                                              : 'bg-white dark:bg-[#111827] border-neutral-300 dark:border-neutral-700'
+                                          }`}
+                                          whileTap={{ scale: 0.9 }}
+                                          animate={{ scale: isPaymentConfirmed ? 1.08 : 1 }}
+                                          transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+                                        >
+                                          {isPaymentConfirmed && (
+                                            <motion.div
+                                              initial={{ scale: 0, opacity: 0 }}
+                                              animate={{ scale: 1, opacity: 1 }}
+                                              transition={{ type: "spring", stiffness: 500, damping: 12 }}
+                                            >
+                                              <Check className="w-4 h-4 text-white stroke-[3.5]" />
+                                            </motion.div>
+                                          )}
+                                        </motion.button>
+                                      </div>
+                                      <label
+                                        onClick={() => setIsPaymentConfirmed(!isPaymentConfirmed)}
+                                        className="text-xs font-semibold text-[#475569] dark:text-[#CBD5E1] cursor-pointer leading-relaxed text-left"
+                                      >
+                                        {language === 'bn' 
+                                          ? `আমি পেমেন্ট করেছি (${formatPriceInCart(total)})`
+                                          : `I have Paid (${formatPriceInCart(total)})`}
+                                      </label>
+                                    </div>
+
                                     <button
                                       type="button"
                                       onClick={() => handleSimulatePayment('Alraji Bank Transfer')}
-                                      className="w-full mt-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-650 hover:from-blue-700 hover:to-indigo-700 text-white font-extrabold rounded-lg text-xs tracking-wider transition duration-200 shadow-md uppercase select-none cursor-pointer"
+                                      className={`w-full py-3 px-4 font-bold rounded-xl text-white text-xs uppercase tracking-wide bg-gradient-to-r transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer select-none ${
+                                        isPaymentConfirmed 
+                                          ? 'from-blue-600 to-indigo-650 hover:from-blue-700 hover:to-indigo-750 hover:scale-[1.02] hover:shadow-[0_12px_30px_rgba(37,99,235,0.35)] active:scale-[0.98]' 
+                                          : 'from-neutral-400 to-neutral-500 opacity-80 cursor-not-allowed'
+                                      }`}
                                     >
-                                      {language === 'bn' ? 'আমি পেমেন্ট করেছি (Place Order Now)' : 'I have paid (Place Order Now)'}
+                                      <span>{language === 'bn' ? 'অর্ডার কনফার্ম করুন' : 'Confirm & Place Order'}</span>
                                     </button>
                                   </div>
                                 )}
@@ -6186,6 +6824,253 @@ Please verify this payment and process the order. Thank you!`;
         </div>
       )}
 
+      {/* 🎉 PREMIUM SAAS-GRADE CONGRATULATIONS SUCCESS POPUP */}
+      <AnimatePresence>
+        {isSuccessPopupOpen && (
+          <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 30 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 30 }}
+              transition={{ type: "spring", damping: 25, stiffness: 350 }}
+              className="relative w-full max-w-lg bg-[#FFFFFF] dark:bg-[#0F172A] rounded-[24px] overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.12)] border border-white/10 dark:border-white/5 text-left p-6 sm:p-8 space-y-6"
+              id="congratulations-success-popup"
+            >
+              {/* Top Premium Color Bar */}
+              <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-[#7C3AED] via-[#A855F7] to-[#EC4899]" />
+
+              {/* Glowing Success Icon & Confetti Stars */}
+              <div className="flex flex-col items-center justify-center text-center space-y-4 pt-2 relative overflow-visible">
+                <div className="relative">
+                  {/* Expanding Ripple Rings */}
+                  <motion.div 
+                    initial={{ scale: 0.6, opacity: 0 }}
+                    animate={{ scale: [1, 1.6, 2], opacity: [0.5, 0.3, 0] }}
+                    transition={{ duration: 2, repeat: Infinity, ease: "easeOut" }}
+                    className="absolute inset-0 bg-emerald-500/20 rounded-full"
+                  />
+                  <motion.div 
+                    initial={{ scale: 0.6, opacity: 0 }}
+                    animate={{ scale: [1, 1.3, 1.6], opacity: [0.6, 0.2, 0] }}
+                    transition={{ duration: 2, delay: 0.6, repeat: Infinity, ease: "easeOut" }}
+                    className="absolute inset-0 bg-emerald-500/10 rounded-full"
+                  />
+                  <div className="absolute inset-0 bg-emerald-500/20 rounded-full blur-xl animate-pulse" />
+                  
+                  {/* Micro Star Particles (Success Confetti Shoot Out) */}
+                  {[...Array(8)].map((_, i) => {
+                    const angle = (i * 360) / 8;
+                    const radius = 60;
+                    const x = Math.cos((angle * Math.PI) / 180) * radius;
+                    const y = Math.sin((angle * Math.PI) / 180) * radius;
+                    return (
+                      <motion.div
+                        key={i}
+                        className="absolute w-2 h-2 rounded-full z-10"
+                        style={{
+                          backgroundColor: i % 3 === 0 ? '#7C3AED' : i % 3 === 1 ? '#EC4899' : '#10B981',
+                          left: 'calc(50% - 4px)',
+                          top: 'calc(50% - 4px)',
+                        }}
+                        initial={{ x: 0, y: 0, opacity: 1, scale: 0.2 }}
+                        animate={{ 
+                          x: x, 
+                          y: y, 
+                          opacity: [1, 1, 0], 
+                          scale: [0.2, 1.2, 0] 
+                        }}
+                        transition={{ 
+                          duration: 1.4, 
+                          delay: 0.1,
+                          ease: "easeOut"
+                        }}
+                      />
+                    );
+                  })}
+
+                  <motion.div 
+                    initial={{ scale: 0, rotate: -60 }}
+                    animate={{ scale: 1, rotate: 0 }}
+                    transition={{ type: "spring", damping: 12, stiffness: 200, delay: 0.1 }}
+                    className="relative w-16 h-16 rounded-full bg-[#DCFCE7] border border-[#22C55E]/30 text-[#22C55E] flex items-center justify-center shadow-[0_8px_20px_rgba(34,197,94,0.15)]"
+                  >
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: [0, 1.25, 1] }}
+                      transition={{ duration: 0.5, delay: 0.3, ease: "easeOut" }}
+                    >
+                      <Check className="w-8 h-8 stroke-[3.5]" />
+                    </motion.div>
+                  </motion.div>
+                </div>
+                
+                <div className="space-y-1">
+                  <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+                    {language === 'bn' ? 'অভিনন্দন! আপনার অর্ডার সফল হয়েছে' : 'Congratulations! Order Logged'}
+                  </h3>
+                  <p className="text-xs sm:text-sm font-semibold text-slate-500 dark:text-slate-400">
+                    {language === 'bn' ? 'আপনার পেমেন্ট অর্ডারটি যাচাইকরণের জন্য সফলভাবে সিস্টেমে যুক্ত করা হয়েছে।' : 'Your digital purchase payment order has been securely locked & logged.'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Premium Details Brief Card */}
+              <div className="bg-slate-50 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800/60 rounded-[18px] p-5 space-y-3.5 shadow-sm">
+                <div className="flex justify-between items-center text-xs font-mono font-bold text-slate-400 dark:text-slate-500 pb-2 border-b border-slate-200/40 dark:border-slate-800/40">
+                  <span>ORDER ID:</span>
+                  <span className="text-violet-600 dark:text-violet-400 font-extrabold">{successOrderId}</span>
+                </div>
+                
+                <div className="space-y-2.5">
+                  <div className="flex justify-between items-start text-xs sm:text-sm">
+                    <span className="font-semibold text-[#475569] dark:text-[#CBD5E1]">{language === 'bn' ? 'গ্রাহকের নাম:' : 'Customer Name:'}</span>
+                    <span className="font-bold text-slate-800 dark:text-slate-100 text-right max-w-[200px] truncate">{successRecipientName}</span>
+                  </div>
+
+                  <div className="flex justify-between items-start text-xs sm:text-sm">
+                    <span className="font-semibold text-[#475569] dark:text-[#CBD5E1]">{language === 'bn' ? 'পেমেন্ট মাধ্যম:' : 'Payment Method:'}</span>
+                    <span className="font-extrabold text-violet-600 dark:text-violet-400">{successPaymentMethod}</span>
+                  </div>
+
+                  {successTransactionId && (
+                    <div className="flex justify-between items-start text-xs sm:text-sm bg-violet-500/10 dark:bg-violet-950/40 p-2 rounded-xl border border-violet-500/20">
+                      <span className="font-semibold text-violet-700 dark:text-violet-300">{language === 'bn' ? 'ট্রানজেকশন আইডি:' : 'Transaction ID:'}</span>
+                      <span className="font-mono font-bold text-violet-800 dark:text-violet-200 text-right select-all">{successTransactionId}</span>
+                    </div>
+                  )}
+
+                  <div className="border-t border-slate-200/40 dark:border-slate-800/40 my-2 pt-2">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                      {language === 'bn' ? 'ক্রয়কৃত প্রোডাক্টসমূহ:' : 'Purchased Products:'}
+                    </span>
+                    <div className="space-y-1.5 max-h-[100px] overflow-y-auto pr-1">
+                      {successItems.map((item, idx) => (
+                        <div key={idx} className="flex justify-between items-center text-xs">
+                          <span className="font-semibold text-[#475569] dark:text-[#CBD5E1] truncate max-w-[220px]">{item.name}</span>
+                          <span className="font-bold text-slate-700 dark:text-slate-200">
+                            {currency === 'BDT' ? `৳${Math.round(item.price * 115).toLocaleString()}` : currency === 'SAR' ? `${Math.round(item.price * 3.75).toLocaleString()} SAR` : `$${item.price.toLocaleString()}`}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between items-start text-xs sm:text-sm border-t border-slate-200/40 dark:border-slate-800/40 pt-2 font-bold">
+                    <span className="font-bold text-slate-900 dark:text-white">{language === 'bn' ? 'মোট পেমেন্ট সম্পন্ন:' : 'Total Amount Paid:'}</span>
+                    <span className="font-black text-transparent bg-clip-text bg-gradient-to-r from-[#7C3AED] via-[#A855F7] to-[#EC4899] text-sm sm:text-base">
+                      {currency === 'BDT' ? `৳${Math.round(successTotal * 115).toLocaleString()}` : currency === 'SAR' ? `${Math.round(successTotal * 3.75).toLocaleString()} SAR` : `$${successTotal.toLocaleString()}`}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Close / Direct WhatsApp verify CTA */}
+              <div className="flex flex-col gap-2.5 pt-1">
+                <motion.button
+                  type="button"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => {
+                    const formattedTotal = currency === 'BDT' 
+                      ? `৳${Math.round(successTotal * 115).toLocaleString()}` 
+                      : currency === 'SAR' 
+                        ? `${Math.round(successTotal * 3.75).toLocaleString()} SAR` 
+                        : `$${successTotal.toLocaleString()}`;
+
+                    sendOrderToWhatsApp({
+                      orderId: successOrderId,
+                      customerName: successRecipientName || 'Customer',
+                      amount: formattedTotal,
+                      currency: currency,
+                      paymentMethod: successPaymentMethod || 'Digital Payment',
+                      transactionId: successTransactionId || undefined,
+                      items: successItems.map(item => ({
+                        name: item.name,
+                        price: currency === 'BDT' 
+                          ? `৳${Math.round(item.price * 115).toLocaleString()}` 
+                          : currency === 'SAR' 
+                            ? `${Math.round(item.price * 3.75).toLocaleString()} SAR` 
+                            : `$${item.price.toLocaleString()}`
+                      })),
+                      targetPhone: '8801864000005',
+                      language: language as any,
+                    });
+
+                    if (triggerToast) {
+                      triggerToast(language === 'bn' ? "হোয়াটসঅ্যাপে অর্ডারের বিবরণ পাঠানো হচ্ছে..." : "Sending order details to WhatsApp... 📲");
+                    }
+                  }}
+                  className="w-full py-3.5 px-4 bg-gradient-to-r from-emerald-500 via-teal-500 to-green-600 text-white text-xs sm:text-sm font-black uppercase tracking-wider rounded-[14px] shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all duration-300 flex items-center justify-center gap-2.5 cursor-pointer select-none"
+                >
+                  <MessageSquare className="w-4 h-4 text-white animate-bounce" />
+                  <span>{language === 'bn' ? 'হোয়াটসঅ্যাপে অর্ডারের বিবরণ পাঠান (Confirm Order)' : 'Send Order Details to WhatsApp (Confirm Order)'}</span>
+                </motion.button>
+
+                <motion.button
+                  type="button"
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => {
+                    const formattedTotal = currency === 'BDT' 
+                      ? `৳${Math.round(successTotal * 115).toLocaleString()}` 
+                      : currency === 'SAR' 
+                        ? `${Math.round(successTotal * 3.75).toLocaleString()} SAR` 
+                        : `$${successTotal.toLocaleString()}`;
+
+                    const summaryText = constructWhatsAppOrderSummaryMessage({
+                      orderId: successOrderId,
+                      customerName: successRecipientName || 'Customer',
+                      amount: formattedTotal,
+                      currency: currency,
+                      paymentMethod: successPaymentMethod || 'Digital Payment',
+                      transactionId: successTransactionId || undefined,
+                      items: successItems.map(item => ({
+                        name: item.name,
+                        price: currency === 'BDT' 
+                          ? `৳${Math.round(item.price * 115).toLocaleString()}` 
+                          : currency === 'SAR' 
+                            ? `${Math.round(item.price * 3.75).toLocaleString()} SAR` 
+                            : `$${item.price.toLocaleString()}`
+                      })),
+                      targetPhone: '8801864000005',
+                      language: language as any,
+                    });
+
+                    navigator.clipboard.writeText(summaryText);
+                    setCopiedOrderMsg(true);
+                    setTimeout(() => setCopiedOrderMsg(false), 2500);
+                    if (triggerToast) {
+                      triggerToast(language === 'bn' ? "অর্ডারের টেক্সট বিবরণ কপি করা হয়েছে!" : "Order summary text copied to clipboard! 📋");
+                    }
+                  }}
+                  className="w-full py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-bold uppercase tracking-wider rounded-[14px] border border-slate-700/80 transition-all flex items-center justify-center gap-2 cursor-pointer select-none"
+                >
+                  {copiedOrderMsg ? (
+                    <>
+                      <Check className="w-4 h-4 text-emerald-400 stroke-[3]" />
+                      <span className="text-emerald-400">{language === 'bn' ? 'কপি সম্পন্ন হয়েছে!' : 'Message Copied!'}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4 text-emerald-400" />
+                      <span>{language === 'bn' ? 'অর্ডার মেসেজ কপি করুন (Copy Message)' : 'Copy Order Summary Message'}</span>
+                    </>
+                  )}
+                </motion.button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsSuccessPopupOpen(false)}
+                  className="w-full py-2.5 px-4 bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs uppercase font-bold tracking-wider rounded-[14px] transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer select-none border border-slate-200/80 dark:border-slate-700/60"
+                >
+                  <Check className="w-4 h-4 stroke-[2.5]" />
+                  <span>{language === 'bn' ? 'ঠিক আছে, খেলা চালিয়ে যান' : 'Perfect, Continue'}</span>
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
     </>
   );

@@ -39,6 +39,14 @@ service cloud.firestore {
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid && isValidOrder(request.resource.data);
       allow update: if isAdmin();
       allow delete: if isAdmin();
+
+      // Real-time project requirements chat messages
+      match /messages/{messageId} {
+        allow read, list: if true;
+        allow create: if request.resource.data.keys().hasAll(['id', 'orderId', 'senderId', 'senderName', 'senderRole', 'message', 'createdAt']);
+        allow update: if true;
+        allow delete: if isAdmin();
+      }
     }
 
     // 3. Support tickets collection
@@ -144,7 +152,30 @@ service cloud.firestore {
       allow create, get, list, update, delete: if true;
     }
 
+    // 11. Store Product Reviews collection
+    match /store_reviews/{reviewId} {
+      allow read: if true;
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid && isValidReview(request.resource.data) && request.resource.data.approved == false;
+      allow update, delete: if isAdmin();
+    }
+
+    // 12. Test collection for boot connection verification
+    match /test/{testId} {
+      allow read: if true;
+    }
+
     // New validation helpers
+    function isValidReview(data) {
+      return data.keys().hasAll(['id', 'productId', 'userId', 'userName', 'rating', 'comment', 'createdAt', 'approved'])
+        && data.id is string && data.id.size() <= 128
+        && data.productId is string && data.productId.size() <= 128
+        && data.userId is string && data.userId.size() <= 128
+        && data.userName is string && data.userName.size() <= 100
+        && data.rating is number && data.rating >= 1 && data.rating <= 5
+        && data.comment is string && data.comment.size() <= 5000
+        && data.createdAt is string
+        && data.approved is bool;
+    }
     function isValidInquiry(data) {
       return data.keys().hasAll(['id', 'serviceName', 'customerName', 'mobileNumber'])
         && data.id is string && data.id.size() <= 128

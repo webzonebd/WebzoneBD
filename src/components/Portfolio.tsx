@@ -26,6 +26,7 @@ import { PortfolioItem, Language, Theme } from '../types';
 import { samplePortfolio } from '../data';
 import { db } from '../firebase';
 import { doc, onSnapshot } from 'firebase/firestore';
+import PortfolioTeamProfiles from './PortfolioTeamProfiles';
 
 interface PortfolioProps {
   language: Language;
@@ -40,6 +41,7 @@ export default function Portfolio({ language, theme }: PortfolioProps) {
 
   const [filter, setFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [sortBy, setSortBy] = useState<'featured' | 'title' | 'category'>('featured');
   const [selectedProject, setSelectedProject] = useState<PortfolioItem | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [activeMediaTab, setActiveMediaTab] = useState<'image' | 'video'>('image');
@@ -115,6 +117,7 @@ export default function Portfolio({ language, theme }: PortfolioProps) {
   const techStackIcons = [
     { name: "Laravel", icon: "⚙️", bg: "bg-red-50 dark:bg-red-950/20", border: "border-red-200 dark:border-red-900/30", text: "text-red-600 dark:text-red-400" },
     { name: "PHP", icon: "🐘", bg: "bg-blue-50 dark:bg-blue-950/20", border: "border-blue-200 dark:border-blue-900/30", text: "text-blue-600 dark:text-blue-400" },
+    { name: "HTML & CSS", icon: "🎨", bg: "bg-amber-50 dark:bg-amber-950/20", border: "border-amber-200 dark:border-amber-900/30", text: "text-amber-600 dark:text-amber-400" },
     { name: "WordPress", icon: "📝", bg: "bg-cyan-50 dark:bg-cyan-950/20", border: "border-cyan-200 dark:border-cyan-900/30", text: "text-cyan-600 dark:text-cyan-400" },
     { name: "WooCommerce", icon: "🛍️", bg: "bg-purple-50 dark:bg-purple-950/20", border: "border-purple-200 dark:border-purple-900/30", text: "text-purple-600 dark:text-purple-400" },
     { name: "React", icon: "⚛️", bg: "bg-sky-50 dark:bg-sky-950/20", border: "border-sky-200 dark:border-sky-900/30", text: "text-sky-600 dark:text-sky-400" },
@@ -145,9 +148,9 @@ export default function Portfolio({ language, theme }: PortfolioProps) {
     ]
   }[language];
 
-  // Filter & Search Logic
+  // Filter, Search & Sort Logic
   const filteredItems = useMemo(() => {
-    return portfolioItems.filter(item => {
+    let result = portfolioItems.filter(item => {
       // Category filter check
       const matchesCategory = filter === 'all' || item.category === filter;
       
@@ -167,7 +170,23 @@ export default function Portfolio({ language, theme }: PortfolioProps) {
 
       return matchesCategory && (titleMatches || clientMatches || categoryMatches || techMatches);
     });
-  }, [filter, searchQuery]);
+
+    if (sortBy === 'title') {
+      result = [...result].sort((a, b) => {
+        const titleA = language === 'bn' ? a.titleBn : language === 'ar' ? a.titleAr : a.title;
+        const titleB = language === 'bn' ? b.titleBn : language === 'ar' ? b.titleAr : b.title;
+        return titleA.localeCompare(titleB);
+      });
+    } else if (sortBy === 'category') {
+      result = [...result].sort((a, b) => {
+        const catA = language === 'bn' ? a.categoryLabelBn : language === 'ar' ? a.categoryLabelAr : a.categoryLabel;
+        const catB = language === 'bn' ? b.categoryLabelBn : language === 'ar' ? b.categoryLabelAr : b.categoryLabel;
+        return catA.localeCompare(catB);
+      });
+    }
+
+    return result;
+  }, [portfolioItems, filter, searchQuery, sortBy, language]);
 
   // Keyboard navigation for Lightbox modal
   useEffect(() => {
@@ -420,39 +439,68 @@ export default function Portfolio({ language, theme }: PortfolioProps) {
       {/* ================= PORTFOLIO CATEGORIES & LIVE SEARCH ================= */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-6" id="bento-grid-catalog">
         
-        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 mb-8">
-          
-          <div className="space-y-1.5 text-left">
-            <h2 className="text-xl sm:text-2xl font-extrabold text-neutral-950 dark:text-white flex items-center gap-1.5">
-              <Layers className="w-5 h-5 text-blue-600 dark:text-cyan-400" />
-              <span>{t.gridTitle}</span>
-            </h2>
-            <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400">
-              {t.gridSub}
-            </p>
-          </div>
+        {/* Strategic Deployments Header Box */}
+        <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-blue-900/10 via-indigo-900/10 to-purple-900/10 dark:from-blue-950/40 dark:via-indigo-950/30 dark:to-purple-950/40 border border-blue-200/60 dark:border-blue-800/40 mb-8 backdrop-blur-xs">
+          <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-6">
+            
+            <div className="space-y-2 text-left max-w-2xl">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-600 text-white shadow-xs">
+                  <Layers className="w-3 h-3" />
+                  <span>Strategic Deployments</span>
+                </span>
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                  <span>99.99% Live Production Uptime</span>
+                </span>
+              </div>
 
-          {/* Luxury Search input bar */}
-          <div className="relative w-full lg:max-w-xs shrink-0">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={t.searchPlaceholder}
-              className="w-full pl-9 pr-8 py-2 text-xs bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white border border-neutral-200 dark:border-neutral-800 rounded-xl focus:outline-none focus:border-blue-500 dark:focus:border-blue-500 transition-colors"
-            />
-            {searchQuery && (
-              <button 
-                onClick={() => setSearchQuery('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-neutral-400 hover:text-neutral-600 dark:hover:text-white rounded-full"
-                title="Clear Search"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
+              <h2 className="text-2xl sm:text-3xl font-black text-neutral-950 dark:text-white tracking-tight">
+                {t.gridTitle}
+              </h2>
+              <p className="text-xs sm:text-sm text-neutral-600 dark:text-neutral-300 font-medium">
+                {t.gridSub}
+              </p>
+            </div>
 
+            {/* Search & Sort Controls */}
+            <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto shrink-0">
+              {/* Search input bar */}
+              <div className="relative w-full sm:w-72">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={t.searchPlaceholder}
+                  className="w-full pl-9 pr-8 py-2.5 text-xs bg-white dark:bg-slate-900 text-neutral-900 dark:text-white border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-indigo-500 shadow-xs transition-colors"
+                />
+                {searchQuery && (
+                  <button 
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-neutral-400 hover:text-neutral-600 dark:hover:text-white rounded-full"
+                    title="Clear Search"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Sort options dropdown */}
+              <div className="relative w-full sm:w-auto shrink-0">
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as any)}
+                  className="w-full sm:w-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-bold text-neutral-800 dark:text-neutral-200 py-2.5 px-3 rounded-xl focus:outline-none focus:border-indigo-500 cursor-pointer transition-colors shadow-xs"
+                >
+                  <option value="featured">✨ {language === 'bn' ? 'ফিচার্ড প্রজেক্ট' : language === 'ar' ? 'المشاريع المميزة' : 'Sort: Featured'}</option>
+                  <option value="title">🔤 {language === 'bn' ? 'নাম অনুযায়ী (A-Z)' : language === 'ar' ? 'أبجدياً (A-Z)' : 'Sort: Name (A-Z)'}</option>
+                  <option value="category">📂 {language === 'bn' ? 'ক্যাটাগরি অনুযায়ী' : language === 'ar' ? 'حسب الفئة' : 'Sort: Category'}</option>
+                </select>
+              </div>
+            </div>
+
+          </div>
         </div>
 
         {/* Filter Navigation Tabs */}
@@ -463,10 +511,10 @@ export default function Portfolio({ language, theme }: PortfolioProps) {
               <button
                 key={cat.id}
                 onClick={() => setFilter(cat.id)}
-                className={`px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap border flex items-center gap-1.5 transition-all duration-150 cursor-pointer ${
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap border flex items-center gap-1.5 transition-all duration-150 cursor-pointer shadow-2xs ${
                   isActive 
-                    ? 'bg-linear-to-r from-blue-600 to-cyan-500 text-white border-blue-500 shadow-lg shadow-blue-500/10'
-                    : 'bg-white dark:bg-[#0F172A] border-neutral-200/70 dark:border-neutral-850 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-900'
+                    ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white border-indigo-500 shadow-md shadow-indigo-500/20'
+                    : 'bg-white dark:bg-[#0F172A] border-slate-200/80 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/80'
                 }`}
               >
                 <span>{cat.icon}</span>
@@ -800,6 +848,47 @@ export default function Portfolio({ language, theme }: PortfolioProps) {
 
                   </div>
 
+                  {/* Project Scope & Objectives */}
+                  {(selectedProject.projectScope || selectedProject.projectScopeBn || selectedProject.projectScopeAr) && (
+                    <div className="p-4 bg-purple-50/50 dark:bg-purple-950/20 border border-purple-200/50 dark:border-purple-900/30 rounded-2xl space-y-1.5">
+                      <h4 className="text-xs font-black uppercase text-purple-600 dark:text-purple-400 tracking-wider flex items-center gap-1.5">
+                        <Layers className="w-3.5 h-3.5 text-purple-500" />
+                        <span>{language === 'bn' ? 'প্রজেক্টের স্কোপ ও লক্ষ্য' : language === 'ar' ? 'نطاق المشروع والأهداف' : 'Project Scope & Objectives'}</span>
+                      </h4>
+                      <p className="text-xs text-neutral-700 dark:text-neutral-300 leading-relaxed font-medium">
+                        {language === 'bn' ? selectedProject.projectScopeBn || selectedProject.projectScope : language === 'ar' ? selectedProject.projectScopeAr || selectedProject.projectScope : selectedProject.projectScope}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Challenge & Solution Breakdown */}
+                  {(selectedProject.challenge || selectedProject.solution) && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {selectedProject.challenge && (
+                        <div className="p-4 bg-rose-50/50 dark:bg-rose-950/20 border border-rose-200/50 dark:border-rose-900/30 rounded-2xl space-y-1.5">
+                          <h4 className="text-xs font-black uppercase text-rose-600 dark:text-rose-400 tracking-wider flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-rose-500"></span>
+                            <span>{language === 'bn' ? 'মূল চ্যালেঞ্জ' : language === 'ar' ? 'التحدي الرئيسي' : 'The Challenge'}</span>
+                          </h4>
+                          <p className="text-xs text-neutral-600 dark:text-neutral-300 leading-relaxed">
+                            {language === 'bn' ? selectedProject.challengeBn || selectedProject.challenge : language === 'ar' ? selectedProject.challengeAr || selectedProject.challenge : selectedProject.challenge}
+                          </p>
+                        </div>
+                      )}
+                      {selectedProject.solution && (
+                        <div className="p-4 bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/50 dark:border-emerald-900/30 rounded-2xl space-y-1.5">
+                          <h4 className="text-xs font-black uppercase text-emerald-600 dark:text-emerald-400 tracking-wider flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                            <span>{language === 'bn' ? 'আমাদের সলিউশন' : language === 'ar' ? 'الحل المقدم' : 'Our Solution'}</span>
+                          </h4>
+                          <p className="text-xs text-neutral-600 dark:text-neutral-300 leading-relaxed">
+                            {language === 'bn' ? selectedProject.solutionBn || selectedProject.solution : language === 'ar' ? selectedProject.solutionAr || selectedProject.solution : selectedProject.solution}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* Core description details block */}
                   <div className="space-y-2">
                     <h4 className="text-xs font-black uppercase text-neutral-400 tracking-wider">Project Audit Analysis</h4>
@@ -818,13 +907,36 @@ export default function Portfolio({ language, theme }: PortfolioProps) {
                       {selectedProject.techStack?.map((tItem, tK) => (
                         <span 
                           key={tK}
-                          className="px-3 py-1 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-cyan-400 border border-blue-200/40 dark:border-blue-900/40 rounded-lg text-xs font-bold"
+                          className="px-3 py-1 bg-gradient-to-r from-purple-500/10 to-indigo-500/10 dark:from-purple-950/40 dark:to-indigo-950/40 text-purple-700 dark:text-purple-300 border border-purple-200/50 dark:border-purple-800/40 rounded-lg text-xs font-bold"
                         >
-                          {tItem}
+                          #{tItem}
                         </span>
                       ))}
                     </div>
                   </div>
+
+                  {/* Client Testimonial Block */}
+                  {selectedProject.testimonial && (
+                    <div className="p-4 bg-neutral-100/70 dark:bg-neutral-900/80 border border-neutral-200/60 dark:border-neutral-800 rounded-2xl space-y-3">
+                      <div className="flex items-center gap-1 text-amber-500">
+                        {[...Array(5)].map((_, s) => (
+                          <Star key={s} className="w-3.5 h-3.5 fill-amber-500" />
+                        ))}
+                      </div>
+                      <p className="text-xs text-neutral-700 dark:text-neutral-300 italic leading-relaxed font-serif">
+                        "{language === 'bn' ? selectedProject.testimonial.quoteBn || selectedProject.testimonial.quote : language === 'ar' ? selectedProject.testimonial.quoteAr || selectedProject.testimonial.quote : selectedProject.testimonial.quote}"
+                      </p>
+                      <div className="flex items-center gap-2.5 pt-1">
+                        {selectedProject.testimonial.avatar && (
+                          <img src={selectedProject.testimonial.avatar} alt={selectedProject.testimonial.author} className="w-8 h-8 rounded-full object-cover shrink-0" referrerPolicy="no-referrer" />
+                        )}
+                        <div>
+                          <p className="text-xs font-bold text-neutral-900 dark:text-white">{selectedProject.testimonial.author}</p>
+                          <p className="text-[10px] text-neutral-500 font-mono">{selectedProject.testimonial.role} — {selectedProject.testimonial.company}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Immersive CTA redirect buttons */}
                   <div className="pt-4 border-t border-neutral-200 dark:border-neutral-850 flex items-center justify-end gap-2.5">
@@ -1015,6 +1127,11 @@ export default function Portfolio({ language, theme }: PortfolioProps) {
           );
         })()}
       </AnimatePresence>
+
+      {/* ================= TEAM PROFILES & QUALITY SERVICES MATRIX ================= */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <PortfolioTeamProfiles language={language} theme={theme} />
+      </section>
 
       {/* ================= CLIENT TESTIMONIALS ================= */}
       <section className="bg-white dark:bg-[#0F172A] border-t border-b border-neutral-200/50 dark:border-neutral-900 py-16">

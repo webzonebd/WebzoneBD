@@ -4,7 +4,7 @@
 
 export type Language = 'en' | 'bn' | 'ar';
 export type Theme = 'light' | 'dark';
-export type UserRole = 'super_admin' | 'admin' | 'editor' | 'customer' | 'user' | 'vendor' | 'staff' | 'affiliate';
+export type UserRole = 'super_admin' | 'admin' | 'content_manager' | 'order_manager' | 'support_staff' | 'editor' | 'staff' | 'customer' | 'user' | 'vendor' | 'affiliate';
 export type Currency = 'USD' | 'BDT' | 'SAR';
 
 export interface UserSession {
@@ -75,6 +75,9 @@ export interface ProductReview {
   rating: number;
   comment: string;
   createdAt: string;
+  approved?: boolean;
+  productId?: string;
+  productName?: string;
 }
 
 export interface Product {
@@ -136,6 +139,23 @@ export interface Coupon {
   discountPercent: number;
   expiryDate: string;
   usageCount?: number;
+  name?: string;
+  description?: string;
+  type?: string;
+  discountValue?: number;
+  startDate?: string;
+  status?: 'active' | 'scheduled' | 'expired' | 'suspended';
+  bannerImage?: string;
+  applyTo?: string[];
+  restrictions?: {
+    minimumOrder?: number;
+    maximumDiscount?: number;
+    maxUses?: number;
+    usesPerCustomer?: number;
+    targetGroup?: string;
+  };
+  customerRules?: string;
+  category?: string;
 }
 
 export interface SupportTicket {
@@ -194,6 +214,15 @@ export interface PortfolioItem {
   description?: string;
   descriptionBn?: string;
   descriptionAr?: string;
+  projectScope?: string;
+  projectScopeBn?: string;
+  projectScopeAr?: string;
+  challenge?: string;
+  challengeBn?: string;
+  challengeAr?: string;
+  solution?: string;
+  solutionBn?: string;
+  solutionAr?: string;
   techStack?: string[];
   features?: string[];
   featuresBn?: string[];
@@ -205,6 +234,17 @@ export interface PortfolioItem {
   longCaseStudyBn?: string;
   longCaseStudyAr?: string;
   videoUrl?: string;
+  galleryImages?: string[];
+  testimonial?: {
+    quote: string;
+    quoteBn?: string;
+    quoteAr?: string;
+    author: string;
+    role: string;
+    company?: string;
+    avatar?: string;
+  };
+  featured?: boolean;
 }
 
 export interface Order {
@@ -228,11 +268,35 @@ export interface Order {
   customerName?: string;
   customerEmail?: string;
   customerPhone?: string;
+  companyName?: string;
+  companyCategory?: string;
   assignedStaff?: string;
   orderNotes?: string;
   advancePercent?: number;
   advanceAmount?: number;
   dueAmount?: number;
+}
+
+export interface OrderMessageAttachment {
+  name: string;
+  url?: string;
+  type?: string;
+  size?: string;
+}
+
+export interface OrderMessage {
+  id: string;
+  orderId: string;
+  senderId: string;
+  senderName: string;
+  senderRole: 'client' | 'staff' | 'admin' | 'system';
+  senderAvatar?: string;
+  message: string;
+  createdAt: string;
+  category?: 'general' | 'requirement' | 'specification' | 'asset' | 'revision' | 'milestone';
+  attachments?: OrderMessageAttachment[];
+  read?: boolean;
+  status?: 'sending' | 'sent' | 'delivered' | 'read';
 }
 
 export interface CartItem {
@@ -241,6 +305,19 @@ export interface CartItem {
   advancePercent?: number;
   advanceAmount?: number;
   dueAmount?: number;
+}
+
+export interface FlyingCartItem {
+  id: string;
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+  image: string;
+  name: string;
+  price: number;
+  badge?: string;
+  category?: string;
 }
 
 export interface SystemConfig {
@@ -252,4 +329,8 @@ export interface SystemConfig {
   bangladeshContact: string;
   supportEmail: string;
   autoApproveTickets: boolean;
+  themePrimaryColor?: string;
+  themeSecondaryColor?: string;
+  themeGradient?: string;
+  themeBorderRadius?: string;
 }
