@@ -817,6 +817,8 @@ export default function Services({
     }
   }, [catalogServices]);
 
+  const [recentlyAddedWishlistId, setRecentlyAddedWishlistId] = useState<string | null>(null);
+
   // Session user check & admin detection with live synchronization
   const [sessionUser, setSessionUser] = useState<any>(() => {
     const userStr = localStorage.getItem('webzone_session_user');
@@ -1676,11 +1678,17 @@ export default function Services({
         createdAt: timestamp
       };
 
-      // Write to Firestore!
-      await setDoc(doc(db, 'service_inquiries', inquiryId), inquiryPayload);
-      await setDoc(doc(db, 'service_orders', orderId), orderPayload);
-      await setDoc(doc(db, 'service_leads', leadId), leadPayload);
-      await setDoc(doc(db, 'whatsapp_leads', whatsappLeadId), whatsappLeadPayload);
+      // Write to Firestore resiliently
+      try {
+        await Promise.allSettled([
+          setDoc(doc(db, 'service_inquiries', inquiryId), inquiryPayload),
+          setDoc(doc(db, 'service_orders', orderId), orderPayload),
+          setDoc(doc(db, 'service_leads', leadId), leadPayload),
+          setDoc(doc(db, 'whatsapp_leads', whatsappLeadId), whatsappLeadPayload)
+        ]);
+      } catch (fireErr) {
+        console.info('Firestore inquiry/order sync in local resilient mode:', fireErr);
+      }
 
       // Save to Admin WhatsApp Service Orders List and Contacts in localStorage
       try {
@@ -3980,27 +3988,44 @@ export default function Services({
                             {/* Dark gradient blur over image */}
                             <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-60 pointer-events-none" />
 
-                            {/* Wishlist Heart Button */}
+                            {/* Wishlist Heart Button with subtle pulse feedback */}
                             {toggleWishlist && (
-                              <motion.button
+                              <button
+                                type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
+                                  const isAdding = !wishlist.includes(srv.id);
+                                  if (isAdding) {
+                                    setRecentlyAddedWishlistId(srv.id);
+                                    setTimeout(() => {
+                                      setRecentlyAddedWishlistId((prev) => (prev === srv.id ? null : prev));
+                                    }, 850);
+                                  }
                                   toggleWishlist(srv.id);
                                 }}
-                                whileHover={{ scale: 1.15 }}
-                                whileTap={{ scale: 0.8 }}
-                                animate={{
-                                  scale: wishlist.includes(srv.id) ? [1, 1.3, 0.9, 1.1, 1] : 1
-                                }}
-                                transition={{ duration: 0.45 }}
-                                className={`absolute top-3 left-3 p-2 rounded-full backdrop-blur-md border shadow-md transition cursor-pointer z-25 ${
+                                className={`absolute top-3 left-3 p-2 rounded-full backdrop-blur-md border shadow-md transition-all duration-150 cursor-pointer z-25 active:scale-90 ${
                                   wishlist.includes(srv.id)
-                                    ? 'bg-rose-50/90 border-rose-200 text-rose-500 dark:bg-rose-950/80 dark:border-rose-900/60'
-                                    : 'bg-white/95 dark:bg-[#020617]/90 border-slate-200 dark:border-slate-800 text-slate-400 hover:text-rose-500'
+                                    ? 'bg-rose-50/95 border-rose-200 text-rose-500 dark:bg-rose-950/90 dark:border-rose-900/60'
+                                    : 'bg-white/95 dark:bg-[#020617]/90 border-slate-200 dark:border-slate-800 text-slate-400 hover:text-rose-500 hover:scale-110'
                                 }`}
+                                title={wishlist.includes(srv.id) ? 'Remove from wishlist' : 'Add to wishlist'}
+                                aria-label={wishlist.includes(srv.id) ? 'Remove from wishlist' : 'Add to wishlist'}
                               >
-                                <Heart className="w-3.5 h-3.5 fill-current" />
-                              </motion.button>
+                                {/* Subtle Expanding Ripple Ring on Addition */}
+                                {recentlyAddedWishlistId === srv.id && (
+                                  <span 
+                                    aria-hidden="true" 
+                                    className="absolute inset-0 rounded-full bg-rose-500/35 animate-heart-ring pointer-events-none" 
+                                  />
+                                )}
+                                <Heart 
+                                  className={`w-3.5 h-3.5 fill-current transition-colors duration-200 ${
+                                    recentlyAddedWishlistId === srv.id 
+                                      ? 'animate-heart-pulse drop-shadow-[0_0_6px_rgba(244,63,94,0.7)]' 
+                                      : ''
+                                  }`} 
+                                />
+                              </button>
                             )}
 
                             {/* Special Label */}

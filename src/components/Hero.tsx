@@ -530,11 +530,11 @@ export default function Hero({ language, theme = 'dark', searchTerm, setSearchTe
           </motion.h2>
 
           {/* Search bar - Premium glassy SaaS input component */}
-          <motion.div variants={searchVariants} className="relative max-w-xl mx-auto w-full z-20">
+          <motion.div variants={searchVariants} className="relative max-w-xl md:max-w-2xl lg:max-w-3xl mx-auto w-full z-20">
             <div 
-              className="mt-4 bg-white/80 dark:bg-slate-900/60 backdrop-blur-xl rounded-2xl p-1.5 shadow-xl hover:shadow-2xl hover:border-blue-500/40 transition-all duration-300 border border-slate-200/80 dark:border-slate-800 flex items-center gap-2"
+              className="mt-4 bg-white/95 dark:bg-slate-900/80 backdrop-blur-xl rounded-2xl md:rounded-3xl p-1.5 md:p-2.5 shadow-xl hover:shadow-2xl hover:border-blue-500/50 transition-all duration-300 border border-slate-200/90 dark:border-slate-800 flex items-center gap-2"
             >
-              <div className="flex-1 flex items-center pl-3">
+              <div className="flex-1 flex items-center pl-3 md:pl-4">
                 <Search className="w-5 h-5 text-slate-400 dark:text-slate-500 flex-shrink-0" />
                 <input
                   type="text"
@@ -542,8 +542,13 @@ export default function Hero({ language, theme = 'dark', searchTerm, setSearchTe
                   onChange={(e) => setSearchTerm(e.target.value)}
                   onKeyDown={handleSearchKeyPress}
                   placeholder={t.searchPlaceholder}
-                  className="w-full bg-transparent border-0 outline-none text-xs sm:text-sm font-medium px-2 py-2 pr-12 text-[#0f172a] dark:text-slate-50 placeholder-slate-400 dark:placeholder-slate-550 focus:ring-0"
+                  className="w-full bg-transparent border-0 outline-none text-xs sm:text-sm md:text-base font-medium px-2 py-2 md:py-2.5 text-[#0f172a] dark:text-slate-50 placeholder-slate-400 dark:placeholder-slate-500 focus:ring-0"
                 />
+
+                {/* Desktop Enter Shortcut Affordance */}
+                <span className="hidden md:inline-flex items-center text-[10px] font-mono px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 mr-2 select-none border border-slate-200/60 dark:border-slate-700/60">
+                  Enter ↵
+                </span>
                 
                 {/* Voice search microphone trigger */}
                 <button
@@ -568,7 +573,7 @@ export default function Hero({ language, theme = 'dark', searchTerm, setSearchTe
               </div>
               <button
                 onClick={() => setCurrentPage('marketplace')}
-                className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-cyan-550 hover:from-blue-700 hover:to-cyan-600 text-white text-xs font-extrabold rounded-xl transition-all duration-305 flex items-center gap-1.5 cursor-pointer shadow-md hover:shadow-[0_0_20px_rgba(37,99,235,0.4)] hover:scale-[1.02]"
+                className="px-5 md:px-7 py-2.5 md:py-3.5 bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 text-white text-xs md:text-sm font-black rounded-xl md:rounded-2xl transition-all duration-200 flex items-center gap-1.5 cursor-pointer shadow-md hover:shadow-blue-500/30 hover:scale-[1.02] active:scale-95 shrink-0"
               >
                 <span>{language === 'bn' ? "খুঁজুন" : language === 'ar' ? "بحث بالمتجر" : "Search"}</span>
                 <ArrowRight className="w-4 h-4" />

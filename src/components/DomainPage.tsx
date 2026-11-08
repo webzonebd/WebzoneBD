@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Search, Globe, ChevronDown, Check, Shield, HelpCircle,
@@ -142,6 +142,116 @@ export default function DomainPage({
     } else {
       return `$${priceInTarget.toFixed(2)}`;
     }
+  };
+
+  // -----------------------------------------------------
+  // REAL-TIME PREDICTIVE DOMAIN SEARCH LOGIC
+  // -----------------------------------------------------
+  const [showDomainSuggestions, setShowDomainSuggestions] = useState(false);
+  const domainSearchContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (domainSearchContainerRef.current && !domainSearchContainerRef.current.contains(e.target as Node)) {
+        setShowDomainSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const predictiveDomainSuggestions = useMemo(() => {
+    const raw = instantSearchQuery.trim().toLowerCase().replace(/^(https?:\/\/)?(www\.)?/, "");
+    if (!raw) return [];
+
+    let namePart = raw;
+    let extFilter = "";
+    const dotIndex = raw.indexOf(".");
+    if (dotIndex !== -1) {
+      namePart = raw.substring(0, dotIndex).replace(/[^a-z0-9\-]/g, "");
+      extFilter = raw.substring(dotIndex);
+    } else {
+      namePart = raw.replace(/[^a-z0-9\-]/g, "");
+    }
+
+    if (!namePart) return [];
+
+    // Metadata for TLDs
+    const TLD_INFO: Record<string, { tag: string; tagBn: string; badge?: string; isHot?: boolean }> = {
+      ".com": { tag: "Global Business Standard", tagBn: "গ্লোবাল বিজনেস স্ট্যান্ডার্ড", badge: "Popular", isHot: true },
+      ".net": { tag: "Tech & High Speed Network", tagBn: "হাই-পারফরম্যান্স টেক", badge: "High-Speed" },
+      ".org": { tag: "Organization & Trust Hub", tagBn: "প্রতিষ্ঠান ও ট্রাস্ট হাব", badge: "Trust" },
+      ".com.bd": { tag: "Official Bangladesh Commercial", tagBn: "অফিসিয়াল বিডি কমার্শিয়াল", badge: "Local BD" },
+      ".xyz": { tag: "Affordable Modern Next-Gen", tagBn: "বাজেট ফ্রেন্ডলি ডোমেন", badge: "Best Deal", isHot: true },
+      ".ai": { tag: "Artificial Intelligence & Tech", tagBn: "এআই ও ফিউচারিস্টিক টেক", badge: "AI Boom", isHot: true },
+      ".io": { tag: "Developer & Startup Hub", tagBn: "ডেভেলপার ও স্টার্টআপ", badge: "Tech", isHot: true },
+      ".store": { tag: "E-Commerce & Online Retail", tagBn: "অনলাইন শপ ও রিটেল", badge: "Shop" },
+      ".online": { tag: "Versatile Global Presence", tagBn: "অলরাউন্ডার ওয়েবসাইট", badge: "Fresh" },
+      ".info": { tag: "Knowledge & Information", tagBn: "তথ্য ও জ্ঞানমূলক সাইট" },
+      ".top": { tag: "Super Budget Friendly", tagBn: "বাজেট ফ্রেন্ডলি" }
+    };
+
+    const results: Array<{
+      domain: string;
+      extension: string;
+      tag: string;
+      tagBn: string;
+      badge?: string;
+      priceBDT: number;
+      isHot?: boolean;
+    }> = [];
+
+    pricingDataBDT.forEach(item => {
+      if (!extFilter || item.ext.startsWith(extFilter)) {
+        const info = TLD_INFO[item.ext] || { tag: "Top Level Domain", tagBn: "টপ লেভেল ডোমেন" };
+        results.push({
+          domain: `${namePart}${item.ext}`,
+          extension: item.ext,
+          tag: info.tag,
+          tagBn: info.tagBn,
+          badge: info.badge,
+          priceBDT: item.offer,
+          isHot: item.isHot
+        });
+      }
+    });
+
+    // Add variations if query is at least 3 characters
+    if (namePart.length >= 3 && !extFilter) {
+      const variations = [
+        { prefix: 'get', ext: '.com' },
+        { prefix: '', suffix: 'app', ext: '.com' },
+        { prefix: 'my', ext: '.net' },
+      ];
+      variations.forEach(v => {
+        const varName = `${v.prefix ? v.prefix : ''}${namePart}${v.suffix ? v.suffix : ''}${v.ext}`;
+        const pricing = pricingDataBDT.find(p => p.ext === v.ext);
+        if (pricing && !results.some(r => r.domain === varName)) {
+          results.push({
+            domain: varName,
+            extension: v.ext,
+            tag: "Smart Brand Variation",
+            tagBn: "স্মার্ট ব্র্যান্ড ভ্যারিয়েশন",
+            badge: "Variation",
+            priceBDT: pricing.offer,
+            isHot: false
+          });
+        }
+      });
+    }
+
+    return results.slice(0, 6);
+  }, [instantSearchQuery]);
+
+  const executeInstantDomainCheck = (targetDomain: string) => {
+    setInstantSearchQuery(targetDomain);
+    setShowDomainSuggestions(false);
+    setTimeout(() => {
+      const form = document.getElementById("instant-domain-form") as HTMLFormElement;
+      if (form) {
+        form.requestSubmit();
+      }
+    }, 50);
   };
 
   // Preset prompts trigger
@@ -563,16 +673,119 @@ export default function DomainPage({
               
               {activeSearchMode === "instant" ? (
                 /* Hostinger-Style Instant Search Form */
-                <form onSubmit={handleInstantDomainSearch} className="space-y-4">
-                  <div className="relative flex items-center">
+                <form id="instant-domain-form" onSubmit={handleInstantDomainSearch} className="space-y-4">
+                  <div ref={domainSearchContainerRef} className="relative flex items-center">
                     <Globe className="absolute left-4 text-blue-500 w-5 h-5 animate-pulse" />
                     <input
                       type="text"
                       placeholder={language === "bn" ? "আপনার পছন্দের ডোমেন নামটি খুঁজুন (যেমন: mybrand.com)..." : language === "ar" ? "ابحث عن نطاقك الفريد واستعلم عن توفره (مثل: mybrand.com)..." : "Search your perfect domain with extensions (e.g. mybrand.com)..."}
                       value={instantSearchQuery}
-                      onChange={(e) => setInstantSearchQuery(e.target.value)}
-                      className="w-full bg-transparent pl-12 pr-4 py-4 text-sm sm:text-base font-semibold text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none border-none"
+                      onFocus={() => setShowDomainSuggestions(true)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Escape") setShowDomainSuggestions(false);
+                      }}
+                      onChange={(e) => {
+                        setInstantSearchQuery(e.target.value);
+                        setShowDomainSuggestions(true);
+                      }}
+                      className="w-full bg-transparent pl-12 pr-12 py-4 text-sm sm:text-base font-semibold text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none border-none"
                     />
+                    {instantSearchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setInstantSearchQuery("")}
+                        className="absolute right-4 p-1.5 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer transition"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+
+                    {/* Real-time Predictive Domain Dropdown */}
+                    {showDomainSuggestions && instantSearchQuery.trim().length > 0 && (
+                      <div
+                        id="domain-predictive-dropdown"
+                        className="absolute left-0 right-0 top-full mt-2 rounded-2xl bg-white/95 dark:bg-[#0B1120]/95 backdrop-blur-2xl border border-slate-200 dark:border-slate-800 shadow-[0_20px_50px_rgba(0,0,0,0.25)] z-50 overflow-hidden divide-y divide-slate-100 dark:divide-slate-800/60 animate-in fade-in slide-in-from-top-2 duration-200 text-left"
+                      >
+                        {/* Header */}
+                        <div className="px-4 py-2.5 bg-gradient-to-r from-blue-50/80 via-indigo-50/50 to-cyan-50/70 dark:from-blue-950/40 dark:via-indigo-950/30 dark:to-cyan-950/40 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Sparkles className="w-3.5 h-3.5 text-blue-500" />
+                            <span className="text-[11px] font-extrabold uppercase font-mono tracking-wider text-slate-700 dark:text-slate-200">
+                              {language === "bn" 
+                                ? `প্রেডিক্টিভ ডোমেন রেজাল্ট (${predictiveDomainSuggestions.length}টি ডোমেন পাওয়া গেছে)` 
+                                : `Predictive Domain Matches (${predictiveDomainSuggestions.length} suggestions)`}
+                            </span>
+                          </div>
+                          <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500 bg-white/80 dark:bg-slate-900/80 px-2 py-0.5 rounded border border-slate-200/60 dark:border-slate-800">
+                            ESC to close
+                          </span>
+                        </div>
+
+                        {/* Suggestions List */}
+                        {predictiveDomainSuggestions.length > 0 ? (
+                          <div className="max-h-[340px] overflow-y-auto p-2 space-y-1">
+                            {predictiveDomainSuggestions.map((item, idx) => (
+                              <div
+                                key={idx}
+                                onClick={() => executeInstantDomainCheck(item.domain)}
+                                className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-blue-50/70 dark:hover:bg-slate-800/80 transition cursor-pointer group"
+                              >
+                                <div className="flex items-center gap-3 min-w-0 flex-1 pr-3">
+                                  <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-600 dark:text-cyan-400 flex items-center justify-center shrink-0 font-bold text-xs">
+                                    <Globe className="w-4 h-4" />
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <span className="text-xs sm:text-sm font-black text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-cyan-400 font-mono transition truncate">
+                                        {item.domain}
+                                      </span>
+                                      <span className="text-[9px] uppercase font-mono font-extrabold px-1.5 py-0.2 rounded bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-cyan-300 border border-blue-200 dark:border-blue-800">
+                                        {item.extension}
+                                      </span>
+                                      {item.isHot && (
+                                        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25">
+                                          HOT 🔥
+                                        </span>
+                                      )}
+                                      {item.badge && !item.isHot && (
+                                        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                                          {item.badge}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                                      {language === "bn" ? item.tagBn : item.tag}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                {/* Price & Action */}
+                                <div className="flex items-center gap-2.5 shrink-0">
+                                  <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 font-mono">
+                                    {convertAndFormatVal(item.priceBDT)}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      executeInstantDomainCheck(item.domain);
+                                    }}
+                                    className="px-2.5 py-1.5 bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white text-[10.5px] font-bold rounded-lg shadow-sm transition active:scale-95 cursor-pointer flex items-center gap-1"
+                                  >
+                                    <Search className="w-3 h-3" />
+                                    <span>{language === "bn" ? "চেক করুন" : "Check WHOIS"}</span>
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="p-4 text-center text-xs text-slate-500 dark:text-slate-400">
+                            {language === "bn" ? "ডোমেন এক্সটেনশন টাইপ করুন যেমন: .com, .net, .org" : "Type a valid domain name to see predictive TLD suggestions"}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* Preloaded suggestion examples row for Instant Mode */}

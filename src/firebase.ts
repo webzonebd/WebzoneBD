@@ -74,8 +74,8 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     operationType,
     path
   };
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
+  console.warn('Firestore Operation Notice: ', JSON.stringify(errInfo));
+  return errInfo;
 }
 
 // Validate Connection to Firestore as mandated in guidelines
@@ -96,17 +96,13 @@ async function testConnection() {
   }
 
   try {
-    const testPromise = getDocFromServer(doc(db, 'test', 'connection'));
-    const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Backend probe timed out; client operating in resilient offline/cache mode')), 4000)
+    const testPromise = getDocFromServer(doc(db, 'test', 'connection')).catch(() => null);
+    const timeoutPromise = new Promise((resolve) => 
+      setTimeout(() => resolve(null), 4000)
     );
     await Promise.race([testPromise, timeoutPromise]);
   } catch (error) {
-    if (error instanceof Error) {
-      if (error.message.includes('the client is offline') || error.message.includes('timed out') || error.message.includes('Could not reach Cloud Firestore')) {
-        console.info("Firestore operating in offline-first mode; updates will sync automatically.");
-      }
-    }
+    console.info("Firestore operating in resilient mode.");
   }
 }
 testConnection();

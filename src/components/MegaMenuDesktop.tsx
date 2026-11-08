@@ -103,8 +103,8 @@ export const MegaMenuDesktop: React.FC<MegaMenuDesktopProps> = ({
         onClick={() => handleNavigate('home')}
         className={`px-3 py-2 rounded-xl text-xs font-bold font-sans transition-all duration-150 cursor-pointer ${
           currentPage === 'home'
-            ? 'bg-blue-50 dark:bg-neutral-900/80 text-blue-600 dark:text-cyan-400 font-extrabold shadow-xs'
-            : 'text-neutral-700 dark:text-neutral-300 hover:text-blue-600 dark:hover:text-cyan-400 hover:bg-neutral-100/70 dark:hover:bg-neutral-900/50'
+            ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-cyan-400 border border-blue-200/80 dark:border-blue-900/60 font-black shadow-xs'
+            : 'text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-cyan-400 hover:bg-slate-100 dark:hover:bg-slate-800/60'
         }`}
       >
         {t.home}
@@ -121,8 +121,8 @@ export const MegaMenuDesktop: React.FC<MegaMenuDesktopProps> = ({
           onClick={() => handleNavigate('services', 'all', 'webzone_target_services_tab')}
           className={`px-3 py-2 rounded-xl text-xs font-bold font-sans transition-all duration-150 flex items-center gap-1.5 cursor-pointer ${
             currentPage === 'services' || activeMenu === 'services'
-              ? 'bg-blue-50 dark:bg-neutral-900/80 text-blue-600 dark:text-cyan-400 font-extrabold shadow-xs'
-              : 'text-neutral-700 dark:text-neutral-300 hover:text-blue-600 dark:hover:text-cyan-400 hover:bg-neutral-100/70 dark:hover:bg-neutral-900/50'
+              ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-cyan-400 border border-blue-200/80 dark:border-blue-900/60 font-black shadow-xs'
+              : 'text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-cyan-400 hover:bg-slate-100 dark:hover:bg-slate-800/60'
           }`}
         >
           <span>{t.services}</span>
@@ -392,8 +392,8 @@ export const MegaMenuDesktop: React.FC<MegaMenuDesktopProps> = ({
           onClick={() => handleNavigate('hosting', 'bdix', 'webzone_target_hosting_tab')}
           className={`px-3 py-2 rounded-xl text-xs font-bold font-sans transition-all duration-150 flex items-center gap-1.5 cursor-pointer ${
             currentPage === 'hosting' || activeMenu === 'hosting'
-              ? 'bg-blue-50 dark:bg-neutral-900/80 text-blue-600 dark:text-cyan-400 font-extrabold shadow-xs'
-              : 'text-neutral-750 dark:text-neutral-300 hover:text-blue-600 dark:hover:text-cyan-400 hover:bg-neutral-100/70 dark:hover:bg-neutral-900/50'
+              ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-cyan-400 border border-blue-200/80 dark:border-blue-900/60 font-black shadow-xs'
+              : 'text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-cyan-400 hover:bg-slate-100 dark:hover:bg-slate-800/60'
           }`}
         >
           <span>{t.hosting}</span>
@@ -540,8 +540,8 @@ export const MegaMenuDesktop: React.FC<MegaMenuDesktopProps> = ({
           onClick={() => handleNavigate('marketplace')}
           className={`px-3 py-2 rounded-xl text-xs font-bold font-sans transition-all duration-150 flex items-center gap-1.5 cursor-pointer ${
             currentPage === 'marketplace' || activeMenu === 'store'
-              ? 'bg-blue-50 dark:bg-neutral-900/80 text-blue-600 dark:text-cyan-400 font-extrabold shadow-xs'
-              : 'text-neutral-750 dark:text-neutral-300 hover:text-blue-600 dark:hover:text-cyan-400 hover:bg-neutral-100/70 dark:hover:bg-neutral-900/50'
+              ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-cyan-400 border border-blue-200/80 dark:border-blue-900/60 font-black shadow-xs'
+              : 'text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-cyan-400 hover:bg-slate-100 dark:hover:bg-slate-800/60'
           }`}
         >
           <span>{t.store}</span>
@@ -718,8 +718,8 @@ export const MegaMenuDesktop: React.FC<MegaMenuDesktopProps> = ({
           onClick={() => handleNavigate('portfolio')}
           className={`px-3 py-2 rounded-xl text-xs font-bold font-sans transition-all duration-150 flex items-center gap-1.5 cursor-pointer ${
             currentPage === 'portfolio' || activeMenu === 'portfolio'
-              ? 'bg-blue-50 dark:bg-neutral-900/80 text-blue-600 dark:text-cyan-400 font-extrabold shadow-xs'
-              : 'text-neutral-750 dark:text-neutral-300 hover:text-blue-600 dark:hover:text-cyan-400 hover:bg-neutral-100/70 dark:hover:bg-neutral-900/50'
+              ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-cyan-400 border border-blue-200/80 dark:border-blue-900/60 font-black shadow-xs'
+              : 'text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-cyan-400 hover:bg-slate-100 dark:hover:bg-slate-800/60'
           }`}
         >
           <span>{t.portfolio}</span>
@@ -840,8 +840,8 @@ export const MegaMenuDesktop: React.FC<MegaMenuDesktopProps> = ({
           onClick={() => handleNavigate('blog')}
           className={`px-3 py-2 rounded-xl text-xs font-bold font-sans transition-all duration-150 flex items-center gap-1.5 cursor-pointer ${
             currentPage === 'blog' || activeMenu === 'blogs'
-              ? 'bg-blue-50 dark:bg-neutral-900/80 text-blue-600 dark:text-cyan-400 font-extrabold shadow-xs'
-              : 'text-neutral-750 dark:text-neutral-300 hover:text-blue-600 dark:hover:text-cyan-400 hover:bg-neutral-100/70 dark:hover:bg-neutral-900/50'
+              ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-cyan-400 border border-blue-200/80 dark:border-blue-900/60 font-black shadow-xs'
+              : 'text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-cyan-400 hover:bg-slate-100 dark:hover:bg-slate-800/60'
           }`}
         >
           <span>{t.blogs}</span>

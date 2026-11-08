@@ -23,6 +23,7 @@ const AdminWhatsAppServiceOrders = lazy(() => import('./AdminWhatsAppServiceOrde
 const OrdersManagement = lazy(() => import('./OrdersManagement'));
 const AffiliateSystem = lazy(() => import('./AffiliateSystem'));
 const AdminAdvancedAnalytics = lazy(() => import('./AdminAdvancedAnalytics'));
+const AdminLiveChat = lazy(() => import('./AdminLiveChat'));
 import { AdminReportsSuite } from './AdminReportsSuite';
 import AdminCouponsSuite from './AdminCouponsSuite';
 import AdminMarketingHub from './AdminMarketingHub';
@@ -889,6 +890,7 @@ export default function AdminPanel({
       case 'services': return Layers;
       case 'projects': return FolderOpen;
       case 'support': return HelpCircle;
+      case 'live-chat': return MessageSquare;
       case 'ai-center': return Sparkles;
       case 'affiliates': return DollarSign;
       case 'marketing': return Send;
@@ -956,11 +958,15 @@ export default function AdminPanel({
       case 'tasks': return CheckCircle;
       case 'files': return FileText;
       case 'approvals': return Check;
-      // Support
+      // Support & Live Chat
       case 'support-tickets': return Ticket;
       case 'support-chat': return MessageSquare;
       case 'support-whatsapp': return Phone;
       case 'support-kb': return BookOpen;
+      case 'chat-sessions': return MessageSquare;
+      case 'chat-waiting': return Clock;
+      case 'chat-history': return FileText;
+      case 'chat-settings': return Sliders;
       // AI Center
       case 'ai-blog': return BookOpen;
       case 'ai-content': return Sparkles;
@@ -1293,6 +1299,7 @@ export default function AdminPanel({
       'projects': 'manage_orders',
       'store': 'manage_products',
       'support': 'manage_users',
+      'live-chat': 'manage_users',
       'ai-center': 'manage_content',
       'gemini-chatbot': 'manage_content',
       'affiliates': 'manage_orders',
@@ -3912,6 +3919,12 @@ export default function AdminPanel({
       { id: 'support-whatsapp', label: 'WhatsApp Requests' },
       { id: 'support-kb', label: 'Knowledge Base' }
     ] },
+    { id: 'live-chat', label: '💬 Live Chat System', desc: 'Real-time visitor live chats & responses', submenus: [
+      { id: 'support-chat', label: 'Live Console' },
+      { id: 'chat-sessions', label: 'Active Sessions' },
+      { id: 'chat-waiting', label: 'Waiting Queue' },
+      { id: 'chat-settings', label: 'Chat Settings' }
+    ] },
     { id: 'ai-center', label: '🤖 AI Center', desc: 'Gemini content generator suite', submenus: [
       { id: 'ai-blog', label: 'AI Blog Generator' },
       { id: 'ai-content', label: 'AI Content Generator' },
@@ -4082,6 +4095,32 @@ export default function AdminPanel({
                     {orders.length}
                   </span>
                 )}
+              </button>
+
+              {/* Quick Navigation: Live Chat System */}
+              <button
+                id="header-live-chat-link"
+                onClick={() => {
+                  setActiveMenu('live-chat');
+                  setActiveSubMenu('support-chat');
+                  triggerToast(language === 'bn' ? '💬 লাইভ চ্যাট সাপোর্ট সিস্টেমে প্রবেশ করা হয়েছে' : '💬 Switched to Live Chat Support System');
+                }}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border transition-all cursor-pointer hover:scale-[1.02] active:scale-95 ${
+                  activeMenu === 'live-chat' || (activeMenu === 'support' && activeSubMenu === 'support-chat')
+                    ? 'bg-gradient-to-r from-[#06B6D4] via-[#0284C7] to-[#2563EB] border-transparent text-white shadow-[0_4px_12px_rgba(6,182,212,0.3)]'
+                    : isDark
+                      ? 'bg-white/[0.05] border-white/[0.08] text-neutral-300 hover:bg-white/[0.1] hover:text-white'
+                      : 'bg-slate-50 border-slate-200 text-neutral-750 hover:bg-slate-100 shadow-sm'
+                }`}
+                title="Live Chat Support System"
+              >
+                <MessageSquare className={`w-4 h-4 ${activeMenu === 'live-chat' || (activeMenu === 'support' && activeSubMenu === 'support-chat') ? 'text-white' : 'text-cyan-500 animate-pulse'}`} />
+                <span className="text-xs font-bold hidden sm:inline">
+                  {language === 'bn' ? 'লাইভ চ্যাট' : 'Live Chat'}
+                </span>
+                <span className="flex h-4 items-center justify-center rounded-full text-[9px] font-black px-1.5 leading-none bg-emerald-500 text-white animate-pulse">
+                  Live
+                </span>
               </button>
 
               {/* Quick Navigation: Customers */}
@@ -5112,6 +5151,12 @@ export default function AdminPanel({
                     { id: 'support-chat', label: 'Live Chat' },
                     { id: 'support-whatsapp', label: 'WhatsApp Requests' },
                     { id: 'support-kb', label: 'Knowledge Base' }
+                  ] },
+                  { id: 'live-chat', label: '💬 Live Chat System', desc: 'Real-time visitor live chats & responses', submenus: [
+                    { id: 'support-chat', label: 'Live Console' },
+                    { id: 'chat-sessions', label: 'Active Sessions' },
+                    { id: 'chat-waiting', label: 'Waiting Queue' },
+                    { id: 'chat-settings', label: 'Chat Settings' }
                   ] },
                   { id: 'ai-center', label: '🤖 AI Center', desc: 'Gemini content generator suite', submenus: [
                     { id: 'ai-blog', label: 'AI Blog Generator' },
@@ -7467,8 +7512,20 @@ export default function AdminPanel({
               </Suspense>
             )}
 
-            {/* FALLBACK VIEWPORT: WEBSITE CONTROL CENTER FOR SERVICES, CMS, WEB-SETTINGS, STAFF & SUPPORT */}
-            {['services', 'support', 'ai-center', 'reviews', 'staff', 'notifications', 'web-settings', 'products', 'categories'].includes(activeMenu) && (
+            {/* SCREEN VIEWPORT: LIVE CHAT MANAGEMENT & TAWK.TO CENTER */}
+            {(activeMenu === 'support' || activeSubMenu === 'support-chat' || activeMenu === 'live-chat') && (
+              <Suspense fallback={<div className="p-8 text-center text-xs text-neutral-500">Loading live chat center...</div>}>
+                <AdminLiveChat
+                  language={language}
+                  theme={theme}
+                  triggerToast={triggerToast}
+                  currentUser={currentUser}
+                />
+              </Suspense>
+            )}
+
+            {/* FALLBACK VIEWPORT: WEBSITE CONTROL CENTER FOR SERVICES, CMS, WEB-SETTINGS, STAFF */}
+            {['services', 'ai-center', 'reviews', 'staff', 'notifications', 'web-settings', 'products', 'categories'].includes(activeMenu) && activeSubMenu !== 'support-chat' && (
               <Suspense fallback={<div className="p-8 text-center text-xs text-neutral-500">Loading control center...</div>}>
                 <WebsiteControlCenter
                   language={language}

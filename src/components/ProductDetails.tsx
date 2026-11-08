@@ -31,6 +31,7 @@ interface ProductDetailsProps {
   setOrders: React.Dispatch<React.SetStateAction<any[]>>;
   currencyRates?: any;
   onViewProduct?: (product: Product) => void;
+  onQuickBuy?: (product: Product, eventOrOrigin?: any) => void;
 }
 
 export default function ProductDetails({
@@ -51,7 +52,8 @@ export default function ProductDetails({
   orders,
   setOrders,
   currencyRates,
-  onViewProduct
+  onViewProduct,
+  onQuickBuy
 }: ProductDetailsProps) {
 
   const isDark = theme === 'dark';
@@ -68,6 +70,7 @@ export default function ProductDetails({
   const [faqSearch, setFaqSearch] = useState<string>('');
   const [activeFaqIdx, setActiveFaqIdx] = useState<number | null>(null);
   const [showSharePanel, setShowSharePanel] = useState<boolean>(false);
+  const [isWishlistPulsing, setIsWishlistPulsing] = useState<boolean>(false);
   
   const [firestoreReviews, setFirestoreReviews] = useState<any[]>([]);
 
@@ -834,6 +837,40 @@ export default function ProductDetails({
                   </span>
                 )}
               </div>
+
+              {/* Wishlist Heart on Gallery Top-Right */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const isAdding = !wishlist.includes(product.id);
+                  if (isAdding) {
+                    setIsWishlistPulsing(true);
+                    setTimeout(() => setIsWishlistPulsing(false), 850);
+                  }
+                  toggleWishlist(product.id);
+                }}
+                className={`absolute top-4 right-4 p-2.5 rounded-2xl backdrop-blur-md border shadow-lg transition-all duration-150 cursor-pointer z-20 active:scale-90 ${
+                  wishlist.includes(product.id)
+                    ? 'bg-rose-50/95 dark:bg-rose-950/90 border-rose-300 dark:border-rose-900 text-rose-500'
+                    : 'bg-white/90 dark:bg-slate-900/80 border-slate-200 dark:border-slate-800 text-slate-500 hover:text-rose-500 hover:scale-105'
+                }`}
+                title={wishlist.includes(product.id) ? 'Remove from wishlist' : 'Add to wishlist'}
+                aria-label={wishlist.includes(product.id) ? 'Remove from wishlist' : 'Add to wishlist'}
+              >
+                {isWishlistPulsing && (
+                  <span aria-hidden="true" className="absolute inset-0 rounded-2xl bg-rose-500/35 animate-heart-ring pointer-events-none" />
+                )}
+                <Heart 
+                  className={`w-5 h-5 transition-colors duration-200 ${
+                    isWishlistPulsing
+                      ? 'fill-rose-500 text-rose-500 animate-heart-pulse drop-shadow-[0_0_6px_rgba(244,63,94,0.7)]'
+                      : wishlist.includes(product.id)
+                        ? 'fill-rose-500 text-rose-500'
+                        : 'fill-transparent'
+                  }`} 
+                />
+              </button>
 
               {/* Zoom guide indicator */}
               <div className="absolute bottom-4 right-4 px-2.5 py-1 bg-slate-900/80 backdrop-blur-sm text-[10px] text-slate-400 rounded-lg border border-white/5 font-mono pointer-events-none group-hover:opacity-0 transition-opacity">

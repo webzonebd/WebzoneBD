@@ -36,9 +36,18 @@ import {
   SlidersHorizontal,
   Activity,
   Award,
-  BookOpen
+  BookOpen,
+  Mail
 } from 'lucide-react';
 import { Order, Language } from '../types';
+import {
+  formatOrderSummary,
+  generateReceiptHtml,
+  generateReceiptPlainText,
+  simulateSendOrderReceiptEmail,
+  FormattedOrderSummary,
+  EmailReceiptDispatchResult
+} from '../utils/orderReceipt';
 
 interface OrdersManagementProps {
   orders: Order[];
@@ -107,9 +116,16 @@ export default function OrdersManagement({
 
   // Detail Drawer and interactive dialog states
   const [inspectingOrder, setInspectingOrder] = useState<Order | null>(null);
-  const [drawerActiveTab, setDrawerActiveTab] = useState<'details' | 'timeline' | 'invoice' | 'logs'>('details');
+  const [drawerActiveTab, setDrawerActiveTab] = useState<'details' | 'timeline' | 'invoice' | 'receipt' | 'logs'>('details');
   const [newOrderNote, setNewOrderNote] = useState('');
   const [customLogs, setCustomLogs] = useState<{ [orderId: string]: any[] }>({});
+
+  // Email receipt trigger and simulation modal states
+  const [selectedOrderForEmailReceipt, setSelectedOrderForEmailReceipt] = useState<Order | null>(null);
+  const [emailReceiptSending, setEmailReceiptSending] = useState(false);
+  const [emailReceiptTargetEmail, setEmailReceiptTargetEmail] = useState('');
+  const [emailReceiptViewMode, setEmailReceiptViewMode] = useState<'preview' | 'html' | 'text'>('preview');
+  const [emailReceiptResult, setEmailReceiptResult] = useState<EmailReceiptDispatchResult | null>(null);
 
   // Confirmation state
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -353,6 +369,38 @@ export default function OrdersManagement({
     window.open(`https://wa.me/${sanitized}?text=${message}`, '_blank');
   };
 
+  // Dedicated trigger for simulated HTML order confirmation email receipt
+  const handleTriggerEmailReceipt = async (order: Order, overrideEmail?: string) => {
+    setEmailReceiptSending(true);
+    try {
+      const cust = resolveCustomer(order);
+      const targetEmail = overrideEmail || emailReceiptTargetEmail || cust.email;
+      
+      const result = await simulateSendOrderReceiptEmail(order, {
+        customerName: cust.name,
+        customerEmail: targetEmail,
+        customerPhone: cust.phone,
+        author: currentUser?.name || 'Order Processing Workflow',
+        currency: 'USD'
+      });
+
+      setEmailReceiptResult(result);
+
+      // Append log entry to order's activity timeline
+      setCustomLogs(prev => ({
+        ...prev,
+        [order.id]: [result.auditLogItem, ...(prev[order.id] || getOrderLogs(order.id))]
+      }));
+
+      triggerToast(`📧 Live confirmation receipt simulated & dispatched to ${targetEmail}!`);
+    } catch (err) {
+      console.error('Email receipt trigger failed', err);
+      triggerToast('⚠️ Failed to simulate email receipt dispatch.');
+    } finally {
+      setEmailReceiptSending(false);
+    }
+  };
+
   // Generate simulated dynamic logs
   const getOrderLogs = (orderId: string) => {
     if (customLogs[orderId]) return customLogs[orderId];
@@ -418,6 +466,25 @@ export default function OrdersManagement({
       let toastMsg = '';
       if (status === 'completed') {
         toastMsg = `💳 Invoice #${getOrderSerial(orderId)} marked as PAID`;
+        
+        // Automated Email Receipt trigger in order processing workflow upon successful payment verification
+        const orderObj = orders.find(o => o.id === orderId);
+        if (orderObj) {
+          const cust = resolveCustomer(orderObj);
+          simulateSendOrderReceiptEmail(orderObj, {
+            customerName: cust.name,
+            customerEmail: cust.email,
+            customerPhone: cust.phone,
+            author: currentUser?.name || 'Payment Verification Workflow',
+            currency: 'USD'
+          }).then(res => {
+            setCustomLogs(prev => ({
+              ...prev,
+              [orderId]: [res.auditLogItem, ...(prev[orderId] || getOrderLogs(orderId))]
+            }));
+            triggerToast(`📧 Payment verified! HTML email receipt dispatched to ${cust.email}`);
+          }).catch(console.error);
+        }
       } else if (status === 'refunded') {
         toastMsg = `💳 Invoice #${getOrderSerial(orderId)} marked as REFUNDED`;
       } else {
@@ -1540,6 +1607,21 @@ export default function OrdersManagement({
                                   <span>WhatsApp Message</span>
                                 </button>
 
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const cust = resolveCustomer(o);
+                                    setEmailReceiptTargetEmail(cust.email);
+                                    setSelectedOrderForEmailReceipt(o);
+                                    setEmailReceiptResult(null);
+                                    setActiveRowMenuId(null);
+                                  }}
+                                  className="w-full text-left text-xs px-2.5 py-2 rounded-lg hover:bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 flex items-center gap-2 cursor-pointer font-bold transition-colors"
+                                >
+                                  <Mail className="w-3.5 h-3.5" />
+                                  <span>Email Receipt</span>
+                                </button>
+
                                 {/* Restrict edit options for Staff users according to permissions schema */}
                                 {!isStaffViewOnly && (
                                   <>
@@ -1943,6 +2025,21 @@ export default function OrdersManagement({
                   >
                     📄 Invoice Live Preview
                   </button>
+                  <button
+                    onClick={() => {
+                      setDrawerActiveTab('receipt');
+                      if (inspectingOrder) {
+                        const cust = resolveCustomer(inspectingOrder);
+                        setEmailReceiptTargetEmail(cust.email);
+                      }
+                    }}
+                    className={`py-3.5 border-b-2 transition-all flex items-center gap-1.5 ${
+                      drawerActiveTab === 'receipt' ? 'border-cyan-500 text-cyan-400' : 'border-transparent hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    <Mail className="w-3.5 h-3.5" />
+                    <span>📧 Email Receipt Trigger</span>
+                  </button>
                 </div>
 
                 {/* Middle scrollable area */}
@@ -2175,6 +2272,126 @@ export default function OrdersManagement({
                       </div>
                     </div>
                   )}
+
+                  {drawerActiveTab === 'receipt' && (() => {
+                    const activeSummary = formatOrderSummary(inspectingOrder, {
+                      customerName: cust.name,
+                      customerEmail: emailReceiptTargetEmail || cust.email,
+                      customerPhone: cust.phone,
+                      currency: 'USD'
+                    });
+                    const receiptHtml = generateReceiptHtml(activeSummary);
+                    const receiptPlain = generateReceiptPlainText(activeSummary);
+
+                    return (
+                      <div className="h-full min-h-[480px] flex flex-col space-y-4 animate-in fade-in duration-200 text-left">
+                        {/* Control header bar */}
+                        <div className="p-4 rounded-2xl border bg-slate-50 dark:bg-white/[0.02] border-slate-200 dark:border-white/[0.08] space-y-3">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div>
+                              <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest font-mono block">
+                                Trigger Order Email Receipt Workflow
+                              </span>
+                              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                Formats order summary using utilities & simulates client HTML confirmation email transmission.
+                              </p>
+                            </div>
+
+                            <button
+                              type="button"
+                              disabled={emailReceiptSending}
+                              onClick={() => handleTriggerEmailReceipt(inspectingOrder, emailReceiptTargetEmail || cust.email)}
+                              className="px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer transition shadow-md shadow-cyan-500/20 active:scale-95 shrink-0"
+                            >
+                              {emailReceiptSending ? (
+                                <>
+                                  <motion.div
+                                    animate={{ rotate: 360 }}
+                                    transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+                                    className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full"
+                                  />
+                                  <span>Simulating Dispatch...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Send className="w-3.5 h-3.5" />
+                                  <span>Trigger Email Receipt</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+
+                          {/* Recipient Target Input & Meta */}
+                          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 pt-2 border-t border-slate-200 dark:border-white/[0.06] text-xs">
+                            <div className="flex items-center gap-2 w-full sm:w-auto flex-1">
+                              <span className="text-slate-400 text-[11px] font-semibold">Recipient:</span>
+                              <input
+                                type="email"
+                                value={emailReceiptTargetEmail || cust.email}
+                                onChange={(e) => setEmailReceiptTargetEmail(e.target.value)}
+                                placeholder="customer@example.com"
+                                className="flex-1 px-2.5 py-1 text-xs rounded-lg border bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 font-mono text-slate-800 dark:text-slate-200 focus:outline-none focus:border-cyan-500"
+                              />
+                            </div>
+
+                            {/* View switcher */}
+                            <div className="flex items-center gap-1 bg-slate-200 dark:bg-white/[0.05] p-0.5 rounded-lg text-[11px]">
+                              <button
+                                type="button"
+                                onClick={() => setEmailReceiptViewMode('preview')}
+                                className={`px-2.5 py-1 rounded-md font-bold transition ${
+                                  emailReceiptViewMode === 'preview'
+                                    ? 'bg-white dark:bg-slate-800 text-cyan-500 shadow-xs'
+                                    : 'text-slate-500 hover:text-slate-800 dark:hover:text-white'
+                                }`}
+                              >
+                                HTML Preview
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEmailReceiptViewMode('text')}
+                                className={`px-2.5 py-1 rounded-md font-bold transition ${
+                                  emailReceiptViewMode === 'text'
+                                    ? 'bg-white dark:bg-slate-800 text-cyan-500 shadow-xs'
+                                    : 'text-slate-500 hover:text-slate-800 dark:hover:text-white'
+                                }`}
+                              >
+                                Plain Text
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Transmission status feedback indicator */}
+                          {emailReceiptResult && (
+                            <div className="mt-2 p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <CheckCircle className="w-4 h-4 text-emerald-400" />
+                                <span>
+                                  Dispatched to <strong>{emailReceiptResult.recipientEmail}</strong> via {emailReceiptResult.details?.deliveryChannel || 'Simulated SMTP Relay'}
+                                </span>
+                              </div>
+                              <span className="font-mono text-[10px] opacity-75">{emailReceiptResult.receiptNumber}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Interactive Viewer Body */}
+                        <div className="flex-1 rounded-2xl overflow-hidden border border-slate-200 dark:border-white/[0.08] min-h-[420px] bg-white relative">
+                          {emailReceiptViewMode === 'preview' ? (
+                            <iframe
+                              title="Live HTML Email Receipt Preview"
+                              srcDoc={receiptHtml}
+                              className="w-full h-full min-h-[420px] bg-slate-900 border-0"
+                            />
+                          ) : (
+                            <pre className="p-4 text-xs font-mono bg-slate-950 text-emerald-400 whitespace-pre-wrap overflow-x-auto h-full min-h-[420px]">
+                              {receiptPlain}
+                            </pre>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Footer action tools */}
@@ -2188,6 +2405,20 @@ export default function OrdersManagement({
                     }`}
                   >
                     Close Drawer
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const cust = resolveCustomer(inspectingOrder);
+                      setEmailReceiptTargetEmail(cust.email);
+                      setSelectedOrderForEmailReceipt(inspectingOrder);
+                      setEmailReceiptResult(null);
+                    }}
+                    className="px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-md shadow-cyan-500/20 active:scale-95"
+                  >
+                    <Mail className="w-3.5 h-3.5" />
+                    <span>Email Receipt</span>
                   </button>
 
                   <button
@@ -2277,6 +2508,197 @@ export default function OrdersManagement({
             </motion.div>
           </div>
         )}
+      </AnimatePresence>
+
+      {/* DEDICATED EMAIL RECEIPT WORKFLOW MODAL */}
+      <AnimatePresence>
+        {selectedOrderForEmailReceipt && (() => {
+          const cust = resolveCustomer(selectedOrderForEmailReceipt);
+          const activeSummary = formatOrderSummary(selectedOrderForEmailReceipt, {
+            customerName: cust.name,
+            customerEmail: emailReceiptTargetEmail || cust.email,
+            customerPhone: cust.phone,
+            currency: 'USD'
+          });
+          const receiptHtml = generateReceiptHtml(activeSummary);
+          const receiptPlain = generateReceiptPlainText(activeSummary);
+
+          return (
+            <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
+              {/* Overlay backdrop */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setSelectedOrderForEmailReceipt(null)}
+                className="absolute inset-0 bg-neutral-950/70 backdrop-blur-md"
+              />
+
+              {/* Modal Card */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 15 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 15 }}
+                transition={{ duration: 0.22, ease: "easeOut" }}
+                className={`relative max-w-3xl w-full max-h-[90vh] rounded-[24px] border shadow-[0_25px_60px_rgba(0,0,0,0.5)] flex flex-col text-left overflow-hidden ${
+                  isDark ? 'bg-[#0F172A] border-white/[0.1] text-white' : 'bg-white border-slate-200 text-slate-900'
+                }`}
+              >
+                {/* Specular Top Bar Accent */}
+                <div className="absolute top-0 left-0 right-0 h-[4px] bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-500" />
+
+                {/* Modal Header */}
+                <div className="p-5 border-b border-slate-100 dark:border-white/[0.08] flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/25 flex items-center justify-center text-cyan-400">
+                      <Mail className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-base font-black tracking-tight">Order Email Receipt Trigger</h3>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                          {activeSummary.receiptNumber}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        Verified payment receipt confirmation workflow & client HTML preview
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedOrderForEmailReceipt(null)}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-800 dark:hover:text-white transition"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Subheader controls */}
+                <div className="px-5 py-3 border-b border-slate-100 dark:border-white/[0.06] bg-slate-50/50 dark:bg-white/[0.02] flex flex-wrap items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2 flex-1 min-w-[240px]">
+                    <span className="text-slate-400 font-semibold text-[11px]">Send to:</span>
+                    <input
+                      type="email"
+                      value={emailReceiptTargetEmail || cust.email}
+                      onChange={(e) => setEmailReceiptTargetEmail(e.target.value)}
+                      placeholder="client@example.com"
+                      className="flex-1 max-w-sm px-2.5 py-1 text-xs rounded-lg border bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 font-mono text-slate-800 dark:text-slate-200 focus:outline-none focus:border-cyan-500"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center bg-slate-200 dark:bg-white/[0.06] p-0.5 rounded-lg text-[11px]">
+                      <button
+                        type="button"
+                        onClick={() => setEmailReceiptViewMode('preview')}
+                        className={`px-3 py-1 rounded-md font-bold transition ${
+                          emailReceiptViewMode === 'preview'
+                            ? 'bg-white dark:bg-slate-800 text-cyan-500 shadow-xs'
+                            : 'text-slate-500 hover:text-slate-800 dark:hover:text-white'
+                        }`}
+                      >
+                        HTML Preview
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEmailReceiptViewMode('text')}
+                        className={`px-3 py-1 rounded-md font-bold transition ${
+                          emailReceiptViewMode === 'text'
+                            ? 'bg-white dark:bg-slate-800 text-cyan-500 shadow-xs'
+                            : 'text-slate-500 hover:text-slate-800 dark:hover:text-white'
+                        }`}
+                      >
+                        Plain Text
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={emailReceiptSending}
+                      onClick={() => handleTriggerEmailReceipt(selectedOrderForEmailReceipt, emailReceiptTargetEmail || cust.email)}
+                      className="px-4 py-1.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition shadow-md shadow-cyan-500/20 active:scale-95"
+                    >
+                      {emailReceiptSending ? (
+                        <>
+                          <motion.div
+                            animate={{ rotate: 360 }}
+                            transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+                            className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full"
+                          />
+                          <span>Simulating...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Send className="w-3.5 h-3.5" />
+                          <span>Simulate Send Email</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Transmission outcome notification if sent */}
+                {emailReceiptResult && (
+                  <div className="mx-5 mt-3 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="w-4 h-4 text-emerald-400" />
+                      <span>
+                        HTML Receipt simulated and sent to <strong>{emailReceiptResult.recipientEmail}</strong> via {emailReceiptResult.details?.deliveryChannel || 'Simulated SMTP Engine'}
+                      </span>
+                    </div>
+                    <span className="font-mono text-[11px] opacity-80">{emailReceiptResult.timestamp}</span>
+                  </div>
+                )}
+
+                {/* Modal Main Preview Viewport */}
+                <div className="flex-1 overflow-hidden p-5 min-h-[400px]">
+                  <div className="w-full h-[460px] rounded-2xl overflow-hidden border border-slate-200 dark:border-white/[0.08] bg-white">
+                    {emailReceiptViewMode === 'preview' ? (
+                      <iframe
+                        title="HTML Order Confirmation Receipt"
+                        srcDoc={receiptHtml}
+                        className="w-full h-full bg-slate-900 border-0"
+                      />
+                    ) : (
+                      <pre className="p-4 text-xs font-mono bg-slate-950 text-emerald-400 whitespace-pre-wrap overflow-y-auto h-full">
+                        {receiptPlain}
+                      </pre>
+                    )}
+                  </div>
+                </div>
+
+                {/* Footer Controls */}
+                <div className="p-4 border-t border-slate-100 dark:border-white/[0.08] bg-slate-50/50 dark:bg-white/[0.01] flex items-center justify-between text-xs">
+                  <div className="text-slate-400 font-mono text-[11px]">
+                    Status: <span className="text-emerald-400 font-bold">✓ PAYMENT VERIFIED</span> &bull; TrxID: {activeSummary.transactionId}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(receiptHtml);
+                        triggerToast('📋 HTML template copied to clipboard!');
+                      }}
+                      className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-white/[0.1] text-slate-300 hover:text-white text-xs font-semibold cursor-pointer"
+                    >
+                      Copy HTML Code
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedOrderForEmailReceipt(null)}
+                      className="px-4 py-1.5 bg-slate-200 dark:bg-white/[0.08] hover:bg-slate-300 dark:hover:bg-white/[0.12] rounded-lg text-xs font-bold cursor-pointer"
+                    >
+                      Close Window
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          );
+        })()}
       </AnimatePresence>
 
     </div>

@@ -2,12 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { 
   X, Mail, Lock, Eye, EyeOff, User, Phone, CheckCircle2, 
   Smartphone, ShieldCheck, Sparkles, RefreshCw, Key, ArrowRight,
-  ShieldAlert, Activity, AlertCircle, Sparkles as SparklesIcon,
+  ShieldAlert, Activity, AlertCircle,
   Check, Info, ChevronRight, CornerDownRight, ExternalLink
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Language, Theme, UserSession, UserRole, Currency } from '../types';
-import { PRESEEDED_USERS } from './AuthSystem';
+import { PRESEEDED_USERS } from '../data/preseededUsers';
 import { auth as firebaseAuth, db as firebaseDb, handleFirestoreError, OperationType } from '../firebase';
 import { 
   signInWithPopup, 

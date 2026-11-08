@@ -1,5 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Globe, Mail, Phone, MapPin, Send, ExternalLink, ShieldCheck, Newspaper, Briefcase, Store, Server, Users, Lock, FileText, RefreshCcw, Terminal, Flame } from 'lucide-react';
+import { 
+  Globe, Mail, Phone, MapPin, Send, ExternalLink, ShieldCheck, Newspaper, 
+  Briefcase, Store, Server, Users, Lock, FileText, RefreshCcw, Terminal, 
+  Flame, Smartphone, ChevronRight, MessageSquare, Shield, CheckCircle,
+  Facebook, Linkedin, Youtube, ArrowRight, Sparkles, Check
+} from 'lucide-react';
 import { Language, Theme, UserSession } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -176,41 +181,408 @@ export default function Footer({
       aboutTitle: "WebzoneBD IT Agency",
       aboutDesc: "Starting a new business or growing an existing one? WebzoneBD IT Agency provides complete IT and digital services including website development, eCommerce, software solutions, branding, SEO, digital marketing, hosting, and technical support to help your business grow faster and smarter.",
       quickTitle: "Quick Navigation",
+      hostingTitle: "Hosting & Cloud",
+      solutionsTitle: "Digital Solutions",
       legalTitle: "Contract Terms",
       newsTitle: "Digital Weekly Newsletter",
       newsDesc: "Get coupon alerts and PHP scripts updates.",
-      placeholder: "Your Email Address",
+      newsBannerTitle: "Stay Ahead in Tech & Cloud Hosting",
+      newsBannerDesc: "Subscribe to receive monthly promo codes, new script releases, and expert IT tips directly to your mailbox.",
+      newsBannerBadge: "EXCLUSIVE COMMUNITY HUB",
+      newsTrust: "100% Privacy Protected · Zero Spam Guarantee · 1-Click Unsubscribe",
+      placeholder: "Enter your business email address...",
       subscribe: "Subscribe",
-      rights: "© 2026 WebzoneBD IT Agency. All Rights Reserved. Trusted on Cloud Run."
+      rights: "© 2026 WebzoneBD IT Agency. All Rights Reserved. Trusted on Cloud Run.",
+      officeDhaka: "Mirpur DOHS, Dhaka-1216, Bangladesh",
+      officeRiyadh: "Olaya Street, Riyadh, Saudi Arabia",
+      liveStatus: "Cloud Infrastructure: 100% Operational (14ms)"
     },
     bn: {
       aboutTitle: "ওয়েবজোনবিডি আইটি এজেন্সি",
       aboutDesc: "নতুন ব্যবসা শুরু করছেন বা চলমান ব্যবসা বাড়াতে চান? ওয়েবজোনবিডি আইটি এজেন্সি দিচ্ছে ওয়েবসাইট ডেভেলপমেন্ট, ই-কমার্স, সফটওয়্যার সলিউশন, ব্র্যান্ডিং, এসইও, ডিজিটাল মার্কেটিং, হোস্টিং এবং টেকনিক্যাল সাপোর্ট সহ সম্পূর্ণ আইটি ও ডিজিটাল সেবা, যা আপনার ব্যবসাকে দ্রুত এবং স্মার্টভাবে এগিয়ে নিতে সাহায্য করবে।",
       quickTitle: "সহজ লিংকসমূহ",
+      hostingTitle: "হোস্টিং ও ক্লাউড",
+      solutionsTitle: "ডিজিটাল সলিউশনস",
       legalTitle: "শর্তাবলী ও পলিসি",
       newsTitle: "উপযোগী নিউজলেটার",
       newsDesc: "নতুন স্ক্রিপ্ট এর রিলিজ এবং কুপন অফারগুলো ইমেইল এর মাধ্যমে ফ্রিতে পান।",
-      placeholder: "আপনার ইমেইল অ্যাড্রেস লিখুন",
-      subscribe: "সাবস্ক্রাইব",
-      rights: "© ২০২৬ ওয়েবজোনবিডি আইটি এজেন্সি। সর্বস্বত্ব সংরক্ষিত।"
+      newsBannerTitle: "প্রযুক্তি ও ক্লাউড হোস্টিংয়ে এগিয়ে থাকুন",
+      newsBannerDesc: "সাপ্তাহিক স্পেশাল ডিসকাউন্ট কুপন, নতুন স্ক্রিপ্ট রিলিজ ও ক্লাউড টিপস সরাসরি আপনার ইনবক্সে পেতে সাবস্ক্রাইব করুন।",
+      newsBannerBadge: "এক্সক্লুসিভ কমিউনিটি হাব",
+      newsTrust: "১০০% প্রাইভেসি সুরক্ষিত · কোনো স্প্যাম পাঠানো হবে না · যেকোনো সময় আনসাবস্ক্রাইবযোগ্য",
+      placeholder: "আপনার অফিসিয়াল ইমেইল লিখুন...",
+      subscribe: "সাবস্ক্রাইব করুন",
+      rights: "© ২০২৬ ওয়েবজোনবিডি আইটি এজেন্সি। সর্বস্বত্ব সংরক্ষিত।",
+      officeDhaka: "মিরপুর ডিওএইচএস, ঢাকা-১২১৬, বাংলাদেশ",
+      officeRiyadh: "ওলাইয়া স্ট্রিট, রিয়াদ, সৌদি আরব",
+      liveStatus: "ক্লাউড নেটওয়ার্ক: ১০০% সক্রিয় ও দ্রুততম (১৪ms)"
     },
     ar: {
       aboutTitle: "وكالة ويب زون بي دي لتقنية المعلومات",
       aboutDesc: "هل تبدأ مشروعاً جديداً أم تطور مشروعاً قائماً؟ تقدم وكالة ويب زون بي دي لتقنية المعلومات خدمات رقمية وتكنولوجية متكاملة تشمل تطوير المواقع، التجارة الإلكترونية، البرمجيات، الهوية البصرية، السيو، التسويق الرقمي، الاستضافة والدعم الفني لمساعدتك على النمو بشكل أسرع وأذكى.",
       quickTitle: "روابط التنقل السريعة",
+      hostingTitle: "الاستضافة والسحاب",
+      solutionsTitle: "الحلول الرقمية",
       legalTitle: "الخصوصية والترخيص",
       newsTitle: "النشرة البريدية الرقمية",
       newsDesc: "احصل على بوابات الخصم والتحديثات البرمجية الفورية.",
-      placeholder: "البريد الإلكتروني الكريم...",
+      newsBannerTitle: "ابق في صدارة التكنولوجيا والاستضافة السحابية",
+      newsBannerDesc: "اشترك للحصول على تنبيهات الخصم وإصدارات الاسكربتات الجديدة مباشرة إلى بريدك الإلكتروني.",
+      newsBannerBadge: "مجتمع المطورين والشركات",
+      newsTrust: "حماية الخصوصية 100% · لا توجد رسائل عشوائية · إلغاء الاشتراك بنقرة واحدة",
+      placeholder: "أدخل بريدك الإلكتروني التجاري...",
       subscribe: "اشتراك مجاني",
-      rights: "© 2026 WebzoneBD IT Agency. All Rights Reserved. Trusted on Cloud Run."
+      rights: "© 2026 WebzoneBD IT Agency. All Rights Reserved. Trusted on Cloud Run.",
+      officeDhaka: "ميربور، دكا-1216، بنغلاديش",
+      officeRiyadh: "شارع العليا، الرياض، المملكة العربية السعودية",
+      liveStatus: "البنية التحتية السحابية: جاهزة 100% (14 مللي ثانية)"
     }
   }[language];
 
   return (
-    <footer className="bg-neutral-900 text-neutral-400 py-6 sm:py-12 border-t border-neutral-800" id="agency-footer">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-8">
+    <footer className="bg-neutral-900 text-neutral-400 py-6 sm:py-12 lg:py-16 border-t border-neutral-800" id="agency-footer">
+      <div className="max-w-7xl 2xl:max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
+        
+        {/* DESKTOP-ONLY: Premium Pre-Footer Newsletter & Community Banner ("fild") */}
+        <div className="hidden lg:flex items-center justify-between p-6 xl:p-8 mb-12 rounded-3xl bg-gradient-to-r from-neutral-950 via-[#0B1120] to-neutral-950 border border-neutral-800/90 shadow-2xl relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute bottom-0 left-0 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+          
+          <div className="relative z-10 max-w-xl text-left space-y-2">
+            <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[10px] font-mono font-bold uppercase tracking-wider">
+              <Sparkles className="w-3 h-3 text-cyan-400 animate-pulse" />
+              <span>{t.newsBannerBadge}</span>
+            </div>
+            <h3 className="text-xl xl:text-2xl font-black text-white tracking-tight">
+              {t.newsBannerTitle}
+            </h3>
+            <p className="text-xs xl:text-sm text-neutral-400 leading-relaxed">
+              {t.newsBannerDesc}
+            </p>
+            <div className="flex items-center gap-3 pt-1 text-[11px] text-neutral-400 font-mono">
+              <span className="flex items-center gap-1 text-emerald-400">
+                <Check className="w-3.5 h-3.5" /> 100% Privacy
+              </span>
+              <span>•</span>
+              <span className="flex items-center gap-1 text-cyan-400">
+                <ShieldCheck className="w-3.5 h-3.5" /> No Spam
+              </span>
+              <span>•</span>
+              <span className="text-neutral-400">
+                Instant Unsubscribe
+              </span>
+            </div>
+          </div>
+
+          {/* Desktop Newsletter Input Field */}
+          <div className="relative z-10 w-full max-w-md xl:max-w-lg">
+            <form onSubmit={handleNewsletterSubmit} className="flex items-center gap-2 p-1.5 rounded-2xl bg-neutral-900/90 border border-neutral-700/80 focus-within:border-blue-500/80 focus-within:ring-2 focus-within:ring-blue-500/20 shadow-xl transition-all">
+              <div className="flex-1 flex items-center pl-3">
+                <Mail className="w-4 h-4 text-neutral-400 shrink-0" />
+                <input
+                  type="email"
+                  required
+                  name="email"
+                  placeholder={t.placeholder}
+                  className="w-full bg-transparent border-0 px-3 py-2.5 text-xs xl:text-sm text-white placeholder-neutral-500 focus:outline-none"
+                />
+              </div>
+              <button
+                type="submit"
+                className="px-5 xl:px-6 py-2.5 xl:py-3 bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all duration-200 cursor-pointer shadow-md shadow-blue-500/25 active:scale-95 flex items-center gap-1.5 shrink-0"
+              >
+                <span>{t.subscribe}</span>
+                <Send className="w-3.5 h-3.5" />
+              </button>
+            </form>
+          </div>
+        </div>
+
+        {/* DESKTOP-ONLY: Comprehensive 5-Column Enterprise Layout */}
+        <div className="hidden lg:grid grid-cols-5 gap-8 xl:gap-10 pb-10 text-left">
+          {/* Column 1: WebzoneBD IT Agency Brand & Identity */}
+          <div className="space-y-4">
+            <div 
+              className="flex items-center space-x-2.5 cursor-pointer select-none"
+              onClick={() => { setCurrentPage('home'); window.scrollTo(0, 0); }}
+            >
+              <div className="p-2 bg-gradient-to-tr from-blue-600 to-cyan-500 rounded-xl text-white shadow-md shadow-blue-500/20">
+                <Globe className="h-5 w-5 stroke-[2.5]" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-base font-black tracking-tight bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
+                  WebzoneBD
+                </span>
+                <span className="text-[8px] uppercase tracking-widest font-mono text-neutral-400 font-bold">
+                  IT Agency
+                </span>
+              </div>
+            </div>
+            <p className="text-xs leading-relaxed text-neutral-400">
+              {t.aboutDesc}
+            </p>
+            
+            {/* Corporate Address & Contact Details */}
+            <div className="space-y-2 pt-2 border-t border-neutral-800 text-xs text-neutral-400">
+              <div className="flex items-start gap-2">
+                <MapPin className="w-3.5 h-3.5 text-blue-400 shrink-0 mt-0.5" />
+                <span>{t.officeDhaka}</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <MapPin className="w-3.5 h-3.5 text-cyan-400 shrink-0 mt-0.5" />
+                <span>{t.officeRiyadh}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Smartphone className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <a href="https://wa.me/966570511931" target="_blank" rel="noopener noreferrer" className="hover:text-emerald-400 transition font-mono">
+                  +966 570511931 (WhatsApp)
+                </a>
+              </div>
+              <div className="flex items-center gap-2">
+                <Mail className="w-3.5 h-3.5 text-violet-400 shrink-0" />
+                <a href="mailto:info@webzonebd.com" className="hover:text-cyan-400 transition font-mono">
+                  info@webzonebd.com
+                </a>
+              </div>
+            </div>
+
+            {/* Social Network Buttons */}
+            <div className="flex items-center gap-2 pt-2">
+              <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" className="p-2 rounded-lg bg-neutral-800/80 hover:bg-blue-600 text-neutral-400 hover:text-white transition-all shadow-xs" aria-label="Facebook">
+                <Facebook className="w-3.5 h-3.5" />
+              </a>
+              <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer" className="p-2 rounded-lg bg-neutral-800/80 hover:bg-blue-500 text-neutral-400 hover:text-white transition-all shadow-xs" aria-label="LinkedIn">
+                <Linkedin className="w-3.5 h-3.5" />
+              </a>
+              <a href="https://youtube.com" target="_blank" rel="noopener noreferrer" className="p-2 rounded-lg bg-neutral-800/80 hover:bg-rose-600 text-neutral-400 hover:text-white transition-all shadow-xs" aria-label="YouTube">
+                <Youtube className="w-3.5 h-3.5" />
+              </a>
+            </div>
+          </div>
+
+          {/* Column 2: Web Hosting & Cloud Servers */}
+          <div className="space-y-4">
+            <h4 className="text-white text-xs font-black uppercase font-mono tracking-wider border-b border-neutral-800 pb-2 flex items-center gap-1.5">
+              <Server className="w-3.5 h-3.5 text-cyan-400" />
+              <span>{t.hostingTitle}</span>
+            </h4>
+            <ul className="space-y-2.5 text-xs font-semibold">
+              {[
+                { label: language === 'bn' ? "BDIX লো-লেটেন্সি হোস্টিং" : "BDIX Turbo Hosting", onClick: () => { setCurrentPage('hosting'); window.scrollTo(0, 0); } },
+                { label: language === 'bn' ? "টার্বো ক্লাউড VPS সার্ভার" : "NVMe Turbo Cloud VPS", onClick: () => { setCurrentPage('hosting'); window.scrollTo(0, 0); } },
+                { label: language === 'bn' ? "ডেডিকেটেড এন্টারপ্রাইজ সার্ভার" : "Dedicated Cloud Servers", onClick: () => { setCurrentPage('hosting'); window.scrollTo(0, 0); } },
+                { label: language === 'bn' ? "রিসেলার cPanel হোস্টিং" : "Reseller WHM Hosting", onClick: () => { setCurrentPage('hosting'); window.scrollTo(0, 0); } },
+                { label: language === 'bn' ? "ওয়ার্ডপ্রেস স্পিড বুস্টার" : "WordPress Optimized Turbo", onClick: () => { setCurrentPage('hosting'); window.scrollTo(0, 0); } },
+                { label: language === 'bn' ? "ফ্রি SSL ও ডেইলি ব্যাকআপ" : "Free SSL & Daily Cloud Backup", onClick: () => { setCurrentPage('hosting'); window.scrollTo(0, 0); } }
+              ].map((item, i) => (
+                <li key={i}>
+                  <button onClick={item.onClick} className="hover:text-cyan-400 transition flex items-center gap-1.5 cursor-pointer text-neutral-300 group">
+                    <ChevronRight className="w-3 h-3 opacity-40 group-hover:opacity-100 group-hover:translate-x-0.5 text-cyan-400 transition" />
+                    <span>{item.label}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Column 3: Domains & Software Solutions */}
+          <div className="space-y-4">
+            <h4 className="text-white text-xs font-black uppercase font-mono tracking-wider border-b border-neutral-800 pb-2 flex items-center gap-1.5">
+              <Briefcase className="w-3.5 h-3.5 text-emerald-400" />
+              <span>{t.solutionsTitle}</span>
+            </h4>
+            <ul className="space-y-2.5 text-xs font-semibold">
+              {[
+                { label: language === 'bn' ? "ডোমেন সার্চ ও রেজিস্ট্রেশন" : "Domain Search (.COM / .BD)", onClick: () => { setCurrentPage('domain'); window.scrollTo(0, 0); } },
+                { label: language === 'bn' ? "কাস্টম ওয়েব অ্যাপ্লিকেশন" : "Custom Web Application", onClick: () => { setCurrentPage('services'); window.scrollTo(0, 0); } },
+                { label: language === 'bn' ? "ই-কমার্স অনলাইন স্টোর" : "E-Commerce Multi-Vendor Store", onClick: () => { setCurrentPage('services'); window.scrollTo(0, 0); } },
+                { label: language === 'bn' ? "মোবাইল অ্যাপ ডেভেলপমেন্ট" : "Mobile Apps (Android & iOS)", onClick: () => { setCurrentPage('services'); window.scrollTo(0, 0); } },
+                { label: language === 'bn' ? "নিউজ পোর্টাল CMS স্ক্রিপ্ট" : "Online News Portal CMS", onClick: () => { setCurrentPage('marketplace'); window.scrollTo(0, 0); } },
+                { label: language === 'bn' ? "ক্লাউড POS ও ইনভেন্টরি ERP" : "Cloud POS & Inventory ERP", onClick: () => { setCurrentPage('services'); window.scrollTo(0, 0); } }
+              ].map((item, i) => (
+                <li key={i}>
+                  <button onClick={item.onClick} className="hover:text-emerald-400 transition flex items-center gap-1.5 cursor-pointer text-neutral-300 group">
+                    <ChevronRight className="w-3 h-3 opacity-40 group-hover:opacity-100 group-hover:translate-x-0.5 text-emerald-400 transition" />
+                    <span>{item.label}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Column 4: Client Portal & Quick Navigation */}
+          <div className="space-y-4">
+            <h4 className="text-white text-xs font-black uppercase font-mono tracking-wider border-b border-neutral-800 pb-2 flex items-center gap-1.5">
+              <Store className="w-3.5 h-3.5 text-pink-400" />
+              <span>{t.quickTitle}</span>
+            </h4>
+            <ul className="space-y-2.5 text-xs font-semibold">
+              {[
+                { label: language === 'bn' ? "🔥 মেগা কম্বো অফার্স" : "🔥 Combo Offers Festival", icon: <Flame className="w-3.5 h-3.5 text-rose-500 animate-pulse" />, onClick: () => { setCurrentPage('offers'); window.scrollTo(0, 0); } },
+                { label: language === 'bn' ? "ডিজিটাল স্টোর ও স্ক্রিপ্ট" : "Digital Store Scripts", icon: <Store className="w-3.5 h-3.5 text-pink-400" />, onClick: () => { setCurrentPage('marketplace'); window.scrollTo(0, 0); } },
+                { label: language === 'bn' ? "সার্ভিসেস তালিকা" : "All Services Catalog", icon: <Briefcase className="w-3.5 h-3.5 text-emerald-400" />, onClick: () => { setCurrentPage('services'); window.scrollTo(0, 0); } },
+                { label: language === 'bn' ? "ব্লগ ও প্রযুক্তি খবর" : "Tech Blog & Updates", icon: <Newspaper className="w-3.5 h-3.5 text-blue-400" />, onClick: () => { setCurrentPage('blog'); window.scrollTo(0, 0); } },
+                { label: language === 'bn' ? "অ্যাফিলিয়েট প্রোগ্রাম (১৫%)" : "Affiliate Program (15%)", icon: <Users className="w-3.5 h-3.5 text-amber-500" />, onClick: () => { setCurrentPage('affiliate'); window.scrollTo(0, 0); } },
+                { label: language === 'bn' ? "কাস্টমার ড্যাশবোর্ড" : "Client Portal Dashboard", icon: <Users className="w-3.5 h-3.5 text-cyan-400" />, onClick: () => { setCurrentPage('dashboard'); window.scrollTo(0, 0); } }
+              ].map((item, i) => (
+                <li key={i}>
+                  <button onClick={item.onClick} className="hover:text-cyan-400 transition flex items-center gap-2 cursor-pointer text-neutral-300 group">
+                    {item.icon}
+                    <span>{item.label}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Column 5: Support, Legal & Enterprise Security */}
+          <div className="space-y-4">
+            <h4 className="text-white text-xs font-black uppercase font-mono tracking-wider border-b border-neutral-800 pb-2 flex items-center gap-1.5">
+              <Shield className="w-3.5 h-3.5 text-violet-400" />
+              <span>{t.legalTitle}</span>
+            </h4>
+            <ul className="space-y-2.5 text-xs font-semibold">
+              <li>
+                <button onClick={() => { setCurrentPage('contact'); window.scrollTo(0, 0); }} className="hover:text-cyan-400 transition flex items-center gap-2 cursor-pointer text-neutral-300">
+                  <Mail className="w-3.5 h-3.5 text-violet-400" />
+                  <span>{language === 'bn' ? "২৪/৭ সরাসরি যোগাযোগ" : "24/7 Contact Desk"}</span>
+                </button>
+              </li>
+              <li>
+                <button onClick={() => { setCurrentPage('privacy'); window.scrollTo(0, 0); }} className="hover:text-cyan-400 transition flex items-center gap-2 cursor-pointer text-neutral-300">
+                  <Lock className="w-3.5 h-3.5 text-teal-400" />
+                  <span>{language === 'bn' ? "প্রাইভেসি পলিসি লাইসেন্স" : "Privacy & Data Policy"}</span>
+                </button>
+              </li>
+              <li>
+                <button onClick={() => { setCurrentPage('privacy'); window.scrollTo(0, 0); }} className="hover:text-cyan-400 transition flex items-center gap-2 cursor-pointer text-neutral-300">
+                  <FileText className="w-3.5 h-3.5 text-stone-400" />
+                  <span>{language === 'bn' ? "টার্মস ও কন্ডিশনস" : "Terms & Conditions"}</span>
+                </button>
+              </li>
+              <li>
+                <button onClick={() => { setCurrentPage('refund'); window.scrollTo(0, 0); }} className="hover:text-pink-400 transition flex items-center gap-2 cursor-pointer text-neutral-300">
+                  <RefreshCcw className="w-3.5 h-3.5 text-rose-400" />
+                  <span>{language === 'bn' ? "১০০% রিফান্ড পলিসি" : "Refund & Cancellation"}</span>
+                </button>
+              </li>
+              <li className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowFooterAdminLogin(!showFooterAdminLogin)}
+                  className={`text-[10px] font-mono flex items-center gap-1.5 cursor-pointer transition select-none outline-none text-left p-1.5 rounded-lg border ${
+                    showFooterAdminLogin 
+                      ? "text-cyan-400 font-bold bg-cyan-950/40 border-cyan-500/40 shadow-inner" 
+                      : "text-neutral-400 hover:text-white border-neutral-800 bg-neutral-950/50"
+                  }`}
+                >
+                  <ShieldCheck className={`w-3.5 h-3.5 text-blue-400 shrink-0 ${showFooterAdminLogin ? "animate-pulse" : ""}`} />
+                  <span>{language === 'bn' ? 'ম্যালওয়্যার-স্ক্যানড অ্যাডমিন পোর্টাল' : 'Malware-Scan Verified cPanel'}</span>
+                </button>
+
+                <AnimatePresence>
+                  {showFooterAdminLogin && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="overflow-hidden mt-3 p-3.5 bg-neutral-950 rounded-2xl border border-neutral-800 text-left space-y-2.5 font-sans w-full shadow-2xl"
+                    >
+                      {isAdmin ? (
+                        <div className="space-y-2 text-xs">
+                          <p className="text-[10px] text-emerald-400 font-bold block leading-relaxed">
+                            ✓ Currently authenticated as Super Admin Root session.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (setUser) setUser(null);
+                              if (setIsAdmin) setIsAdmin(false);
+                              triggerToast("Super Admin session closed.");
+                              setShowFooterAdminLogin(false);
+                            }}
+                            className="w-full text-center py-1.5 bg-neutral-850 hover:bg-neutral-800 text-neutral-300 text-[10px] font-bold rounded-lg transition"
+                          >
+                            Close Admin Mode
+                          </button>
+                        </div>
+                      ) : (
+                        <form
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            if (!footerEmail || !footerPassword) {
+                              triggerToast("All admin login options required.");
+                              return;
+                            }
+                            const formattedEmail = footerEmail.trim().toLowerCase();
+                            if ((formattedEmail === 'admin@webzonebd.com' || formattedEmail === 'webzonebd@yahoo.com') && footerPassword === 'admin123') {
+                              const adminUserSession = {
+                                id: formattedEmail === 'webzonebd@yahoo.com' ? 'usr-webzonebd-admin' : 'usr-admin',
+                                name: formattedEmail === 'webzonebd@yahoo.com' ? 'WebzoneBD Admin Office' : 'Super Admin Manager',
+                                username: formattedEmail === 'webzonebd@yahoo.com' ? 'webzonebd' : 'admin_root',
+                                email: formattedEmail,
+                                phone: formattedEmail === 'webzonebd@yahoo.com' ? '+8801864000123' : '+8801799887766',
+                                role: 'admin',
+                                isVerified: true,
+                                createdAt: '2026-06-10',
+                                status: 'active',
+                                wishlistedProductIds: []
+                              } as any;
+                              if (setUser) setUser(adminUserSession);
+                              if (setIsAdmin) setIsAdmin(true);
+                              triggerToast(language === 'bn' ? "স্বাগতম! আপনি অ্যাডমিন প্যানেলে সফলভাবে প্রবেশ করেছেন।" : "Welcome back, Chief Architect! Authorized WebzoneBD Super Admin session.");
+                              setCurrentPage('dashboard');
+                              setShowFooterAdminLogin(false);
+                            } else {
+                              triggerToast("❌ Handshake failed: Incorrect credentials.");
+                            }
+                          }}
+                          className="space-y-2 text-neutral-300"
+                        >
+                          <span className="text-[9px] uppercase font-mono tracking-widest font-black text-neutral-400 block pb-1 border-b border-neutral-800">WHMCS cPanel Access</span>
+                          
+                          <div className="space-y-1">
+                            <label className="text-[9px] font-bold text-neutral-500 uppercase block">User ID</label>
+                            <input
+                              type="email"
+                              required
+                              value={footerEmail}
+                              onChange={(e) => setFooterEmail(e.target.value)}
+                              placeholder="webzonebd@yahoo.com"
+                              className="w-full bg-neutral-900 border border-neutral-800 px-2.5 py-1 text-[11px] text-white rounded focus:outline-none focus:border-blue-500 font-mono"
+                            />
+                          </div>
+                          
+                          <div className="space-y-1">
+                            <label className="text-[9px] font-bold text-neutral-500 uppercase block">PIN Key</label>
+                            <input
+                              type="password"
+                              required
+                              value={footerPassword}
+                              onChange={(e) => setFooterPassword(e.target.value)}
+                              placeholder="••••••••"
+                              className="w-full bg-neutral-900 border border-neutral-800 px-2.5 py-1 text-[11px] text-white rounded focus:outline-none focus:border-blue-500 font-mono"
+                            />
+                          </div>
+
+                          <button
+                            type="submit"
+                            className="w-full py-1.5 bg-gradient-to-r from-blue-600 to-cyan-500 hover:opacity-95 text-white font-black text-[10px] uppercase tracking-wider rounded-lg transition cursor-pointer"
+                          >
+                            Login WHMCS
+                          </button>
+                        </form>
+                      )}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        {/* MOBILE-ONLY: Compact Original Layout (Untouched for Mobile Mode) */}
+        <div className="lg:hidden grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-8 text-left">
           {/* Brand block */}
           <div className="space-y-4">
             <div className="flex items-center space-x-2 text-white">
@@ -334,121 +706,10 @@ export default function Footer({
                   <span>{language === 'bn' ? "রিফান্ড পলিসি" : language === 'ar' ? "سياسة الاسترجاع" : "Refund Policy"}</span>
                 </button>
               </li>
-              <li className="pt-2" id="admin-portal-handshake">
-                <button
-                  type="button"
-                  onClick={() => setShowFooterAdminLogin(!showFooterAdminLogin)}
-                  className={`text-[10.5px] font-mono flex items-center gap-1.5 cursor-pointer transition select-none outline-none text-left p-1 rounded-md ${
-                    showFooterAdminLogin 
-                      ? "text-cyan-400 font-black bg-cyan-950/20 shadow-inner" 
-                      : "text-neutral-505 hover:text-neutral-300"
-                  }`}
-                >
-                  <ShieldCheck className={`w-4 h-4 text-blue-505 shrink-0 ${showFooterAdminLogin ? "animate-pulse stroke-[2.5]" : ""}`} />
-                  <span>{language === 'bn' ? 'ম্যালওয়্যার-স্ক্যানড অ্যাডমিন পোর্টাল' : 'Malware-Scan Verified cPanel ready'}</span>
-                </button>
-
-                <AnimatePresence>
-                  {showFooterAdminLogin && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="overflow-hidden mt-3 p-4 bg-neutral-950 rounded-2xl border border-neutral-800 text-left space-y-3 font-sans w-full max-w-[240px] shadow-2xl"
-                    >
-                      {isAdmin ? (
-                        <div className="space-y-2 text-xs">
-                          <p className="text-[10px] text-emerald-400 font-bold block leading-relaxed">
-                            ✓ Currently authenticated as Super Admin Root session.
-                          </p>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (setUser) setUser(null);
-                              if (setIsAdmin) setIsAdmin(false);
-                              triggerToast("Super Admin session closed.");
-                              setShowFooterAdminLogin(false);
-                            }}
-                            className="w-full text-center py-1.5 bg-neutral-850 hover:bg-neutral-800 text-neutral-300 text-[10px] font-bold rounded-lg transition"
-                          >
-                            Close Admin Mode
-                          </button>
-                        </div>
-                      ) : (
-                        <form
-                          onSubmit={(e) => {
-                            e.preventDefault();
-                            if (!footerEmail || !footerPassword) {
-                              triggerToast("All admin login options required.");
-                              return;
-                            }
-                            const formattedEmail = footerEmail.trim().toLowerCase();
-                            if ((formattedEmail === 'admin@webzonebd.com' || formattedEmail === 'webzonebd@yahoo.com') && footerPassword === 'admin123') {
-                              const adminUserSession = {
-                                id: formattedEmail === 'webzonebd@yahoo.com' ? 'usr-webzonebd-admin' : 'usr-admin',
-                                name: formattedEmail === 'webzonebd@yahoo.com' ? 'WebzoneBD Admin Office' : 'Super Admin Manager',
-                                username: formattedEmail === 'webzonebd@yahoo.com' ? 'webzonebd' : 'admin_root',
-                                email: formattedEmail,
-                                phone: formattedEmail === 'webzonebd@yahoo.com' ? '+8801864000123' : '+8801799887766',
-                                role: 'admin',
-                                isVerified: true,
-                                createdAt: '2026-06-10',
-                                status: 'active',
-                                wishlistedProductIds: []
-                              } as any;
-                              if (setUser) setUser(adminUserSession);
-                              if (setIsAdmin) setIsAdmin(true);
-                              triggerToast(language === 'bn' ? "স্বাগতম! আপনি অ্যাডমিন প্যানেলে সফলভাবে প্রবেশ করেছেন।" : "Welcome back, Chief Architect! Authorized WebzoneBD Super Admin session.");
-                              setCurrentPage('dashboard');
-                              setShowFooterAdminLogin(false);
-                            } else {
-                              triggerToast("❌ Handshake failed: Incorrect credentials.");
-                            }
-                          }}
-                          className="space-y-2.5 text-neutral-300"
-                        >
-                          <span className="text-[9.5px] uppercase font-mono tracking-widest font-black text-neutral-400 block pb-1 border-b border-neutral-800">WHMCS cPanel Access</span>
-                          
-                          <div className="space-y-1">
-                            <label className="text-[9px] font-bold text-neutral-500 uppercase block">User Interface ID</label>
-                            <input
-                              type="email"
-                              required
-                              value={footerEmail}
-                              onChange={(e) => setFooterEmail(e.target.value)}
-                              placeholder="webzonebd@yahoo.com"
-                              className="w-full bg-neutral-900 border border-neutral-800 px-2.5 py-1.5 text-[11px] text-white rounded focus:outline-none focus:border-blue-500 font-mono"
-                            />
-                          </div>
-                          
-                          <div className="space-y-1">
-                            <label className="text-[9px] font-bold text-neutral-500 uppercase block">Secret PIN Key</label>
-                            <input
-                              type="password"
-                              required
-                              value={footerPassword}
-                              onChange={(e) => setFooterPassword(e.target.value)}
-                              placeholder="••••••••"
-                              className="w-full bg-neutral-900 border border-neutral-800 px-2.5 py-1.5 text-[11px] text-white rounded focus:outline-none focus:border-blue-500 font-mono"
-                            />
-                          </div>
-
-                          <button
-                            type="submit"
-                            className="w-full py-2 bg-gradient-to-r from-blue-600 to-cyan-500 hover:opacity-95 text-white font-black text-[10px] uppercase tracking-wider rounded-lg transition cursor-pointer"
-                          >
-                            Login WHMCS
-                          </button>
-                        </form>
-                      )}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </li>
             </ul>
           </div>
 
-          {/* Newsletter Form */}
+          {/* Mobile Newsletter Form */}
           <div className="space-y-4">
             <h4 className="text-white text-xs sm:text-sm font-extrabold uppercase font-mono tracking-wider">
               {t.newsTitle}
@@ -582,8 +843,25 @@ export default function Footer({
         </div>
 
         {/* Lower row - 50% smaller padding on mobile */}
-        <div className="mt-6 sm:mt-12 pt-3 sm:pt-6 border-t border-neutral-800 text-center text-xs text-neutral-500">
+        <div className="mt-6 sm:mt-12 pt-4 sm:pt-6 border-t border-neutral-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left text-xs text-neutral-500">
           <p>{t.rights}</p>
+          <div className="flex items-center gap-3 text-[11px] text-neutral-400">
+            <button onClick={() => { setCurrentPage('privacy'); window.scrollTo(0, 0); }} className="hover:text-cyan-400 transition cursor-pointer">
+              {language === 'bn' ? 'প্রাইভেসি পলিসি' : 'Privacy'}
+            </button>
+            <span>•</span>
+            <button onClick={() => { setCurrentPage('privacy'); window.scrollTo(0, 0); }} className="hover:text-cyan-400 transition cursor-pointer">
+              {language === 'bn' ? 'শর্তাবলী' : 'Terms'}
+            </button>
+            <span>•</span>
+            <button onClick={() => { setCurrentPage('refund'); window.scrollTo(0, 0); }} className="hover:text-cyan-400 transition cursor-pointer">
+              {language === 'bn' ? 'রিফান্ড পলিসি' : 'Refund'}
+            </button>
+          </div>
+          <div className="hidden md:flex items-center gap-1.5 text-emerald-400 font-mono text-[11px]">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span>{t.liveStatus}</span>
+          </div>
         </div>
       </div>
     </footer>

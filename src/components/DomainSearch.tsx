@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { 
   Search, Globe, Star, Sparkles, 
   ArrowRight, RefreshCw, Layers, Check, Zap,
-  Database, Cpu
+  Database, Cpu, Cloud, CheckCircle2, ChevronRight, 
+  ShieldCheck, Server, Activity, ArrowUpRight, X
 } from 'lucide-react';
 import { Language, Currency, Product } from '../types';
 
@@ -47,6 +48,7 @@ export default function DomainSearch({
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [searchedName, setSearchedName] = useState('');
+  const [isMarqueePaused, setIsMarqueePaused] = useState(false);
   
   // Results structures
   const [primaryResult, setPrimaryResult] = useState<{
@@ -199,6 +201,111 @@ export default function DomainSearch({
       searchInputRef.current.focus();
       searchInputRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
+  };
+
+  // -----------------------------------------------------
+  // REAL-TIME PREDICTIVE DOMAIN SEARCH LOGIC
+  // -----------------------------------------------------
+  const [showDomainSuggestions, setShowDomainSuggestions] = useState(false);
+  const domainSearchDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (domainSearchDropdownRef.current && !domainSearchDropdownRef.current.contains(e.target as Node)) {
+        setShowDomainSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const predictiveDomainSuggestions = useMemo(() => {
+    const raw = searchQuery.trim().toLowerCase().replace(/^(https?:\/\/)?(www\.)?/, "");
+    if (!raw) return [];
+
+    let namePart = raw;
+    let extFilter = "";
+    const dotIndex = raw.indexOf(".");
+    if (dotIndex !== -1) {
+      namePart = raw.substring(0, dotIndex).replace(/[^a-z0-9\-]/g, "");
+      extFilter = raw.substring(dotIndex);
+    } else {
+      namePart = raw.replace(/[^a-z0-9\-]/g, "");
+    }
+
+    if (!namePart) return [];
+
+    const TLD_TAGS: Record<string, { tag: string; tagBn: string; badge?: string; isHot?: boolean }> = {
+      '.com': { tag: 'Global Business Standard', tagBn: 'গ্লোবাল বিজনেস স্ট্যান্ডার্ড', badge: 'Popular', isHot: true },
+      '.net': { tag: 'Network & High-Speed Tech', tagBn: 'হাই-স্পিড টেক ও নেটওয়ার্ক', badge: 'Fast' },
+      '.org': { tag: 'Community & Trust Organization', tagBn: 'অর্গানাইজেশন ও ট্রাস্ট' },
+      '.com.bd': { tag: 'Official Bangladesh Commercial', tagBn: 'অফিসিয়াল বিডি কমার্শিয়াল', badge: 'BD Local' },
+      '.bd': { tag: 'Official Bangladesh Identity', tagBn: 'অফিসিয়াল বিডি ডোমেন', badge: 'BD Gov/Biz' },
+      '.ai': { tag: 'Artificial Intelligence & Tech', tagBn: 'এআই ও টেক ইনোভেশন', badge: 'AI Hot', isHot: true },
+      '.dev': { tag: 'Developers & Software Engineers', tagBn: 'ডেভেলপার ও সফটওয়্যার' },
+      '.co': { tag: 'Company & Global Ventures', tagBn: 'গ্লোবাল কোম্পানি ও স্টার্টআপ' },
+      '.info': { tag: 'Information & Knowledge Portals', tagBn: 'ইনফরমেশন পোর্টাল' },
+      '.biz': { tag: 'Small Business & Commerce', tagBn: 'বিজনেস ও কমার্স' },
+    };
+
+    const list: Array<{
+      fullDomain: string;
+      namePart: string;
+      ext: string;
+      tag: string;
+      tagBn: string;
+      badge?: string;
+      isHot?: boolean;
+      priceUSD: number;
+    }> = [];
+
+    Object.entries(domainExtensionsPrices).forEach(([ext, price]) => {
+      if (!extFilter || ext.startsWith(extFilter)) {
+        const meta = TLD_TAGS[ext] || { tag: 'Top-Level Domain', tagBn: 'টপ লেভেল ডোমেন' };
+        list.push({
+          fullDomain: `${namePart}${ext}`,
+          namePart,
+          ext,
+          tag: meta.tag,
+          tagBn: meta.tagBn,
+          badge: meta.badge,
+          isHot: meta.isHot,
+          priceUSD: price,
+        });
+      }
+    });
+
+    if (namePart.length >= 3 && !extFilter) {
+      ['get', 'the', 'go'].forEach(prefix => {
+        const full = `${prefix}${namePart}.com`;
+        if (!list.some(item => item.fullDomain === full)) {
+          list.push({
+            fullDomain: full,
+            namePart: `${prefix}${namePart}`,
+            ext: '.com',
+            tag: 'Smart Brand Alternative',
+            tagBn: 'স্মার্ট ব্র্যান্ড অল্টারনেটিভ',
+            badge: 'Idea',
+            isHot: false,
+            priceUSD: domainExtensionsPrices['.com'] || 10.99,
+          });
+        }
+      });
+    }
+
+    return list.slice(0, 6);
+  }, [searchQuery]);
+
+  const selectPredictiveDomain = (domain: string, ext: string) => {
+    const dotIndex = domain.indexOf('.');
+    const cleanName = dotIndex !== -1 ? domain.substring(0, dotIndex) : domain;
+    setSearchQuery(cleanName);
+    setSelectedExt(ext);
+    setShowDomainSuggestions(false);
+    
+    setTimeout(() => {
+      handleCheckAvailability();
+    }, 50);
   };
 
   // Check Domain availability using real-time node resolve with mock fallback
@@ -392,33 +499,49 @@ export default function DomainSearch({
         </div>
  
         {/* LARGE Glassmorphic Domain Search Box */}
-        <div className="max-w-3xl mx-auto mb-4">
-          <div className="relative p-1.5 sm:p-2 bg-slate-950/60 backdrop-blur-md rounded-2xl sm:rounded-3xl border border-slate-800/80 focus-within:border-cyan-500/50 shadow-2xl focus-within:shadow-cyan-500/10 transition-all duration-500">
-            <form onSubmit={handleCheckAvailability} className="flex flex-col sm:flex-row items-stretch gap-1.5">
+        <div ref={domainSearchDropdownRef} className="max-w-3xl lg:max-w-4xl mx-auto mb-4 relative">
+          <div className="relative p-1.5 sm:p-2.5 md:p-3 bg-white/95 dark:bg-slate-950/80 backdrop-blur-xl rounded-2xl sm:rounded-3xl border border-slate-200/90 dark:border-slate-800/80 focus-within:border-blue-500 dark:focus-within:border-cyan-500/50 shadow-xl dark:shadow-2xl focus-within:shadow-blue-500/10 transition-all duration-300">
+            <form onSubmit={handleCheckAvailability} className="flex flex-col sm:flex-row items-stretch gap-1.5 md:gap-2">
               
               {/* Domain Input & Extension selector grouped on a single line for mobile & desktop */}
               <div className="flex-1 flex items-center min-w-0 bg-transparent">
                 <div className="relative flex-1 flex items-center min-w-0">
-                  <Search className="absolute left-3.5 sm:left-4 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 sm:w-5 h-5" />
+                  <Search className="absolute left-3.5 sm:left-4 md:left-5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 w-4 h-4 sm:w-5 sm:h-5 md:w-5 md:h-5" />
                   <input
                     ref={searchInputRef}
                     type="text"
                     placeholder={currentTrans.placeholder}
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full bg-transparent pl-10 sm:pl-11 pr-2 sm:pr-4 py-3 sm:py-3.5 text-sm sm:text-base font-medium text-white placeholder-slate-500 focus:outline-none"
+                    onFocus={() => setShowDomainSuggestions(true)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape') setShowDomainSuggestions(false);
+                    }}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setShowDomainSuggestions(true);
+                    }}
+                    className="w-full bg-transparent pl-10 sm:pl-12 md:pl-13 pr-8 sm:pr-9 py-3 sm:py-3.5 md:py-4 text-sm sm:text-base md:text-lg font-medium text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none"
                   />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-2 p-1 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white cursor-pointer transition"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
 
                 {/* Selector Extension dropdown chip */}
-                <div className="relative flex items-center px-1.5 sm:px-2 border-l border-slate-800/85 my-1 py-0.5 shrink-0">
+                <div className="relative flex items-center px-2 sm:px-3 border-l border-slate-200 dark:border-slate-800 my-1 py-1 shrink-0">
                   <select
                     value={selectedExt}
                     onChange={(e) => setSelectedExt(e.target.value)}
-                    className="bg-transparent text-xs sm:text-sm font-bold text-cyan-400 cursor-pointer pr-3 sm:pr-4 pl-1 sm:pl-2 focus:outline-none uppercase"
+                    className="bg-transparent text-xs sm:text-sm md:text-base font-black text-blue-600 dark:text-cyan-400 cursor-pointer pr-3 sm:pr-4 pl-1 sm:pl-2 focus:outline-none uppercase"
                   >
                     {Object.keys(domainExtensionsPrices).map((ext) => (
-                      <option key={ext} value={ext} className="bg-slate-900 text-white font-sans text-xs">
+                      <option key={ext} value={ext} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-sans text-xs sm:text-sm">
                         {ext}
                       </option>
                     ))}
@@ -430,7 +553,7 @@ export default function DomainSearch({
               <button
                 type="submit"
                 disabled={isSearching || !searchQuery.trim()}
-                className="px-6 py-3 sm:py-3.5 bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 disabled:opacity-50 text-white font-black text-xs sm:text-sm rounded-xl sm:rounded-2xl transition-all duration-300 flex items-center justify-center gap-2 hover:scale-[1.01]"
+                className="px-6 sm:px-8 md:px-10 py-3 sm:py-3.5 md:py-4 bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 disabled:opacity-50 text-white font-black text-xs sm:text-sm md:text-base rounded-xl sm:rounded-2xl transition-all duration-300 flex items-center justify-center gap-2 hover:scale-[1.01] shadow-lg shadow-blue-500/25 active:scale-95 cursor-pointer shrink-0"
               >
                 {isSearching ? (
                   <>
@@ -446,6 +569,93 @@ export default function DomainSearch({
               </button>
             </form>
           </div>
+
+          {/* Real-time Predictive Domain Dropdown */}
+          {showDomainSuggestions && searchQuery.trim().length > 0 && (
+            <div
+              id="domain-search-predictive-dropdown"
+              className="absolute left-0 right-0 top-full mt-2 rounded-2xl bg-white/95 dark:bg-[#080d1a]/95 backdrop-blur-2xl border border-slate-200 dark:border-slate-800 shadow-[0_20px_50px_rgba(0,0,0,0.15)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-50 overflow-hidden divide-y divide-slate-100 dark:divide-slate-800/60 animate-in fade-in slide-in-from-top-2 duration-200 text-left"
+            >
+              {/* Header */}
+              <div className="px-4 py-2.5 bg-gradient-to-r from-blue-50 via-cyan-50/50 to-indigo-50/50 dark:from-blue-950/50 dark:via-cyan-950/30 dark:to-indigo-950/50 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                  <span className="text-[11px] font-extrabold uppercase font-mono tracking-wider text-slate-200">
+                    {language === 'bn' 
+                      ? `প্রেডিক্টিভ ডোমেন সাজেশন্স (${predictiveDomainSuggestions.length}টি)` 
+                      : `Predictive Domain Suggestions (${predictiveDomainSuggestions.length})`}
+                  </span>
+                </div>
+                <span className="text-[10px] font-mono text-slate-400 bg-slate-900/90 px-2 py-0.5 rounded border border-slate-800">
+                  ESC to close
+                </span>
+              </div>
+
+              {/* Suggestions List */}
+              {predictiveDomainSuggestions.length > 0 ? (
+                <div className="max-h-[340px] overflow-y-auto p-2 space-y-1">
+                  {predictiveDomainSuggestions.map((item, idx) => (
+                    <div
+                      key={idx}
+                      onClick={() => selectPredictiveDomain(item.fullDomain, item.ext)}
+                      className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-800/70 transition cursor-pointer group"
+                    >
+                      <div className="flex items-center gap-3 min-w-0 flex-1 pr-3">
+                        <div className="w-8 h-8 rounded-lg bg-cyan-500/10 text-cyan-400 flex items-center justify-center shrink-0">
+                          <Globe className="w-4 h-4" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs sm:text-sm font-black text-white group-hover:text-cyan-400 font-mono transition truncate">
+                              {item.fullDomain}
+                            </span>
+                            <span className="text-[9px] uppercase font-mono font-extrabold px-1.5 py-0.2 rounded bg-cyan-950/80 text-cyan-300 border border-cyan-800/50">
+                              {item.ext}
+                            </span>
+                            {item.isHot && (
+                              <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-400 border border-amber-500/25">
+                                HOT 🔥
+                              </span>
+                            )}
+                            {item.badge && !item.isHot && (
+                              <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-slate-800 text-slate-400">
+                                {item.badge}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[10px] text-slate-400 truncate mt-0.5">
+                            {language === 'bn' ? item.tagBn : item.tag}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Price & Action */}
+                      <div className="flex items-center gap-2.5 shrink-0">
+                        <span className="text-xs font-black text-emerald-400 font-mono">
+                          {formatValue(item.priceUSD, item.ext)}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            selectPredictiveDomain(item.fullDomain, item.ext);
+                          }}
+                          className="px-2.5 py-1.5 bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white text-[10.5px] font-bold rounded-lg shadow-sm transition active:scale-95 cursor-pointer flex items-center gap-1"
+                        >
+                          <Search className="w-3 h-3" />
+                          <span>{language === 'bn' ? 'চেক করুন' : 'Check'}</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-4 text-center text-xs text-slate-400">
+                  {language === 'bn' ? 'ডোমেন নামটি টাইপ করুন' : 'Type a domain name to see suggestions'}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Quick interactive Domain extensions toggle row */}
           <div className="flex flex-wrap items-center justify-center gap-2 mt-4 overflow-x-auto pb-1.5">
@@ -651,222 +861,318 @@ export default function DomainSearch({
         )}
 
         {/* ================================= AUTOMATED SLIDING HOSTING CATEGORIES ================================= */}
-        {showCategories && (
-          <div className="mt-12 pt-8 border-t border-slate-800/50">
-            <div className="text-center max-w-3xl mx-auto mb-8">
-              <h3 className="text-lg sm:text-xl font-extrabold text-white tracking-tight leading-tight flex items-center justify-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
-                <span>
-                  {language === 'bn' ? 'বিশেষায়িত হোস্টিং ক্যাটাগরি' : language === 'ar' ? 'فئات الاستضافة السحابية' : 'Tailored Hosting Categories'}
-                </span>
-              </h3>
-              <p className="text-xs sm:text-sm text-slate-400 mt-1.5">
-                {language === 'bn' 
-                  ? 'আপনার ইউনিক ট্রাফিক স্কেল এবং প্রয়োজনীয়তার জন্য ডিজাইন করা কম্পিউটিং আর্কিটেকচারগুলো বেছে নিন।' 
-                  : language === 'ar' 
-                  ? 'اختر البنية الحسابية المصممة لخصائص حركة المرور الفريدة لمتجرك أو موقعك الالكتروني.' 
-                  : 'Choose the computing architectures designed for your unique traffic scales and requirements.'}
-              </p>
-            </div>
+        {showCategories && (() => {
+          const getHostingFormattedPrice = (usdPrice: number) => {
+            const formatted = formatValue(usdPrice);
+            const suffix = language === 'bn' ? '/মাস' : language === 'ar' ? '/شهرياً' : '/mo';
+            return `${formatted}${suffix}`;
+          };
 
-            {/* Marquee Outer Container with horizontal overflow hidden */}
-            <div className="relative w-full overflow-hidden py-4 select-none">
-              {/* Smooth Edge Fades */}
-              <div className="absolute left-0 top-0 bottom-0 w-16 bg-gradient-to-r from-slate-900 to-transparent z-10 pointer-events-none" />
-              <div className="absolute right-0 top-0 bottom-0 w-16 bg-gradient-to-l from-slate-900 to-transparent z-10 pointer-events-none" />
+          const handleHostingCategorySelect = (categoryId: string) => {
+            localStorage.setItem('webzone_target_hosting_tab', categoryId);
+            setCurrentPage('hosting');
+            setTimeout(() => {
+              const targetEl = document.getElementById('redesigned-packages') || document.getElementById('redesigned-categories');
+              if (targetEl) {
+                targetEl.scrollIntoView({ behavior: 'smooth' });
+              }
+            }, 120);
+          };
 
-              {/* Framer Motion Infinite Loop Container */}
-              {/* Since we want to move from left to right (scrolling right), we animate x: ['-50%', '0%'] */}
-              <motion.div 
-                className="flex gap-6 w-max"
-                animate={{ x: ['-50%', '0%'] }}
-                transition={{
-                  ease: "linear",
-                  duration: 25,
-                  repeat: Infinity,
-                }}
-              >
-                {/* Double or triple the cards to ensure seamless infinite scroll */}
-                {[
-                  {
-                    id: 'bdix',
-                    title: language === 'bn' ? 'শেয়ার্ড বিডিআইএক্স হোস্টিং' : language === 'ar' ? 'استضافة BDIX المشتركة' : 'Shared BDIX Hosting',
-                    desc: language === 'bn' 
-                      ? 'বিডিআইএক্স-অপ্টিমাইজড হোস্টিং যা বাংলাদেশে ৫ মিলি-সেকেন্ডের কম লেটেন্সি দেয়।' 
-                      : language === 'ar' 
-                      ? 'استضافة محسنة لنطاق BDIX تقدم سرعة استجابة فائقة تقل عن 5 ملّي ثانية.' 
-                      : 'BDIX-optimized hosting delivering sub-5ms rendering speeds in Bangladesh.',
-                    price: language === 'bn' ? '৳১২০/মাস' : language === 'ar' ? '$0.99/شهرياً' : '$0.99/mo',
-                    icon: Database
-                  },
-                  {
-                    id: 'vps',
-                    title: language === 'bn' ? 'ম্যানেজড ভিপিএস হোস্টিং' : language === 'ar' ? 'خوادم VPS المدارة' : 'Managed VPS Hosting',
-                    desc: language === 'bn' 
-                      ? 'ডেডিকেটেড সার্ভার-গ্রেড সিপিইউ এবং ওএস এনভায়রনমেন্ট সহ হাই-পারফরম্যান্স নোড।' 
-                      : language === 'ar' 
-                      ? 'خوادم عالية الأداء مع معالجات مخصصة وبيئة نظام تشغيل مستقلة بالكامل.' 
-                      : 'High-performance nodes with dedicated server-grade CPUs and OS environments.',
-                    price: language === 'bn' ? '৳১৮০০/মাস' : language === 'ar' ? '$14.99/شهرياً' : '$14.99/mo',
-                    icon: Cpu
-                  },
-                  {
-                    id: 'reseller',
-                    title: language === 'bn' ? 'রিসেলার হোস্টিং' : language === 'ar' ? 'استضافة الموزعين' : 'Reseller Hosting',
-                    desc: language === 'bn' 
-                      ? 'কাস্টম নেম সার্ভার এবং WHM কন্ট্রোল সহ আপনার হোয়াইট-লেবেল ব্যবসা শুরু করুন।' 
-                      : language === 'ar' 
-                      ? 'ابدأ أعمالك التجارية الخاصة مع خوادم أسماء مخصصة ولوحة تحكم WHM كاملة.' 
-                      : 'Start your white-label business with custom name servers and WHM control.',
-                    price: language === 'bn' ? '৳১৪৫০/মাস' : language === 'ar' ? '$11.99/شهرياً' : '$11.99/mo',
-                    icon: Layers
-                  }
-                ].concat([
-                  {
-                    id: 'bdix',
-                    title: language === 'bn' ? 'শেয়ার্ড বিডিআইএক্স হোস্টিং' : language === 'ar' ? 'استضافة BDIX المشتركة' : 'Shared BDIX Hosting',
-                    desc: language === 'bn' 
-                      ? 'বিডিআইএক্স-অপ্টিমাইজড হোস্টিং যা বাংলাদেশে ৫ মিলি-সেকেন্ডের কম লেটেন্সি দেয়।' 
-                      : language === 'ar' 
-                      ? 'استضافة محسنة لنطاق BDIX تقدم سرعة استجابة فائقة تقل عن 5 ملّي ثانية.' 
-                      : 'BDIX-optimized hosting delivering sub-5ms rendering speeds in Bangladesh.',
-                    price: language === 'bn' ? '৳১২০/মাস' : language === 'ar' ? '$0.99/شهرياً' : '$0.99/mo',
-                    icon: Database
-                  },
-                  {
-                    id: 'vps',
-                    title: language === 'bn' ? 'ম্যানেজড ভিপিএস হোস্টিং' : language === 'ar' ? 'خوادم VPS المدارة' : 'Managed VPS Hosting',
-                    desc: language === 'bn' 
-                      ? 'ডেডিকেটেড সার্ভার-গ্রেড সিপিইউ এবং ওএস এনভায়রনমেন্ট সহ হাই-পারফরম্যান্স নোড।' 
-                      : language === 'ar' 
-                      ? 'خوادم عالية الأداء مع معالجات مخصصة وبيئة نظام تشغيل مستقلة بالكامل.' 
-                      : 'High-performance nodes with dedicated server-grade CPUs and OS environments.',
-                    price: language === 'bn' ? '৳১৮০০/মাস' : language === 'ar' ? '$14.99/شهرياً' : '$14.99/mo',
-                    icon: Cpu
-                  },
-                  {
-                    id: 'reseller',
-                    title: language === 'bn' ? 'রিসেলার হোস্টিং' : language === 'ar' ? 'استضافة الموزعين' : 'Reseller Hosting',
-                    desc: language === 'bn' 
-                      ? 'কাস্টম নেম সার্ভার এবং WHM কন্ট্রোল সহ আপনার হোয়াইট-লেবেল ব্যবসা শুরু করুন।' 
-                      : language === 'ar' 
-                      ? 'ابدأ أعمالك التجارية الخاصة مع خوادم أسماء مخصصة ولوحة تحكم WHM كاملة.' 
-                      : 'Start your white-label business with custom name servers and WHM control.',
-                    price: language === 'bn' ? '৳১৪৫০/মাস' : language === 'ar' ? '$11.99/شهرياً' : '$11.99/mo',
-                    icon: Layers
-                  }
-                ]).concat([
-                  {
-                    id: 'bdix',
-                    title: language === 'bn' ? 'শেয়ার্ড বিডিআইএক্স হোস্টিং' : language === 'ar' ? 'استضافة BDIX المشتركة' : 'Shared BDIX Hosting',
-                    desc: language === 'bn' 
-                      ? 'বিডিআইএক্স-অপ্টিমাইজড হোস্টিং যা বাংলাদেশে ৫ মিলি-সেকেন্ডের কম লেটেন্সি দেয়।' 
-                      : language === 'ar' 
-                      ? 'استضافة محسنة لنطاق BDIX تقدم سرعة استجابة فائقة تقل عن 5 ملّي ثانية.' 
-                      : 'BDIX-optimized hosting delivering sub-5ms rendering speeds in Bangladesh.',
-                    price: language === 'bn' ? '৳১২০/মাস' : language === 'ar' ? '$0.99/شهرياً' : '$0.99/mo',
-                    icon: Database
-                  },
-                  {
-                    id: 'vps',
-                    title: language === 'bn' ? 'ম্যানেজড ভিপিএস হোস্টিং' : language === 'ar' ? 'خوادم VPS المدارة' : 'Managed VPS Hosting',
-                    desc: language === 'bn' 
-                      ? 'ডেডিকেটেড সার্ভার-গ্রেড সিপিইউ এবং ওএস এনভায়রনমেন্ট সহ হাই-পারফরম্যান্স নোড।' 
-                      : language === 'ar' 
-                      ? 'خوادم عالية الأداء مع معالجات مخصصة وبيئة نظام تشغيل مستقلة بالكامل.' 
-                      : 'High-performance nodes with dedicated server-grade CPUs and OS environments.',
-                    price: language === 'bn' ? '৳১৮০০/মাস' : language === 'ar' ? '$14.99/شهرياً' : '$14.99/mo',
-                    icon: Cpu
-                  },
-                  {
-                    id: 'reseller',
-                    title: language === 'bn' ? 'রিসেলার হোস্টিং' : language === 'ar' ? 'استضافة الموزعين' : 'Reseller Hosting',
-                    desc: language === 'bn' 
-                      ? 'কাস্টম নেম সার্ভার এবং WHM কন্ট্রোল সহ আপনার হোয়াইট-লেবেল ব্যবসা শুরু করুন।' 
-                      : language === 'ar' 
-                      ? 'ابدأ أعمالك التجارية الخاصة مع خوادم أسماء مخصصة ولوحة تحكم WHM كاملة.' 
-                      : 'Start your white-label business with custom name servers and WHM control.',
-                    price: language === 'bn' ? '৳১৪৫০/মাস' : language === 'ar' ? '$11.99/شهرياً' : '$11.99/mo',
-                    icon: Layers
-                  }
-                ]).map((card, idx) => {
-                  const IconComponent = card.icon;
-                  const catColor = card.id === 'bdix' 
-                    ? 'from-sky-400 to-blue-600' 
-                    : card.id === 'vps' 
-                    ? 'from-[#2563EB] to-[#8B5CF6]' 
-                    : 'from-emerald-400 to-cyan-500';
-                  
-                  const catBadge = card.id === 'bdix'
-                    ? (language === 'bn' ? "বিডিআইএক্স অপ্টিমাইজড ⚡" : language === 'ar' ? "تحسين BDIX ⚡" : "BDIX Optimized ⚡")
-                    : card.id === 'vps'
-                    ? (language === 'bn' ? "ডেডিকেটেড কোর 🚀" : language === 'ar' ? "أنوية مخصصة 🚀" : "Dedicated Core 🚀")
-                    : (language === 'bn' ? "হোয়াইট-লেবেল 👥" : language === 'ar' ? "علامة تجارية مخصصة 👥" : "White-Label 👥");
+          const hostingCategoriesList = [
+            {
+              id: 'bdix',
+              title: language === 'bn' ? 'শেয়ার্ড বিডিআইএক্স হোস্টিং' : language === 'ar' ? 'استضافة BDIX المشتركة' : 'Shared BDIX Hosting',
+              tagline: language === 'bn' ? '৫ms লোকাল লেটেন্সি' : language === 'ar' ? 'استجابة فائقة 5ms' : 'Sub-5ms Local Ping',
+              desc: language === 'bn' 
+                ? 'বিডিআইএক্স ক্যাশিং ও ১০০% NVMe স্টোরেজ সহ বাংলাদেশে সর্বোচ্চ গতির ওয়েব হোস্টিং আর্কিটেকচার।' 
+                : language === 'ar' 
+                ? 'استضافة محسنة لنطاق BDIX تقدم سرعة استجابة فائقة تقل عن 5 ملّي ثانية مع أقراص NVMe فائقة السرعة.' 
+                : 'BDIX-optimized NVMe hosting delivering blazing-fast sub-5ms rendering speeds in Bangladesh.',
+              priceUsd: 0.99,
+              badgeText: language === 'bn' ? 'বিডিআইএক্স অপ্টিমাইজড ⚡' : language === 'ar' ? 'تحسين BDIX ⚡' : '5ms BDIX ⚡',
+              badgeColor: 'text-sky-400 bg-sky-500/10 border-sky-500/25',
+              color: 'from-sky-400 via-blue-500 to-indigo-600',
+              glowColor: 'bg-sky-500',
+              borderGlow: 'hover:border-sky-400/50 hover:shadow-sky-500/15',
+              icon: Database,
+              specs: language === 'bn' 
+                ? ['৫ মিলি-সেকেন্ড বিডিআইএক্স লেটেন্সি', 'ফ্রি cPanel ও লাইটস্পিড ক্যাশ', '১০০% এন্টারপ্রাইজ NVMe SSD ড্রাইভ']
+                : language === 'ar'
+                ? ['استجابة محلية سريعة < 5ms', 'لوحة cPanel وخادم LiteSpeed', 'أقراص NVMe SSD فائقة الأداء']
+                : ['Sub-5ms Ultra-Fast Local Ping', 'Free cPanel & LiteSpeed Cache', '100% Enterprise NVMe SSDs'],
+              pillHighlight: language === 'bn' ? '৯৯.৯% আপটাইম গ্যারান্টি' : language === 'ar' ? 'ضمان استقرار 99.9%' : '99.9% Uptime SLA'
+            },
+            {
+              id: 'cloud',
+              title: language === 'bn' ? 'হাই-স্পিড ক্লাউড হোস্টিং' : language === 'ar' ? 'الاستضافة السحابية المتقدمة' : 'High-Speed Cloud Hosting',
+              tagline: language === 'bn' ? 'অটো ফেইলওভার SAN' : language === 'ar' ? 'بنية سحابية ذاتية' : 'Auto-Failover SAN',
+              desc: language === 'bn' 
+                ? 'রিডানড্যান্ট ক্লাউড ক্লাস্টার, অটো-স্কেলিং ও ইমিউনিফাই ৩৬০ অ্যান্টি-DDoS হাই-প্রোটেকশন।' 
+                : language === 'ar' 
+                ? 'بنية تحتية سحابية عالية التوافر مع توسع تلقائي وحماية Imunify360 المتقدمة ضد الهجمات.' 
+                : 'High-availability multi-node cloud clusters with auto-healing SAN and Imunify360 shield.',
+              priceUsd: 4.99,
+              badgeText: language === 'bn' ? 'অটো-হিলিং ক্লাউড ☁️' : language === 'ar' ? 'بنية سحابية ☁️' : 'Auto-Heal ☁️',
+              badgeColor: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/25',
+              color: 'from-cyan-400 via-teal-500 to-blue-600',
+              glowColor: 'bg-cyan-500',
+              borderGlow: 'hover:border-cyan-400/50 hover:shadow-cyan-500/15',
+              icon: Cloud,
+              specs: language === 'bn'
+                ? ['রিডানড্যান্ট Ceph SAN স্টোরেজ', 'ফ্রি ওয়াইল্ডকার্ড SSL ও DDoS শিল্ড', 'শূন্য ডাউনটাইম অটো-রিউটিং']
+                : language === 'ar'
+                ? ['تخزين سحابي موزع Ceph SAN', 'شهادات أمان SSL وحماية DDoS', 'إعادة توجيه فورية بدون توقف']
+                : ['Redundant Ceph SAN Storage', 'Free Wildcard SSL & DDoS Shield', 'Zero-Downtime Auto Routing'],
+              pillHighlight: language === 'bn' ? 'লাইটস্পিড LSCache ইঞ্জিন' : language === 'ar' ? 'محرك تسريع LiteSpeed' : 'LiteSpeed LSCache Engine'
+            },
+            {
+              id: 'vps',
+              title: language === 'bn' ? 'ম্যানেজড ক্লাউড ভিপিএস' : language === 'ar' ? 'سيرفرات VPS المدارة' : 'Managed Cloud VPS',
+              tagline: language === 'bn' ? 'ফুল রুট অ্যাক্সেস' : language === 'ar' ? 'تحكم كامل بالخادم' : 'Dedicated Core',
+              desc: language === 'bn' 
+                ? 'সার্ভার-গ্রেড ডেডিকেটেড সিপিইউ ও র‍্যাম, ডেডিকেটেড স্ট্যাটিক IPv4 ও সম্পূর্ণ রুট SSH অ্যাক্সেস।' 
+                : language === 'ar' 
+                ? 'خوادم عالية الأداء مع معالجات مخصصة وبيئة نظام تشغيل مستقلة بالكامل وعناوين IP خاصة.' 
+                : 'High-performance nodes with dedicated server-grade CPUs, root access, and static IPv4.',
+              priceUsd: 14.99,
+              badgeText: language === 'bn' ? 'ডেডিকেটেড কোর 🚀' : language === 'ar' ? 'موارد مخصصة 🚀' : 'Dedicated Core 🚀',
+              badgeColor: 'text-purple-400 bg-purple-500/10 border-purple-500/25',
+              color: 'from-blue-600 via-indigo-600 to-purple-600',
+              glowColor: 'bg-purple-500',
+              borderGlow: 'hover:border-purple-400/50 hover:shadow-purple-500/15',
+              icon: Cpu,
+              specs: language === 'bn'
+                ? ['ডেডিকেটেড স্ট্যাটিক IPv4 অ্যাড্রেস', 'ফুল রুট অ্যাডমিন SSH কন্ট্রোল', 'কেভিএম ভার্চুয়ালাইজেশন ও ১Gbps পোর্ট']
+                : language === 'ar'
+                ? ['عنوان IPv4 مخصص ومستقل', 'تحكم كامل بصلاحية Root SSH', 'افتراضية KVM ومنفذ 1Gbps']
+                : ['Dedicated Static IPv4 Address', 'Full Root SSH Administrator Control', 'KVM Virtualization & 1Gbps Port'],
+              pillHighlight: language === 'bn' ? '১Gbps আপলিঙ্ক ব্যাকবোন' : language === 'ar' ? 'منفذ شبكة فائق 1Gbps' : '1Gbps Uplink Backbone'
+            },
+            {
+              id: 'reseller',
+              title: language === 'bn' ? 'রিসেলার হোস্টিং ব্যবসা' : language === 'ar' ? 'استضافة الموزعين الاحترافية' : 'Reseller Hosting Agency',
+              tagline: language === 'bn' ? 'WHM মাস্টার প্যানেল' : language === 'ar' ? 'لوحة تحكم WHM' : 'WHM Master Admin',
+              desc: language === 'bn' 
+                ? 'কাস্টম ব্র্যান্ডেড নেমসার্ভার ও মাস্টার WHM কন্ট্রোল সহ আপনার হোয়াইট-লেবেল এজেন্সি শুরু করুন।' 
+                : language === 'ar' 
+                ? 'ابدأ أعمالك التجارية الخاصة مع خوادم أسماء مخصصة ولوحة تحكم WHM كاملة وإدارة عملاء.' 
+                : 'Start your white-label business with custom name servers, master WHM control, and billing.',
+              priceUsd: 11.99,
+              badgeText: language === 'bn' ? 'হোয়াইট-লেবেল 👥' : language === 'ar' ? 'علامة تجارية مخصصة 👥' : 'White-Label 👥',
+              badgeColor: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/25',
+              color: 'from-emerald-400 via-teal-500 to-cyan-500',
+              glowColor: 'bg-emerald-500',
+              borderGlow: 'hover:border-emerald-400/50 hover:shadow-emerald-500/15',
+              icon: Layers,
+              specs: language === 'bn'
+                ? ['১০০% হোয়াইট-লেবেল প্রাইভেট DNS', 'মাস্টার WHM ও cPanel অ্যাকাউন্ট', 'ফ্রি ক্লায়েন্ট ডেটাবেজ মাইগ্রেশন']
+                : language === 'ar'
+                ? ['خوادم أسماء DNS بهويتك الخاصة', 'لوحة تحكم رئيسية WHM وحسابات cPanel', 'نقل بيانات العملاء مجاناً']
+                : ['100% White-Label Private DNS', 'Master WHM Admin & cPanel Engine', 'Free Automated Website Migration'],
+              pillHighlight: language === 'bn' ? 'আনলিমিটেড cPanel অ্যাকাউন্ট' : language === 'ar' ? 'حسابات cPanel غير محدودة' : 'Unlimited cPanel Accounts'
+            }
+          ];
 
-                  const subBadge = card.id === 'bdix' ? 'BDIX Network' : card.id === 'vps' ? 'Root Access' : 'WHM Panel';
+          // Quadruple items to make the horizontal scroll ticker perfectly seamless on any viewport width
+          const duplicatedCategories = [
+            ...hostingCategoriesList,
+            ...hostingCategoriesList,
+            ...hostingCategoriesList,
+            ...hostingCategoriesList
+          ];
 
-                  return (
-                    <div
-                      key={`${card.id}-${idx}`}
-                      onClick={() => {
-                        setCurrentPage('hosting');
-                        setTimeout(() => {
-                          const el = document.getElementById('redesigned-categories');
-                          if (el) el.scrollIntoView({ behavior: 'smooth' });
-                        }, 100);
-                      }}
-                      className="w-[280px] sm:w-[320px] p-5 sm:p-6 bg-slate-950/80 hover:bg-slate-900 rounded-3xl border border-slate-800/60 hover:border-cyan-500/30 transition-all duration-300 shadow-xl cursor-pointer group shrink-0 relative overflow-hidden flex flex-col justify-between"
+          return (
+            <div className="mt-14 pt-10 border-t border-slate-800/60 relative">
+              {/* Top Section Header */}
+              <div className="text-center max-w-3xl mx-auto mb-8 space-y-2.5 px-4">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-[11px] font-mono font-bold text-cyan-400 uppercase tracking-widest">
+                  <Sparkles className="w-3.5 h-3.5 text-cyan-400 animate-spin" style={{ animationDuration: '6s' }} />
+                  <span>{language === 'bn' ? 'নেক্সট-জেন সার্ভার আর্কিটেকচার' : language === 'ar' ? 'بنية خوادم الجيل القادم' : 'Next-Gen Server Architecture'}</span>
+                </div>
+
+                <h3 className="text-xl sm:text-2xl lg:text-3xl font-black text-white tracking-tight leading-tight flex items-center justify-center gap-2.5">
+                  <span>
+                    {language === 'bn' ? 'বিশেষায়িত হোস্টিং ক্যাটাগরি' : language === 'ar' ? 'فئات الاستضافة السحابية المخصصة' : 'Tailored Hosting Categories'}
+                  </span>
+                </h3>
+
+                <p className="text-xs sm:text-sm text-slate-400 max-w-2xl mx-auto leading-relaxed">
+                  {language === 'bn' 
+                    ? 'আপনার ইউনিক ট্রাফিক স্কেল এবং প্রয়োজনীয়তার জন্য বিশেষভাবে ডিজাইন করা প্রিমিয়াম কম্পিউটিং আর্কিটেকচার।' 
+                    : language === 'ar' 
+                    ? 'اختر البنية الحسابية المصممة لخصائص حركة المرور الفريدة لمتجرك أو موقعك الالكتروني مع سرعة فائقة.' 
+                    : 'Choose the computing architectures designed for your unique traffic scales, workload needs, and growth.'}
+                </p>
+
+                {/* Quick Category Jump Buttons */}
+                <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+                  {hostingCategoriesList.map((cat) => (
+                    <button
+                      key={`jump-${cat.id}`}
+                      type="button"
+                      onClick={() => handleHostingCategorySelect(cat.id)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-950/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800/90 hover:border-cyan-500/40 transition-all duration-200 cursor-pointer shadow-sm group"
                     >
-                      {/* Visual glow accent */}
-                      <div className={`absolute top-0 right-0 w-24 h-24 bg-gradient-to-br ${catColor} opacity-10 blur-xl pointer-events-none group-hover:opacity-35 transition duration-500`} />
-                      
-                      {/* Top Floating Mini Badge */}
-                      <span className="absolute top-3.5 right-3.5 text-slate-400 group-hover:text-cyan-300 font-mono font-bold text-[8px] uppercase tracking-wider bg-slate-900/60 border border-slate-800/80 px-2 py-0.5 rounded-full transition duration-300">
-                        {catBadge}
-                      </span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 group-hover:scale-125 transition-transform" />
+                      <span>{cat.title}</span>
+                      <span className="text-[10.5px] font-mono text-cyan-400 font-bold ml-1">{getHostingFormattedPrice(cat.priceUsd)}</span>
+                    </button>
+                  ))}
+                </div>
 
-                      <div className="space-y-4">
-                        {/* Icon beside title */}
-                        <div className="flex items-center gap-3">
-                          <div className={`p-2.5 rounded-xl bg-gradient-to-tr ${catColor} text-white flex items-center justify-center w-10 h-10 shadow-md shrink-0 transition duration-300 group-hover:scale-105`}>
-                            <IconComponent className="w-5 h-5 stroke-[2]" />
+                {/* Hover Pause Status Indicator */}
+                <div className="flex items-center justify-center gap-2 pt-1 text-[11px] font-mono text-slate-400">
+                  <span className={`w-2 h-2 rounded-full ${isMarqueePaused ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400 animate-ping'}`} />
+                  <span>
+                    {isMarqueePaused 
+                      ? (language === 'bn' ? '⏸️ পজ করা আছে — কার্ডে ক্লিক করে সরাসরি প্যাকেজে যান' : language === 'ar' ? '⏸️ متوقف مؤقتاً — انقر على أي بطاقة لعرض الباقة' : '⏸️ Paused — Click any card to configure plan')
+                      : (language === 'bn' ? 'কার্ডে মাউস রেখে স্পেক্স দেখুন ও পজ করুন' : language === 'ar' ? 'مرر المؤشر للإيقاف المؤقت واستعراض المواصفات' : 'Hover over any card to pause and inspect technical specs')}
+                  </span>
+                </div>
+              </div>
+
+              {/* Seamless Marquee Outer Container */}
+              <div 
+                className="relative w-full overflow-hidden py-4 select-none"
+                onMouseEnter={() => setIsMarqueePaused(true)}
+                onMouseLeave={() => setIsMarqueePaused(false)}
+                onTouchStart={() => setIsMarqueePaused(true)}
+                onTouchEnd={() => setIsMarqueePaused(false)}
+              >
+                {/* Visual Edge Blur Vignettes */}
+                <div className="absolute left-0 top-0 bottom-0 w-16 sm:w-24 bg-gradient-to-r from-slate-900 via-slate-900/80 to-transparent z-10 pointer-events-none" />
+                <div className="absolute right-0 top-0 bottom-0 w-16 sm:w-24 bg-gradient-to-l from-slate-900 via-slate-900/80 to-transparent z-10 pointer-events-none" />
+
+                {/* Inline Style Sheet for Smooth CSS Keyframes Marquee */}
+                <style>{`
+                  @keyframes tailoredMarqueeAnim {
+                    0% {
+                      transform: translate3d(-50%, 0, 0);
+                    }
+                    100% {
+                      transform: translate3d(0%, 0, 0);
+                    }
+                  }
+                  .tailored-marquee-track {
+                    animation: tailoredMarqueeAnim 40s linear infinite;
+                    will-change: transform;
+                  }
+                  .tailored-marquee-track:hover {
+                    animation-play-state: paused;
+                  }
+                `}</style>
+
+                <div 
+                  className="flex gap-6 w-max tailored-marquee-track"
+                  style={{
+                    animationPlayState: isMarqueePaused ? 'paused' : 'running'
+                  }}
+                >
+                  {duplicatedCategories.map((card, idx) => {
+                    const IconComponent = card.icon;
+
+                    return (
+                      <div
+                        key={`${card.id}-${idx}`}
+                        onClick={() => handleHostingCategorySelect(card.id)}
+                        className={`w-[320px] sm:w-[350px] p-6 sm:p-7 rounded-[28px] bg-gradient-to-b from-slate-950/95 via-slate-900/90 to-slate-950/95 border border-slate-800/80 ${card.borderGlow} shadow-[0_16px_40px_-15px_rgba(0,0,0,0.7)] hover:shadow-2xl transition-all duration-300 cursor-pointer group shrink-0 relative overflow-hidden flex flex-col justify-between backdrop-blur-xl hover:-translate-y-1`}
+                      >
+                        {/* Top specular accent bar */}
+                        <div className={`absolute top-0 inset-x-0 h-[2.5px] bg-gradient-to-r ${card.color} opacity-70 group-hover:opacity-100 group-hover:h-[3px] transition-all duration-300`} />
+
+                        {/* Ambient radial color bloom */}
+                        <div className={`absolute -top-12 -right-12 w-36 h-36 rounded-full bg-gradient-to-br ${card.color} opacity-10 blur-2xl group-hover:opacity-30 group-hover:scale-125 transition-all duration-500 pointer-events-none`} />
+
+                        <div>
+                          {/* Top row: Icon + Spec Badge */}
+                          <div className="flex items-start justify-between gap-3 mb-4">
+                            <div className="flex items-center gap-3">
+                              <div className={`p-3 rounded-2xl bg-gradient-to-tr ${card.color} text-white flex items-center justify-center w-12 h-12 shadow-lg shadow-black/40 shrink-0 group-hover:scale-105 group-hover:rotate-1 transition-all duration-300`}>
+                                <IconComponent className="w-6 h-6 stroke-[2.2]" />
+                              </div>
+                              <div>
+                                <h4 className="text-sm sm:text-base font-black text-white group-hover:text-cyan-300 transition-colors leading-tight">
+                                  {card.title}
+                                </h4>
+                                <div className="flex items-center gap-1.5 mt-1">
+                                  <span className="inline-flex items-center gap-1 text-[9px] font-mono uppercase bg-white/5 text-slate-300 border border-white/10 px-2 py-0.5 rounded-md font-bold">
+                                    <Activity className="w-2.5 h-2.5 text-cyan-400" />
+                                    {card.tagline}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Floating Top-Right Spec Badge */}
+                            <span className={`shrink-0 inline-flex items-center text-[9.5px] font-mono font-bold tracking-wider uppercase px-2.5 py-1 rounded-full border shadow-sm ${card.badgeColor}`}>
+                              {card.badgeText}
+                            </span>
                           </div>
-                          <div>
-                            <h4 className="text-xs sm:text-sm font-black text-white group-hover:text-cyan-300 transition duration-300">
-                              {card.title}
-                            </h4>
-                            <span className="inline-block text-[8.5px] font-mono uppercase bg-cyan-500/10 text-cyan-400 px-2 py-0.5 rounded-md font-bold mt-0.5">
-                              {subBadge}
+
+                          {/* Description */}
+                          <p className="text-[11.5px] sm:text-xs text-slate-400 group-hover:text-slate-300 leading-relaxed min-h-[44px] mb-4 transition-colors">
+                            {card.desc}
+                          </p>
+
+                          {/* 3 Tech Architecture Bullets */}
+                          <div className="space-y-1.5 mb-4">
+                            {card.specs.map((spec, sIdx) => (
+                              <div 
+                                key={sIdx}
+                                className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-slate-900/70 border border-slate-800/80 text-[11px] text-slate-300 group-hover:border-slate-700/80 transition-colors"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                                <span className="truncate font-medium">{spec}</span>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Performance SLA Tag */}
+                          <div className="flex items-center justify-between px-3 py-1.5 rounded-xl bg-cyan-950/20 border border-cyan-800/20 mb-4">
+                            <span className="text-[9.5px] font-mono font-bold uppercase tracking-wider text-cyan-400 flex items-center gap-1.5">
+                              <Sparkles className="w-3 h-3 text-cyan-400" />
+                              {card.pillHighlight}
+                            </span>
+                            <span className="text-[9px] font-mono text-slate-500 font-bold">
+                              {language === 'bn' ? 'তাত্ক্ষণিক অ্যাক্টিভেশন' : language === 'ar' ? 'تفعيل فوري' : 'Instant Provision'}
                             </span>
                           </div>
                         </div>
 
-                        <p className="text-[11px] text-slate-400 leading-relaxed min-h-[44px]">
-                          {card.desc}
-                        </p>
-                      </div>
+                        {/* Card Bottom: Dynamic Price + CTA Button */}
+                        <div className="pt-4 border-t border-slate-800/80 flex items-center justify-between gap-3">
+                          <div>
+                            <span className="text-[9px] font-mono uppercase font-bold text-slate-500 block leading-none mb-1">
+                              {language === 'bn' ? 'শুরু মাত্র' : language === 'ar' ? 'يبدأ من' : 'Starting from'}
+                            </span>
+                            <div className="flex items-baseline gap-1">
+                              <span className="text-base sm:text-lg font-black text-white group-hover:text-cyan-400 transition-colors font-sans tracking-tight">
+                                {getHostingFormattedPrice(card.priceUsd)}
+                              </span>
+                            </div>
+                          </div>
 
-                      {/* Bottom Pricing Indicator */}
-                      <div className="mt-4 pt-3.5 border-t border-slate-900 flex items-center justify-between">
-                        <div>
-                          <span className="text-[9px] text-slate-500 uppercase font-bold font-mono block leading-none mb-1">
-                            {language === 'bn' ? 'শুরু মাত্র' : language === 'ar' ? 'يبدأ من' : 'Starting from'}
-                          </span>
-                          <span className="text-sm sm:text-base font-extrabold text-white group-hover:text-cyan-400 transition duration-300 font-sans">
-                            {card.price}
-                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleHostingCategorySelect(card.id);
+                            }}
+                            className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-black text-white bg-slate-800/90 group-hover:bg-gradient-to-r ${card.color} border border-slate-700/80 group-hover:border-transparent shadow-sm group-hover:shadow-md transition-all duration-300 cursor-pointer`}
+                          >
+                            <span>{language === 'bn' ? 'প্যাকেজ দেখুন' : language === 'ar' ? 'عرض الباقات' : 'Explore Plans'}</span>
+                            <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+                          </button>
                         </div>
-                        <span className="text-[9.5px] font-black text-cyan-400 bg-cyan-950/40 border border-cyan-800/30 px-2.5 py-1 rounded-xl group-hover:bg-cyan-500 group-hover:text-white transition-all duration-300">
-                          {language === 'bn' ? 'হোস্টিং দেখুন' : language === 'ar' ? 'عرض الاستضافة' : 'View Hosting'} →
-                        </span>
                       </div>
-                    </div>
-                  );
-                })}
-              </motion.div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
     </section>
   );

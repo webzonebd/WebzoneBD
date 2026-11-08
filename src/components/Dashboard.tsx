@@ -19,6 +19,7 @@ import { DashboardWidgets } from './DashboardWidgets';
 import UserOrderHistory from './UserOrderHistory';
 import CompanyRevenueDashboard from './CompanyRevenueDashboard';
 import OrderProjectChat from './OrderProjectChat';
+import { simulateSendOrderReceiptEmail } from '../utils/orderReceipt';
 
 interface DashboardProps {
   language: Language;
@@ -402,6 +403,13 @@ export default function Dashboard({
             localStorage.setItem(`webzone_notifications_${user?.id || 'guest'}`, JSON.stringify(updated));
             return updated;
           });
+
+          // Simulate sending an HTML order confirmation email to the client upon successful payment verification
+          simulateSendOrderReceiptEmail(currentOrder, {
+            customerName: user?.name,
+            customerEmail: user?.email,
+            author: 'Client Verification Monitor'
+          }).catch(console.error);
 
           onAddActivityLog(`System generated Order Confirmed notification for Order #${currentOrder.id}`);
         }

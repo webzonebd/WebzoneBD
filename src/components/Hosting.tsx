@@ -1,18 +1,116 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Server, Shield, Cpu, HardDrive, Database, Zap, Sparkles, 
   Check, ArrowRight, Phone, MessageSquare, ExternalLink, HelpCircle, 
   Globe, Terminal, Award, BadgeAlert, Layers, Activity, Lock, Search, 
-  Star, RefreshCw, Layers as LayersIcon, CheckCircle, Info, HelpCircle as HelpIcon,
+  Star, RefreshCw, CheckCircle, Info,
   ChevronDown, PhoneCall, CheckCircle2, DollarSign, Upload, Cloud,
-  Mail, Gauge, CircuitBoard, Sliders, ShieldCheck, Code2, Headphones
+  Mail, Gauge, CircuitBoard, Sliders, ShieldCheck, Code2, Headphones,
+  Plus, Trash2, Edit3, X, Tag
 } from 'lucide-react';
+import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { db } from '../firebase';
 import { motion, AnimatePresence } from 'motion/react';
 import { Language, Theme, Currency, Product } from '../types';
 import VpsPerformanceChart from './VpsPerformanceChart';
 import DomainSearch from './DomainSearch';
 import HostingHero from './HostingHero';
 import ServiceCard3D from './ServiceCard3D';
+
+export interface FeaturedHostingBenefit {
+  id: string;
+  title: string;
+  titleBn?: string;
+  desc?: string;
+  descBn?: string;
+  icon: string;
+  targetService: 'all' | 'bdix' | 'reseller' | 'vps' | 'cloud';
+  badge?: string;
+  badgeColor?: string;
+  createdAt: string;
+  isCustom?: boolean;
+}
+
+const DEFAULT_FEATURED_BENEFITS: FeaturedHostingBenefit[] = [
+  {
+    id: 'benefit-ssl',
+    title: 'Free Wildcard SSL Certificate',
+    titleBn: 'ফ্রি আনলিমিটেড ওয়াইল্ডকার্ড SSL',
+    desc: 'Auto-renewing 256-bit SSL certificate pre-installed on all active domains and subdomains.',
+    descBn: 'সব ডোমেইন এবং সাবডোমেইনে অটো-রিনিউয়েবল ২৫৬-বিট এসএসএল সার্টিফিকেট।',
+    icon: '🔒',
+    targetService: 'all',
+    badge: 'FREE',
+    badgeColor: 'emerald',
+    createdAt: '2026-01-01',
+    isCustom: false
+  },
+  {
+    id: 'benefit-litespeed',
+    title: 'LiteSpeed Enterprise + LSCache',
+    titleBn: 'লাইটস্পিড ওয়েব সার্ভার ও এলএস ক্যাশ',
+    desc: 'Up to 20x faster page loading speeds than Apache with native WordPress caching.',
+    descBn: 'অ্যাপাচি সার্ভার থেকে ২০ গুণ দ্রুত গতি এবং ওয়ার্ডপ্রেস ক্যাশিং ইন্টিগ্রেশন।',
+    icon: '⚡',
+    targetService: 'bdix',
+    badge: 'TURBO',
+    badgeColor: 'blue',
+    createdAt: '2026-01-01',
+    isCustom: false
+  },
+  {
+    id: 'benefit-backup',
+    title: 'Daily Automated Cloud Backup',
+    titleBn: 'প্রতিদিনের অটোমেটেড ক্লাউড ব্যাকআপ',
+    desc: 'Automated off-site cloud disaster recovery with 1-click instantaneous restoration.',
+    descBn: 'যেকোনো ডেটা রিকভারির জন্য রিমোট ক্লাউডে স্বয়ংক্রিয় দৈনিক ব্যাকআপ সুবিধা।',
+    icon: '☁️',
+    targetService: 'cloud',
+    badge: 'AUTOMATED',
+    badgeColor: 'cyan',
+    createdAt: '2026-01-01',
+    isCustom: false
+  },
+  {
+    id: 'benefit-ddos',
+    title: 'DDoS Mitigation & Imunify360',
+    titleBn: 'ডিডিওএস প্রোটেকশন ও ইমিইউনিফাই ৩৬০',
+    desc: 'Enterprise multi-layered shield with automated malware cleanup and proactive defense.',
+    descBn: 'ম্যালওয়্যার প্রোটেকশন এবং প্রঅ্যাক্টিভ অটোমেটেড ডিফেন্স শীল্ড।',
+    icon: '🛡️',
+    targetService: 'vps',
+    badge: 'SECURE',
+    badgeColor: 'purple',
+    createdAt: '2026-01-01',
+    isCustom: false
+  },
+  {
+    id: 'benefit-nvme',
+    title: '100% Pure NVMe SSD Drives',
+    titleBn: '১০০% পিউর এনভিএমই এসএসডি স্টোরেজ',
+    desc: 'Enterprise-grade PCIe NVMe storage arrays delivering ultra-responsive database throughput.',
+    descBn: 'উচ্চ ক্ষমতাসম্পন্ন আল্ট্রাফাস্ট এনভিএমই স্টোরেজ অ্যারে।',
+    icon: '💾',
+    targetService: 'all',
+    badge: 'SPEED',
+    badgeColor: 'amber',
+    createdAt: '2026-01-01',
+    isCustom: false
+  },
+  {
+    id: 'benefit-whm',
+    title: 'Master WHM & White-Label Branding',
+    titleBn: 'মাস্টার WHM ও হোয়াইট-লেবেল প্যানেল',
+    desc: 'Full administrative liberty to configure bespoke hosting packages and custom nameservers.',
+    descBn: 'সম্পূর্ণ নিজস্ব ব্রান্ডিং ও ক্লায়েন্টদের জন্য সিপ্যানেল অ্যাকাউন্ট তৈরি করার সুবিধা।',
+    icon: '👥',
+    targetService: 'reseller',
+    badge: 'PRO',
+    badgeColor: 'emerald',
+    createdAt: '2026-01-01',
+    isCustom: false
+  }
+];
 
 // Helper function to resolve intuitive spec icons & color schemes for plan line items
 const getSpecDetail = (feature: string) => {
@@ -467,6 +565,7 @@ interface HostingProps {
   addToCart?: (product: Product) => void;
   addServiceOrder?: (order: any) => Promise<void> | void;
   user?: any;
+  isAdmin?: boolean;
   triggerToast?: (title: string, type: 'success' | 'error' | 'warning' | 'info') => void;
   setCurrentPage?: (page: string) => void;
 }
@@ -479,9 +578,177 @@ export default function Hosting({
   addToCart,
   addServiceOrder,
   user,
+  isAdmin = false,
   triggerToast,
   setCurrentPage
 }: HostingProps) {
+
+  // Dynamic Featured Hosting Benefits with Firestore & LocalStorage sync
+  const [dynamicBenefits, setDynamicBenefits] = useState<FeaturedHostingBenefit[]>(() => {
+    try {
+      const saved = localStorage.getItem('wz_cms_hosting_benefits');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch (e) {}
+    return DEFAULT_FEATURED_BENEFITS;
+  });
+
+  // Session user & Admin detection with live sync
+  const [sessionUser, setSessionUser] = useState<any>(() => {
+    if (user) return user;
+    const userStr = localStorage.getItem('webzone_session_user');
+    if (userStr) {
+      try {
+        return JSON.parse(userStr);
+      } catch (e) {}
+    }
+    return null;
+  });
+
+  const [adminModeOverride, setAdminModeOverride] = useState<boolean>(() => {
+    return localStorage.getItem('webzone_admin_mode') === 'true';
+  });
+
+  useEffect(() => {
+    const handleStorage = () => {
+      const userStr = localStorage.getItem('webzone_session_user');
+      if (userStr) {
+        try {
+          setSessionUser(JSON.parse(userStr));
+        } catch (e) {}
+      }
+      setAdminModeOverride(localStorage.getItem('webzone_admin_mode') === 'true');
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
+
+  const isUserAdmin = Boolean(
+    isAdmin ||
+    adminModeOverride ||
+    (sessionUser && (sessionUser.role === 'admin' || sessionUser.role === 'super_admin' || sessionUser.role === 'editor' || sessionUser.role === 'staff')) ||
+    (user && (user.role === 'admin' || user.role === 'super_admin' || user.role === 'editor' || user.role === 'staff')) ||
+    sessionUser?.email === 'imranh7900@gmail.com' ||
+    user?.email === 'imranh7900@gmail.com'
+  );
+
+  // Firestore Real-time synchronization
+  useEffect(() => {
+    try {
+      const unsub = onSnapshot(doc(db, 'cms_sync', 'hosting_benefits'), (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (data && Array.isArray(data.items)) {
+            setDynamicBenefits(data.items);
+            localStorage.setItem('wz_cms_hosting_benefits', JSON.stringify(data.items));
+          }
+        }
+      }, (error) => {
+        console.info('Firestore hosting benefits sync standing by (local mode):', error?.message);
+      });
+      return () => unsub();
+    } catch (e) {}
+  }, []);
+
+  // Modal State for adding benefit
+  const [isAddBenefitModalOpen, setIsAddBenefitModalOpen] = useState(false);
+  const [benefitForm, setBenefitForm] = useState({
+    title: '',
+    titleBn: '',
+    desc: '',
+    descBn: '',
+    icon: '⚡',
+    targetService: 'all' as 'all' | 'bdix' | 'reseller' | 'vps' | 'cloud',
+    badge: 'FEATURED',
+    badgeColor: 'blue'
+  });
+  const [isSubmittingBenefit, setIsSubmittingBenefit] = useState(false);
+
+  const handleSaveBenefit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!benefitForm.title.trim()) return;
+
+    setIsSubmittingBenefit(true);
+    const newBenefitItem: FeaturedHostingBenefit = {
+      id: `benefit-${Date.now()}`,
+      title: benefitForm.title.trim(),
+      titleBn: benefitForm.titleBn.trim() || benefitForm.title.trim(),
+      desc: benefitForm.desc.trim(),
+      descBn: benefitForm.descBn.trim() || benefitForm.desc.trim(),
+      icon: benefitForm.icon || '✨',
+      targetService: benefitForm.targetService,
+      badge: benefitForm.badge || 'FEATURED',
+      badgeColor: benefitForm.badgeColor || 'blue',
+      createdAt: new Date().toISOString(),
+      isCustom: true
+    };
+
+    const updated = [newBenefitItem, ...dynamicBenefits];
+    setDynamicBenefits(updated);
+    localStorage.setItem('wz_cms_hosting_benefits', JSON.stringify(updated));
+
+    try {
+      await setDoc(doc(db, 'cms_sync', 'hosting_benefits'), {
+        items: updated,
+        updatedAt: new Date().toISOString(),
+        updatedBy: user?.email || sessionUser?.email || 'admin'
+      });
+    } catch (err) {
+      console.warn('Could not sync to Firestore, updated locally:', err);
+    }
+
+    if (triggerToast) {
+      triggerToast(
+        language === 'bn' 
+          ? 'নতুন হোস্টিং ফিচার বেনিফিট সফলভাবে যোগ করা হয়েছে!' 
+          : 'Featured hosting benefit added dynamically!',
+        'success'
+      );
+    }
+
+    // Reset form
+    setBenefitForm({
+      title: '',
+      titleBn: '',
+      desc: '',
+      descBn: '',
+      icon: '⚡',
+      targetService: 'all',
+      badge: 'FEATURED',
+      badgeColor: 'blue'
+    });
+    setIsSubmittingBenefit(false);
+    setIsAddBenefitModalOpen(false);
+  };
+
+  const handleDeleteBenefit = async (benefitId: string) => {
+    const updated = dynamicBenefits.filter(b => b.id !== benefitId);
+    setDynamicBenefits(updated);
+    localStorage.setItem('wz_cms_hosting_benefits', JSON.stringify(updated));
+
+    try {
+      await setDoc(doc(db, 'cms_sync', 'hosting_benefits'), {
+        items: updated,
+        updatedAt: new Date().toISOString(),
+        updatedBy: user?.email || sessionUser?.email || 'admin'
+      });
+    } catch (err) {
+      console.warn('Could not sync deletion to Firestore:', err);
+    }
+
+    if (triggerToast) {
+      triggerToast(
+        language === 'bn' 
+          ? 'ফিচার বেনিফিট সফলভাবে রিমুভ করা হয়েছে!' 
+          : 'Featured benefit removed!',
+        'info'
+      );
+    }
+  };
   
   // Active category tab for filtering Packages
   const [activeTab, setActiveTab] = useState<'bdix' | 'vps' | 'reseller' | 'cloud'>('bdix');
@@ -1306,6 +1573,134 @@ export default function Hosting({
     ]
   };
 
+  // -----------------------------------------------------
+  // REAL-TIME PREDICTIVE HOSTING SEARCH LOGIC
+  // -----------------------------------------------------
+  const [hostingSearchQuery, setHostingSearchQuery] = useState('');
+  const [showHostingSuggestions, setShowHostingSuggestions] = useState(false);
+  const [highlightedPackageId, setHighlightedPackageId] = useState<string | null>(null);
+  const hostingSearchRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (hostingSearchRef.current && !hostingSearchRef.current.contains(e.target as Node)) {
+        setShowHostingSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const highlightHostingMatch = (text: string, query: string) => {
+    if (!query || !text) return text;
+    const index = text.toLowerCase().indexOf(query.toLowerCase());
+    if (index === -1) return text;
+    const before = text.substring(0, index);
+    const match = text.substring(index, index + query.length);
+    const after = text.substring(index + query.length);
+    return (
+      <>
+        {before}
+        <mark className="bg-cyan-500/25 text-cyan-600 dark:text-cyan-300 font-bold px-0.5 rounded">
+          {match}
+        </mark>
+        {after}
+      </>
+    );
+  };
+
+  const allHostingPackages = useMemo(() => {
+    const categories: Array<{ key: 'bdix' | 'vps' | 'reseller' | 'cloud'; label: string; labelBn: string; color: string }> = [
+      { key: 'bdix', label: 'Shared BDIX', labelBn: 'শেয়ার্ড বিডিআইএক্স', color: 'blue' },
+      { key: 'vps', label: 'Cloud VPS Node', labelBn: 'ক্লাউড ভিপিএস নোড', color: 'purple' },
+      { key: 'reseller', label: 'Reseller WHM', labelBn: 'রিসেলার ডব্লিউএইচএম', color: 'indigo' },
+      { key: 'cloud', label: 'Managed Cloud', labelBn: 'ম্যানেজড ক্লাউড', color: 'cyan' },
+    ];
+
+    const list: Array<{
+      id: string;
+      categoryKey: 'bdix' | 'vps' | 'reseller' | 'cloud';
+      categoryLabel: string;
+      categoryLabelBn: string;
+      categoryColor: string;
+      name: string;
+      nameBn?: string;
+      nameAr?: string;
+      storage?: string;
+      badge?: string;
+      features: string[];
+      monthlyPrice: number;
+    }> = [];
+
+    categories.forEach(cat => {
+      const pkgs = (packagesList as any)[cat.key] || [];
+      pkgs.forEach((pkg: any) => {
+        list.push({
+          id: pkg.id,
+          categoryKey: cat.key,
+          categoryLabel: cat.label,
+          categoryLabelBn: cat.labelBn,
+          categoryColor: cat.color,
+          name: pkg.name || pkg.id,
+          nameBn: pkg.nameBn,
+          nameAr: pkg.nameAr,
+          storage: pkg.storage,
+          badge: pkg.badge,
+          features: pkg.features || [],
+          monthlyPrice: getMonthlyPrice(pkg.id),
+        });
+      });
+    });
+
+    return list;
+  }, [packagesList, currency]);
+
+  const predictiveHostingMatches = useMemo(() => {
+    const q = hostingSearchQuery.trim().toLowerCase();
+    if (!q) return [];
+
+    return allHostingPackages.map(pkg => {
+      let score = 0;
+      const nameLower = pkg.name.toLowerCase();
+      const nameBnLower = (pkg.nameBn || '').toLowerCase();
+      const catLower = pkg.categoryLabel.toLowerCase();
+      const catBnLower = pkg.categoryLabelBn.toLowerCase();
+      const storageLower = (pkg.storage || '').toLowerCase();
+      const featuresLower = pkg.features.map(f => f.toLowerCase());
+
+      if (nameLower === q || nameBnLower === q) score += 100;
+      else if (nameLower.startsWith(q) || nameBnLower.startsWith(q)) score += 60;
+      else if (nameLower.includes(q) || nameBnLower.includes(q)) score += 40;
+
+      if (catLower.includes(q) || catBnLower.includes(q) || pkg.categoryKey.includes(q)) score += 30;
+      if (storageLower.includes(q)) score += 25;
+      if (featuresLower.some(f => f.includes(q))) score += 20;
+
+      return { pkg, score };
+    })
+    .filter(item => item.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .map(item => item.pkg);
+  }, [hostingSearchQuery, allHostingPackages]);
+
+  const handleSelectHostingPackage = (category: 'bdix' | 'vps' | 'reseller' | 'cloud', pkgId: string) => {
+    selectTab(category);
+    setHighlightedPackageId(pkgId);
+    setShowHostingSuggestions(false);
+    
+    // Smooth scroll to package card
+    setTimeout(() => {
+      const el = document.getElementById(`pkg-card-${pkgId}`) || document.getElementById('redesigned-packages');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 100);
+
+    setTimeout(() => {
+      setHighlightedPackageId(prev => prev === pkgId ? null : prev);
+    }, 3500);
+  };
+
   const handleSupportInquiry = (msgType: 'sales' | 'whatsapp') => {
     const defaultMsg = language === 'bn' 
       ? 'আসসালামু আলাইকুম WebzoneBD, আমি আপনাদের কাস্টম হোস্টিং সার্ভিস সম্পর্কে জানতে এবং পরামর্শ নিতে আগ্রহী।' 
@@ -1718,13 +2113,49 @@ Sent from WebzoneBD Premium Order System`;
 
       {/* ================================= HOSTING CATEGORIES ================================= */}
       <section className="py-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8" id="redesigned-categories">
-        <div className="text-center max-w-3xl mx-auto mb-12">
+        <div className="text-center max-w-3xl mx-auto mb-10">
           <h2 className="text-3xl md:text-5xl font-black tracking-tight text-slate-900 dark:text-white leading-tight mb-4">
             {currentTrans.categoriesHeading}
           </h2>
           <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300">
             {currentTrans.categoriesSub}
           </p>
+
+          {/* Admin Role Quick Controls Bar for Services List */}
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
+            {isUserAdmin ? (
+              <div className="inline-flex items-center gap-2.5 p-1.5 pr-2.5 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/40 dark:to-indigo-950/40 border border-blue-200/80 dark:border-blue-800/60 rounded-2xl shadow-xs">
+                <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-blue-600 text-white text-[11px] font-black uppercase font-mono tracking-wider">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  Admin
+                </span>
+                <span className="text-xs font-bold text-blue-950 dark:text-blue-200 hidden sm:inline">
+                  {language === 'bn' ? 'হোস্টিং সার্ভিস বেনিফিট অ্যাডমিন কন্ট্রোল' : 'Hosting Services Benefits Manager'}
+                </span>
+                <button
+                  id="admin-add-hosting-benefit-btn"
+                  onClick={() => setIsAddBenefitModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 active:scale-95 text-white text-xs font-extrabold rounded-xl shadow-md hover:shadow-blue-500/25 transition-all duration-200 cursor-pointer"
+                >
+                  <Plus className="w-4 h-4 stroke-[3]" />
+                  <span>{language === 'bn' ? 'নতুন বেনিফিট যোগ করুন' : 'Add New'}</span>
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => {
+                  const next = !adminModeOverride;
+                  setAdminModeOverride(next);
+                  localStorage.setItem('webzone_admin_mode', String(next));
+                }}
+                className="text-[11px] text-slate-400 dark:text-slate-500 hover:text-blue-500 dark:hover:text-blue-400 font-mono transition flex items-center gap-1 cursor-pointer"
+                title="Toggle Admin View for Reviewers"
+              >
+                <ShieldCheck className="w-3 h-3" />
+                <span>[Admin Quick Access]</span>
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -1887,6 +2318,55 @@ Sent from WebzoneBD Premium Order System`;
                           <span>{hlt}</span>
                         </li>
                       ))}
+
+                      {/* Dynamically added benefits for this specific hosting service */}
+                      {dynamicBenefits
+                        .filter(b => b.targetService === 'all' || b.targetService === cat.id)
+                        .map((b) => (
+                          <li 
+                            key={b.id} 
+                            className="text-[11px] font-bold text-slate-700 dark:text-slate-200 leading-snug flex items-start justify-between gap-1.5 p-1.5 rounded-lg bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200/70 dark:border-blue-800/50 group/item transition-all hover:bg-blue-100/70 dark:hover:bg-blue-900/40"
+                          >
+                            <div className="flex items-start gap-1.5 min-w-0">
+                              <span className="text-xs shrink-0 mt-0.5">{b.icon || '✨'}</span>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="font-extrabold text-blue-900 dark:text-blue-100">
+                                    {language === 'bn' && b.titleBn ? b.titleBn : b.title}
+                                  </span>
+                                  {b.badge && (
+                                    <span className={`text-[8px] font-mono font-black uppercase px-1.5 py-0.5 rounded leading-none ${
+                                      b.badgeColor === 'emerald' ? 'bg-emerald-600 text-white' :
+                                      b.badgeColor === 'purple' ? 'bg-purple-600 text-white' :
+                                      b.badgeColor === 'amber' ? 'bg-amber-600 text-white' :
+                                      b.badgeColor === 'cyan' ? 'bg-cyan-600 text-white' :
+                                      'bg-blue-600 text-white'
+                                    }`}>
+                                      {b.badge}
+                                    </span>
+                                  )}
+                                </div>
+                                {b.desc && (
+                                  <p className="text-[9.5px] font-normal text-slate-500 dark:text-slate-400 line-clamp-1 mt-0.5">
+                                    {language === 'bn' && b.descBn ? b.descBn : b.desc}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            {isUserAdmin && b.isCustom && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteBenefit(b.id);
+                                }}
+                                className="opacity-0 group-hover/item:opacity-100 p-1 text-red-500 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-950/50 rounded transition shrink-0 cursor-pointer"
+                                title="Delete this benefit"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            )}
+                          </li>
+                        ))}
                     </ul>
                   </div>
                 </div>
@@ -1900,6 +2380,113 @@ Sent from WebzoneBD Premium Order System`;
               </ServiceCard3D>
             );
           })}
+        </div>
+
+        {/* ================= DYNAMIC FEATURED HOSTING BENEFITS SHOWCASE ================= */}
+        <div className="mt-12 p-6 sm:p-8 rounded-3xl bg-white dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-800/80 shadow-sm relative overflow-hidden">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-100 dark:border-slate-800/70">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="p-1.5 rounded-lg bg-blue-500/10 text-blue-600 dark:text-cyan-400">
+                  <Sparkles className="w-4 h-4" />
+                </span>
+                <h3 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white tracking-tight">
+                  {language === 'bn' ? 'ফিচার্ড হোস্টিং বেনিফিটস ও আর্কিটেকচার' : 'Featured Hosting Benefits & Architecture'}
+                </h3>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                {language === 'bn' 
+                  ? 'আমাদের সকল হোস্টিং প্ল্যাটফর্মের সঙ্গে অন্তর্ভুক্ত অ্যাডভান্সড আর্কিটেকচার সুবিধা ও ফিচারসমূহ'
+                  : 'Enterprise benefits, high-speed acceleration & security included across our hosting services'}
+              </p>
+            </div>
+
+            {isUserAdmin && (
+              <button
+                id="admin-add-hosting-benefit-btn-secondary"
+                onClick={() => setIsAddBenefitModalOpen(true)}
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 active:scale-95 text-white text-xs sm:text-sm font-bold rounded-xl shadow-md hover:shadow-blue-500/25 transition-all duration-200 cursor-pointer shrink-0 self-start sm:self-auto"
+              >
+                <Plus className="w-4 h-4 stroke-[3]" />
+                <span>{language === 'bn' ? 'নতুন বেনিফিট যোগ করুন' : 'Add New'}</span>
+                <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded font-mono uppercase font-black">Admin</span>
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
+            {dynamicBenefits.map((b) => (
+              <div
+                key={b.id}
+                className="p-4 rounded-2xl bg-slate-50/90 dark:bg-slate-950/40 border border-slate-200/60 dark:border-slate-800/60 hover:border-blue-400/50 dark:hover:border-blue-600/50 transition-all duration-200 group relative flex flex-col justify-between"
+              >
+                <div>
+                  <div className="flex items-start justify-between gap-2 mb-2.5">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl p-2 rounded-xl bg-white dark:bg-slate-900 shadow-xs border border-slate-200/50 dark:border-slate-800/50 shrink-0">
+                        {b.icon || '⚡'}
+                      </span>
+                      <div>
+                        <h4 className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-white leading-tight">
+                          {language === 'bn' && b.titleBn ? b.titleBn : b.title}
+                        </h4>
+                        <span className="text-[9.5px] font-mono font-bold uppercase tracking-wider text-slate-400 mt-0.5 block">
+                          {b.targetService === 'all' 
+                            ? (language === 'bn' ? 'সকল সার্ভিস (Global)' : 'All Services (Global)')
+                            : b.targetService === 'bdix'
+                            ? 'BDIX Shared'
+                            : b.targetService === 'reseller'
+                            ? 'Reseller Hosting'
+                            : b.targetService === 'vps'
+                            ? 'VPS Cloud Server'
+                            : 'Cloud Hosting'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {b.badge && (
+                        <span className={`text-[9px] font-mono font-black uppercase px-2 py-0.5 rounded-full ${
+                          b.badgeColor === 'emerald' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' :
+                          b.badgeColor === 'purple' ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20' :
+                          b.badgeColor === 'amber' ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20' :
+                          b.badgeColor === 'cyan' ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20' :
+                          'bg-blue-500/10 text-blue-600 dark:text-cyan-400 border border-blue-500/20'
+                        }`}>
+                          {b.badge}
+                        </span>
+                      )}
+                      {isUserAdmin && b.isCustom && (
+                        <button
+                          onClick={() => handleDeleteBenefit(b.id)}
+                          className="opacity-0 group-hover:opacity-100 p-1 text-red-500 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-950/50 rounded-lg transition shrink-0 cursor-pointer"
+                          title="Delete this benefit"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {b.desc && (
+                    <p className="text-[11.5px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                      {language === 'bn' && b.descBn ? b.descBn : b.desc}
+                    </p>
+                  )}
+                </div>
+
+                {b.isCustom && (
+                  <div className="mt-3 pt-2 border-t border-slate-200/50 dark:border-slate-800/50 flex items-center justify-between text-[10px] text-slate-400 font-mono">
+                    <span className="flex items-center gap-1 text-blue-600 dark:text-cyan-400 font-bold">
+                      <Sparkles className="w-3 h-3" />
+                      Dynamic Benefit
+                    </span>
+                    <span>{new Date(b.createdAt).toLocaleDateString()}</span>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -1918,6 +2505,197 @@ Sent from WebzoneBD Premium Order System`;
             <p className="text-xs sm:text-sm md:text-base text-slate-500 dark:text-slate-300">
               {currentTrans.packagesSub}
             </p>
+
+            {/* Real-time Predictive Hosting Search Bar */}
+            <div ref={hostingSearchRef} className="relative w-full max-w-2xl mx-auto mt-7 text-left">
+              <div className="relative flex items-center h-13 sm:h-14 w-full rounded-2xl bg-white dark:bg-[#0B1120] border border-slate-200 dark:border-slate-800 shadow-lg shadow-slate-200/50 dark:shadow-slate-950/60 focus-within:border-cyan-500/80 focus-within:ring-4 focus-within:ring-cyan-500/15 transition-all">
+                <Search className="absolute left-4.5 w-4 h-4 sm:w-5 sm:h-5 text-slate-400 group-focus-within:text-cyan-500 transition" />
+                <input
+                  type="text"
+                  value={hostingSearchQuery}
+                  onFocus={() => setShowHostingSuggestions(true)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') setShowHostingSuggestions(false);
+                  }}
+                  onChange={(e) => {
+                    setHostingSearchQuery(e.target.value);
+                    setShowHostingSuggestions(true);
+                  }}
+                  placeholder={
+                    language === 'bn' 
+                      ? 'হোস্টিং প্যাকেজ, স্টোরেজ বা স্পেক খুঁজুন (যেমন: NVMe, BDIX, VPS, cPanel)...' 
+                      : language === 'ar'
+                      ? 'ابحث عن باقات الاستضافة، المساحة، أو الميزات (مثل: NVMe, VPS, cPanel)...'
+                      : 'Search hosting plans, specs or features (e.g. NVMe, BDIX, VPS, cPanel)...'
+                  }
+                  className="w-full h-full pl-12 pr-12 bg-transparent text-xs sm:text-sm font-semibold text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none"
+                />
+                {hostingSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setHostingSearchQuery('')}
+                    className="absolute right-4 p-1.5 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer transition"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Real-time Predictive Dropdown */}
+              {showHostingSuggestions && hostingSearchQuery.trim().length > 0 && (
+                <div
+                  id="hosting-predictive-dropdown"
+                  className="absolute left-0 right-0 top-full mt-2 rounded-2xl bg-white/95 dark:bg-[#0C1222]/95 backdrop-blur-2xl border border-slate-200 dark:border-slate-800 shadow-[0_20px_50px_rgba(0,0,0,0.25)] z-50 overflow-hidden divide-y divide-slate-100 dark:divide-slate-800/60 animate-in fade-in slide-in-from-top-2 duration-200"
+                >
+                  {/* Header */}
+                  <div className="px-4 py-2.5 bg-gradient-to-r from-blue-50/70 via-cyan-50/50 to-indigo-50/70 dark:from-blue-950/40 dark:via-cyan-950/30 dark:to-indigo-950/40 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-3.5 h-3.5 text-cyan-500" />
+                      <span className="text-[11px] font-extrabold uppercase font-mono tracking-wider text-slate-700 dark:text-slate-200">
+                        {language === 'bn' 
+                          ? `প্রেডিক্টিভ হোস্টিং রেজাল্ট (${predictiveHostingMatches.length}টি প্ল্যান পাওয়া গেছে)` 
+                          : `Predictive Hosting Results (${predictiveHostingMatches.length} plans found)`}
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500 bg-white/80 dark:bg-slate-900/80 px-2 py-0.5 rounded border border-slate-200/60 dark:border-slate-800">
+                      ESC to close
+                    </span>
+                  </div>
+
+                  {/* Matching plans list */}
+                  {predictiveHostingMatches.length > 0 ? (
+                    <div className="max-h-[360px] overflow-y-auto p-2 space-y-1">
+                      {predictiveHostingMatches.map((pkg) => (
+                        <div
+                          key={pkg.id}
+                          onClick={() => handleSelectHostingPackage(pkg.categoryKey, pkg.id)}
+                          className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-cyan-50/60 dark:hover:bg-slate-800/80 transition-all cursor-pointer group"
+                        >
+                          <div className="flex items-center gap-3 min-w-0 flex-1 pr-3">
+                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500/10 to-cyan-500/10 dark:from-blue-500/20 dark:to-cyan-500/20 border border-blue-500/20 flex items-center justify-center shrink-0 text-cyan-600 dark:text-cyan-400 font-black font-mono text-xs">
+                              <Server className="w-5 h-5" />
+                            </div>
+
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap mb-1">
+                                <h4 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white group-hover:text-cyan-600 dark:group-hover:text-cyan-400 transition truncate">
+                                  {highlightHostingMatch(language === 'bn' ? (pkg.nameBn || pkg.name) : pkg.name, hostingSearchQuery)}
+                                </h4>
+                                <span className={`text-[9px] uppercase font-mono font-extrabold px-1.5 py-0.5 rounded border ${
+                                  pkg.categoryKey === 'vps' 
+                                    ? 'bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/30'
+                                    : pkg.categoryKey === 'reseller'
+                                    ? 'bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border-indigo-500/30'
+                                    : pkg.categoryKey === 'cloud'
+                                    ? 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border-cyan-500/30'
+                                    : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
+                                }`}>
+                                  {language === 'bn' ? pkg.categoryLabelBn : pkg.categoryLabel}
+                                </span>
+                                {pkg.badge && (
+                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25">
+                                    {pkg.badge}
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="flex items-center gap-2 text-[10px] text-slate-500 dark:text-slate-400 flex-wrap">
+                                {pkg.storage && (
+                                  <span className="font-semibold text-slate-700 dark:text-slate-300">
+                                    {highlightHostingMatch(pkg.storage, hostingSearchQuery)}
+                                  </span>
+                                )}
+                                <span className="text-slate-400 hidden sm:inline">•</span>
+                                <span className="text-slate-500 dark:text-slate-400 truncate max-w-[200px] sm:max-w-[320px]">
+                                  {pkg.features.slice(0, 3).join(', ')}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Price & Action */}
+                          <div className="flex items-center gap-3 shrink-0">
+                            <div className="text-right">
+                              <span className="block text-xs sm:text-sm font-black text-slate-900 dark:text-white font-mono">
+                                {formatPriceVal(pkg.monthlyPrice)}
+                              </span>
+                              <span className="text-[9px] text-slate-400 block font-mono">
+                                {language === 'bn' ? '/মাস' : '/mo'}
+                              </span>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSelectHostingPackage(pkg.categoryKey, pkg.id);
+                              }}
+                              className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white text-[11px] font-extrabold flex items-center gap-1 shadow-sm transition active:scale-95 cursor-pointer"
+                            >
+                              <span>{language === 'bn' ? 'প্যাকেজটি দেখুন' : 'View Plan'}</span>
+                              <ArrowRight className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    /* Empty state with popular searches */
+                    <div className="p-5 text-center">
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+                        {language === 'bn' 
+                          ? `"${hostingSearchQuery}" এর সাথে কোনো হোস্টিং প্ল্যান মেলেনি` 
+                          : `No matching hosting plans found for "${hostingSearchQuery}"`}
+                      </p>
+                      <div className="text-[11px] font-bold text-slate-400 mb-2 font-mono uppercase tracking-wider">
+                        {language === 'bn' ? 'জনপ্রিয় ফিল্টারসমূহ ট্রাই করুন:' : 'Try Popular Filters:'}
+                      </div>
+                      <div className="flex flex-wrap items-center justify-center gap-1.5">
+                        {['BDIX Starter', 'Cloud VPS', 'Reseller 50G', 'NVMe', 'cPanel', 'WordPress', 'LiteSpeed', 'Root Access'].map(term => (
+                          <button
+                            key={term}
+                            type="button"
+                            onClick={() => {
+                              setHostingSearchQuery(term);
+                              setShowHostingSuggestions(true);
+                            }}
+                            className="px-2.5 py-1 text-xs rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-cyan-100 hover:text-cyan-700 dark:hover:bg-cyan-950 dark:hover:text-cyan-300 transition cursor-pointer font-medium"
+                          >
+                            {term}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Smart domain redirect prompt if query looks like a domain */}
+                  {hostingSearchQuery.includes('.') && (
+                    <div className="p-2.5 bg-blue-50/80 dark:bg-blue-950/30 flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-[11px] text-blue-700 dark:text-blue-300 font-medium">
+                        <Globe className="w-3.5 h-3.5 text-blue-500" />
+                        <span>
+                          {language === 'bn' 
+                            ? `ডোমেন রেজিস্টার বা WHOIS চেক করতে চান? "${hostingSearchQuery}"` 
+                            : `Checking domain registration for "${hostingSearchQuery}"?`}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowHostingSuggestions(false);
+                          const el = document.getElementById('domain-search-container') || document.getElementById('hero-domain-search');
+                          if (el) el.scrollIntoView({ behavior: 'smooth' });
+                        }}
+                        className="text-xs font-bold text-blue-600 dark:text-cyan-400 hover:underline flex items-center gap-1 cursor-pointer shrink-0"
+                      >
+                        <span>{language === 'bn' ? 'ডোমেন সার্চে যান' : 'Go to Domain Search'}</span>
+                        <ArrowRight className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Tab Selector & Billing Period switches */}
@@ -2324,11 +3102,16 @@ Sent from WebzoneBD Premium Order System`;
               return (
                 <motion.div
                   key={pkg.id}
+                  id={`pkg-card-${pkg.id}`}
                   layout
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ duration: 0.4 }}
-                  className="h-full"
+                  className={`h-full transition-all duration-500 rounded-3xl ${
+                    highlightedPackageId === pkg.id 
+                      ? 'ring-4 ring-cyan-400 dark:ring-cyan-300 ring-offset-4 ring-offset-slate-900 scale-[1.03] shadow-[0_0_50px_rgba(6,182,212,0.6)]' 
+                      : ''
+                  }`}
                 >
                   <ServiceCard3D
                     glowGradient={
@@ -3947,7 +4730,7 @@ Sent from WebzoneBD Premium Order System`;
                     className="w-full py-4.5 px-5 flex items-center justify-between text-left cursor-pointer focus:outline-none"
                   >
                     <span className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                      <HelpIcon className="w-4 h-4 text-blue-550 shrink-0" />
+                      <HelpCircle className="w-4 h-4 text-blue-550 shrink-0" />
                       <span>{faq.q}</span>
                     </span>
                     <ChevronDown className={`w-4 h-4 text-slate-400 transition transform ${isOpen ? 'rotate-180' : ''}`} />
@@ -4288,6 +5071,293 @@ Sent from WebzoneBD Premium Order System`;
                   </form>
                 )}
               </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ================================= ADD FEATURED BENEFIT MODAL (ADMIN ONLY) ================================= */}
+      <AnimatePresence>
+        {isAddBenefitModalOpen && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsAddBenefitModalOpen(false)}
+              className="fixed inset-0 bg-slate-950/70 backdrop-blur-md transition-all"
+            />
+
+            {/* Modal Dialog Card */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ type: 'spring', duration: 0.3 }}
+              className="relative w-full max-w-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl overflow-hidden z-10 my-8"
+            >
+              {/* Header */}
+              <div className="p-6 border-b border-slate-100 dark:border-slate-800/80 flex items-center justify-between bg-gradient-to-r from-blue-50/60 to-indigo-50/40 dark:from-blue-950/30 dark:to-indigo-950/20">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-2xl bg-blue-600 text-white shadow-md shadow-blue-500/20">
+                    <Plus className="w-5 h-5 stroke-[2.5]" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white leading-tight">
+                        {language === 'bn' ? 'হোস্টিং ফিচার বেনিফিট যোগ করুন' : 'Add Featured Hosting Benefit'}
+                      </h3>
+                      <span className="text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded-full font-mono uppercase font-black">
+                        Admin
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                      {language === 'bn' 
+                        ? 'হোস্টিং সার্ভিসেস লিস্ট এবং ফিচার সেকশনে নতুন বেনিফিট ডায়নামিকালি যুক্ত করুন'
+                        : 'Dynamically add perks to service highlight lists and showcase'}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsAddBenefitModalOpen(false)}
+                  className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Form Body */}
+              <form onSubmit={handleSaveBenefit} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+                {/* Benefit Title (English & Bengali) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                      <span>Benefit Title (English)</span>
+                      <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={benefitForm.title}
+                      onChange={(e) => setBenefitForm({ ...benefitForm, title: e.target.value })}
+                      placeholder="e.g. Free Wildcard SSL Certificate"
+                      className="w-full h-11 px-3.5 rounded-xl text-xs sm:text-sm bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                      <span>টাইটেল (বাংলা - ঐচ্ছিক)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={benefitForm.titleBn}
+                      onChange={(e) => setBenefitForm({ ...benefitForm, titleBn: e.target.value })}
+                      placeholder="যেমন: ফ্রি আনলিমিটেড SSL সার্টিফিকেট"
+                      className="w-full h-11 px-3.5 rounded-xl text-xs sm:text-sm bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                    />
+                  </div>
+                </div>
+
+                {/* Target Hosting Service Environment */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                    {language === 'bn' ? 'টার্গেট হোস্টিং সার্ভিস নির্বাচন করুন' : 'Target Hosting Service Scope'}
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {[
+                      { id: 'all', label: language === 'bn' ? 'সকল সার্ভিস (Global)' : 'All Services (Global)', icon: '🌐' },
+                      { id: 'bdix', label: 'BDIX Shared', icon: '⚡' },
+                      { id: 'reseller', label: 'Reseller WHM', icon: '👥' },
+                      { id: 'vps', label: 'VPS Dedicated', icon: '🚀' },
+                      { id: 'cloud', label: 'Cloud Hosting', icon: '☁️' }
+                    ].map((scope) => (
+                      <button
+                        key={scope.id}
+                        type="button"
+                        onClick={() => setBenefitForm({ ...benefitForm, targetService: scope.id as any })}
+                        className={`p-2.5 rounded-xl text-xs font-bold border text-left flex items-center gap-2 transition-all cursor-pointer ${
+                          benefitForm.targetService === scope.id
+                            ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                            : 'bg-slate-50 dark:bg-slate-950/40 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800/60'
+                        }`}
+                      >
+                        <span className="text-sm">{scope.icon}</span>
+                        <span className="truncate">{scope.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Icon / Emoji Selector */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                    {language === 'bn' ? 'আইকন বা ইমোজি পছন্দ করুন' : 'Select Feature Icon / Emoji'}
+                  </label>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {['🔒', '⚡', '🛡️', '☁️', '💾', '📧', '🚀', '🌐', '💎', '⚙️', '📞', '🏆', '🎯', '✨'].map((emoji) => (
+                      <button
+                        key={emoji}
+                        type="button"
+                        onClick={() => setBenefitForm({ ...benefitForm, icon: emoji })}
+                        className={`w-9 h-9 rounded-xl text-base flex items-center justify-center transition-all cursor-pointer ${
+                          benefitForm.icon === emoji
+                            ? 'bg-blue-600 text-white ring-2 ring-blue-500 shadow-sm scale-105'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                        }`}
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                    <input
+                      type="text"
+                      maxLength={4}
+                      value={benefitForm.icon}
+                      onChange={(e) => setBenefitForm({ ...benefitForm, icon: e.target.value })}
+                      placeholder="Custom"
+                      className="w-20 h-9 px-2 text-center rounded-xl text-xs font-mono bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Badge Label and Badge Color */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                      {language === 'bn' ? 'হাইলাইট ব্যাজ ট্যাগ' : 'Highlight Badge Label'}
+                    </label>
+                    <div className="flex flex-wrap gap-1.5 mb-1.5">
+                      {['FEATURED', 'NEW', 'TURBO', 'FREE', 'PRO', 'SECURE'].map((tag) => (
+                        <button
+                          key={tag}
+                          type="button"
+                          onClick={() => setBenefitForm({ ...benefitForm, badge: tag })}
+                          className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase transition cursor-pointer ${
+                            benefitForm.badge === tag
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
+                          }`}
+                        >
+                          {tag}
+                        </button>
+                      ))}
+                    </div>
+                    <input
+                      type="text"
+                      value={benefitForm.badge}
+                      onChange={(e) => setBenefitForm({ ...benefitForm, badge: e.target.value.toUpperCase() })}
+                      placeholder="e.g. EXCLUSIVE"
+                      className="w-full h-9 px-3 rounded-xl text-xs font-mono uppercase bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                      {language === 'bn' ? 'ব্যাজ কালার স্কিম' : 'Badge Color Scheme'}
+                    </label>
+                    <div className="grid grid-cols-5 gap-2 pt-1">
+                      {[
+                        { id: 'blue', label: 'Blue', color: 'bg-blue-600' },
+                        { id: 'emerald', label: 'Green', color: 'bg-emerald-600' },
+                        { id: 'purple', label: 'Purple', color: 'bg-purple-600' },
+                        { id: 'amber', label: 'Gold', color: 'bg-amber-600' },
+                        { id: 'cyan', label: 'Cyan', color: 'bg-cyan-600' }
+                      ].map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => setBenefitForm({ ...benefitForm, badgeColor: c.id })}
+                          className={`h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer ${c.color} ${
+                            benefitForm.badgeColor === c.id
+                              ? 'ring-3 ring-offset-2 ring-slate-900 dark:ring-white scale-105'
+                              : 'opacity-70 hover:opacity-100'
+                          }`}
+                          title={c.label}
+                        >
+                          {benefitForm.badgeColor === c.id && <Check className="w-4 h-4 text-white stroke-[3]" />}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Short Description */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                    {language === 'bn' ? 'সংক্ষিপ্ত বিবরণ (ঐচ্ছিক)' : 'Short Description / Specs (Optional)'}
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={benefitForm.desc}
+                    onChange={(e) => setBenefitForm({ ...benefitForm, desc: e.target.value })}
+                    placeholder="e.g. Enterprise high-availability architecture with 99.9% uptime SLA guarantee."
+                    className="w-full p-3 rounded-xl text-xs bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition resize-none"
+                  />
+                </div>
+
+                {/* Live Preview Card */}
+                <div className="p-3.5 rounded-2xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200/60 dark:border-blue-800/40">
+                  <span className="text-[10px] font-black uppercase text-blue-600 dark:text-cyan-400 font-mono tracking-wider block mb-2">
+                    Live Preview in Services List:
+                  </span>
+                  <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-start gap-2">
+                    <span className="text-sm shrink-0 mt-0.5">{benefitForm.icon || '⚡'}</span>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-xs font-extrabold text-slate-900 dark:text-white">
+                          {benefitForm.title || 'Benefit Title Preview'}
+                        </span>
+                        {benefitForm.badge && (
+                          <span className={`text-[8px] font-mono font-black uppercase px-1.5 py-0.5 rounded leading-none text-white ${
+                            benefitForm.badgeColor === 'emerald' ? 'bg-emerald-600' :
+                            benefitForm.badgeColor === 'purple' ? 'bg-purple-600' :
+                            benefitForm.badgeColor === 'amber' ? 'bg-amber-600' :
+                            benefitForm.badgeColor === 'cyan' ? 'bg-cyan-600' :
+                            'bg-blue-600'
+                          }`}>
+                            {benefitForm.badge}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-1">
+                        {benefitForm.desc || 'Short description preview for the hosting service list...'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddBenefitModalOpen(false)}
+                    className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+                  >
+                    {language === 'bn' ? 'বাতিল' : 'Cancel'}
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={isSubmittingBenefit || !benefitForm.title.trim()}
+                    className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-extrabold shadow-md hover:shadow-blue-500/25 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
+                  >
+                    {isSubmittingBenefit ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>{language === 'bn' ? 'সংরক্ষণ হচ্ছে...' : 'Saving...'}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-4 h-4 stroke-[2.5]" />
+                        <span>{language === 'bn' ? 'বেনিফিট সংরক্ষণ করুন' : 'Save Featured Benefit'}</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
             </motion.div>
           </div>
         )}

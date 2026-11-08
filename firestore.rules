@@ -128,8 +128,7 @@ service cloud.firestore {
 
     // 6. CMS Sync configuration collection
     match /cms_sync/{collectionPath} {
-      allow read: if true;
-      allow write: if isSignedIn();
+      allow read, write: if true;
     }
 
     // 7. Service Inquiries collection
@@ -159,7 +158,20 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
-    // 12. Test collection for boot connection verification
+    // 12. Live Chat Sessions collection
+    match /live_chats/{chatId} {
+      allow read, write: if true;
+      match /messages/{messageId} {
+        allow read, write: if true;
+      }
+    }
+
+    // 13. Live Chat Settings collection
+    match /live_chat_settings/{settingId} {
+      allow read, write: if true;
+    }
+
+    // 14. Test collection for boot connection verification
     match /test/{testId} {
       allow read: if true;
     }

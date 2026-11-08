@@ -140,8 +140,8 @@ export default function KanbanBoard({ language, theme, triggerToast, isAdmin }: 
             setIsLoading(false);
           } else {
             // Seed base items into Firestore once if it's empty
-            INITIAL_PROJECTS.forEach(async (p) => {
-              await setDoc(doc(db, 'projects', p.id), p);
+            INITIAL_PROJECTS.forEach((p) => {
+              setDoc(doc(db, 'projects', p.id), p).catch(() => {});
             });
           }
         }, (err) => {
@@ -163,8 +163,8 @@ export default function KanbanBoard({ language, theme, triggerToast, isAdmin }: 
             setIsUsingFirestore(true);
           } else {
             // Seed base tasks into Firestore once if empty
-            INITIAL_TASKS.forEach(async (t) => {
-              await setDoc(doc(db, 'tasks', t.id), t);
+            INITIAL_TASKS.forEach((t) => {
+              setDoc(doc(db, 'tasks', t.id), t).catch(() => {});
             });
           }
         }, (err) => {

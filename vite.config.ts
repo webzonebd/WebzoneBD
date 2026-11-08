@@ -7,9 +7,43 @@ import {defineConfig} from 'vite';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+function safeStoragePlugin() {
+  return {
+    name: 'safe-storage-injector',
+    enforce: 'pre' as const,
+    transform(code: string, id: string) {
+      // Skip node_modules and the storage utility itself
+      if (
+        id.includes('node_modules') || 
+        !/\.(tsx?|jsx?)$/.test(id) || 
+        id.includes('storage.ts') ||
+        id.includes('main.tsx')
+      ) {
+        return null;
+      }
+
+      const hasLocal = code.includes('localStorage');
+      const hasSession = code.includes('sessionStorage');
+      if (!hasLocal && !hasSession) {
+        return null;
+      }
+
+      if (code.includes('/utils/storage') || code.includes('safeLocalStorage')) {
+        return null;
+      }
+
+      const importStatement = `import { safeLocalStorage as localStorage, safeSessionStorage as sessionStorage } from '@/src/utils/storage';\n`;
+      return {
+        code: importStatement + code,
+        map: null,
+      };
+    },
+  };
+}
+
 export default defineConfig(() => {
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [safeStoragePlugin(), react(), tailwindcss()],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

@@ -18,6 +18,7 @@ import {
 } from './StoreData';
 import { motion, AnimatePresence } from 'motion/react';
 import { MarketplaceGridSkeleton } from './skeletons/MarketplaceSkeleton';
+import StoreHeroSlider from './StoreHeroSlider';
 
 interface MarketplaceProps {
   language: Language;
@@ -35,6 +36,7 @@ interface MarketplaceProps {
   onOpenLogin?: () => void;
   onUpdateProduct?: (updatedProduct: Product) => void;
   onViewProduct?: (product: Product) => void;
+  onQuickBuy?: (product: Product, eventOrOrigin?: any) => void;
 }
 
 export default function Marketplace({ 
@@ -52,7 +54,8 @@ export default function Marketplace({
   triggerToast,
   onOpenLogin,
   onUpdateProduct,
-  onViewProduct
+  onViewProduct,
+  onQuickBuy
 }: MarketplaceProps) {
   
   // -----------------------------------------------------
@@ -64,6 +67,28 @@ export default function Marketplace({
     const saved = localStorage.getItem('webzone_store_categories');
     return saved ? JSON.parse(saved) : defaultStoreCategories;
   });
+
+  // Track item just added to wishlist for immediate subtle heart pulse feedback
+  const [recentlyAddedWishlistId, setRecentlyAddedWishlistId] = useState<string | null>(null);
+
+  // Centralized Quick Buy Handler
+  const handleQuickBuy = (prod: Product, e?: any) => {
+    if (onQuickBuy) {
+      onQuickBuy(prod, e);
+    } else {
+      addToCart(prod, e);
+      if (setCartOpen) {
+        setCartOpen(true);
+      }
+      if (triggerToast) {
+        triggerToast(
+          language === 'bn' 
+            ? `⚡ ${prod.nameBn || prod.name} কার্টে যোগ হয়েছে! চেকআউটে নেওয়া হচ্ছে...` 
+            : `⚡ ${prod.name} added! Redirecting to checkout...`
+        );
+      }
+    }
+  };
 
   const [subCategories, setSubCategories] = useState<StoreSubCategory[]>(() => {
     const saved = localStorage.getItem('webzone_store_subcategories');
@@ -317,6 +342,18 @@ export default function Marketplace({
 
   // Search suggestions and Recents state
   const [showSuggestions, setShowSuggestions] = useState<boolean>(false);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const [recentlyViewed, setRecentlyViewed] = useState<string[]>(() => {
     const saved = localStorage.getItem('webzone_recent_views');
     return saved ? JSON.parse(saved) : [];
@@ -424,25 +461,84 @@ export default function Marketplace({
   };
 
   // -----------------------------------------------------
-  // AI SEARCH SUGGESTIONS & AUTOCOMPLETE
+  // REAL-TIME PREDICTIVE SEARCH AUTOCOMPLETE & MATCHING
   // -----------------------------------------------------
-  const searchSuggestionsList = useMemo(() => {
-    if (!localSearch.trim()) return [];
-    const query = localSearch.toLowerCase();
-    
-    // Grab unique words or short titles matching text
-    const matchingProducts = products.filter(p => 
-      p.name.toLowerCase().includes(query) || 
-      p.nameBn.includes(query) || 
-      p.tags.some(t => t.toLowerCase().includes(query))
-    ).slice(0, 5);
+  const highlightMatch = (text: string, query: string) => {
+    if (!query || !text) return text;
+    const index = text.toLowerCase().indexOf(query.toLowerCase());
+    if (index === -1) return text;
+    const before = text.substring(0, index);
+    const match = text.substring(index, index + query.length);
+    const after = text.substring(index + query.length);
+    return (
+      <>
+        {before}
+        <mark className="bg-purple-500/25 text-purple-700 dark:text-purple-300 font-bold px-0.5 rounded">
+          {match}
+        </mark>
+        {after}
+      </>
+    );
+  };
 
-    return matchingProducts.map(p => ({
+  const predictiveSearchResults = useMemo(() => {
+    const raw = localSearch.trim();
+    if (!raw) return { products: [], categories: [], total: 0 };
+    const query = raw.toLowerCase();
+
+    // Score and match products
+    const matched = products.map(p => {
+      let score = 0;
+      const nameLower = (p.name || '').toLowerCase();
+      const nameBnLower = (p.nameBn || '').toLowerCase();
+      const nameArLower = (p.nameAr || '').toLowerCase();
+      const categoryName = (getCategoryName(p.category) || '').toLowerCase();
+      const subCat = (p.subCategory || '').toLowerCase();
+      const tags = (p.tags || []).map(t => t.toLowerCase());
+      const desc = (p.description || '').toLowerCase();
+
+      // Exact title match gets highest score
+      if (nameLower === query || nameBnLower === query) score += 100;
+      else if (nameLower.startsWith(query) || nameBnLower.startsWith(query)) score += 60;
+      else if (nameLower.includes(query) || nameBnLower.includes(query) || nameArLower.includes(query)) score += 40;
+
+      // Category / SubCategory matches
+      if (categoryName.includes(query) || p.category.toLowerCase().includes(query)) score += 30;
+      if (subCat.includes(query)) score += 25;
+
+      // Tags match
+      if (tags.some(t => t === query)) score += 35;
+      else if (tags.some(t => t.includes(query))) score += 20;
+
+      // Description match
+      if (desc.includes(query)) score += 10;
+
+      return { product: p, score };
+    })
+    .filter(item => item.score > 0)
+    .sort((a, b) => b.score - a.score);
+
+    // Matching categories
+    const matchingCategoryIds: string[] = Array.from(new Set(matched.map(m => m.product.category)));
+    const matchingCategories = matchingCategoryIds.map((catId: string) => {
+      const count = matched.filter(m => m.product.category === catId).length;
+      return { id: catId, name: getCategoryName(catId), count };
+    }).slice(0, 4);
+
+    return {
+      products: matched.slice(0, 6).map(m => m.product),
+      categories: matchingCategories,
+      total: matched.length
+    };
+  }, [localSearch, products, categories, language]);
+
+  const searchSuggestionsList = useMemo(() => {
+    return predictiveSearchResults.products.map(p => ({
       id: p.id,
       text: p.name,
       category: p.category
     }));
-  }, [localSearch, products]);
+  }, [predictiveSearchResults]);
 
   const handleSuggestionClick = (text: string, categoryId?: string) => {
     setLocalSearch(text);
@@ -1875,41 +1971,54 @@ export default function Marketplace({
       )}
 
       {/* -----------------------------------------------------------------
-          CATEGORY BANNER (COVERS REQUIREMENTS OF DYNAMIC HERO CONFIG)
+          GOOGLE PLAY STORE STYLE HERO SLIDER (WITH SMOOTH SLIDE ANIMATION)
           ----------------------------------------------------------------- */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-10 overflow-hidden" id="marketplace-dynamic-hero">
-        <div className="relative p-8 md:p-12 rounded-[32px] bg-gradient-to-br from-slate-900 via-[#111827] to-[#010309] text-white overflow-hidden shadow-xl border border-slate-800">
-          
-          {/* Animated luxury grids inside hero backdrop */}
-          <div className="absolute inset-0 bg-[linear-gradient(to_right,#1f29371a_1px,transparent_1px),linear-gradient(to_bottom,#1f29371a_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] shrink-0 opacity-40" />
-          <div className="absolute -top-32 -left-32 w-96 h-96 bg-blue-600/10 blur-3xl rounded-full" />
-          <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-cyan-600/10 blur-3xl rounded-full" />
+      <StoreHeroSlider 
+        products={products}
+        language={language}
+        theme={theme}
+        formatPrice={formatPrice}
+        addToCart={addToCart}
+        setCartOpen={setCartOpen}
+        onViewProduct={handleViewProduct}
+        wishlist={wishlist}
+        toggleWishlist={toggleWishlist}
+        activeCategory={activeCategory}
+        categories={categories}
+        triggerToast={triggerToast}
+        onQuickBuy={handleQuickBuy}
+      />
 
-          {/* Banner Contents */}
-          <div className="relative text-left max-w-3xl space-y-4">
-            <div className="flex items-center gap-2">
-              <span className="px-3 py-1 text-[10px] font-mono tracking-widest bg-emerald-500/15 border border-emerald-500/20 text-emerald-400 font-extrabold uppercase rounded-full">
-                {activeCategory === 'all' ? 'Codecanyon Plus Verified' : 'Primary Category Spotlight'}
-              </span>
-              <span className="text-slate-500 text-xs font-mono">•</span>
-              <span className="text-xs font-mono font-bold text-slate-350 bg-slate-800/55 px-2.5 py-0.5 rounded-full">
-                {processedProducts.length} {t.matchedCount}
-              </span>
+      {/* Active Category Header Pill (if filtered by category or search) */}
+      {activeCategory !== 'all' && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-6">
+          <div className="flex items-center justify-between p-4 rounded-2xl bg-white dark:bg-[#0B0F19] border border-slate-200 dark:border-slate-800 shadow-sm">
+            <div className="flex items-center gap-3">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+              <div>
+                <span className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider block">
+                  {language === 'bn' ? 'বাছাইকৃত ক্যাটাগরি' : 'Active Category'}
+                </span>
+                <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
+                  {getCategoryName(activeCategory)}
+                </h3>
+              </div>
             </div>
 
-            <h1 className="text-3xl sm:text-4.5xl font-black tracking-tight leading-none bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent font-display">
-              {activeCategory === 'all' ? t.heading : getCategoryName(activeCategory)}
-            </h1>
-
-            <p className="text-xs sm:text-sm text-slate-350 leading-relaxed max-w-2xl font-serif">
-              {activeCategory === 'all' 
-                ? t.subheading 
-                : categories.find(c => c.id === activeCategory)?.[language === 'bn' ? 'descriptionBn' : language === 'ar' ? 'descriptionAr' : 'description'] 
-                  || 'Clean structured modules, dynamic script interfaces with easy installation guidelines.'}
-            </p>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-mono font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full">
+                {processedProducts.length} {t.matchedCount}
+              </span>
+              <button
+                onClick={() => { setActiveCategory('all'); setActiveSubCategory('all'); }}
+                className="text-xs text-blue-600 hover:text-blue-500 font-bold px-2.5 py-1 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition cursor-pointer"
+              >
+                {language === 'bn' ? 'সব দেখুন' : 'View All'}
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* -----------------------------------------------------------------
           CORE LAYOUT: SIDEBAR FILTERS MATRIX + PRODUCT LISTINGS GRID
@@ -2108,7 +2217,7 @@ export default function Marketplace({
             <div className="flex flex-col md:flex-row items-center gap-4">
               
               {/* Dynamic search input with Premium SaaS Gradient Focus & Floating layout */}
-              <div className="relative flex-1 w-full text-left group">
+              <div ref={searchContainerRef} className="relative flex-1 w-full text-left group">
                 <div className="absolute -inset-[1px] bg-gradient-to-r from-[#7C3AED] via-[#A855F7] to-[#EC4899] rounded-[15px] opacity-0 group-focus-within:opacity-100 transition duration-500 blur-[2px] -z-10"></div>
                 <div className="absolute -inset-[1px] bg-gradient-to-r from-[#7C3AED] via-[#A855F7] to-[#EC4899] rounded-[15px] opacity-0 group-focus-within:opacity-100 transition duration-500 -z-10"></div>
                 
@@ -2118,6 +2227,13 @@ export default function Marketplace({
                     type="text"
                     value={localSearch}
                     onFocus={() => setShowSuggestions(true)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape') {
+                        setShowSuggestions(false);
+                      } else if (e.key === 'Enter') {
+                        setShowSuggestions(false);
+                      }
+                    }}
                     onChange={e => {
                       setLocalSearch(e.target.value);
                       setShowSuggestions(true);
@@ -2181,20 +2297,187 @@ export default function Marketplace({
                   </div>
                 )}
 
-                {/* Suggestions List Dropdown with Glassmorphic visual matching */}
-                {showSuggestions && searchSuggestionsList.length > 0 && (
-                  <div className="absolute left-0 right-0 top-full mt-2.5 rounded-[18px] bg-white/95 dark:bg-[#0F172A]/95 backdrop-blur-xl border border-slate-200/80 dark:border-white/[0.08] shadow-[0_20px_50px_rgba(0,0,0,0.15)] z-40 p-2 divide-y divide-slate-100 dark:divide-slate-800/60">
-                    <div className="p-2 text-[10px] uppercase font-mono tracking-wider font-extrabold text-slate-400 dark:text-slate-500">Search Autocomplete Suggestions</div>
-                    {searchSuggestionsList.map(item => (
-                      <button
-                        key={item.id}
-                        onClick={() => handleSuggestionClick(item.text, item.category)}
-                        className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-900/60 transition text-left cursor-pointer text-xs"
-                      >
-                        <span className="font-semibold text-slate-800 dark:text-neutral-100 group-hover:text-[#7C3AED]">{item.text}</span>
-                        <span className="text-[9px] uppercase font-mono font-bold px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/40 text-indigo-500 dark:text-indigo-400">{getCategoryName(item.category)}</span>
-                      </button>
-                    ))}
+                {/* Real-Time Predictive Search Dropdown */}
+                {showSuggestions && localSearch.trim().length > 0 && (
+                  <div 
+                    id="store-predictive-search-dropdown"
+                    className="absolute left-0 right-0 top-full mt-2.5 rounded-2xl bg-white/95 dark:bg-[#0F172A]/95 backdrop-blur-2xl border border-slate-200/90 dark:border-slate-800 shadow-[0_20px_60px_rgba(0,0,0,0.2)] z-50 overflow-hidden divide-y divide-slate-100 dark:divide-slate-800/60 animate-in fade-in slide-in-from-top-2 duration-200"
+                  >
+                    {/* Header bar */}
+                    <div className="px-4 py-2.5 bg-gradient-to-r from-purple-50/70 via-indigo-50/50 to-pink-50/70 dark:from-purple-950/30 dark:via-indigo-950/20 dark:to-pink-950/30 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="w-3.5 h-3.5 text-[#7C3AED]" />
+                        <span className="text-[11px] font-extrabold uppercase font-mono tracking-wider text-slate-700 dark:text-slate-200">
+                          {language === 'bn' 
+                            ? `প্রেডিক্টিভ সার্চ রেজাল্ট (${predictiveSearchResults.total}টি পাওয়া গেছে)` 
+                            : `Predictive Search Matches (${predictiveSearchResults.total} found)`}
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-mono font-medium text-slate-400 dark:text-slate-500 bg-white/80 dark:bg-slate-900/80 px-2 py-0.5 rounded-md border border-slate-200/60 dark:border-slate-800">
+                        ESC to close
+                      </span>
+                    </div>
+
+                    {/* Matching Category Chips (if any matching categories) */}
+                    {predictiveSearchResults.categories.length > 0 && (
+                      <div className="px-4 py-2 bg-slate-50/80 dark:bg-slate-900/40 flex items-center gap-2 overflow-x-auto no-scrollbar">
+                        <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 shrink-0 font-mono">
+                          {language === 'bn' ? 'ক্যাটাগরি ফিল্টার:' : 'Filter by:'}
+                        </span>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {predictiveSearchResults.categories.map(cat => (
+                            <button
+                              key={cat.id}
+                              type="button"
+                              onClick={() => {
+                                setActiveCategory(cat.id);
+                                setShowSuggestions(false);
+                              }}
+                              className="px-2 py-1 rounded-lg text-[11px] font-bold bg-white dark:bg-slate-800 text-[#7C3AED] dark:text-[#A855F7] border border-purple-200/60 dark:border-purple-800/40 hover:bg-purple-50 dark:hover:bg-purple-950/50 transition cursor-pointer flex items-center gap-1 shrink-0"
+                            >
+                              <span>{cat.name}</span>
+                              <span className="text-[9px] px-1 py-0.2 rounded-full bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 font-mono">
+                                {cat.count}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Products Predictive List */}
+                    {predictiveSearchResults.products.length > 0 ? (
+                      <div className="max-h-[380px] overflow-y-auto p-2 space-y-1 divide-y divide-slate-100/60 dark:divide-slate-800/40">
+                        {predictiveSearchResults.products.map(product => (
+                          <div
+                            key={product.id}
+                            onClick={() => {
+                              handleViewProduct(product);
+                              setShowSuggestions(false);
+                            }}
+                            className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-purple-50/60 dark:hover:bg-slate-800/70 transition-all text-left cursor-pointer group/item"
+                          >
+                            <div className="flex items-center gap-3 min-w-0 flex-1 pr-3">
+                              <div className="w-12 h-12 rounded-lg bg-slate-100 dark:bg-slate-800 overflow-hidden shrink-0 border border-slate-200/60 dark:border-slate-700/60 relative">
+                                <img
+                                  src={product.image}
+                                  alt={product.name}
+                                  className="w-full h-full object-cover group-hover/item:scale-110 transition-transform duration-300"
+                                  onError={(e) => {
+                                    (e.target as HTMLElement).style.display = 'none';
+                                  }}
+                                />
+                              </div>
+
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                                  <h4 className="text-xs font-bold text-slate-800 dark:text-white group-hover/item:text-[#7C3AED] dark:group-hover/item:text-[#A855F7] transition truncate">
+                                    {highlightMatch(language === 'bn' ? (product.nameBn || product.name) : product.name, localSearch)}
+                                  </h4>
+                                  {product.badge && (
+                                    <span className="text-[9px] uppercase font-mono font-black px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20 shrink-0">
+                                      {product.badge}
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div className="flex items-center gap-2 text-[10px] text-slate-500 dark:text-slate-400 flex-wrap">
+                                  <span className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-medium">
+                                    {getCategoryName(product.category)}
+                                  </span>
+                                  {product.subCategory && (
+                                    <span className="text-slate-400 hidden sm:inline">
+                                      • {product.subCategory}
+                                    </span>
+                                  )}
+                                  <span className="flex items-center gap-0.5 text-amber-500 font-bold">
+                                    <Star className="w-2.5 h-2.5 fill-current" />
+                                    <span>{product.rating?.toFixed(1) || '4.9'}</span>
+                                  </span>
+                                  {product.downloadsCount && (
+                                    <span className="hidden sm:inline text-slate-400">
+                                      • {product.downloadsCount}+ {language === 'bn' ? 'ডাউনলোড' : 'sales'}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Price & Quick Buy action */}
+                            <div className="flex items-center gap-3 shrink-0">
+                              <div className="text-right">
+                                <span className="block text-xs sm:text-sm font-black text-slate-900 dark:text-white font-mono">
+                                  {formatPrice(product.price)}
+                                </span>
+                                {product.discountPrice && product.discountPrice > product.price && (
+                                  <span className="text-[10px] line-through text-slate-400 block font-mono">
+                                    {formatPrice(product.discountPrice)}
+                                  </span>
+                                )}
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleQuickBuy(product, e);
+                                  setShowSuggestions(false);
+                                }}
+                                className="px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-[11px] font-extrabold flex items-center gap-1 shadow-sm transition active:scale-95 cursor-pointer"
+                                title="Quick Buy"
+                              >
+                                <Zap className="w-3 h-3 text-amber-300 fill-current" />
+                                <span className="hidden sm:inline">{language === 'bn' ? 'কুইক বাই' : 'Quick Buy'}</span>
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      /* Empty state with popular recommendations */
+                      <div className="p-5 text-center">
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+                          {language === 'bn' 
+                            ? `"${localSearch}" এর সাথে কোনো ডিজিটাল পণ্য মেলেনি` 
+                            : `No matching digital items found for "${localSearch}"`}
+                        </p>
+                        <div className="text-[11px] font-bold text-slate-400 mb-2 font-mono uppercase tracking-wider">
+                          {language === 'bn' ? 'জনপ্রিয় সার্চসমূহ ট্রাই করুন:' : 'Try Popular Searches:'}
+                        </div>
+                        <div className="flex flex-wrap items-center justify-center gap-1.5">
+                          {['E-Commerce', 'POS System', 'Courier', 'Pharmacy', 'Flutter App', 'WordPress', 'React', 'Laravel'].map(term => (
+                            <button
+                              key={term}
+                              type="button"
+                              onClick={() => {
+                                setLocalSearch(term);
+                                setShowSuggestions(true);
+                              }}
+                              className="px-2.5 py-1 text-xs rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-purple-100 hover:text-purple-700 dark:hover:bg-purple-950 dark:hover:text-purple-300 transition cursor-pointer font-medium"
+                            >
+                              {term}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Footer bar */}
+                    {predictiveSearchResults.total > 0 && (
+                      <div className="p-2.5 bg-slate-50 dark:bg-slate-900/60 flex items-center justify-between">
+                        <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                          {language === 'bn' ? 'ক্যাটালগে দেখতে চান?' : 'Want to view all in store?'}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setShowSuggestions(false)}
+                          className="text-xs font-bold text-[#7C3AED] dark:text-[#A855F7] hover:underline flex items-center gap-1 cursor-pointer"
+                        >
+                          <span>{language === 'bn' ? `সকল ${predictiveSearchResults.total}টি রেজাল্ট দেখুন` : `View all ${predictiveSearchResults.total} items`}</span>
+                          <ArrowRight className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -2305,8 +2588,8 @@ export default function Marketplace({
                 const totalSales = product.downloadsCount || Math.floor(product.reviewsCount * 4 + 11);
 
                 const viewText = language === 'bn' ? 'বিস্তারিত দেখুন' : language === 'ar' ? 'عرض التفاصيل' : 'View';
-                const addCardText = language === 'bn' ? 'কার্টে যোগ করুন' : language === 'ar' ? 'أضف للسلة' : 'Add Card';
-                const directCheckoutText = language === 'bn' ? 'ফাইল ডাউনলোড' : language === 'ar' ? 'تنزيل الملف' : 'File Download';
+                const addCardText = language === 'bn' ? 'কার্টে যোগ' : language === 'ar' ? 'أضف للسلة' : 'Add to Cart';
+                const quickBuyText = language === 'bn' ? 'কুইক বাই' : language === 'ar' ? 'شراء سريع' : 'Quick Buy';
 
                 return (
                   <motion.div 
@@ -2364,26 +2647,58 @@ export default function Marketplace({
                           </div>
                         )}
 
-                        {/* Wishlist triggers */}
-                        <motion.button
+                        {/* Wishlist triggers with subtle pulse animation */}
+                        <button
+                          type="button"
                           onClick={(e) => {
                             e.stopPropagation();
+                            const isAdding = !wishlist.includes(product.id);
+                            if (isAdding) {
+                              setRecentlyAddedWishlistId(product.id);
+                              setTimeout(() => {
+                                setRecentlyAddedWishlistId((prev) => (prev === product.id ? null : prev));
+                              }, 850);
+                            }
                             toggleWishlist(product.id);
                           }}
-                          whileHover={{ scale: 1.15 }}
-                          whileTap={{ scale: 0.8 }}
-                          animate={{
-                            scale: wishlist.includes(product.id) ? [1, 1.3, 0.9, 1.1, 1] : 1
-                          }}
-                          transition={{ duration: 0.45 }}
-                          className={`absolute ${hasDiscount ? 'top-11 right-3' : 'top-4 right-4'} p-2 rounded-full backdrop-blur-md border shadow-md transition cursor-pointer z-10 ${
+                          className={`relative ${hasDiscount ? 'top-11 right-3' : 'top-4 right-4'} p-2 rounded-full backdrop-blur-md border shadow-md transition-all duration-150 cursor-pointer z-10 active:scale-90 ${
                             wishlist.includes(product.id)
-                              ? 'bg-rose-50/90 border-rose-200 text-rose-500 dark:bg-rose-950/80 dark:border-rose-900/60'
-                              : 'bg-white/95 dark:bg-[#020617]/90 border-slate-200 dark:border-slate-800 text-slate-400 hover:text-rose-500'
+                              ? 'bg-rose-50/95 border-rose-200 text-rose-500 dark:bg-rose-950/90 dark:border-rose-900/60'
+                              : 'bg-white/95 dark:bg-[#020617]/90 border-slate-200 dark:border-slate-800 text-slate-400 hover:text-rose-500 hover:scale-110'
                           }`}
+                          title={wishlist.includes(product.id) ? 'Remove from wishlist' : 'Add to wishlist'}
+                          aria-label={wishlist.includes(product.id) ? 'Remove from wishlist' : 'Add to wishlist'}
                         >
-                          <Heart className="w-3.5 h-3.5 fill-current" />
-                        </motion.button>
+                          {/* Subtle Expanding Ripple Ring on Addition */}
+                          {recentlyAddedWishlistId === product.id && (
+                            <span 
+                              aria-hidden="true" 
+                              className="absolute inset-0 rounded-full bg-rose-500/35 animate-heart-ring pointer-events-none" 
+                            />
+                          )}
+                          <Heart 
+                            className={`w-3.5 h-3.5 fill-current transition-colors duration-200 ${
+                              recentlyAddedWishlistId === product.id 
+                                ? 'animate-heart-pulse drop-shadow-[0_0_6px_rgba(244,63,94,0.7)]' 
+                                : ''
+                            }`} 
+                          />
+                        </button>
+
+                        {/* Quick Buy floating action on image hover */}
+                        <div className="absolute inset-0 bg-slate-950/25 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center pointer-events-none z-15">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleQuickBuy(product, e);
+                            }}
+                            className="pointer-events-auto px-4 py-2 rounded-xl bg-white/95 dark:bg-slate-900/95 text-slate-900 dark:text-white text-xs font-black shadow-xl border border-white/20 hover:scale-105 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500 animate-pulse" />
+                            <span>{quickBuyText}</span>
+                          </button>
+                        </div>
                       </div>
 
                       {/* Metadata contents */}
@@ -2445,6 +2760,7 @@ export default function Marketplace({
                           </div>
 
                           {/* High fidelity 3-Button structure */}
+                          {/* High fidelity 3-Button structure */}
                           <div className="flex flex-col gap-2">
                             {/* Row 1: View & Add Card */}
                             <div className="grid grid-cols-2 gap-2">
@@ -2465,28 +2781,26 @@ export default function Marketplace({
                                   addToCart(product, e);
                                 }}
                                 className="px-2 py-2.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/20 dark:hover:bg-indigo-950/45 border border-indigo-200/55 dark:border-indigo-900/55 hover:border-indigo-300 dark:hover:border-cyan-500/40 text-indigo-650 dark:text-indigo-305 rounded-xl text-[10.5px] font-black duration-200 flex items-center justify-center gap-1.5 cursor-pointer hover:scale-[1.01] active:scale-95 hover:shadow-xs"
-                                title="Add Card"
+                                title={addCardText}
                               >
                                 <ShoppingCart className="w-3.5 h-3.5 text-indigo-500 dark:text-cyan-400" />
                                 <span>{addCardText}</span>
                               </button>
                             </div>
 
-                            {/* Row 2: 'Direct Checkout' Button */}
+                            {/* Row 2: 'Quick Buy' Button (Instant cart addition & checkout redirect) */}
                             <button
+                              id={`quick-buy-btn-${product.id}`}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                addToCart(product, e);
-                                if (setCartOpen) {
-                                  setCartOpen(true);
-                                }
+                                handleQuickBuy(product, e);
                               }}
-                              className="w-full px-4 py-2.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500 hover:opacity-95 text-white rounded-xl text-[11px] font-black flex items-center justify-center gap-1.5 duration-200 transition-all cursor-pointer hover:scale-[1.01] active:scale-95 text-center shadow-md shadow-indigo-600/10 dark:shadow-cyan-455/5"
-                              title="File Download"
+                              className="w-full px-4 py-2.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500 hover:from-blue-500 hover:via-indigo-500 hover:to-cyan-400 text-white rounded-xl text-[11.5px] font-black flex items-center justify-center gap-1.5 duration-200 transition-all cursor-pointer hover:scale-[1.01] active:scale-95 text-center shadow-md shadow-indigo-600/15 dark:shadow-cyan-455/10 group/qb"
+                              title={quickBuyText}
                             >
-                              <ShoppingBag className="w-3.5 h-3.5" />
-                              <span>{directCheckoutText}</span>
-                              <ArrowRight className="w-3.5 h-3.5" />
+                              <Zap className="w-3.5 h-3.5 fill-current text-amber-300 animate-pulse" />
+                              <span className="tracking-wide">{quickBuyText}</span>
+                              <ArrowRight className="w-3.5 h-3.5 group-hover/qb:translate-x-1 transition-transform" />
                             </button>
                           </div>
                         </div>
@@ -2653,17 +2967,34 @@ export default function Marketplace({
                           )}
                         </div>
 
-                        {/* Action Cart click */}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            addToCart(product, e);
-                          }}
-                          className="p-1.5 bg-indigo-50 hover:bg-blue-600 dark:bg-indigo-950/40 dark:hover:bg-cyan-500/20 text-indigo-650 dark:text-indigo-305 hover:text-white dark:hover:text-cyan-400 rounded-lg border border-indigo-200/40 dark:border-indigo-900/40 hover:border-blue-600 transition-all duration-200 cursor-pointer hover:scale-105"
-                          title="Add to cart"
-                        >
-                          <ShoppingCart className="w-3.5 h-3.5" />
-                        </button>
+                        {/* Action Buttons: Quick Buy + Cart */}
+                        <div className="flex items-center gap-1.5">
+                          {/* Quick Buy button */}
+                          <button
+                            id={`quick-buy-compact-${product.id}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleQuickBuy(product, e);
+                            }}
+                            className="px-2 py-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-lg text-[10px] font-black flex items-center gap-1 shadow-xs transition-all duration-200 cursor-pointer active:scale-95"
+                            title={language === 'bn' ? 'কুইক বাই' : language === 'ar' ? 'شراء سريع' : 'Quick Buy'}
+                          >
+                            <Zap className="w-2.5 h-2.5 fill-current text-amber-300" />
+                            <span>{language === 'bn' ? 'কুইক বাই' : 'Quick Buy'}</span>
+                          </button>
+
+                          {/* Action Cart click */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              addToCart(product, e);
+                            }}
+                            className="p-1.5 bg-indigo-50 hover:bg-blue-600 dark:bg-indigo-950/40 dark:hover:bg-cyan-500/20 text-indigo-650 dark:text-indigo-305 hover:text-white dark:hover:text-cyan-400 rounded-lg border border-indigo-200/40 dark:border-indigo-900/40 hover:border-blue-600 transition-all duration-200 cursor-pointer hover:scale-105"
+                            title={language === 'bn' ? 'কার্টে যোগ' : 'Add to cart'}
+                          >
+                            <ShoppingCart className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </motion.div>
@@ -3143,17 +3474,14 @@ export default function Marketplace({
 
                   <button
                     onClick={(e) => {
-                      addToCart(activeProduct, e);
-                      const checkoutText = encodeURIComponent(
-                        `Assalamu Alaikum WebzoneBD, I would like to purchase: "${activeProduct.name}" ($${activeProduct.discountPrice || activeProduct.price})`
-                      );
-                      window.open(`https://wa.me/966570511931?text=${checkoutText}`, '_blank');
+                      e.stopPropagation();
+                      handleQuickBuy(activeProduct, e);
                       setActiveProduct(null);
                     }}
-                    className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-650 hover:from-blue-700 hover:to-indigo-750 text-white font-black rounded-xl cursor-pointer hover:scale-101 transition flex items-center gap-1.5 shadow shadow-blue-500/10"
+                    className="px-5 py-2.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500 hover:opacity-95 text-white font-black rounded-xl cursor-pointer hover:scale-[1.01] active:scale-95 transition flex items-center gap-1.5 shadow shadow-blue-500/10"
                   >
-                    <ShoppingBag className="w-4 h-4" />
-                    <span>{t.buyNow}</span>
+                    <Zap className="w-4 h-4 fill-current text-amber-300 animate-pulse" />
+                    <span>{language === 'bn' ? 'কুইক বাই (চেকআউট)' : language === 'ar' ? 'شراء سريع' : 'Quick Buy'}</span>
                   </button>
                 </div>
               </div>

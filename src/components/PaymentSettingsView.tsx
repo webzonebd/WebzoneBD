@@ -3,6 +3,7 @@ import {
   DollarSign, Smartphone, Globe, Database, ShieldCheck, FileText, Plus,
   Sliders, Trash2, Edit3, Check, RefreshCw, X, Download, Info, CheckCircle, Bell, Search, AlertCircle, ShieldAlert
 } from 'lucide-react';
+import { simulateSendOrderReceiptEmail } from '../utils/orderReceipt';
 
 interface PaymentSettingsViewProps {
   theme: 'light' | 'dark';
@@ -111,7 +112,7 @@ export default function PaymentSettingsView({
       { progress: 35, msg: "⚡ Querying cellular mobile money gateway database ledger..." },
       { progress: 55, msg: "📡 Authorizing secure digital signature verification keys..." },
       { progress: 80, msg: "💰 Simulating direct bank fund clearance & reconciliation..." },
-      { progress: 100, msg: "🎉 Transaction verified! Releasing product download credentials..." }
+      { progress: 100, msg: "🎉 Transaction verified! Generating HTML order confirmation receipt & dispatching email..." }
     ];
 
     let currentStep = 0;
@@ -131,6 +132,26 @@ export default function PaymentSettingsView({
           setSelectedVerifyOrder(null);
           triggerToast(`✅ Payment status synchronized! Cleared Order ID: #${orderId} state to ${nextStatus.toUpperCase()}`);
           logAdminAction(`Manually audited and verified payment receipt for Order Reference: #${orderId} to status: ${nextStatus.toUpperCase()}`);
+
+          // Automated Email Receipt trigger upon manual verification approval
+          if (nextStatus === 'completed') {
+            const verifiedOrder = (orders || []).find((o: any) => o.id === orderId) || {
+              id: orderId,
+              itemTitle: 'Verified Hosting/Domain Order',
+              price: 99,
+              paymentMethod: 'Manual Gateway'
+            };
+            const clientName = (verifiedOrder as any).customerName || (verifiedOrder as any).guestName || 'Valued Client';
+            const clientEmail = (verifiedOrder as any).customerEmail || (verifiedOrder as any).guestEmail || 'client@webzonebd.com';
+
+            simulateSendOrderReceiptEmail(verifiedOrder as any, {
+              customerName: clientName,
+              customerEmail: clientEmail,
+              author: 'Payment Audit & Verification Hub'
+            }).then(() => {
+              triggerToast(`📧 Order confirmation receipt dispatched to ${clientEmail}!`);
+            }).catch(console.error);
+          }
         }, 600);
       }
     }, 850);

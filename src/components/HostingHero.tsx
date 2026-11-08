@@ -18,15 +18,6 @@ const rotatingServices = [
   "Cloud Hosting"
 ];
 
-const hostingFeatures = [
-  { emoji: "💾", title: "NVMe SSD Storage" },
-  { emoji: "🔒", title: "Free SSL Certificate" },
-  { emoji: "📧", title: "Business Email" },
-  { emoji: "🛡️", title: "DDoS Protection" },
-  { emoji: "⚡", title: "LiteSpeed Server" },
-  { emoji: "☁️", title: "Daily Backup" }
-];
-
 const statisticsData = [
   { value: "99.9%", label: "Uptime SLA", sub: "Guaranteed" },
   { value: "640+", label: "Hosted Websites", sub: "Active" },
@@ -367,40 +358,12 @@ export default function HostingHero({
               </button>
             </motion.div>
 
-            {/* Hosting Feature Cards - Horizontal Line Row */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, delay: 0.4 }}
-              className={`pt-4 border-t ${isLight ? 'border-slate-200/80' : 'border-slate-800/80'}`}
-            >
-              <div className="flex items-center gap-2.5 overflow-x-auto pb-2 pt-1 scrollbar-none [mask-image:linear-gradient(to_right,transparent,black_10px,black_calc(100%-10px),transparent)] sm:[mask-image:none]">
-                {hostingFeatures.map((feat, idx) => (
-                  <div
-                    key={idx}
-                    className={`p-3 rounded-xl border transition-all duration-300 hover:scale-[1.03] flex items-center gap-2.5 backdrop-blur-sm group shrink-0 whitespace-nowrap min-w-[155px] ${
-                      isLight 
-                        ? 'bg-white/80 border-slate-200/80 text-slate-800 hover:border-purple-400 hover:bg-white shadow-sm' 
-                        : 'bg-slate-800/40 border-slate-700/50 text-slate-200 hover:border-[#8B5CF6]/50 hover:text-white'
-                    }`}
-                  >
-                    <span className="text-xl sm:text-2xl group-hover:scale-125 transition-transform duration-300">{feat.emoji}</span>
-                    <span className={`text-xs sm:text-sm font-bold transition-colors ${
-                      isLight ? 'text-slate-800 group-hover:text-purple-700' : 'text-slate-200 group-hover:text-white'
-                    }`}>
-                      {feat.title}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-
             {/* Statistics Counter (4 Items) */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, delay: 0.5 }}
-              className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-2"
+              transition={{ duration: 0.7, delay: 0.4 }}
+              className={`grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4 border-t ${isLight ? 'border-slate-200/80' : 'border-slate-800/80'}`}
             >
               {statisticsData.map((stat, idx) => (
                 <div 

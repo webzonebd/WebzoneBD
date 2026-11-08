@@ -1,11 +1,12 @@
 import express from "express";
 import path from "path";
+import fs from "fs";
 import dns from "dns";
 import { GoogleGenAI, Type } from "@google/genai";
 import nodemailer from "nodemailer";
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.NODE_ENV === "production" && process.env.PORT ? Number(process.env.PORT) : 3000;
 
 // Body parsing middlewares
 app.use(express.json());
@@ -633,7 +634,9 @@ async function launchServer() {
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), "dist");
+    const distPath = fs.existsSync(path.join(process.cwd(), "dist", "index.html"))
+      ? path.join(process.cwd(), "dist")
+      : path.join(process.cwd(), "build");
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
       res.sendFile(path.join(distPath, "index.html"));

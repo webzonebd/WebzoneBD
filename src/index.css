@@ -9,7 +9,8 @@ body,
   overflow-x: clip;
 }
 
-@variant dark (&:where(.dark, .dark *));
+@custom-variant dark (&:where(.dark, .dark *, [data-theme="dark"], [data-theme="dark"] *));
+@variant dark (&:where(.dark, .dark *, [data-theme="dark"], [data-theme="dark"] *));
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
@@ -550,5 +551,44 @@ body,
   animation: skeleton-pulse-glow 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
+@keyframes heart-pulse {
+  0% {
+    transform: scale(1);
+  }
+  14% {
+    transform: scale(1.32);
+  }
+  28% {
+    transform: scale(0.96);
+  }
+  42% {
+    transform: scale(1.18);
+  }
+  70% {
+    transform: scale(0.98);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
 
+@keyframes heart-ring {
+  0% {
+    transform: scale(0.7);
+    opacity: 0.85;
+  }
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
 
+.animate-heart-pulse {
+  animation: heart-pulse 0.75s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  will-change: transform;
+}
+
+.animate-heart-ring {
+  animation: heart-ring 0.65s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  will-change: transform, opacity;
+}

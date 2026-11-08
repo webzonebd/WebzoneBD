@@ -18,6 +18,7 @@ import { Language, Theme, Product, Order, SupportTicket, Coupon, SystemConfig, C
 import { sampleProducts, systemConfigDefault, sampleCoupons, clientTestimonials } from './data';
 
 // Import Parts
+import { localStorage, sessionStorage } from './utils/storage';
 import { db as firebaseDb, auth as firebaseAuth, handleFirestoreError, OperationType } from './firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import Header from './components/Header';
@@ -26,27 +27,30 @@ import Footer from './components/Footer';
 import Hero from './components/Hero';
 import Services from './components/Services';
 import MacBookCartGenieAnimation from './components/MacBookCartGenieAnimation';
-const Marketplace = lazy(() => import('./components/Marketplace'));
-const Dashboard = lazy(() => import('./components/Dashboard'));
-const AdminPanel = lazy(() => import('./components/AdminPanel'));
-const Blog = lazy(() => import('./components/Blog'));
+import ErrorBoundary from './components/ErrorBoundary';
+import { lazyWithRetry } from './utils/lazyWithRetry';
+const Marketplace = lazyWithRetry(() => import('./components/Marketplace'));
+const Dashboard = lazyWithRetry(() => import('./components/Dashboard'));
+const AdminPanel = lazyWithRetry(() => import('./components/AdminPanel'));
+const Blog = lazyWithRetry(() => import('./components/Blog'));
 import { initialLocalBlogs, LocalBlogPost } from './components/BlogData';
-const Portfolio = lazy(() => import('./components/Portfolio'));
-const Contact = lazy(() => import('./components/Contact'));
-const FAQ = lazy(() => import('./components/FAQ'));
-const PrivacyTerms = lazy(() => import('./components/PrivacyTerms'));
+import { generateWhatsAppUrl, sendOrderToWhatsApp, WhatsAppOrderPayload } from './utils/whatsapp';
+const Portfolio = lazyWithRetry(() => import('./components/Portfolio'));
+const Contact = lazyWithRetry(() => import('./components/Contact'));
+const FAQ = lazyWithRetry(() => import('./components/FAQ'));
+const PrivacyTerms = lazyWithRetry(() => import('./components/PrivacyTerms'));
 import Notification from './components/Notification';
-const AuthSystem = lazy(() => import('./components/AuthSystem'));
+const AuthSystem = lazyWithRetry(() => import('./components/AuthSystem'));
 import DomainSearch from './components/DomainSearch';
 import LiveChatWidget from './components/LiveChatWidget';
-const Hosting = lazy(() => import('./components/Hosting'));
-const Solutions = lazy(() => import('./components/Solutions'));
-const DomainPage = lazy(() => import('./components/DomainPage'));
-const AffiliateSystem = lazy(() => import('./components/AffiliateSystem'));
-const AuthPopup = lazy(() => import('./components/AuthPopup'));
-const RefundPolicy = lazy(() => import('./components/RefundPolicy'));
-const OffersPage = lazy(() => import('./components/OffersPage'));
-const PromotionalOfferSystem = lazy(() => import('./components/PromotionalOfferSystem'));
+const Hosting = lazyWithRetry(() => import('./components/Hosting'));
+const Solutions = lazyWithRetry(() => import('./components/Solutions'));
+const DomainPage = lazyWithRetry(() => import('./components/DomainPage'));
+const AffiliateSystem = lazyWithRetry(() => import('./components/AffiliateSystem'));
+import AuthPopup from './components/AuthPopup';
+const RefundPolicy = lazyWithRetry(() => import('./components/RefundPolicy'));
+const OffersPage = lazyWithRetry(() => import('./components/OffersPage'));
+const PromotionalOfferSystem = lazyWithRetry(() => import('./components/PromotionalOfferSystem'));
 import ScrollReveal from './components/ScrollReveal';
 import BottomNavigation from './components/BottomNavigation';
 import ScrollToTop from './components/ScrollToTop';
@@ -1525,10 +1529,18 @@ export default function App() {
         const root = window.document.documentElement;
         if (nextTheme === 'dark') {
           root.classList.add('dark');
-          root.style.backgroundColor = '#0F172A';
+          root.setAttribute('data-theme', 'dark');
+          root.style.backgroundColor = '#0B1120';
+          root.style.colorScheme = 'dark';
+          document.body.classList.add('dark');
+          document.body.style.backgroundColor = '#0B1120';
         } else {
           root.classList.remove('dark');
+          root.setAttribute('data-theme', 'light');
           root.style.backgroundColor = '#FFFFFF';
+          root.style.colorScheme = 'light';
+          document.body.classList.remove('dark');
+          document.body.style.backgroundColor = '#FFFFFF';
         }
       });
     };
@@ -1556,10 +1568,18 @@ export default function App() {
     root.classList.add('transition-colors', 'duration-500');
     if (theme === 'dark') {
       root.classList.add('dark');
-      root.style.backgroundColor = '#0F172A';
+      root.setAttribute('data-theme', 'dark');
+      root.style.backgroundColor = '#0B1120';
+      root.style.colorScheme = 'dark';
+      document.body.classList.add('dark');
+      document.body.style.backgroundColor = '#0B1120';
     } else {
       root.classList.remove('dark');
+      root.setAttribute('data-theme', 'light');
       root.style.backgroundColor = '#FFFFFF';
+      root.style.colorScheme = 'light';
+      document.body.classList.remove('dark');
+      document.body.style.backgroundColor = '#FFFFFF';
     }
   }, [theme]);
 
@@ -1612,6 +1632,65 @@ export default function App() {
     setCart(prev => [...prev, newItem]);
     addActivityLog(`Added product in digital cart: ${product.name}`);
     triggerToast(language === 'bn' ? `${product.name} কার্ট ফাইলে যোগ করা হয়েছে!` : language === 'ar' ? `تمت إضافة ${product.name} بنجاح` : `Added ${product.name} to cart.`);
+  };
+
+  // Quick Buy with automated WhatsApp message trigger
+  const handleQuickBuyWithWhatsApp = (
+    product: Product,
+    eventOrOrigin?: React.MouseEvent | HTMLElement | { clientX: number; clientY: number }
+  ) => {
+    // 1. Immediately add item to cart with animation
+    addToCart(product, eventOrOrigin);
+
+    // 2. Open checkout slideover drawer for immediate checkout visibility
+    setCartOpen(true);
+
+    // 3. Format total price according to selected currency and conversion rates
+    const rawPrice = product.discountPrice || product.price;
+    const rate = currencyRates?.[currency] || (currency === 'BDT' ? 118.5 : currency === 'SAR' ? 3.75 : 1.0);
+    const converted = Math.round(rawPrice * rate);
+
+    const formattedAmount = currency === 'BDT' 
+      ? `৳${converted.toLocaleString()}`
+      : currency === 'SAR'
+        ? `${converted.toLocaleString()} SAR`
+        : `$${rawPrice.toLocaleString()}`;
+
+    // 4. Construct payload for WhatsApp order
+    const orderId = `QB-${Date.now().toString().slice(-6)}`;
+    const payload: WhatsAppOrderPayload = {
+      orderId,
+      customerName: user?.name || 'Valued Customer',
+      customerPhone: user?.phone || user?.whatsapp || '',
+      amount: formattedAmount,
+      currency: currency || 'USD',
+      paymentMethod: 'Quick Buy (Instant Checkout)',
+      items: [
+        {
+          name: language === 'bn' ? (product.nameBn || product.name) : language === 'ar' ? (product.nameAr || product.name) : product.name,
+          price: formattedAmount,
+          quantity: 1
+        }
+      ],
+      targetPhone: '8801864000005',
+      language: (language === 'bn' || language === 'ar') ? language : 'en'
+    };
+
+    // 5. Use both existing WhatsApp utilities to generate URL and launch WhatsApp message
+    const waUrl = generateWhatsAppUrl(payload);
+    sendOrderToWhatsApp(payload, true);
+
+    // 6. Log activity and notify user
+    addActivityLog(`Quick Buy: WhatsApp order triggered for "${product.name}" (#${orderId})`);
+    triggerToast(
+      language === 'bn'
+        ? `⚡ "${product.nameBn || product.name}" কার্টে যুক্ত হয়েছে এবং হোয়াটসঅ্যাপ ওপেন হচ্ছে...`
+        : language === 'ar'
+          ? `⚡ تم فتح واتساب لإتمام الشراء السريع لـ "${product.nameAr || product.name}"!`
+          : `⚡ "${product.name}" added to cart & WhatsApp checkout launched!`
+    );
+
+    return waUrl;
   };
 
   const removeFromCart = (index: number) => {
@@ -2104,7 +2183,7 @@ export default function App() {
 
   return (
     <div 
-      className="min-h-screen w-full max-w-full overflow-x-clip flex flex-col justify-between bg-neutral-50 dark:bg-neutral-950 text-neutral-800 dark:text-neutral-200 font-sans transition-colors duration-200"
+      className="min-h-screen w-full max-w-full overflow-x-clip flex flex-col justify-between bg-slate-50 dark:bg-[#0B1120] text-slate-800 dark:text-slate-100 font-sans transition-colors duration-200"
       dir={isRtl ? 'rtl' : 'ltr'}
       id="webzone-root-app"
     >
@@ -2314,12 +2393,13 @@ export default function App() {
 
       {/* Main Core Router Panels */}
       <main className="flex-1 pb-32 md:pb-0">
-        <Suspense fallback={
-          <div className="min-h-[400px] flex flex-col items-center justify-center p-8 text-center text-zinc-500 dark:text-zinc-400 font-sans">
-            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 dark:border-cyan-400 mb-4 animate-pulse"></div>
-            <p className="text-sm font-medium">Loading panel...</p>
-          </div>
-        }>
+        <ErrorBoundary fallbackTitle="Page View Notice">
+          <Suspense fallback={
+            <div className="min-h-[400px] flex flex-col items-center justify-center p-8 text-center text-zinc-500 dark:text-zinc-400 font-sans">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 dark:border-cyan-400 mb-4 animate-pulse"></div>
+              <p className="text-sm font-medium">Loading panel...</p>
+            </div>
+          }>
         {currentPage === 'home' && (
           <div className="space-y-5 animate-in fade-in duration-300">
             {/* Embedded Hero & Domain Search group without space-y-5 gap */}
@@ -2404,6 +2484,7 @@ export default function App() {
                     isAdmin={isAdmin}
                     onOpenLogin={() => setIsAuthPopupOpen(true)}
                     onUpdateProduct={handleUpdateProduct}
+                    onQuickBuy={handleQuickBuyWithWhatsApp}
                   />
                 </div>
               </div>
@@ -2499,6 +2580,7 @@ export default function App() {
                 setSelectedProduct(product);
                 setCurrentPage('product-details');
               }}
+              onQuickBuy={handleQuickBuyWithWhatsApp}
             />
           </div>
         )}
@@ -2530,6 +2612,7 @@ export default function App() {
                 setSelectedProduct(prod);
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
+              onQuickBuy={handleQuickBuyWithWhatsApp}
             />
           </div>
         )}
@@ -2590,6 +2673,7 @@ export default function App() {
               addToCart={addToCart}
               addServiceOrder={addSimulatedServiceOrder}
               user={user}
+              isAdmin={isAdmin}
               triggerToast={triggerToast}
               setCurrentPage={setCurrentPage}
             />
@@ -3181,22 +3265,46 @@ export default function App() {
           </div>
         )}
         </Suspense>
+        </ErrorBoundary>
       </main>
 
-      {/* Floating Action Live Support Widget (WhatsApp & Telegram Support) */}
-      {!(user && (user.role === 'admin' || user.role === 'super_admin' || user.role === 'editor')) && !isAdmin && (
-        <LiveChatWidget language={language} currentPage={currentPage} />
+      {/* Floating Action Live Support Widget (Admin & Visitor Live Support System) */}
+      {currentPage !== 'admin' && (
+        <ErrorBoundary fallbackTitle="Live Support Notice">
+          <LiveChatWidget 
+            language={language} 
+            currentPage={currentPage}
+            user={user}
+            isAdmin={isAdmin || (user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'editor')}
+            onOpenAdminChat={() => {
+              localStorage.setItem('webzone_admin_active_menu', 'live-chat');
+              setCurrentPage('admin');
+            }}
+            onOpenAuth={(view?: 'login' | 'register') => {
+              setAuthDefaultView(view || 'login');
+              setIsAuthPopupOpen(true);
+            }}
+          />
+        </ErrorBoundary>
       )}
 
       {/* Floating 'Scroll to Top' button */}
       <ScrollToTop currentPage={currentPage} />
 
-      {/* Premium Telegram-style Bottom Navigation menu */}
+      {/* Samsung Galaxy Store One UI Mobile Bottom Navigation Menu */}
       <BottomNavigation
         language={language}
         currentPage={currentPage}
         cartOpen={cartOpen}
         cartCount={cart.length}
+        theme={theme}
+        onToggleTheme={handleThemeToggle}
+        onChangeLanguage={setLanguage}
+        onLogout={() => {
+          setUser(null);
+          setCurrentPage('home');
+          triggerToast(language === 'bn' ? 'সফলভাবে সাইন আউট করা হয়েছে' : 'Signed out successfully');
+        }}
         onNavigate={(p) => {
           if (p === 'dashboard' || p === 'admin') {
             handleAuthRedirect(p);
@@ -3233,7 +3341,7 @@ export default function App() {
       />
 
       {/* Modern Authentication Glassmorphic Modal System */}
-      <Suspense fallback={null}>
+      {isAuthPopupOpen && (
         <AuthPopup
           isOpen={isAuthPopupOpen}
           onClose={() => setIsAuthPopupOpen(false)}
@@ -3272,7 +3380,7 @@ export default function App() {
           }}
           triggerToast={triggerToast}
         />
-      </Suspense>
+      )}
 
       {/* Persistent Smart Promotional & Newsletter Offer System (Pop-ups + Notification panels) */}
       <PromotionalOfferSystem

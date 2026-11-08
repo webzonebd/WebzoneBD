@@ -7,8 +7,65 @@
     <meta name="description" content="Leading agency for Web Development, Digital Marketing, and IT Solutions. Access custom scripts, secure cloud hosting, and premium enterprise web systems." />
     <meta property="og:title" content="WebzoneBD IT Solutions" />
     <meta property="og:description" content="Leading agency for Web Development, Digital Marketing, and IT Solutions. Access custom scripts, secure cloud hosting, and premium enterprise web systems." />
+    <script>
+      (function() {
+        var isStorageSupported = false;
+        try {
+          if (typeof window !== 'undefined' && 'localStorage' in window) {
+            var test = '__probe__test__';
+            window.localStorage.setItem(test, test);
+            window.localStorage.removeItem(test);
+            isStorageSupported = true;
+          }
+        } catch (e) {
+          isStorageSupported = false;
+        }
+
+        if (!isStorageSupported) {
+          try {
+            var mem = {};
+            var fakeStorage = {
+              getItem: function(k) { return Object.prototype.hasOwnProperty.call(mem, k) ? mem[k] : null; },
+              setItem: function(k, v) { mem[k] = String(v); },
+              removeItem: function(k) { delete mem[k]; },
+              clear: function() { mem = {}; },
+              key: function(i) { return Object.keys(mem)[i] || null; },
+              get length() { return Object.keys(mem).length; }
+            };
+            Object.defineProperty(window, 'localStorage', {
+              value: fakeStorage,
+              configurable: true,
+              writable: true,
+              enumerable: true
+            });
+            Object.defineProperty(window, 'sessionStorage', {
+              value: fakeStorage,
+              configurable: true,
+              writable: true,
+              enumerable: true
+            });
+          } catch (err) {}
+        }
+
+        try {
+          var saved = (isStorageSupported ? window.localStorage.getItem('webzone_theme') : 'light') || 'light';
+          var root = document.documentElement;
+          if (saved === 'dark') {
+            root.classList.add('dark');
+            root.setAttribute('data-theme', 'dark');
+            root.style.backgroundColor = '#0B1120';
+            root.style.colorScheme = 'dark';
+          } else {
+            root.classList.remove('dark');
+            root.setAttribute('data-theme', 'light');
+            root.style.backgroundColor = '#FFFFFF';
+            root.style.colorScheme = 'light';
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
-  <body>
+  <body class="bg-slate-50 dark:bg-[#0B1120] text-slate-800 dark:text-slate-100 transition-colors duration-300">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
